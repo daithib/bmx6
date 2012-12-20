@@ -118,8 +118,7 @@ void add_dbgl_node(struct ctrl_node *cn, int dbgl)
 	if ( !cn || dbgl < DBGL_MIN || dbgl > DBGL_MAX )
 		return;
 	
-	struct dbgl_node *dn = debugMalloc( sizeof( struct dbgl_node ), -300009 );
-	memset( dn, 0, sizeof( struct dbgl_node ) );
+	struct dbgl_node *dn = debugMallocReset( sizeof( struct dbgl_node ), -300009 );
 	
 	dn->cn = cn;
 	cn->dbgl = dbgl;
@@ -242,8 +241,7 @@ struct ctrl_node *create_ctrl_node(int fd, void (*cn_fd_handler) (struct ctrl_no
 {
         TRACE_FUNCTION_CALL;
 
-	struct ctrl_node *cn = debugMalloc( sizeof(struct ctrl_node), -300010 );
-	memset( cn, 0, sizeof(struct ctrl_node) );
+	struct ctrl_node *cn = debugMallocReset( sizeof(struct ctrl_node), -300010 );
 
         list_add_tail(&ctrl_list, &cn->list);
 	
@@ -1368,8 +1366,7 @@ STATIC_FUNC
 struct opt_child *add_opt_child(struct opt_type *opt, struct opt_parent *p)
 {
 	
-	struct opt_child *c = debugMalloc( sizeof( struct opt_child ), -300017 );
-	memset( c, 0, sizeof(struct opt_child) );
+	struct opt_child *c = debugMallocReset( sizeof( struct opt_child ), -300017 );
 	
 	c->opt = opt;
 	c->parent_instance = p;
@@ -1412,8 +1409,7 @@ void set_opt_parent_ref(struct opt_parent *p, char *ref)
 struct opt_parent *add_opt_parent( struct opt_type *opt )
 {
 
-	struct opt_parent *p = debugMalloc( sizeof( struct opt_parent ), -300018 );
-	memset( p, 0, sizeof(struct opt_parent) );
+	struct opt_parent *p = debugMallocReset( sizeof( struct opt_parent ), -300018 );
 
 	LIST_INIT_HEAD( p->childs_instance_list, struct opt_child, list, list );
 
@@ -3036,7 +3032,7 @@ static struct opt_type control_options[]=
 //			"	 2  : gateways\n"
 			"	 3  : changes\n"
 			"	 4  : verbose changes (depends on -DNO_DEBUG_ALL)\n"
-			"	 5  : profiling (depends on -DNO_DEBUG_MALLOC -DNO_MEMORY_USAGE -DPROFILE_DATA)\n"
+			"	 5  : profiling (depends on -DNO_MEMORY_USAGE -DPROFILE_DATA)\n"
 //			"	 7  : services\n"
 			"	 8  : details\n"
 //			"	 9  : announced networks and interfaces\n"
