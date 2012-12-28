@@ -278,6 +278,10 @@ char *tlv_op_str(uint8_t op);
 
 
 
+struct problem_type {
+    LOCAL_ID_T local_id;
+    uint16_t problem_code;
+};
 
 #define FRAME_TYPE_PROBLEM_CODE_MIN          0x01
 #define FRAME_TYPE_PROBLEM_CODE_DUP_LINK_ID  0x01
@@ -764,8 +768,8 @@ int32_t rx_frame_iterate(struct rx_frame_iterator* it);
 #define SCHEDULE_UNKNOWN_MSGS_SIZE 0
 #define SCHEDULE_MIN_MSG_SIZE -1
 
-void schedule_tx_task(struct link_dev_node *lndev_out, uint16_t type, int16_t msgs_len,
-	uint16_t u16, uint32_t u32, IID_T myIID4x, IID_T neighIID4x);
+void schedule_tx_task(struct link_dev_node *dest_lndev, uint16_t frame_type, int16_t frame_msgs_len,
+        void *data, uint32_t dlen, IID_T myIID4x, IID_T neighIID4x);
 
 void register_frame_handler(struct frame_handl *array, int pos, struct frame_handl *handl);
 
