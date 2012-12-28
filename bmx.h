@@ -755,11 +755,12 @@ struct task_node {
 	void *data; //NULL or pointer to data to be given to function. Data will be freed after functio is called.
 };
 
+#define TX_TASK_MAX_DATA_LEN 20
+
 struct tx_task_content {
 	struct dev_node *dev; // the outgoing interface to be used for transmitting
 	struct link_node *link;
-	uint32_t u32;
-	uint16_t u16;
+	uint8_t data[TX_TASK_MAX_DATA_LEN];
 	IID_T myIID4x;
 	IID_T neighIID4x;
 	uint16_t type;

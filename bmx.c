@@ -810,8 +810,10 @@ struct link_node *get_link_node(struct packet_buff *pb)
                                         pb->i.llip_str, ntohl(pb->i.link_key.local_id), pb->i.iif->label_cfg.str, pb->i.pkt_sqn, local->packet_sqn,
                                         PKT_SQN_DAD_RANGE, PKT_SQN_DAD_RANGE * my_tx_interval);
 
+				struct problem_type problem = { .problem_code = FRAME_TYPE_PROBLEM_CODE_DUP_LINK_ID, .local_id = local->local_id };
+
                                 schedule_tx_task(&pb->i.iif->dummy_lndev, FRAME_TYPE_PROBLEM_ADV, sizeof (struct msg_problem_adv),
-                                        FRAME_TYPE_PROBLEM_CODE_DUP_LINK_ID, local->local_id, 0, pb->i.transmittersIID);
+                                        &problem, sizeof(problem), 0, pb->i.transmittersIID);
 
                                 // its safer to purge the old one, otherwise we might end up with hundrets
                                 //return NULL;
@@ -860,8 +862,10 @@ struct link_node *get_link_node(struct packet_buff *pb)
                                 // be carefull here. Errornous PROBLEM_ADVs cause neighboring nodes to cease!!!
                                 //struct link_dev_node dummy_lndev = {.key ={.dev = pb->i.iif, .link = link}, .mr = {ZERO_METRIC_RECORD, ZERO_METRIC_RECORD}};
 
+				struct problem_type problem = { .problem_code = FRAME_TYPE_PROBLEM_CODE_DUP_LINK_ID, .local_id = link->key.local_id };
+
                                 schedule_tx_task(&pb->i.iif->dummy_lndev, FRAME_TYPE_PROBLEM_ADV, sizeof (struct msg_problem_adv),
-                                        FRAME_TYPE_PROBLEM_CODE_DUP_LINK_ID, link->key.local_id, 0, pb->i.transmittersIID);
+                                        &problem, sizeof(problem), 0, pb->i.transmittersIID);
 
                                 // its safer to purge the old one, otherwise we might end up with hundrets
                                 //return NULL;
