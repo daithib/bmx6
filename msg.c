@@ -268,7 +268,7 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, str
         assertion(-500590, IMPLIES(on == self, (op == TLV_OP_DEBUG ||
                 (op >= TLV_OP_CUSTOM_MIN && op <= TLV_OP_CUSTOM_MAX) || (op >= TLV_OP_PLUGIN_MIN && op <= TLV_OP_PLUGIN_MAX))));
         assertion(-500807, (desc));
-        assertion(-500000, (dext));
+        assertion(-501572, (dext));
 //        assertion(-500829, IMPLIES(op == TLV_OP_DEL, !on->blocked));
         assertion(-501354, IMPLIES(op == TLV_OP_DEL, on->added));
 
@@ -519,7 +519,7 @@ void schedule_tx_task(struct link_dev_node *dest_lndev, uint16_t frame_type, int
         assertion(-501090, (frame_msgs_len >= SCHEDULE_MIN_MSG_SIZE));
         assertion(-501091, (dest_lndev->key.dev->active));
         assertion(-501092, (dest_lndev->key.dev->linklayer != TYP_DEV_LL_LO));
-	assertion(-500000, (dlen <= TX_TASK_MAX_DATA_LEN));
+	assertion(-501573, (dlen <= TX_TASK_MAX_DATA_LEN));
 
         // ensure, this is NOT a dummy dest_lndev if:!!!
         ASSERTION(-500976, (IMPLIES(handl->is_destination_specific_frame,
@@ -1089,11 +1089,11 @@ struct ref_node* ref_node_get(struct packet_buff *pb, SHA1_T *rhash ) {
 STATIC_FUNC
 void ref_node_del (struct ref_node *refn)
 {
-	assertion(-500000, !refn->usage_counter);
-	assertion(-500000, ref_tree.items);
-	avl_remove(&ref_tree, &refn->rhash, -300000);
-	debugFree(refn->f_data, -300000);
-	debugFree(refn, -300000);
+	assertion(-501574, !refn->usage_counter);
+	assertion(-501575, ref_tree.items);
+	avl_remove(&ref_tree, &refn->rhash, -300560);
+	debugFree(refn->f_data, -300561);
+	debugFree(refn, -300562);
 }
 
 void ref_node_purge (IDM_T all_unused)
@@ -1119,7 +1119,7 @@ void ref_node_purge (IDM_T all_unused)
 	}
 
 	if ((int32_t)ref_tree.items - ref_tree_items_used >= ref_nodes_max_unused) {
-		assertion(-500000, oldest_unused);
+		assertion(-501576, oldest_unused);
 		ref_node_del(oldest_unused);
 	}
 }
@@ -1160,17 +1160,17 @@ struct ref_node * ref_node_add(uint8_t *frame_data, uint32_t f_data_len, int8_t 
 		if ((int32_t)ref_tree.items - ref_tree_items_used >= ref_nodes_max_unused)
 			ref_node_purge(NO /*all unused*/);
 
-		refn = debugMallocReset(sizeof(struct ref_node), -300000);
+		refn = debugMallocReset(sizeof(struct ref_node), -300563);
 
 		refn->f_compression = compression;
 		refn->f_long = long_hdr;
 		refn->last_mentioning = bmx_time;
 		refn->rhash = rhash;
 		refn->f_data_len = f_data_len;
-		refn->f_data = debugMalloc(f_data_len, -300000);
+		refn->f_data = debugMalloc(f_data_len, -300564);
 		memcpy(refn->f_data, frame_data, f_data_len);
 
-		avl_insert(&ref_tree, refn, -300000);
+		avl_insert(&ref_tree, refn, -300565);
 	}
 
 	return refn;
@@ -1183,11 +1183,11 @@ void ref_node_use(struct desc_extension *dext, struct ref_node *refn)
 		ref_tree_items_used++;
 
 	refn->usage_counter++;
-	struct refnl_node *rn = debugMallocReset(sizeof(struct refnl_node), -300000);
+	struct refnl_node *rn = debugMallocReset(sizeof(struct refnl_node), -300566);
 	rn->refn = refn;
 	list_add_tail(&dext->refnl_list, &rn->list);
 
-	assertion(-500000, ((int32_t)ref_tree.items >= ref_tree_items_used));
+	assertion(-501578, ((int32_t)ref_tree.items >= ref_tree_items_used));
 
 	if (refn->usage_counter == 1 && desc_adv_tx_unsolicited) {
 		struct link_dev_node **lndev_arr = lndevs_get_best_tp(NULL);
@@ -1204,13 +1204,13 @@ void ref_node_release( struct desc_extension *dext)
 	struct refnl_node *rn;
 
 	while ((rn = list_del_head(&dext->refnl_list))) {
-		assertion(-500000, (rn->refn->usage_counter > 0));
-		assertion(-500000, (ref_tree_items_used > 0));
+		assertion(-501579, (rn->refn->usage_counter > 0));
+		assertion(-501580, (ref_tree_items_used > 0));
 		rn->refn->usage_counter--;
 		if(!rn->refn->usage_counter)
 			ref_tree_items_used--;
 
-		debugFree(rn, -300000);
+		debugFree(rn, -300567);
 	}
 }
 
@@ -1255,11 +1255,11 @@ int32_t tx_frame_ref_adv(struct tx_frame_iterator *it)
 	SHA1_T *rhash = (SHA1_T *)it->ttn->task.data;
 	struct ref_node *refn = ref_node_get(NULL, rhash);
 
-	assertion(-500000, refn);
+	assertion(-501581, refn);
 
 	if(refn && refn->usage_counter) {
 
-		assertion(-500000, (int)refn->f_data_len <= tx_iterator_cache_data_space_max(it));
+		assertion(-501582, (int)refn->f_data_len <= tx_iterator_cache_data_space_max(it));
 
 		memcpy(tx_iterator_cache_msg_ptr(it), refn->f_data, refn->f_data_len);
 		it->already_compressed = refn->f_compression;
@@ -1277,7 +1277,7 @@ int32_t rx_frame_ref_adv(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	assertion(-500000, !it->is_virtual_header && it->frame_type == FRAME_TYPE_REF_ADV);
+	assertion(-501583, !it->is_virtual_header && it->frame_type == FRAME_TYPE_REF_ADV);
 
 	ref_node_add(it->frame_data, it->frame_data_length, !it->is_short_header, it->frame_compression);
 
@@ -1300,9 +1300,9 @@ int process_description_tlv_ref(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-        assertion(-500000, (!it->is_short_header));
-        assertion(-500000, (!it->on));
-	assertion(-500000, (0));
+        assertion(-501584, (!it->is_short_header));
+        assertion(-501585, (!it->on));
+	assertion(-501586, (0));
 	
         return TLV_RX_DATA_FAILURE;
 }
@@ -2511,7 +2511,7 @@ struct dhash_node *process_dhash_description_neighIID4x
 
                                 assertion(-500969, (is_described_neigh(pb->i.link, pb->i.transmittersIID)));
                         }
-			assertion(-500000, orig_dhn);
+			assertion(-501587, orig_dhn);
 
                 } else if (local->neigh && (cache = get_cached_description(dhash, NO/*remove*/))) {
 
@@ -2521,7 +2521,7 @@ struct dhash_node *process_dhash_description_neighIID4x
                                 if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, orig_dhn->myIID4orig) == FAILURE)
                                         return FAILURE_PTR;
                         }
-			assertion(-500000, orig_dhn);
+			assertion(-501589, orig_dhn);
                 }
         }
 
@@ -2865,7 +2865,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 uint8_t *f_data;
 
                 assertion(-500775, (fhs->type == ((struct frame_header_long*) fhs)->type));
-                assertion(-500000, IMPLIES(it->on, f_type != BMX_DSC_TLV_REF_ADV));
+                assertion(-501590, IMPLIES(it->on, f_type != BMX_DSC_TLV_REF_ADV));
 
                 if (f_short) {
                         f_len = fhs->length;
@@ -3046,7 +3046,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 
                         } else if (receptor_result == TLV_RX_DATA_UNRESOLVED) {
 
-				assertion(-500000, 0); //not used. Case can be purged??!!
+				assertion(-501591, 0); //not used. Case can be purged??!!
                                 dbgf_sys(DBGT_ERR, "%s - rx_frame_handler(%s)=%d frame_msgs_len=%d : UNRESOLVED",
                                         it->caller, f_handl->name, receptor_result, it->frame_msgs_length );
 
@@ -3231,7 +3231,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 	if (it->dext) {
 		// this is the creation of my description...
 
-		it->dext->data = debugReallocReset(it->dext->data, it->dext->dlen + sizeof(struct frame_header_virtual) + cache_pos, -300000);
+		it->dext->data = debugReallocReset(it->dext->data, it->dext->dlen + sizeof(struct frame_header_virtual) + cache_pos, -300568);
 		struct frame_header_virtual *fhv = (struct frame_header_virtual *)(it->dext->data + it->dext->dlen);
 		fhv->is_virtual = 1;
 		fhv->is_relevant = handl->is_relevant;
@@ -3242,13 +3242,13 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 	}
 
 	if (it->dext && handl->do_reference && *handl->do_reference == 1) {
-		assertion(-500000, (!it->already_compressed));  //unless tx_frame_create already provides precompressed desc extension frames for myself
-		assertion(-500000, (!it->use_long_header));     //yet only used by tx_frame_ref_adv. NOT for creation of my desc frames.
+		assertion(-501592, (!it->already_compressed));  //unless tx_frame_create already provides precompressed desc extension frames for myself
+		assertion(-501593, (!it->use_long_header));     //yet only used by tx_frame_ref_adv. NOT for creation of my desc frames.
 
 		uint8_t *rf_hdr = (it->frames_out_ptr + it->frames_out_pos);
 		uint8_t *rfd_agg_data = rf_compress ? NULL : it->frame_cache_array;
 		int32_t rfd_agg_len = rf_compress ? z_compress(it->frame_cache_array, cache_pos, &rfd_agg_data, 0, 0, 0) : cache_pos;
-		assertion(-500000, IMPLIES(rf_compress, rfd_agg_len > 0));
+		assertion(-501594, IMPLIES(rf_compress, rfd_agg_len > 0));
 		int32_t rfd_msgs = rfd_agg_len/PREF_PKT_FRAME_DATA_SIZE + (rfd_agg_len%PREF_PKT_FRAME_DATA_SIZE?1:0);
 		int32_t rfd_size = sizeof(struct description_hdr_ref) + (rfd_msgs*sizeof(struct description_msg_ref));
 
@@ -3284,9 +3284,9 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		}
 
 		if (rfd_agg_data && rfd_agg_data != it->frame_cache_array)
-			debugFree(rfd_agg_data, -500000);
+			debugFree(rfd_agg_data, -501595);
 
-		assertion(-500000, (m == rfd_msgs));
+		assertion(-501596, (m == rfd_msgs));
 
 	} else {
 		
@@ -3307,7 +3307,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 				it->frames_out_pos += sizeof ( struct frame_header_long);
 				int32_t z_size = z_compress(it->frame_cache_array, cache_pos, 0,0, it->frames_out_ptr + it->frames_out_pos, cache_pos);
-				assertion(-500000, z_size > 0);
+				assertion(-501597, z_size > 0);
 				it->frames_out_pos += z_size;
 				fhl->length = htons(z_size + sizeof ( struct frame_header_long));
 				fhl->compression = FRAME_COMPRESSION_GZIP;
@@ -3829,7 +3829,7 @@ IDM_T validate_desc_sqn(struct description *desc, struct orig_node *on)
 STATIC_FUNC
 int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, uint8_t compression, struct desc_extension *dext, uint8_t nest_level )
 {
-	assertion(-500000, (FAILURE==-1 && SUCCESS==0));
+	assertion(-501598, (FAILURE==-1 && SUCCESS==0));
 
 	struct description_hdr_ref *hdr = (struct description_hdr_ref *)data;
         struct description_msg_ref *msg = hdr->msg;
@@ -3869,7 +3869,7 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 		} else if (refn->f_compression == FRAME_COMPRESSION_NONE) {
 
 			if (solvable && dext) {
-				dext->data = debugRealloc(dext->data, dext->dlen + refn->f_data_len, -300000);
+				dext->data = debugRealloc(dext->data, dext->dlen + refn->f_data_len, -300569);
 				memcpy(dext->data + dext->dlen, refn->f_data, refn->f_data_len);
 				dext->dlen += refn->f_data_len;
 
@@ -3897,7 +3897,7 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 		} else {
 			return FAILURE;
 		}
-		assertion(-500000, IMPLIES(solvable && dext, dext_begin + ref_len == dext->dlen));
+		assertion(-501599, IMPLIES(solvable && dext, dext_begin + ref_len == dext->dlen));
         }
 
 	if (m != msgs)
@@ -3943,7 +3943,7 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 
 void free_desc_extensions(struct desc_extension **dext)
 {
-	assertion(-500000, dext);
+	assertion(-501600, dext);
         if(*dext) {
 
 		ref_node_release(*dext);
@@ -3951,7 +3951,7 @@ void free_desc_extensions(struct desc_extension **dext)
 		if((*dext)->data)
 			debugFree((*dext)->data, -300530);
 
-                debugFree((*dext), -300000);
+                debugFree((*dext), -300570);
 	}
 
 	*dext = NULL;
@@ -3994,7 +3994,7 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 		return UNRESOLVED_PTR;
 
 
-	dext = debugMallocReset(sizeof(struct desc_extension), -300000);
+	dext = debugMallocReset(sizeof(struct desc_extension), -300571);
 	LIST_INIT_HEAD(dext->refnl_list, struct refnl_node, list, list);
 	it = it_init;
         while (rx_frame_iterate(&it) > TLV_RX_DATA_DONE) {
@@ -4031,7 +4031,7 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 			if (vf_data_len <= 0)
 				goto resolve_desc_extension_error;
 
-			assertion(-500000, (vf_data_len == (int32_t)hdr->expanded_rframes_data_len));
+			assertion(-501601, (vf_data_len == (int32_t)hdr->expanded_rframes_data_len));
 
 
                 } else {
@@ -4090,7 +4090,7 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 		return UNRESOLVED_PTR;
 	}
 
-	assertion(-500000, dext);
+	assertion(-501602, dext);
 
 
         if (!on) // create new orig:
@@ -4222,7 +4222,7 @@ void update_my_description_adv(void)
         dsc->comp_version = COMPATIBILITY_VERSION;
         dsc->descSqn = htonl(++(self->descSqn));
 
-	struct desc_extension *next_dext = debugMallocReset(sizeof(struct desc_extension), -300000);
+	struct desc_extension *next_dext = debugMallocReset(sizeof(struct desc_extension), -300572);
 	LIST_INIT_HEAD(next_dext->refnl_list, struct refnl_node, list, list);
 
         // add all tlv options:
