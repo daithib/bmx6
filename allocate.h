@@ -24,7 +24,7 @@
 #include <stdint.h>
 
 
-// currently used memory tags: -300000, -300001 .. -300559
+// currently used memory tags: -300000, -300001 .. -300578
 #define debugMalloc( length,tag )  _debugMalloc( (length), (tag), 0 )
 #define debugMallocReset( length,tag )  _debugMalloc( (length), (tag), 1 )
 #define debugRealloc( mem,length,tag ) _debugRealloc( (mem), (length), (tag), 0 )

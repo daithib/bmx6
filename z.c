@@ -51,7 +51,7 @@ int32_t z_compress( uint8_t *src, int32_t slen, uint8_t **dst, uint32_t dpos, ui
 
     do {
 	    int flush = 0;
-	    debugRealloc(tmp, tlen + Z_CHUNK_SIZE, -300000);
+	    debugRealloc(tmp, tlen + Z_CHUNK_SIZE, -300573);
 
 	    strm.avail_out = Z_CHUNK_SIZE;
 	    strm.next_out = tmp + tlen;
@@ -70,7 +70,7 @@ int32_t z_compress( uint8_t *src, int32_t slen, uint8_t **dst, uint32_t dpos, ui
 
     if (tmp && tlen > 0 && tlen < slen) {
 	    if (dst) {
-		    *dst = debugRealloc(*dst, dpos + tlen, -300000);
+		    *dst = debugRealloc(*dst, dpos + tlen, -300574);
 		    memcpy(*dst + dpos, tmp, tlen);
 	    }
 	    if (darr && darr_max_size >= tlen)
@@ -80,7 +80,7 @@ int32_t z_compress( uint8_t *src, int32_t slen, uint8_t **dst, uint32_t dpos, ui
     }
 
     if (tmp)
-	    debugFree(tmp, -300000);
+	    debugFree(tmp, -300575);
 
     dbgf(tlen>0?DBGL_CHANGES:DBGL_SYS, tlen>0?DBGT_INFO:DBGT_ERR, "slen=%d tlen=%d", slen, tlen);
 
@@ -110,7 +110,7 @@ int32_t z_decompress( uint8_t *src, uint32_t slen, uint8_t **dst, uint32_t dpos)
 	strm.next_in = (Bytef*)src;
 
 	do {
-		tmp = debugRealloc(tmp, tlen + Z_CHUNK_SIZE, -300000);
+		tmp = debugRealloc(tmp, tlen + Z_CHUNK_SIZE, -300576);
 
 		strm.avail_out = Z_CHUNK_SIZE;
 		strm.next_out = tmp;
@@ -128,12 +128,12 @@ int32_t z_decompress( uint8_t *src, uint32_t slen, uint8_t **dst, uint32_t dpos)
 	(void)inflateEnd(&strm);
 
 	if (dst && tmp && tlen > 0) {
-		*dst = debugRealloc(*dst, dpos + tlen, -300000);
+		*dst = debugRealloc(*dst, dpos + tlen, -300577);
 		memcpy( (*dst) + dpos, tmp, tlen);
 	}
 
 	if(tmp)
-		debugFree(tmp, -300000);
+		debugFree(tmp, -300578);
 
 	dbgf(tlen>0?DBGL_CHANGES:DBGL_SYS, tlen>0?DBGT_INFO:DBGT_ERR, "slen=%d tlen=%d", slen, tlen);
 
