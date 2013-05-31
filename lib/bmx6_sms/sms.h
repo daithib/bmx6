@@ -31,6 +31,12 @@
 #define MIN_SMS_GZIP 0
 #define MAX_SMS_GZIP 1
 
+#define ARG_SMS_REFERENCE "refSms"
+#define DEF_SMS_REFER 0
+#define MIN_SMS_REFER 0
+#define MAX_SMS_REFER 1
+
+
 struct sms_node {
 	char name[MAX_JSON_SMS_NAME_LEN];
         uint16_t stale;
