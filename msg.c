@@ -2525,10 +2525,13 @@ struct dhash_node *process_dhash_description_neighIID4x
 
         dbgf_track(DBGT_INFO, "via dev=%s NB=%s dhash=%8X.. %s %s %s neighIID4x=%d  is_sender=%d %s",
                 pb->i.iif->label_cfg.str, pb->i.llip_str, dhash->h.u32[0],
-                (dsc ? "DESCRIPTION" : "-"), (cache ? "CACHED" : "-"),
-		(orig_dhn?(orig_dhn==FAILURE_PTR?"FAILURE":(orig_dhn==UNRESOLVED_PTR?"UNRESOLVED":(orig_dhn==IGNORED_PTR?"IGNORED":"RESOLVED"))):"UNKNOWN"),
+                (dsc ? globalIdAsString(&dsc->globalId) : "NO DESCRIPTION"), (cache ? "CACHED" : "-"),
+		(orig_dhn?(orig_dhn==FAILURE_PTR?"FAILURE":
+			(orig_dhn==UNRESOLVED_PTR?"UNRESOLVED":(orig_dhn==IGNORED_PTR?"IGNORED":"RESOLVED"))):"UNKNOWN"),
                 neighIID4x, is_transmitters_iid,
-                invalid ? "INVALIDATED" : (orig_dhn && orig_dhn->on ? globalIdAsString(&orig_dhn->on->global_id) : DBG_NIL));
+                invalid ? "INVALIDATED" : 
+			(orig_dhn && orig_dhn!=FAILURE_PTR && orig_dhn!=UNRESOLVED_PTR && orig_dhn!=IGNORED_PTR && orig_dhn->on ?
+				globalIdAsString(&orig_dhn->on->global_id) : DBG_NIL));
 
 
         return orig_dhn;
