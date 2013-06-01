@@ -24,8 +24,8 @@
 #include <linux/if.h>
 #include <linux/rtnetlink.h>
 
-#include "cyassl/sha.h"
-#include "cyassl/random.h"
+#include <cyassl/sha.h>
+#include <cyassl/random.h>
 
 /*
  * from other headers:
