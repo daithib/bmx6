@@ -2190,7 +2190,7 @@ void init_bmx(void)
                 cleanup_all(-500272);
         }
 
-        RNG_GenerateBlock(&rng, &(id.pkid.u8[GLOBAL_ID_PKID_RAND_POS]), GLOBAL_ID_PKID_RAND_LEN);
+	RNG_GenerateBlock(&rng, &(id.pkid.u8[GLOBAL_ID_PKID_RAND_POS]), GLOBAL_ID_PKID_RAND_LEN);
 
         self = init_orig_node(&id);
 

@@ -16,7 +16,7 @@
 
 
   GIT_REV = $(shell ( [ "$(REVISION_VERSION)" ] && echo "$(REVISION_VERSION)" ) || ( [ -d .git ] && git --no-pager log -n 1 --oneline|cut -d " " -f 1 ) ||  echo 0)
-  CFLAGS += -pedantic -Wall -W -Wno-unused-parameter -Os -g3 -std=gnu99 -DGIT_REV=\"$(GIT_REV)\"
+  CFLAGS += -pedantic -Wall -W -Wno-unused-parameter -Os -g3 -std=gnu99 -DHAVE_CONFIG_H -DGIT_REV=\"$(GIT_REV)\"
 #-DHAVE_CONFIG_H
 
 # optinal defines:
@@ -73,15 +73,15 @@ LDFLAGS += -g3
 LDFLAGS += $(shell echo "$(CFLAGS) $(EXTRA_CFLAGS)" | grep -q "DNO_DYNPLUGIN" || echo "-Wl,-export-dynamic -ldl" )
 LDFLAGS += $(shell echo "$(CFLAGS) $(EXTRA_CFLAGS)" | grep -q "DPROFILING" && echo "-pg -lc" )
 
-
+LDFLAGS += -lm -lcyassl
 
 
 SBINDIR =       $(INSTALL_PREFIX)/usr/sbin
 
 SRC_FILES= "\(\.c\)\|\(\.h\)\|\(Makefile\)\|\(INSTALL\)\|\(LIESMICH\)\|\(README\)\|\(THANKS\)\|\(./posix\)\|\(./linux\)\|\(./man\)\|\(./doc\)"
 
-SRC_C =  bmx.c msg.c metrics.c tools.c plugin.c list.c allocate.c avl.c iid.c hna.c control.c schedule.c ip.c cyassl/sha.c cyassl/random.c cyassl/arc4.c
-SRC_H =  bmx.h msg.h metrics.h tools.h plugin.h list.h allocate.h avl.h iid.h hna.h control.h schedule.h ip.h cyassl/sha.h cyassl/random.h cyassl/arc4.h
+SRC_C =  bmx.c msg.c metrics.c tools.c plugin.c list.c allocate.c avl.c iid.c hna.c control.c schedule.c ip.c
+SRC_H =  bmx.h msg.h metrics.h tools.h plugin.h list.h allocate.h avl.h iid.h hna.h control.h schedule.h ip.h
 
 SRC_C += $(shell echo "$(CFLAGS) $(EXTRA_CFLAGS)" | grep -q "DTRAFFIC_DUMP" && echo dump.c )
 SRC_H += $(shell echo "$(CFLAGS) $(EXTRA_CFLAGS)" | grep -q "DTRAFFIC_DUMP" && echo dump.h )
@@ -147,6 +147,8 @@ install_all: install install_libs
 
 
 help:
+	# see also http://bmx6.net/projects/bmx6/wiki
+	#
 	# further make targets:
 	# help					show this help
 	# all					compile  bmx6 core only
@@ -155,4 +157,19 @@ help:
 	# strip / strip_libs / strip_all	strip    bmx6 / plugins / all
 	# install / install_libs / install_all	install  bmx6 / plugins / all
 	# clean / clean_libs / clean_all	clean    bmx6 / libs / all
+	#
+	# minimum compile requirements are zlib and cyassl libraries:
+	#
+	# for cyassl do:
+	#   wget http://www.yassl.com/cyassl-1.6.5.zip
+	#   unzip cyassl-2.6.0.zip
+	#   cd cyassl-2.6.0
+	#   ./configure --includedir=/usr/local/include/cyassl --libdir=/usr/local/lib
+	#   make
+	#   make install
+	#
+	# for zlib on debian do:
+	#   apt-get install zlib1g-dev
+	#
+	#   
 
