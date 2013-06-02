@@ -26,6 +26,11 @@
 
 #define SMS_POLLING_INTERVAL 5000
 
+#define ARG_SMS_GZIP "gzipSms"
+#define DEF_SMS_GZIP 0
+#define MIN_SMS_GZIP 0
+#define MAX_SMS_GZIP 1
+
 struct json_sms {
 	char name[MAX_JSON_SMS_NAME_LEN];
         uint16_t stale;

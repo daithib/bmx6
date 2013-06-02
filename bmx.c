@@ -68,6 +68,12 @@ IDM_T cleaning_up = NO;
 const IDM_T CONST_YES = YES;
 const IDM_T CONST_NO = NO;
 
+
+void* IGNORED_PTR = (void*) & IGNORED_PTR;
+void* UNRESOLVED_PTR = (void*) & UNRESOLVED_PTR;
+void* FAILURE_PTR = (void*) & FAILURE_PTR;
+
+
 static struct timeval start_time_tv;
 static struct timeval curr_tv;
 
@@ -671,7 +677,7 @@ void free_orig_node(struct orig_node *on)
 
         if (on->desc && on->added) {
                 //cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, on);
-                process_description_tlvs(NULL, on, on->desc, TLV_OP_DEL, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
+                process_description_tlvs(NULL, on, on->desc, on->dext, TLV_OP_DEL, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
         } else {
                 cache_desc_tlv_hashes(TLV_OP_DEL, on, 0, BMX_DSC_TLV_MAX, NULL, 0);
         }
@@ -698,6 +704,9 @@ void free_orig_node(struct orig_node *on)
 
         if (on->desc)
                 debugFree(on->desc, -300228);
+
+        if (on->dext)
+		free_desc_extensions(&on->dext);
 
         debugFree( on, -300086 );
 }
@@ -1327,12 +1336,12 @@ void cleanup_all(int32_t status)
 
                 cleanup_ip();
 
-                if (self && self->dhn) {
-                        self->dhn->on = NULL;
-                        free_dhash_node(self->dhn);
-                }
-
                 if (self) {
+			if (self->dhn) {
+				self->dhn->on = NULL;
+				free_dhash_node(self->dhn);
+			}
+
                         avl_remove(&orig_tree, &(self->global_id), -300203);
                         debugFree(self, -300386);
                         self = NULL;
@@ -1561,8 +1570,13 @@ uint32_t field_iterate(struct field_iterator *it)
         uint32_t field_bits = format->field_bits ? format->field_bits : it->var_bits;
         int32_t std_bits = field_standard_sizes[field_type];
 
-        dbgf_all(DBGT_INFO, "field_name=%s max_data_size=%d min_msg_size=%d msg_bit_pos=%d data=%p field=%d field_bits=%d field_bit_pos=%d var_bits=%d field_type=%d field_bits=%d std_bits=%d\n",
-                format->field_name, it->data_size, it->min_msg_size, it->msg_bit_pos, it->data, it->field, it->field_bits, it->field_bit_pos, it->var_bits, field_type, format->field_bits, std_bits);
+        dbgf_all(DBGT_INFO,
+                "fmt.field_name=%s data_size_bits=%d min_msg_size_bits=%d msg_bit_pos=%d data=%p "
+                "it.field=%d it.field_bits=%d it.field_bit_pos=%d it.var_bits=%d "
+                "fmt.field_type=%d fmt.field_bits=%d std_bits=%d\n",
+                format->field_name, (8 * it->data_size), (8 * it->min_msg_size), it->msg_bit_pos, it->data,
+                it->field, it->field_bits, it->field_bit_pos, it->var_bits,
+                field_type, format->field_bits, std_bits);
 
 
         if (it->msg_bit_pos + (it->min_msg_size * 8) + it->var_bits <=
@@ -1628,7 +1642,8 @@ uint32_t field_iterate(struct field_iterator *it)
         assertion(-501164, IMPLIES(it->data_size, it->data_size * 8 == it->field_bit_pos));
         assertion(-501208, ((it->field_bit_pos % 8) == 0));
 
-        return (it->msg_bit_pos / 8);
+//        return (it->msg_bit_pos / 8);
+        return (it->field_bit_pos / 8);
 }
 
 int16_t field_format_get_items(const struct field_format *format) {
@@ -2085,7 +2100,6 @@ int32_t opt_purge(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_p
 }
 
 
-STATIC_FUNC
 int32_t opt_update_description(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
 {
         TRACE_FUNCTION_CALL;
@@ -2194,7 +2208,7 @@ STATIC_FUNC
 void init_bmx(void)
 {
 
-        static uint8_t my_desc0[MAX_PKT_MSG_SIZE];
+        static uint8_t my_desc0[MAX_PKT_FRAME_DATA_SIZE];
         static GLOBAL_ID_T id;
         memset(&id, 0, sizeof (id));
 
@@ -2315,13 +2329,13 @@ void bmx(void)
 
                                 assertion(-501351, (on->blocked && !on->added));
 
-                                IDM_T tlvs_res = process_description_tlvs(NULL, on, on->desc, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
+                                IDM_T tlvs_res = process_description_tlvs(NULL, on, on->desc, on->dext, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
 
                                 if (tlvs_res == TLV_RX_DATA_DONE) {
 
                                         cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, on);
 
-                                        tlvs_res = process_description_tlvs(NULL, on, on->desc, TLV_OP_NEW, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
+                                        tlvs_res = process_description_tlvs(NULL, on, on->desc, on->dext, TLV_OP_NEW, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
 
                                         assertion(-500364, (tlvs_res == TLV_RX_DATA_DONE)); // checked, so MUST SUCCEED!!
 
@@ -2333,6 +2347,8 @@ void bmx(void)
                                         on->desc->globalId.name, tlvs_res == TLV_RX_DATA_DONE ? "success" : "failed");
 
                         }
+
+			ref_node_purge(NO /*all_unused*/);
 
 			// check for corrupted memory..
 			checkIntegrity();

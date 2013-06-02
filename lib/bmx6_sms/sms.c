@@ -54,7 +54,7 @@ static int extensions_wd = -1;
 static AVL_TREE(json_sms_tree, struct json_sms, name );
 
 
-
+int32_t sms_gzip = DEF_SMS_GZIP;
 
 
 
@@ -399,8 +399,11 @@ int32_t opt_json_sms(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
 static struct opt_type sms_options[]= {
 //        ord parent long_name          shrt Attributes				*ival		min		max		default		*func,*syntax,*help
 	
-	{ODI,0,ARG_SMS,	        0,  9,2,A_PM1N,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,0,		opt_json_sms,
-			ARG_FILE_FORM,"add arbitrary file-data to description"}
+	{ODI,0,ARG_SMS,	                0,  9,2,A_PM1N,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,0,		opt_json_sms,
+			ARG_FILE_FORM,"add arbitrary file-data to description"},
+	{ODI,0,ARG_SMS_GZIP,            0,  9,2,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	&sms_gzip,       MIN_SMS_GZIP,   MAX_SMS_GZIP,   DEF_SMS_GZIP,0,	NULL,
+			ARG_VALUE_FORM, "enable/disable"}
+
 	
 };
 
@@ -443,6 +446,7 @@ static int32_t sms_init( void ) {
         tlv_handl.min_msg_size = sizeof (struct description_msg_sms);
         tlv_handl.fixed_msg_size = 0;
         tlv_handl.is_relevant = 0;
+	tlv_handl.do_compress = sms_gzip;
         tlv_handl.name = "SMS_EXTENSION";
         tlv_handl.tx_frame_handler = create_description_sms;
         tlv_handl.rx_frame_handler = process_description_sms;

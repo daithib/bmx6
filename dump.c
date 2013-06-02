@@ -147,13 +147,11 @@ void dump(struct packet_buff *pb)
         struct rx_frame_iterator it = {
                 .caller = __FUNCTION__, .on = NULL, .cn = NULL, .op = 0, .pb = NULL,
                 .handls = packet_frame_handler, .handl_max = FRAME_TYPE_MAX, .process_filter = FRAME_TYPE_PROCESS_NONE,
-                .data = ((uint8_t*) phdr), .frame_type = -1,
-                .frames_in = (((uint8_t*) phdr) + sizeof (struct packet_header)),
+                .frame_type = -1, .frames_in = (((uint8_t*) phdr) + sizeof (struct packet_header)),
                 .frames_length = (plength - sizeof (struct packet_header)), .frames_pos = 0
         };
 
         int32_t iterator_result;
-        uint16_t frame_length = 0;
         uint16_t pkt_pos = sizeof (struct packet_header);
 
         while ((iterator_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
@@ -167,9 +165,6 @@ void dump(struct packet_buff *pb)
                         tname = tnum;
                 }
 
-                frame_length = it.frame_data_length +
-                        (it.is_short_header ? sizeof (struct frame_header_short) : sizeof (struct frame_header_long));
-
                 if (packet_frame_handler[it.frame_type].fixed_msg_size) {
                         frame_msgs = it.frame_msgs_length / packet_frame_handler[it.frame_type].min_msg_size;
                 }
@@ -177,37 +172,34 @@ void dump(struct packet_buff *pb)
 
                 dbgf_dump(DBGT_NONE, "%s             frame_type=%-12s data_header_size=%-3d msgs=%-3d frame_length=%-4d",
                         direction == DUMP_DIRECTION_IN ? "in " : "out", tname,
-                        packet_frame_handler[it.frame_type].data_header_size, frame_msgs, frame_length);
+                        packet_frame_handler[it.frame_type].data_header_size, frame_msgs, it.frame_length);
 
                 dbgf_dump(DBGT_NONE, "%s         data [%3d...%3d]:%s",
                         direction == DUMP_DIRECTION_IN ? "in  hex" : "out hex",
-                        pkt_pos, pkt_pos + frame_length - 1, memAsHexString(((uint8_t*) phdr) + pkt_pos, frame_length));
+                        pkt_pos, pkt_pos + it.frame_length - 1, memAsHexString(((uint8_t*) phdr) + pkt_pos, it.frame_length));
 
                 //assertion(-500991, (packet_frame_handler[it.frame_type].min_msg_size));
                 assertion(-500992, (it.frame_msgs_length >= 0));
 
-                (*dev_plugin_data)->tmp_frame[direction][it.frame_type] += (frame_length << IMPROVE_ROUNDOFF);
+                (*dev_plugin_data)->tmp_frame[direction][it.frame_type] += (it.frame_length << IMPROVE_ROUNDOFF);
 
-                dump_all.tmp_frame[direction][it.frame_type] += (frame_length << IMPROVE_ROUNDOFF);
+                dump_all.tmp_frame[direction][it.frame_type] += (it.frame_length << IMPROVE_ROUNDOFF);
 
-                (*dev_plugin_data)->tmp_all[direction][DUMP_TYPE_FRAME_HEADER] += ((frame_length - it.frame_data_length) << IMPROVE_ROUNDOFF);
+                (*dev_plugin_data)->tmp_all[direction][DUMP_TYPE_FRAME_HEADER] += ((it.frame_length - it.frame_data_length) << IMPROVE_ROUNDOFF);
 
-                dump_all.tmp_all[direction][DUMP_TYPE_FRAME_HEADER] += ((frame_length - it.frame_data_length) << IMPROVE_ROUNDOFF);
+                dump_all.tmp_all[direction][DUMP_TYPE_FRAME_HEADER] += ((it.frame_length - it.frame_data_length) << IMPROVE_ROUNDOFF);
 
-                pkt_pos += frame_length;
+                pkt_pos += it.frame_length;
         }
 
         if (iterator_result != TLV_RX_DATA_DONE) {
 
-                frame_length = it.frame_data_length +
-                        (it.is_short_header ? sizeof (struct frame_header_short) : sizeof (struct frame_header_long));
-
                 dbgf_dump(DBGT_NONE, "%s             ERROR frame_type=%d frame_length=%d frame_data_lenghth=%d short_header=%d iterator_result=%d - ignoring further frames!!",
-                        direction == DUMP_DIRECTION_IN ? "in " : "out", it.frame_type, frame_length, it.frame_data_length, it.is_short_header, iterator_result);
+                        direction == DUMP_DIRECTION_IN ? "in " : "out", it.frame_type, it.frame_length, it.frame_data_length, it.is_short_header, iterator_result);
 
                 dbgf_dump(DBGT_NONE, "%s         data [%3d...%3d]:%s",
                         direction == DUMP_DIRECTION_IN ? "in  hex" : "out hex",
-                        pkt_pos, pkt_pos + frame_length - 1, memAsHexString(((uint8_t*) phdr) + pkt_pos, frame_length));
+                        pkt_pos, pkt_pos + it.frame_length - 1, memAsHexString(((uint8_t*) phdr) + pkt_pos, it.frame_length));
         }
 
         assertion(-500990, (IMPLIES(direction == DUMP_DIRECTION_OUT, iterator_result == TLV_RX_DATA_DONE)));

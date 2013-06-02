@@ -564,6 +564,10 @@ enum NoYes {
 extern const IDM_T CONST_YES;
 extern const IDM_T CONST_NO;
 
+extern void *IGNORED_PTR;
+extern void *UNRESOLVED_PTR;
+extern void *FAILURE_PTR;
+
 
 enum ADGSN {
 	ADD,
@@ -915,6 +919,36 @@ struct desc_tlv_hash_node {
 };
 
 
+
+
+#define MAX_DESC_LEN (INT32_MAX-1)
+#define MAX_REF_NESTING 2
+
+struct ref_node {
+        SHA1_T rhash;
+        //struct frame_header_long *frame_hdr;
+	uint8_t f_compression;
+	uint8_t f_long;
+	uint8_t *f_data;
+        uint32_t f_data_len; // NOT including frame header!!
+        uint32_t last_mentioning;
+        uint32_t usage_counter;
+};
+
+
+
+struct refnl_node {
+    	struct list_node list;
+	struct ref_node *refn;
+};
+
+struct desc_extension {
+        uint8_t max_nesting;
+        uint8_t *data;
+        uint32_t dlen;
+	struct list_head refnl_list;
+};
+
 struct orig_node {
 	// filled in by validate_new_link_desc0():
 
@@ -922,6 +956,8 @@ struct orig_node {
 
 	struct dhash_node *dhn;
 	struct description *desc;
+	struct desc_extension *dext;
+
 	struct avl_tree desc_tlv_hash_tree;
 
 	TIME_T updated_timestamp; // last time this on's desc was succesfully updated
@@ -1200,3 +1236,4 @@ char *get_human_uptime( uint32_t reference );
 IDM_T validate_param(int32_t probe, int32_t min, int32_t max, char *name);
 
 int32_t opt_status(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn);
+int32_t opt_update_description(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn);
