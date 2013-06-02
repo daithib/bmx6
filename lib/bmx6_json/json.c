@@ -519,30 +519,27 @@ void json_description_event_hook(int32_t cb_id, struct orig_node *on)
                 json_object *jblocked = json_object_new_int(on->blocked);
                 json_object_object_add(jorig, "blocked", jblocked);
 
-                uint16_t tlvs_len = ntohs(on->desc->extensionLen);
-                struct msg_description_adv * desc_buff =
-                        debugMalloc(sizeof (struct msg_description_adv) +tlvs_len, -300361);
+                struct msg_description_adv * desc_buff = debugMalloc(sizeof (struct msg_description_adv), -300361);
 
                 desc_buff->transmitterIID4x = htons(on->dhn->myIID4orig);
-                memcpy(&desc_buff->desc, on->desc, sizeof (struct description) +tlvs_len);
+                memcpy(&desc_buff->desc, on->desc, sizeof (struct description));
 
                 json_object *jdesc_fields = NULL;
 
                 if ((jdesc_fields = fields_dbg_json(
-                        FIELD_RELEVANCE_MEDI, NO, sizeof (struct msg_description_adv) +tlvs_len, (uint8_t*) desc_buff,
+                        FIELD_RELEVANCE_MEDI, NO, sizeof (struct msg_description_adv), (uint8_t*) desc_buff,
                         packet_frame_handler[FRAME_TYPE_DESC_ADV].min_msg_size,
                         packet_frame_handler[FRAME_TYPE_DESC_ADV].msg_format))) {
 
-                        if (tlvs_len) {
+                        if (on->dext && on->dext->dlen) {
 
                                 struct rx_frame_iterator it = {
                                         .caller = __FUNCTION__, .on = on, .cn = NULL, .op = TLV_OP_PLUGIN_MIN,
                                         .handls = description_tlv_handl, .handl_max = BMX_DSC_TLV_MAX,
                                         .process_filter = FRAME_TYPE_PROCESS_ALL,
-                                        .data = ((uint8_t*) on->desc), .frame_type = -1,
-                                        .frames_in = (((uint8_t*) on->desc) + sizeof (struct description)),
-                                        .frames_length = tlvs_len
+                                        .frame_type = -1, .frames_in = on->dext->data, .frames_length = on->dext->dlen
                                 };
+				
 
                                 json_object *jextensions = NULL;
 

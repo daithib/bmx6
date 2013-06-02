@@ -29,7 +29,16 @@
 #define MAX_UDPD_SIZE (XMIN( 1400, MAX_PACKET_SIZE))
 #define ARG_UDPD_SIZE "udpDataSize"
 
+#define MAX_PKT_FRAME_DATA_SIZE (MAX_UDPD_SIZE - sizeof(struct packet_header) - sizeof(struct frame_header_long))
+#define PREF_PKT_FRAME_DATA_SIZE (pref_udpd_size - sizeof(struct packet_header) - sizeof(struct frame_header_long))
 
+#define MAX_DSC_FRAME_SIZE (MAX_PKT_FRAME_DATA_SIZE - sizeof (struct msg_description_adv))
+#define MAX_DSC_FRAME_DATA_SIZE (MAX_PKT_FRAME_DATA_SIZE - sizeof (struct msg_description_adv) - sizeof(struct frame_header_long))
+
+#define MIN_VRT_FRAME_DATA_SIZE (MAX_DSC_FRAME_SIZE - sizeof (struct frame_header_long))
+#define DEF_VRT_FRAME_DATA_SIZE 16384
+#define MAX_VRT_FRAME_DATA_SIZE 16384
+#define ARG_VRT_FRAME_DATA_SIZE "myDescriptionSize"
 
 #define DEF_TX_TS_TREE_SIZE 150
 #define DEF_TX_TS_TREE_PURGE_FK 3
@@ -126,6 +135,8 @@
 #define CONTENT_MIN_TX_INTERVAL_MAX 50000
 
 //TODO: set REQ_TO to 1 (in a non-packet-loss testenvironment this may be set to 1000 for testing)
+#define DEF_TX_REF_REQ_TO    ((DEF_TX_INTERVAL*3)/2)
+#define DEF_TX_DREF_ADV_TO    200
 #define DEF_TX_DESC0_REQ_TO  ((DEF_TX_INTERVAL*3)/2)
 #define DEF_TX_DESC0_ADV_TO  200
 #define DEF_TX_DHASH0_REQ_TO ((DEF_TX_INTERVAL*3)/2)
@@ -137,9 +148,6 @@
 
 #define DEF_DESC0_REQ_STONE_OLD_TO 40000
 
-#define MAX_PKT_MSG_SIZE (MAX_UDPD_SIZE - sizeof(struct packet_header) - sizeof(struct frame_header_long))
-
-#define MAX_DESC0_TLV_SIZE (MAX_PKT_MSG_SIZE - sizeof(struct msg_description_adv) )
 
 
 
@@ -158,6 +166,8 @@
 
 #define FRAME_TYPE_RP_ADV      11
 
+#define FRAME_TYPE_REF_REQ     12
+#define FRAME_TYPE_REF_ADV     13
 
 #define FRAME_TYPE_DESC_REQ    14
 #define FRAME_TYPE_DESC_ADV    15
@@ -179,6 +189,8 @@
 #define FRAME_TYPE_PROCESS_ALL    (255)
 #define FRAME_TYPE_PROCESS_NONE   (254)
 
+#define FRAME_COMPRESSION_NONE  0
+#define FRAME_COMPRESSION_GZIP  1
 
 #define ARG_DESCRIPTIONS        "descriptions"
 #define HLP_DESCRIPTIONS        "show node descriptions\n"
@@ -207,7 +219,7 @@ struct frame_header_short { // 2 bytes
 #else
 # error "Please fix <bits/endian.h>"
 #endif
-	uint8_t length_TLV_DATA_STEPS; // lenght of frame in TLV_DATA_STEPS Byte steps, including frame_header and variable data field
+	uint8_t length; // lenght of frame in TLV_DATA_STEPS Byte steps, including frame_header and variable data field
 //	uint8_t  data[];   // frame-type specific data consisting of 0-1 data headers and 1-n data messages
 } __attribute__((packed));
 
@@ -217,7 +229,6 @@ struct frame_header_long { // 4 bytes
 	unsigned int type : FRAME_TYPE_BIT_SIZE;
 	unsigned int is_relevant : FRAME_RELEVANCE_BIT_SIZE;
 	unsigned int is_short : FRAME_ISSHORT_BIT_SIZE;
-
 #elif __BYTE_ORDER == __BIG_ENDIAN
 	unsigned int is_short : FRAME_ISSHORT_BIT_SIZE;
 	unsigned int is_relevant : FRAME_RELEVANCE_BIT_SIZE;
@@ -225,38 +236,63 @@ struct frame_header_long { // 4 bytes
 #else
 # error "Please fix <bits/endian.h>"
 #endif
-	uint8_t  reserved;
-	uint16_t length;  // lenght of frame in 1-Byte steps, including frame_header and variable data field
+
+//	uint8_t  reserved;
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+	unsigned int is_virtual  : 1;
+	unsigned int compression : 3; // 0:= NO compresson, 1:= gzip compression, 2-7:=reserved; only data field is compressed
+	                              // if (frame) type == BMX_DSC_TLV_REF_ADV then all resolved data fields are compressed (NOT the hashes)
+	unsigned int reserved    : 4;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+	unsigned int reserved    : 4;
+	unsigned int compression : 3;
+	unsigned int is_virtual  : 1;
+#else
+# error "Please fix <bits/endian.h>"
+#endif
+
+	uint16_t length;  // lenght of (compressed) frame in 1-Byte steps, including frame_header and variable data field
 //	uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
 } __attribute__((packed));
 
 
+struct frame_header_virtual { // 6 bytes
+	unsigned int type : FRAME_TYPE_BIT_SIZE;
+	unsigned int is_relevant : FRAME_RELEVANCE_BIT_SIZE;
+	unsigned int is_short : FRAME_ISSHORT_BIT_SIZE;
+
+	unsigned int is_virtual  : 1;
+	unsigned int reserved    : 7;
+
+	uint32_t length;  // lenght of (always uncompressed and resolved) frame in 1-Byte steps, including frame_header and variable data field
+//	uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
+} __attribute__((packed));
+
+//#define SHORT_FRAME_DATA_MAX (XMIN( 500, ((int)((((sizeof( ((struct frame_header_short*)NULL)->length_TLV_DATA_STEPS ))<<8)-1)*TLV_DATA_STEPS))))
 
 
 
-#define SHORT_FRAME_DATA_MAX (XMIN( 500, ((int)((((sizeof( ((struct frame_header_short*)NULL)->length_TLV_DATA_STEPS ))<<8)-1)*TLV_DATA_STEPS))))
-
+#define MAX_SHORT_FRAME_LEN ((int)((((sizeof( ((struct frame_header_short*)NULL)->length ))<<8)-1)))
+#define MAX_SHORT_FRAME_DATA_LEN (MAX_SHORT_FRAME_LEN - sizeof(struct frame_header_short))
 
 // iterator return codes:
-#define TLV_RX_DATA_BLOCKED    (-5) // blocked due to DAD
+#define TLV_RX_DATA_BLOCKED    (-6) // blocked due to DAD
 
-#define TLV_TX_DATA_FULL       (-4) // nothing done! Frame finished or not enough remining data area to write
+#define TLV_TX_DATA_FULL       (-5) // nothing done! Frame finished or not enough remining data area to write
                                  // only returns from tx-iterations, rx- will return FAILURE
-#define TLV_RX_DATA_FAILURE    (-3) // syntax error: exit or blacklist
-#define TLV_TX_DATA_FAILURE    (-3) // syntax error: will fail assertion()
+#define TLV_RX_DATA_FAILURE    (-4) // syntax error: exit or blacklist
+#define TLV_TX_DATA_FAILURE    (-4) // syntax error: will fail assertion()
 
-#define TLV_RX_DATA_DONE        (-2) // done, nothing more to do
-#define TLV_TX_DATA_DONE        (-2) // done, nothing more to do
+#define TLV_RX_DATA_DONE        (-3) // done, nothing more to do
+#define TLV_TX_DATA_DONE        (-3) // done, nothing more to do
+
+#define TLV_RX_DATA_UNRESOLVED  (-2) // TBD: remove !!?? (unknown, filtered, nothing to send, or ignored due to bad link...)
 
 #define TLV_RX_DATA_IGNORED     (-1) // unknown, filtered, nothing to send, or ignored due to bad link...
 #define TLV_TX_DATA_IGNORED     (-1) // unknown, filtered, nothing to send, or ignored due to bad link...
 
 #define TLV_RX_DATA_PROCESSED   (0) // >= means succesfully processed returned amount of data
 #define TLV_TX_DATA_PROCESSED   (0) // >= means succesfully processed returned amount of data
-#define TLV_DATA_STEPS          (1) // legal data-size steps, never returns
-                                    // the smalles legal frame must be:
-                                    // - a multiple of two
-                                    // - have lenght of frame_header_short plus 2 bytes frame_data
 
 
 
@@ -429,6 +465,7 @@ struct msg_rp_adv { // 1 byte
 
 
 
+
 struct msg_dhash_request { // 2 bytes
 	IID_T receiverIID4x;
 } __attribute__((packed));
@@ -445,9 +482,46 @@ struct msg_dhash_adv { // 2 + X bytes
 } __attribute__((packed));
 
 
+
+
+// for FRAME_TYPE_REF_REQ:
+struct msg_ref_req {
+    SHA1_T rframe_hash;
+} __attribute__((packed));
+
+
+
+// for BMX_DSC_TLV_REF_ADV:
+struct description_msg_ref {
+//? uint32_t rframe_position; // position of to-be-resolved frame in hdr_rhash_adv->expanded_len area
+    SHA1_T rframe_hash;       // hash over full frame (including frame-header and data) as transmitted
+} __attribute__((packed));
+
+struct description_hdr_ref {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+	unsigned int reserved        : 2;
+	unsigned int referenced_type : FRAME_TYPE_BIT_SIZE; // type of most inner references! NEVER BMX_DSC_TLV_REF
+#elif __BYTE_ORDER == __BIG_ENDIAN
+	unsigned int referenced_type : FRAME_TYPE_BIT_SIZE;
+	unsigned int reserved        : 2;
+#else
+# error "Please fix <bits/endian.h>"
+#endif
+    uint32_t expanded_rframes_data_len; // length of fully expanded (uncompressed, resolved rhash->rdata), without frame header!
+    SHA1_T expanded_rframes_data_hash;  // hash over expanded_rframes_data_len data
+    struct description_msg_ref msg[];
+} __attribute__((packed));
+
+#define DESCRIPTION_MSG_REF_FORMAT { \
+{FIELD_TYPE_STRING_BINARY, -1, 160, 1, FIELD_RELEVANCE_LOW,  "rframe_hash"},  \
+	FIELD_FORMAT_END }
+
+
+
+
+
 #define msg_description_request msg_dhash_request
 #define hdr_description_request hdr_dhash_request
-
 
 
 struct description { // 68 bytes
@@ -463,8 +537,16 @@ struct description { // 68 bytes
 	uint16_t capabilities; // 2 bytes // TODOCV18: dont use before!
 
 	uint8_t comp_version;  // 1 bytes
-//	uint8_t reservedTtl;   // 1 byte
-        uint8_t reserved;      // 1 byte
+
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+	unsigned int reserved    : 6;
+	unsigned int ref_nesting : 2;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+	unsigned int ref_nesting : 2;
+	unsigned int reserved    : 6;
+#else
+# error "Please fix <bits/endian.h>"
+#endif
 
         uint16_t extensionLen;// 2 bytes
 //	uint8_t extensionData[];
@@ -495,7 +577,8 @@ struct msg_description_adv { // IPv6: >= 92 bytes
 {FIELD_TYPE_UINT,             -1, (8*sizeof(OGM_SQN_T)),   0, FIELD_RELEVANCE_MEDI, ARG_OGM_SQN_RANGE }, \
 {FIELD_TYPE_HEX,              -1, 16,                      0, FIELD_RELEVANCE_MEDI, "capabilities" }, \
 {FIELD_TYPE_UINT,             -1, 8,                       1, FIELD_RELEVANCE_LOW,  "comp_version" }, \
-{FIELD_TYPE_UINT,             -1, 8,                       1, FIELD_RELEVANCE_LOW,  "reserved" }, \
+{FIELD_TYPE_UINT,             -1, 6,                       1, FIELD_RELEVANCE_LOW,  "reserved" }, \
+{FIELD_TYPE_UINT,             -1, 2,                       1, FIELD_RELEVANCE_LOW,  "ref_nesting" }, \
 {FIELD_TYPE_STRING_SIZE,      -1, 16,                      0, FIELD_RELEVANCE_LOW,  "extensionLen" }, \
 {FIELD_TYPE_STRING_BINARY,    -1, 0,                       1, FIELD_RELEVANCE_LOW,  "extensionData" }, \
 FIELD_FORMAT_END}
@@ -573,7 +656,10 @@ struct msg_ogm_ack {
 #define BMX_DSC_TLV_TUN6_MAX            0x0A
 
 #define BMX_DSC_TLV_JSON_SMS    0x10
-#define BMX_DSC_TLV_MAX_KNOWN    0x10
+
+#define BMX_DSC_TLV_REF_ADV     (FRAME_TYPE_ARRSZ-1)
+
+#define BMX_DSC_TLV_MAX_KNOWN   (FRAME_TYPE_ARRSZ-1)
 #define BMX_DSC_TLV_MAX         (FRAME_TYPE_ARRSZ-1)
 #define BMX_DSC_TLV_ARRSZ       (FRAME_TYPE_ARRSZ)
 
@@ -598,7 +684,7 @@ struct rx_frame_iterator {
         struct packet_buff *pb;
         struct orig_node *on;
         struct ctrl_node *cn;
-        uint8_t *data;
+//        uint8_t *data;
         uint8_t *frames_in;
         struct frame_handl *handls;
         struct frame_handl *handl;
@@ -610,12 +696,18 @@ struct rx_frame_iterator {
         // MUST be initialized, updated by rx..iterate(), and consumed by handl[].rx_tlv_handler
         int32_t frames_pos;
         int8_t frame_type; //init to -1 !!
+        int8_t frame_type_no_ref; //init to -1 !!
 
         // set by rx..iterate(), and consumed by handl[].rx_tlv_handler
         uint8_t is_short_header;
+        uint8_t is_relevant;
+        uint8_t is_virtual_header;
+	uint8_t frame_compression;
         int32_t frame_data_length;
+        int32_t frame_length;
         int32_t frame_msgs_length;
         int32_t frame_msgs_fixed;
+	struct frame_header_short *frame_hdr;
         uint8_t *frame_data;
         uint8_t *msg;
 
@@ -636,21 +728,26 @@ struct tx_frame_iterator {
 	const char          *caller;
 	struct list_head    *tx_task_list;
 	struct tx_task_node *ttn;
+	struct desc_extension *dext;
 
-	uint8_t             *cache_data_array;
+	uint8_t             *frame_cache_array;
 	uint8_t             *frames_out_ptr;
 	struct frame_handl  *handls;
 	uint8_t              handl_max;
 	int32_t              frames_out_pref;
 	int32_t              frames_out_max;
-
+	int32_t              frame_cache_size;
         // updated by fs_caller():
 	uint8_t              frame_type;
 
 	// updated by tx..iterate():
 	int32_t              frames_out_pos;
 	int32_t              frames_out_num;
-	int32_t              cache_msgs_size;
+	int32_t              frame_cache_msgs_size;
+
+	// optionally set by tx_frame_handler():
+	uint8_t              use_long_header;
+	uint8_t              already_compressed;
 
 //#define tx_iterator_cache_data_space( it ) (((it)->frames_out_max) - ((it)->frames_out_pos + (it)->cache_msg_pos + ((int)(sizeof (struct frame_header_long)))))
 //#define tx_iterator_cache_hdr_ptr( it ) ((it)->cache_data_array)
@@ -669,6 +766,8 @@ struct frame_handl {
 	                     // If irrelevant and unknown: then frame propagation depends on the super_frame logic.
 	                     // i.e.: * unknown packet_frames MUST BE dropped.
 	                     //       * unknown and irrelevant description_tlv_frames MUST BE propagated
+	int32_t *do_compress;
+	int32_t *do_reference;
         uint8_t family;
 	uint8_t rx_requires_described_neigh;
         uint16_t data_header_size;
@@ -693,30 +792,23 @@ struct frame_handl {
 
 static inline uint8_t * tx_iterator_cache_hdr_ptr(struct tx_frame_iterator *it)
 {
-	return it->cache_data_array;
+	return it->frame_cache_array;
 }
 
 static inline uint8_t * tx_iterator_cache_msg_ptr(struct tx_frame_iterator *it)
 {
-	return it->cache_data_array + it->handls[it->frame_type].data_header_size + it->cache_msgs_size;
+	return it->frame_cache_array + it->handls[it->frame_type].data_header_size + it->frame_cache_msgs_size;
 }
 
-static inline int32_t tx_iterator_cache_data_space_max(struct tx_frame_iterator *it)
-{
-	return it->frames_out_max - (
-		it->frames_out_pos +
-		it->handls[it->frame_type].data_header_size +
-		it->cache_msgs_size +
-		(int) sizeof(struct frame_header_long));
-}
+int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max);
 
-static inline int32_t tx_iterator_cache_data_space_pref(struct tx_frame_iterator *it)
+#define tx_iterator_cache_data_space_max( it )  _tx_iterator_cache_data_space(it, 1)
+#define tx_iterator_cache_data_space_pref( it ) _tx_iterator_cache_data_space(it, 0)
+
+static inline int32_t tx_iterator_cache_data_space_sched(struct tx_frame_iterator *it)
 {
-	return it->frames_out_pref - (
-		it->frames_out_pos +
-		it->handls[it->frame_type].data_header_size +
-		it->cache_msgs_size +
-		(int) sizeof(struct frame_header_long));
+    return (!it->frames_out_pos && !it->frame_cache_msgs_size) ?
+	tx_iterator_cache_data_space_max(it) : tx_iterator_cache_data_space_pref(it);
 }
 
 static inline int32_t tx_iterator_cache_msg_space_max(struct tx_frame_iterator *it)
@@ -753,12 +845,14 @@ void update_my_description_adv( void );
 void update_my_dev_adv(void);
 void update_my_link_adv(uint32_t changes);
 
+void free_desc_extensions(struct desc_extension **dext);
 struct dhash_node * process_description(struct packet_buff *pb, struct description *desc, struct description_hash *dhash);
-IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, struct description *desc, uint8_t op,
-        uint8_t filter, void *custom_data, struct ctrl_node *cn);
+IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, struct description *desc, struct desc_extension *dext,
+        uint8_t op, uint8_t filter, void *custom, struct ctrl_node *cn);
 int32_t get_desc_frame_data(uint8_t **frame_data, uint8_t *desc_ext_data, int32_t desc_ext_len, uint8_t frame_type);
 IDM_T desc_frame_changed(  struct rx_frame_iterator *it, uint8_t f_type );
 void purge_tx_task_list(struct list_head *tx_tasks_list, struct link_node *only_link, struct dev_node *only_dev);
+void ref_node_purge (IDM_T all_unused);
 
 void tx_packets( void *unused );
 IDM_T rx_frames(struct packet_buff *pb);
