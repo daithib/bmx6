@@ -120,7 +120,7 @@ int32_t z_decompress( uint8_t *src, uint32_t slen, uint8_t **dst, uint32_t dpos)
 		strm.avail_out = Z_CHUNK_SIZE;
 		strm.next_out = tmp;
 
-		if (tlen > INT32_MAX || (z_ret=inflate(&strm, Z_NO_FLUSH)) != Z_OK) {
+		if (tlen >= (INT32_MAX - Z_CHUNK_SIZE) || (((z_ret=inflate(&strm, Z_NO_FLUSH)) != Z_OK) && z_ret != Z_STREAM_END)) {
 //		if (err==Z_STREAM_ERROR || err==Z_NEED_DICT || err==Z_DATA_ERROR || err==Z_MEM_ERROR) {
 			dbgf_sys(DBGT_ERR, "slen=%d tlen=%d z_ret=%d error: %s ???", slen, tlen, z_ret, strerror(errno));
 			tlen = FAILURE;

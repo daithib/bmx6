@@ -2452,10 +2452,10 @@ struct dhash_node *process_dhash_description_neighIID4x
                         // is about the transmitter:
 
                         if (update_local_neigh(pb, orig_dhn) == FAILURE)
-                                return FAILURE_PTR;
+                                return (struct dhash_node *) FAILURE_PTR;
 
                         if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, orig_dhn->myIID4orig) == FAILURE)
-                                return FAILURE_PTR;
+                                return (struct dhash_node *) FAILURE_PTR;
 
                         assertion(-500968, (is_described_neigh(pb->i.link, pb->i.transmittersIID)));
 
@@ -2476,14 +2476,14 @@ struct dhash_node *process_dhash_description_neighIID4x
                                 dbgf_sys(DBGT_ERR, "%s via %s neighIID4x=%d IS NOT transmitter=%d",
                                         globalIdAsString(&orig_dhn->on->global_id), pb->i.llip_str, neighIID4x, pb->i.transmittersIID);
 
-                                return FAILURE_PTR;
+                                return (struct dhash_node *) FAILURE_PTR;
 
                         } else {
                                 // is about.a another dhash known by me and a (neighboring) transmitter..:
                         }
 
                         if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, orig_dhn->myIID4orig) == FAILURE)
-                                return FAILURE_PTR;
+                                return (struct dhash_node *) FAILURE_PTR;
 
                 }
 
@@ -2501,10 +2501,10 @@ struct dhash_node *process_dhash_description_neighIID4x
 				orig_dhn != FAILURE_PTR && orig_dhn != UNRESOLVED_PTR && orig_dhn != IGNORED_PTR) {
 
                                 if (update_local_neigh(pb, orig_dhn) == FAILURE)
-                                        return FAILURE_PTR;
+                                        return (struct dhash_node *) FAILURE_PTR;
 
                                 if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, orig_dhn->myIID4orig) == FAILURE)
-                                        return FAILURE_PTR;
+                                        return (struct dhash_node *) FAILURE_PTR;
 
                                 assertion(-500969, (is_described_neigh(pb->i.link, pb->i.transmittersIID)));
                         }
@@ -2516,7 +2516,7 @@ struct dhash_node *process_dhash_description_neighIID4x
 				orig_dhn != FAILURE_PTR && orig_dhn != UNRESOLVED_PTR && orig_dhn != IGNORED_PTR) {
 
                                 if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, orig_dhn->myIID4orig) == FAILURE)
-                                        return FAILURE_PTR;
+                                        return (struct dhash_node *) FAILURE_PTR;
                         }
 			assertion(-501589, orig_dhn);
                 }
@@ -3943,6 +3943,8 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 void free_desc_extensions(struct desc_extension **dext)
 {
 	assertion(-501600, dext);
+	assertion(-501608, IMPLIES(*dext, *dext!=IGNORED_PTR && *dext!=FAILURE_PTR && *dext!=UNRESOLVED_PTR));
+
         if(*dext) {
 
 		ref_node_release(*dext);
@@ -3990,7 +3992,7 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 	}
 
 	if (unresolved)
-		return UNRESOLVED_PTR;
+		return (struct desc_extension *) UNRESOLVED_PTR;
 
 
 	dext = debugMallocReset(sizeof(struct desc_extension), -300571);
@@ -4055,7 +4057,7 @@ resolve_desc_extension_error:
 
 	free_desc_extensions(&dext);
 	dbgf_sys(DBGT_ERR, "Failed converting type=%d compression=%d", it.frame_type, it.frame_compression);
-	return FAILURE_PTR;
+	return (struct desc_extension *) FAILURE_PTR;
 }
 
 struct dhash_node * process_description(struct packet_buff *pb, struct description *desc, struct description_hash *dhash)
@@ -4074,7 +4076,7 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 		dbgf_sys(DBGT_WARN, "IGNORED global_id=%s rcvd via_dev=%s via_ip=%s",
 			desc ? globalIdAsString(&desc->globalId) : "???", pb->i.iif->label_cfg.str, pb->i.llip_str);
 
-		return IGNORED_PTR;
+		return (struct dhash_node *) IGNORED_PTR;
 	}
 
         struct desc_extension *dext = resolve_desc_extensions(pb, (((uint8_t*) desc) + sizeof (struct description)), ntohs(desc->extensionLen));
@@ -4086,10 +4088,10 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 		dbgf_sys(DBGT_WARN, "UNRESOLVED global_id=%s rcvd via_dev=%s via_ip=%s",
 			desc ? globalIdAsString(&desc->globalId) : "???", pb->i.iif->label_cfg.str, pb->i.llip_str);
 
-		return UNRESOLVED_PTR;
+		return (struct dhash_node *) UNRESOLVED_PTR;
 	}
 
-	assertion(-501602, dext);
+	assertion(-501602, dext && dext!=IGNORED_PTR && dext!= FAILURE_PTR && dext!=UNRESOLVED_PTR);
 
 
         if (!on) // create new orig:
@@ -4157,7 +4159,7 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 
 process_desc0_error:
 
-        if (dext)
+        if (dext && dext!=IGNORED_PTR && dext!= FAILURE_PTR && dext!=UNRESOLVED_PTR)
 		free_desc_extensions(&dext);
 
         if (on)
@@ -4168,7 +4170,7 @@ process_desc0_error:
 	dbgf_sys(DBGT_ERR, "FAILED global_id=%s rcvd via_dev=%s via_ip=%s",
 		desc ? globalIdAsString(&desc->globalId) : "???", pb->i.iif->label_cfg.str, pb->i.llip_str);
 
-        return FAILURE_PTR;
+        return (struct dhash_node *) FAILURE_PTR;
 }
 
 

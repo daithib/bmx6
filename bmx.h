@@ -564,9 +564,9 @@ enum NoYes {
 extern const IDM_T CONST_YES;
 extern const IDM_T CONST_NO;
 
-extern void *IGNORED_PTR;
-extern void *UNRESOLVED_PTR;
-extern void *FAILURE_PTR;
+extern const void *IGNORED_PTR;
+extern const void *UNRESOLVED_PTR;
+extern const void *FAILURE_PTR;
 
 
 enum ADGSN {
@@ -1152,7 +1152,7 @@ void rx_packet( struct packet_buff *pb );
 /*
  * ASSERTION / PARANOIA ERROR CODES:
  * Negative numbers are used as SIGSEV error codes !
- * Currently used numbers are: -500000 -500001 ... -501607
+ * Currently used numbers are: -500000 -500001 ... -501608
  */
 
 //#define paranoia( code , problem ) do { if ( (problem) ) { cleanup_all( code ); } }while(0)
