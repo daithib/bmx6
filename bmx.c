@@ -71,9 +71,9 @@ const IDM_T CONST_YES = YES;
 const IDM_T CONST_NO = NO;
 
 
-void* IGNORED_PTR = (void*) & IGNORED_PTR;
-void* UNRESOLVED_PTR = (void*) & UNRESOLVED_PTR;
-void* FAILURE_PTR = (void*) & FAILURE_PTR;
+const void* IGNORED_PTR = (void*) & IGNORED_PTR;
+const void* UNRESOLVED_PTR = (void*) & UNRESOLVED_PTR;
+const void* FAILURE_PTR = (void*) & FAILURE_PTR;
 
 
 static struct timeval start_time_tv;
