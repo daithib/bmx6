@@ -19,7 +19,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include "zlib.h"
+#include <errno.h>
+#include <zlib.h>
 #include "bmx.h"
 #include "allocate.h"
 #include "z.h"
@@ -50,14 +51,13 @@ int32_t z_compress( uint8_t *src, int32_t slen, uint8_t **dst, uint32_t dpos, ui
     strm.next_in = src;
 
     do {
-	    int flush = 0;
-	    debugRealloc(tmp, tlen + Z_CHUNK_SIZE, -300573);
+	    tmp = debugRealloc(tmp, tlen + Z_CHUNK_SIZE, -300573);
 
 	    strm.avail_out = Z_CHUNK_SIZE;
 	    strm.next_out = tmp + tlen;
-	    z_ret = deflate(&strm, flush);
 
-	    if (z_ret == Z_STREAM_ERROR) {
+	    if ((z_ret = deflate(&strm, Z_FINISH)) != Z_OK && z_ret != Z_STREAM_END) { //== Z_STREAM_ERROR) {
+		    dbgf_sys(DBGT_ERR, "slen=%d tlen=%d z_ret=%d error: %s ???", slen, tlen, z_ret, strerror(errno));
 		    tlen = FAILURE;
 		    break;
 	    } else {
@@ -66,8 +66,6 @@ int32_t z_compress( uint8_t *src, int32_t slen, uint8_t **dst, uint32_t dpos, ui
 
     } while (strm.avail_out == 0);
 
-    (void)deflateEnd(&strm);
-
     if (tmp && tlen > 0 && tlen < slen) {
 	    if (dst) {
 		    *dst = debugRealloc(*dst, dpos + tlen, -300574);
@@ -75,14 +73,20 @@ int32_t z_compress( uint8_t *src, int32_t slen, uint8_t **dst, uint32_t dpos, ui
 	    }
 	    if (darr && darr_max_size >= tlen)
 		    memcpy(darr, tmp, tlen);
+
+    } else if (tmp && tlen >= slen) {
+	    tlen = 0;
+
     } else {
 	    tlen = FAILURE;
     }
 
+    (void)deflateEnd(&strm);
+
     if (tmp)
 	    debugFree(tmp, -300575);
 
-    dbgf(tlen>0?DBGL_CHANGES:DBGL_SYS, tlen>0?DBGT_INFO:DBGT_ERR, "slen=%d tlen=%d", slen, tlen);
+    dbgf(tlen>=0?DBGL_CHANGES:DBGL_SYS, tlen>=0?DBGT_INFO:DBGT_ERR, "slen=%d tlen=%d", slen, tlen);
 
     return tlen;
 }
@@ -100,10 +104,11 @@ int32_t z_decompress( uint8_t *src, uint32_t slen, uint8_t **dst, uint32_t dpos)
 
 	uint8_t *tmp = NULL;
 	int32_t tlen = 0;
+	int z_ret;
 
 	z_stream strm = {.zalloc = Z_NULL, .zfree = Z_NULL, .opaque = Z_NULL, .avail_in = 0, .next_in = Z_NULL};
 
-	if (inflateInit(&strm) != Z_OK)
+	if ((z_ret=inflateInit(&strm)) != Z_OK)
 		return FAILURE;
 
 	strm.avail_in = slen;
@@ -114,8 +119,10 @@ int32_t z_decompress( uint8_t *src, uint32_t slen, uint8_t **dst, uint32_t dpos)
 
 		strm.avail_out = Z_CHUNK_SIZE;
 		strm.next_out = tmp;
-		if (tlen > INT32_MAX || inflate(&strm, Z_NO_FLUSH) != Z_OK) {
+
+		if (tlen > INT32_MAX || (z_ret=inflate(&strm, Z_NO_FLUSH)) != Z_OK) {
 //		if (err==Z_STREAM_ERROR || err==Z_NEED_DICT || err==Z_DATA_ERROR || err==Z_MEM_ERROR) {
+			dbgf_sys(DBGT_ERR, "slen=%d tlen=%d z_ret=%d error: %s ???", slen, tlen, z_ret, strerror(errno));
 			tlen = FAILURE;
 			break;
 		}

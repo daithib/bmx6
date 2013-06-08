@@ -3245,7 +3245,9 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 		uint8_t *rf_hdr = (it->frames_out_ptr + it->frames_out_pos);
 		uint8_t *rfd_agg_data = rf_compress ? NULL : it->frame_cache_array;
-		int32_t rfd_agg_len = rf_compress ? z_compress(it->frame_cache_array, cache_pos, &rfd_agg_data, 0, 0, 0) : cache_pos;
+		int32_t rfd_zagg_len = rf_compress ? z_compress(it->frame_cache_array, cache_pos, &rfd_agg_data, 0, 0, 0) : 0;
+		assertion(-501606, IMPLIES(rf_compress, rfd_zagg_len >= 0 && rfd_zagg_len < cache_pos));
+		int32_t rfd_agg_len = rfd_zagg_len > 0 ? rfd_zagg_len : cache_pos;
 		assertion(-501594, IMPLIES(rf_compress, rfd_agg_len > 0));
 		int32_t rfd_msgs = rfd_agg_len/PREF_PKT_FRAME_DATA_SIZE + (rfd_agg_len%PREF_PKT_FRAME_DATA_SIZE?1:0);
 		int32_t rfd_size = sizeof(struct description_hdr_ref) + (rfd_msgs*sizeof(struct description_msg_ref));
@@ -3301,18 +3303,20 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 		if (is_long_header) {
 
-			if (!it->already_compressed && rf_compress) {
+			int32_t z_size = 0;
 
-				it->frames_out_pos += sizeof ( struct frame_header_long);
-				int32_t z_size = z_compress(it->frame_cache_array, cache_pos, 0,0, it->frames_out_ptr + it->frames_out_pos, cache_pos);
-				assertion(-501597, z_size > 0);
+			it->frames_out_pos += sizeof ( struct frame_header_long);
+
+			if (!it->already_compressed && rf_compress &&
+				(z_size = z_compress(it->frame_cache_array, cache_pos, 0,0, it->frames_out_ptr + it->frames_out_pos, cache_pos)) > 0) {
+
+				assertion(-501597, z_size < cache_pos);
 				it->frames_out_pos += z_size;
 				fhl->length = htons(z_size + sizeof ( struct frame_header_long));
 				fhl->compression = FRAME_COMPRESSION_GZIP;
 
 			} else {
-
-				it->frames_out_pos += sizeof ( struct frame_header_long);
+				assertion(-501607, z_size == 0);
 				memcpy(it->frames_out_ptr + it->frames_out_pos, it->frame_cache_array, cache_pos);
 				it->frames_out_pos += cache_pos;
 				fhl->length = htons(cache_pos + sizeof ( struct frame_header_long));
