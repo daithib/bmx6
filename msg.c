@@ -103,6 +103,11 @@ static AGGREG_SQN_T ogm_aggreg_sqn_max;
 
 //static struct dhash_node* DHASH_NODE_FAILURE = (struct dhash_node*) & DHASH_NODE_FAILURE;
 
+STATIC_FUNC
+struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t *data, uint32_t dlen);
+
+STATIC_FUNC
+int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, uint8_t compression, struct desc_extension *dext, uint8_t nest_level );
 
 /***********************************************************
   The core frame/message structures and handlers
@@ -1298,6 +1303,25 @@ STATIC_FUNC
 int process_description_tlv_ref(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
+
+	// description reference extenstions are processed explicitly via:
+	assertion(-500000, ( TEST_FUNCTION(process_description))); //calling:
+	assertion(-500000, ( TEST_FUNCTION(resolve_desc_extensions))); //calling:
+	assertion(-500000, ( TEST_FUNCTION(resolve_ref_frame)) );
+	assertion(-500000, ( TEST_FUNCTION(ref_node_get)) );
+	assertion(-500000, ( TEST_FUNCTION(ref_node_use)) );
+	// and must be ignored when processed implicitly via:
+	assertion(-500000, ( TEST_FUNCTION(rx_frame_iterate)) );
+	// either while processing:
+	assertion(-500000, ( TEST_STRUCT(struct description)) );
+	// and using:
+	assertion(-500000, ( TEST_VALUE( FRAME_TYPE_PROCESS_NONE )) );
+
+	// or while processing:
+	assertion(-500000, ( TEST_STRUCT(struct desc_extension)) );
+	// where type:
+	assertion(-500000, ( TEST_VALUE( BMX_DSC_TLV_REF_ADV )) );
+	// must not exist anymore because it should have been resolved already!
 
         assertion(-501584, (!it->is_short_header));
         assertion(-501585, (!it->on));
@@ -2558,17 +2582,24 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
                 return sizeof (struct msg_dhash_adv);
         }
 
-        if ((dhn = process_dhash_description_neighIID4x(pb, &adv->dhash, NULL, neighIID4x)) == FAILURE_PTR)
-                return FAILURE;
+        if ((dhn = process_dhash_description_neighIID4x(pb, &adv->dhash, NULL, neighIID4x)) == FAILURE_PTR) {
+                
+		return FAILURE;
 
-	if (!dhn) {
-		schedule_tx_task(pb->i.link->local->best_tp_lndev, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, 0, 0, 0, neighIID4x);
 	} else if (dhn == UNRESOLVED_PTR || dhn == IGNORED_PTR) {
-	} else {
-		assertion(-500690, (dhn && dhn->on)); // UNDESCRIBED or fully described
 
+	} else if (dhn) {
+
+		assertion(-500690, (dhn && dhn->on)); // UNDESCRIBED or fully described
 		//if rcvd transmitters' description then it must have become a described neighbor:
 		assertion(-500488, IMPLIES(is_transmitter_adv, (is_described_neigh(pb->i.link, pb->i.transmittersIID))));
+
+	} else if (!dhn) {
+		
+		schedule_tx_task(pb->i.link->local->best_tp_lndev, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, 0, 0, 0, neighIID4x);
+
+	} else {
+		assertion(-500000, 0);
 	}
 
         return sizeof (struct msg_dhash_adv);
@@ -2600,34 +2631,40 @@ int32_t rx_frame_description_advs(struct rx_frame_iterator *it)
                 if (neighIID4x <= IID_RSVD_MAX || tlvs_len > MAX_DSC_FRAME_SIZE || pos > it->frame_msgs_length)
                         break;
 
-                ShaUpdate(&bmx_sha, (byte*) desc, (sizeof (struct description) +tlvs_len));
-                ShaFinal(&bmx_sha, (byte*) & dhash0);
-
-                dhn = process_dhash_description_neighIID4x(pb, &dhash0, desc, neighIID4x);
-
                 dbgf_all( DBGT_INFO, "rcvd desc: global_id=%s via_dev=%s via_ip=%s",
                         globalIdAsString(&desc->globalId), pb->i.iif->label_cfg.str, pb->i.llip_str);
 
-                if (dhn == FAILURE_PTR)
+                ShaUpdate(&bmx_sha, (byte*) desc, (sizeof (struct description) +tlvs_len));
+                ShaFinal(&bmx_sha, (byte*) & dhash0);
+
+                if ((dhn = process_dhash_description_neighIID4x(pb, &dhash0, desc, neighIID4x)) == FAILURE_PTR) {
+
                         return FAILURE;
+			
+		} else if (dhn == IGNORED_PTR || dhn == UNRESOLVED_PTR) {
 
-		if (dhn == IGNORED_PTR || dhn == UNRESOLVED_PTR)
-			continue;
+		} else if (dhn) {
 
-		assertion(-500691, (IMPLIES(dhn, (dhn->on))));
-		assertion(-500692, (IMPLIES(dhn && neighIID4x == pb->i.transmittersIID, is_described_neigh(pb->i.link, pb->i.transmittersIID))));
+			assertion(-500691, (dhn->on));
+			assertion(-500692, (IMPLIES(neighIID4x == pb->i.transmittersIID, is_described_neigh(pb->i.link, pb->i.transmittersIID))));
 
-		if (desc_adv_tx_unsolicited && dhn && dhn->on->updated_timestamp == bmx_time && is_described_neigh(pb->i.link, pb->i.transmittersIID)) {
+			if (desc_adv_tx_unsolicited && dhn->on->updated_timestamp == bmx_time &&
+				is_described_neigh(pb->i.link, pb->i.transmittersIID)) {
 
-			struct link_dev_node **lndev_arr = lndevs_get_best_tp(pb->i.link->local);
-			int d;
+				struct link_dev_node **lndev_arr = lndevs_get_best_tp(pb->i.link->local);
+				int d;
 
-			uint16_t desc_len = sizeof ( struct msg_description_adv) +ntohs(dhn->on->desc->extensionLen);
+				uint16_t desc_len = sizeof ( struct msg_description_adv) +ntohs(dhn->on->desc->extensionLen);
 
-			for (d = 0; (lndev_arr[d]); d++)
-				schedule_tx_task(lndev_arr[d], FRAME_TYPE_DESC_ADV, desc_len, 0, 0, dhn->myIID4orig, 0);
+				for (d = 0; (lndev_arr[d]); d++)
+					schedule_tx_task(lndev_arr[d], FRAME_TYPE_DESC_ADV, desc_len, 0, 0, dhn->myIID4orig, 0);
+			}
+		} else if (!dhn) {
+			
+		} else {
+			assertion(-500000, 0);
 		}
-        }
+	}
 
         
         if (pos != it->frame_msgs_length) {
@@ -4081,6 +4118,8 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 
         struct desc_extension *dext = resolve_desc_extensions(pb, (((uint8_t*) desc) + sizeof (struct description)), ntohs(desc->extensionLen));
 
+	assertion(-501602, (dext && dext!=IGNORED_PTR));
+
 	if (dext == FAILURE_PTR)
 		goto process_desc0_error;
 
@@ -4091,7 +4130,6 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 		return (struct dhash_node *) UNRESOLVED_PTR;
 	}
 
-	assertion(-501602, dext && dext!=IGNORED_PTR && dext!= FAILURE_PTR && dext!=UNRESOLVED_PTR);
 
 
         if (!on) // create new orig:
