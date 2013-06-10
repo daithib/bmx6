@@ -1198,6 +1198,10 @@ void trace_function_call(const char *);
 
 #define TRACE_FUNCTION_CALL trace_function_call ( __FUNCTION__ )
 
+#define TEST_FUNCTION(X) ( ((void(*)(void*))&trace_function_call) != ((void(*)(void*))&(X)) )
+#define TEST_VALUE(X) 1
+#define TEST_STRUCT(X) 1
+#define TEST_VARIABLE(X) 1
 
 #else
 
