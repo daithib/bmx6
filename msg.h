@@ -640,7 +640,7 @@ struct msg_ogm_ack {
  * - else update_orig(orig_sid, orig_sqn)
  */
 
-
+#define BMX_DSC_TLV_MIN         0x00
 #define BMX_DSC_TLV_METRIC      0x00
 
 #define BMX_DSC_TLV_UHNA4       0x01
@@ -663,7 +663,7 @@ struct msg_ogm_ack {
 #define BMX_DSC_TLV_MAX_KNOWN   (FRAME_TYPE_ARRSZ-1)
 #define BMX_DSC_TLV_MAX         (FRAME_TYPE_ARRSZ-1)
 #define BMX_DSC_TLV_ARRSZ       (FRAME_TYPE_ARRSZ)
-
+#define BMX_DSC_TLV_INVALID     (FRAME_TYPE_ARRSZ)
 
 
 

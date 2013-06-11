@@ -22,6 +22,7 @@
 
 #include <unistd.h>
 #include <errno.h>
+#include <stdint.h>
 
 #include "bmx.h"
 #include "msg.h"
@@ -107,7 +108,8 @@ STATIC_FUNC
 struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t *data, uint32_t dlen);
 
 STATIC_FUNC
-int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, uint8_t compression, struct desc_extension *dext, uint8_t nest_level );
+int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, uint8_t compression, struct desc_extension *dext, uint8_t *rf_type, uint8_t nest_level )
+;
 
 /***********************************************************
   The core frame/message structures and handlers
@@ -163,7 +165,19 @@ void register_frame_handler(struct frame_handl *array, int pos, struct frame_han
 
         assertion(-501213, IMPLIES(handl->msg_format, handl->min_msg_size ==
                 fields_dbg_lines(NULL, FIELD_RELEVANCE_LOW, 0, NULL, handl->min_msg_size, handl->msg_format)));
-                
+
+	assertion(-500000, IMPLIES(array==description_tlv_handl && pos!=BMX_DSC_TLV_REF_ADV, !handl->data_header_size));
+	// this is mandatory to let
+	assertion(-500000, TEST_VALUE(BMX_DSC_TLV_REF_ADV));
+	// messages to point and allow unambiguous concatenation of
+	assertion(-500000, TEST_VALUE(FRAME_TYPE_REF_ADV));
+	// into
+	assertion(-500000, TEST_STRUCT(struct frame_header_virtual));
+	// and
+	assertion(-500000, TEST_STRUCT(struct desc_extension));
+	// without potentially conflicting message headers (frame data headers)
+
+
         array[pos] = *handl;
 
         memset(handl, 0, sizeof ( struct frame_handl ) );
@@ -3863,7 +3877,7 @@ IDM_T validate_desc_sqn(struct description *desc, struct orig_node *on)
  *          < 0 if error (nest_level exceeded, ...)
  */
 STATIC_FUNC
-int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, uint8_t compression, struct desc_extension *dext, uint8_t nest_level )
+int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, uint8_t compression, struct desc_extension *dext, uint8_t *rf_type, uint8_t nest_level )
 {
 	assertion(-501598, (FAILURE==-1 && SUCCESS==0));
 
@@ -3875,10 +3889,10 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 	IDM_T solvable = 1;
 
 	if ((++nest_level) > MAX_REF_NESTING)
-		return FAILURE;
+		goto resolve_ref_frame_error;
 
 	if (hdr->expanded_rframes_data_len == 0 || hdr->expanded_rframes_data_len > MAX_DESC_LEN)
-		return FAILURE;
+		goto resolve_ref_frame_error;
 
 	if (dext && dext->max_nesting < nest_level)
 		dext->max_nesting = nest_level;
@@ -3893,16 +3907,21 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 
 		} else if (hdr->referenced_type == BMX_DSC_TLV_REF_ADV) {
 
-			int32_t tmp_len = resolve_ref_frame(pb, refn->f_data, refn->f_data_len, refn->f_compression, solvable?dext:NULL, nest_level);
+			int32_t tmp_len = resolve_ref_frame(pb, refn->f_data, refn->f_data_len, refn->f_compression, solvable?dext:NULL, rf_type, nest_level);
 
 			if (tmp_len < 0)
-				return FAILURE;
+				goto resolve_ref_frame_error;
 			if (tmp_len == 0)
 				solvable = 0;
 			if (tmp_len > 0)
 				ref_len += tmp_len;
 
 		} else if (refn->f_compression == FRAME_COMPRESSION_NONE) {
+
+			if ( *rf_type != BMX_DSC_TLV_INVALID && *rf_type != hdr->referenced_type)
+				*rf_type = hdr->referenced_type;
+			else
+				goto resolve_ref_frame_error;
 
 			if (solvable && dext) {
 				dext->data = debugRealloc(dext->data, dext->dlen + refn->f_data_len, -300569);
@@ -3918,49 +3937,63 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 
 			int32_t tmp_len;
 
+			if ( *rf_type != BMX_DSC_TLV_INVALID && *rf_type != hdr->referenced_type)
+				*rf_type = hdr->referenced_type;
+			else
+				goto resolve_ref_frame_error;
+
 			if (solvable && dext) {
 				if((tmp_len = z_decompress(refn->f_data, refn->f_data_len, &dext->data, dext->dlen)) <= 0)
-					return FAILURE;
+					goto resolve_ref_frame_error;
 				dext->dlen += tmp_len;
 				ref_node_use(dext, refn);
 			} else {
 				if ((tmp_len = z_decompress(refn->f_data, refn->f_data_len, NULL, 0)) <= 0)
-					return FAILURE;
+					goto resolve_ref_frame_error;
 			}
 
 			ref_len += tmp_len;
 
 		} else {
-			return FAILURE;
+			goto resolve_ref_frame_error;
 		}
+
 		assertion(-501599, IMPLIES(solvable && dext, dext_begin + ref_len == dext->dlen));
+		assertion(-500000, IMPLIES(solvable, *rf_type <= BMX_DSC_TLV_MAX));
         }
 
 	if (m != msgs)
-		return FAILURE;
+		goto resolve_ref_frame_error;
 
 	if (!solvable)
-		return SUCCESS; // 0 == unresolved
+		goto resolve_ref_frame_unresolved;
 
 	if (compression == FRAME_COMPRESSION_NONE) {
+
 		if (ref_len != (int32_t)hdr->expanded_rframes_data_len)
-			return FAILURE;
+			goto resolve_ref_frame_error;
 
 	} else if (compression == FRAME_COMPRESSION_GZIP) {
 
 			if (dext) {
 				if ((ref_len = z_decompress(dext->data + dext_begin, ref_len, &dext->data, dext_begin)) <= 0)
-					return FAILURE;
+					goto resolve_ref_frame_error;
 
 				dext->dlen = dext_begin + ref_len;
 
 			} else {
-				if ((ref_len = z_decompress(dext->data + dext_begin, ref_len, NULL, 0)) <= 0)
-					return FAILURE;
+
+
+				if ((ref_len = z_decompress( GRRR( dext==NULL) dext->data + dext_begin, ref_len, NULL, 0)) <= 0)
+					goto resolve_ref_frame_error;
 			}
 
+			if (ref_len != (int32_t)hdr->expanded_rframes_data_len)
+				goto resolve_ref_frame_error;
+
+
 	} else {
-		return FAILURE;
+		goto resolve_ref_frame_error;
 	}
 
 	if (dext) {
@@ -3969,10 +4002,19 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 		ShaFinal(&bmx_sha, (byte*) &rhash);
 
 		if (memcmp(&rhash, &hdr->expanded_rframes_data_hash, sizeof(SHA1_T)))
-			return FAILURE;
+			goto resolve_ref_frame_error;
 	}
 
 	return ref_len;
+
+resolve_ref_frame_unresolved:
+	return SUCCESS; // 0 == unresolved
+
+resolve_ref_frame_error:
+
+	assertion(-500000, !dext); // this function should only be called if a prior call with dext=NULL succeeded
+	return FAILURE;
+
 }
 
 
@@ -3999,8 +4041,11 @@ STATIC_FUNC
 struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t *data, uint32_t dlen)
 {
         TRACE_FUNCTION_CALL;
+	assertion(-500000, (BMX_DSC_TLV_INVALID > BMX_DSC_TLV_MAX && BMX_DSC_TLV_INVALID <= UINT8_MAX));
+
 	IDM_T unresolved = 0;
         struct desc_extension *dext = NULL;
+	uint8_t dsc_frame_types[BMX_DSC_TLV_ARRSZ] = {0};
 
         struct rx_frame_iterator it, it_init = {
                 .caller = __FUNCTION__, .on = NULL, .cn = NULL, .op = TLV_OP_PLUGIN_MIN,
@@ -4009,36 +4054,66 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
                 .frame_type = -1,.frames_in = data, .frames_length = dlen };
 
 
+	// First check if dext is fully resolvable::
 	it = it_init;
         while (rx_frame_iterate(&it) > TLV_RX_DATA_DONE) {
 
+		uint8_t vf_type = BMX_DSC_TLV_INVALID;
+		int32_t vf_data_len = 0;
+
                 if (it.frame_type != BMX_DSC_TLV_REF_ADV && it.frame_compression == FRAME_COMPRESSION_NONE) {
+
+			vf_type = it.frame_type;
+			vf_data_len = it.frame_data_length;
+
 		} else if (it.frame_type != BMX_DSC_TLV_REF_ADV && it.frame_compression == FRAME_COMPRESSION_GZIP) {
-                } else if (it.frame_type == BMX_DSC_TLV_REF_ADV && it.frame_compression == FRAME_COMPRESSION_NONE) {
 
-			int32_t tmp_ref_len = resolve_ref_frame(pb, it.frame_data, it.frame_data_length, it.frame_compression, NULL, 1);
+			vf_type = it.frame_type;
+			vf_data_len = z_decompress(it.frame_data, it.frame_data_length, NULL, 0);
 
-			if ( tmp_ref_len < 0 )
+			if ( vf_data_len <= 0 || vf_data_len <= it.frame_data_length)
 				goto resolve_desc_extension_error;
-			else if (tmp_ref_len == 0)
+
+                } else if (it.frame_type == BMX_DSC_TLV_REF_ADV && it.frame_compression == FRAME_COMPRESSION_NONE &&
+			(((struct description_hdr_ref*)(it.frame_data))->expanded_rframes_data_len) > 0) {
+
+			vf_type = 0;
+			vf_data_len = resolve_ref_frame(pb, it.frame_data, it.frame_data_length, it.frame_compression, NULL, &vf_type, 1);
+
+			if (vf_data_len == 0) {
+
 				unresolved = 1;
+				
+			} else if ( vf_data_len == (int32_t)(((struct description_hdr_ref*)(it.frame_data))->expanded_rframes_data_len)) {
+
+			} else {
+
+				goto resolve_desc_extension_error;
+			}
 
                 } else {
 			goto resolve_desc_extension_error;
+		}
+
+		if (!unresolved) {
+			if (vf_type > BMX_DSC_TLV_MAX || dsc_frame_types[vf_type])
+				goto resolve_desc_extension_error;
+			else
+				dsc_frame_types[vf_type] = 1;
 		}
 	}
 
 	if (unresolved)
 		return (struct desc_extension *) UNRESOLVED_PTR;
 
-
+	// only if dext is fully resolvable allocate it, so this should always succeed!!!
 	dext = debugMallocReset(sizeof(struct desc_extension), -300571);
 	LIST_INIT_HEAD(dext->refnl_list, struct refnl_node, list, list);
 	it = it_init;
         while (rx_frame_iterate(&it) > TLV_RX_DATA_DONE) {
 
-		uint8_t vf_type;
-		int32_t vf_data_len ;
+		uint8_t vf_type = BMX_DSC_TLV_INVALID;
+		int32_t vf_data_len = 0;
 
 		dext->dlen += sizeof(struct frame_header_virtual);
 
@@ -4054,27 +4129,21 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 			vf_type = it.frame_type;
 			vf_data_len = z_decompress(it.frame_data, it.frame_data_length, &dext->data, dext->dlen);
 
-			if (vf_data_len <= 0)
-				goto resolve_desc_extension_error;
-
+			assertion(-500000, (vf_data_len > 0));
 			dbgf_track(DBGT_INFO, "Successfully inflated ");
 
                 } else if (it.frame_type == BMX_DSC_TLV_REF_ADV) {
 
-			struct description_hdr_ref *hdr = ((struct description_hdr_ref*)(it.frame_data));
+			vf_type = 0;
+			vf_data_len = resolve_ref_frame(pb, it.frame_data, it.frame_data_length, it.frame_compression, dext, &vf_type, 1);
 
-			vf_type = hdr->referenced_type;
-			vf_data_len = resolve_ref_frame(pb, it.frame_data, it.frame_data_length, it.frame_compression, dext, 1);
-
-			if (vf_data_len <= 0)
-				goto resolve_desc_extension_error;
-
-			assertion(-501601, (vf_data_len == (int32_t)hdr->expanded_rframes_data_len));
-
+			assertion(-500000,  (vf_data_len == (int32_t)(((struct description_hdr_ref*)(it.frame_data))->expanded_rframes_data_len)));
 
                 } else {
-			goto resolve_desc_extension_error;
+			assertion(-500000, 0);
 		}
+
+		assertion(-500000, (vf_data_len > 0 && vf_type <= BMX_DSC_TLV_MAX));
 
 		struct frame_header_virtual vf_hdr = {.is_virtual=1, .is_relevant=it.is_relevant, .type=vf_type,
 		                                      .length=sizeof(struct frame_header_virtual)+vf_data_len};
@@ -4092,7 +4161,8 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 	
 resolve_desc_extension_error:
 
-	free_desc_extensions(&dext);
+	assertion(-500000, (!dext)); //otherwise the check should have failed!
+	//free_desc_extensions(&dext);
 	dbgf_sys(DBGT_ERR, "Failed converting type=%d compression=%d", it.frame_type, it.frame_compression);
 	return (struct desc_extension *) FAILURE_PTR;
 }
