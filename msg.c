@@ -3269,7 +3269,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
         struct frame_handl *handl = &(it->handls[it->frame_type]);
         int32_t tlv_result = it->frame_cache_msgs_size;
         int32_t cache_pos = tlv_result + handl->data_header_size;
-	uint8_t rf_compress = handl->do_compress ? *handl->do_compress : 0;
+	uint8_t do_compress = handl->do_compress ? *handl->do_compress : 0;
 
         assertion(-500881, (tlv_result >= TLV_TX_DATA_PROCESSED));
         assertion(-500786, (tx_iterator_cache_data_space_max(it) >= 0));
@@ -3295,15 +3295,15 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		assertion(-501593, (!it->use_long_header));     //yet only used by tx_frame_ref_adv. NOT for creation of my desc frames.
 
 		uint8_t *rf_hdr = (it->frames_out_ptr + it->frames_out_pos);
-		uint8_t *rfd_agg_data = rf_compress ? NULL : it->frame_cache_array;
-		int32_t rfd_zagg_len = rf_compress ? z_compress(it->frame_cache_array, cache_pos, &rfd_agg_data, 0, 0, 0) : 0;
-		assertion(-501606, IMPLIES(rf_compress, rfd_zagg_len >= 0 && rfd_zagg_len < cache_pos));
+		uint8_t *rfd_agg_data = do_compress ? NULL : it->frame_cache_array;
+		int32_t rfd_zagg_len = do_compress ? z_compress(it->frame_cache_array, cache_pos, &rfd_agg_data, 0, 0, 0) : 0;
+		assertion(-501606, IMPLIES(do_compress, rfd_zagg_len >= 0 && rfd_zagg_len < cache_pos));
 		int32_t rfd_agg_len = rfd_zagg_len > 0 ? rfd_zagg_len : cache_pos;
-		assertion(-501594, IMPLIES(rf_compress, rfd_agg_len > 0));
+		assertion(-501594, IMPLIES(do_compress, rfd_agg_len > 0));
 		int32_t rfd_msgs = rfd_agg_len/PREF_PKT_FRAME_DATA_SIZE + (rfd_agg_len%PREF_PKT_FRAME_DATA_SIZE?1:0);
 		int32_t rfd_size = sizeof(struct description_hdr_ref) + (rfd_msgs*sizeof(struct description_msg_ref));
 
-		uint8_t rf_short = !rf_compress && rfd_size <= (int)MAX_SHORT_FRAME_DATA_LEN;
+		uint8_t rf_short = !do_compress && rfd_size <= (int)MAX_SHORT_FRAME_DATA_LEN;
 		int32_t rf_hdr_size = rf_short?sizeof (struct frame_header_short):sizeof (struct frame_header_long);
 		memset(rf_hdr, 0, rf_hdr_size);
 
@@ -3316,7 +3316,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		} else {
 			struct frame_header_long *fhl = (struct frame_header_long *) rf_hdr;
 			fhl->length = htons(rf_hdr_size + rfd_size);
-			fhl->compression = rf_compress;
+			fhl->compression = do_compress;
 		}
 
 		struct description_hdr_ref *rfd_hdr = (struct description_hdr_ref *) rf_hdr + rf_hdr_size;
@@ -3341,7 +3341,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 	} else {
 		
-		IDM_T is_long_header = it->use_long_header || it->already_compressed || rf_compress ||
+		IDM_T is_long_header = it->use_long_header || it->already_compressed || do_compress ||
 			(cache_pos > (int)MAX_SHORT_FRAME_DATA_LEN);
 
 		struct frame_header_short *fhs = (struct frame_header_short *) (it->frames_out_ptr + it->frames_out_pos);
@@ -3358,7 +3358,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 			it->frames_out_pos += sizeof ( struct frame_header_long);
 
-			if (!it->already_compressed && rf_compress &&
+			if (!it->already_compressed && do_compress &&
 				(z_size = z_compress(it->frame_cache_array, cache_pos, 0,0, it->frames_out_ptr + it->frames_out_pos, cache_pos)) > 0) {
 
 				assertion(-501597, z_size < cache_pos);
