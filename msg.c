@@ -3278,7 +3278,8 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
         assertion(-501019, (cache_pos)); // there must be some data to send!!
 
 	if (it->dext) {
-		// this is the creation of my description...
+		// this is the dext creation of my description...
+		assertion(-500000, (it->handls==description_tlv_handl));
 
 		it->dext->data = debugReallocReset(it->dext->data, it->dext->dlen + sizeof(struct frame_header_virtual) + cache_pos, -300568);
 		struct frame_header_virtual *fhv = (struct frame_header_virtual *)(it->dext->data + it->dext->dlen);
@@ -3291,10 +3292,18 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 	}
 
 	if (it->dext && handl->do_reference && *handl->do_reference == 1) {
+		assertion(-500000, (it->handls==description_tlv_handl));
 		assertion(-501592, (!it->already_compressed));  //unless tx_frame_create already provides precompressed desc extension frames for myself
 		assertion(-501593, (!it->use_long_header));     //yet only used by tx_frame_ref_adv. NOT for creation of my desc frames.
 
-		uint8_t *rf_hdr = (it->frames_out_ptr + it->frames_out_pos);
+		// calculate description extension frames
+		assertion(-500000, TEST_STRUCT(struct frame_header_short)); // or
+		assertion(-500000, TEST_STRUCT(struct frame_header_long));  // of type
+		assertion(-500000, TEST_VALUE(BMX_DSC_TLV_REF_ADV));
+		// with frame-data hdr and msgs:
+		assertion(-500000, TEST_STRUCT(struct description_hdr_ref));
+		assertion(-500000, TEST_STRUCT(struct description_msg_ref));
+
 		uint8_t *rfd_agg_data = do_compress ? NULL : it->frame_cache_array;
 		int32_t rfd_zagg_len = do_compress ? z_compress(it->frame_cache_array, cache_pos, &rfd_agg_data, 0, 0, 0) : 0;
 		assertion(-501606, IMPLIES(do_compress, rfd_zagg_len >= 0 && rfd_zagg_len < cache_pos));
@@ -3305,28 +3314,37 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 		uint8_t rf_short = !do_compress && rfd_size <= (int)MAX_SHORT_FRAME_DATA_LEN;
 		int32_t rf_hdr_size = rf_short?sizeof (struct frame_header_short):sizeof (struct frame_header_long);
-		memset(rf_hdr, 0, rf_hdr_size);
 
-		struct frame_header_short *fhs = (struct frame_header_short *) rf_hdr;
+		// set frame header size and values:
+		struct frame_header_short *fhs = (struct frame_header_short *) (it->frames_out_ptr + it->frames_out_pos);
+		memset(fhs, 0, rf_hdr_size);
 		fhs->type = FRAME_TYPE_REF_ADV;
 		fhs->is_relevant = handl->is_relevant;
 		fhs->is_short = rf_short;
 		if (rf_short) {
 			fhs->length = rf_hdr_size + rfd_size;
 		} else {
-			struct frame_header_long *fhl = (struct frame_header_long *) rf_hdr;
+			struct frame_header_long *fhl = (struct frame_header_long*) fhs;
 			fhl->length = htons(rf_hdr_size + rfd_size);
 			fhl->compression = do_compress;
 		}
 
-		struct description_hdr_ref *rfd_hdr = (struct description_hdr_ref *) rf_hdr + rf_hdr_size;
+		// set: frame-data hdr:
+		struct description_hdr_ref *rfd_hdr = (struct description_hdr_ref *) ((uint8_t*)fhs + rf_hdr_size);
 		rfd_hdr->referenced_type = it->frame_type;
 		rfd_hdr->expanded_rframes_data_len = cache_pos;
 		ShaUpdate(&bmx_sha, (byte*) it->frame_cache_array, cache_pos);
 		ShaFinal(&bmx_sha, (byte*) &rfd_hdr->expanded_rframes_data_hash);
 
+		// set: frame-data msgs:
+		// by splitting potentially huge
+		assertion(-500000, TEST_VARIABLE(rfd_agg_data));
+		// of size
+		assertion(-500000, TEST_VARIABLE(rfd_agg_len));
+		// into pieces of max size
+		assertion(-500000, TEST_VALUE(PREF_PKT_FRAME_DATA_SIZE));
+		// and add each's hash as msg
 		int32_t pos, m=0;
-
 		for (pos=0; pos < rfd_agg_len; pos += PREF_PKT_FRAME_DATA_SIZE) {
 			int32_t rsize = MIN(rfd_agg_len - pos, (int)PREF_PKT_FRAME_DATA_SIZE);
 			struct ref_node *refn = ref_node_add(rfd_agg_data + pos, rsize, 0, 0);
@@ -3338,6 +3356,8 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 			debugFree(rfd_agg_data, -501595);
 
 		assertion(-501596, (m == rfd_msgs));
+
+		it->frames_out_pos += rf_hdr_size + sizeof(struct description_hdr_ref) + (rfd_msgs * sizeof(struct description_msg_ref)); ///TODO
 
 	} else {
 		
@@ -3394,7 +3414,8 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 	it->already_compressed = 0;
 	it->use_long_header = 0;
 
-        return tlv_result;
+	return TLV_TX_DATA_PROCESSED;
+        //return tlv_result;
 }
 
 /*
@@ -4331,7 +4352,7 @@ void update_my_description_adv(void)
         // add all tlv options:
         
         struct tx_frame_iterator it = {
-                .caller = __FUNCTION__, .handls = description_tlv_handl, .handl_max = FRAME_TYPE_MAX, 
+                .caller = __FUNCTION__, .handls = description_tlv_handl, .handl_max = FRAME_TYPE_MAX,
 		.frames_out_ptr = (((uint8_t*) dsc) + sizeof (struct description)),
                 .frames_out_max = MAX_DSC_FRAME_SIZE,
                 .frames_out_pref = MAX_DSC_FRAME_SIZE,
