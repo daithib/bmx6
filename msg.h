@@ -499,14 +499,18 @@ struct description_msg_ref {
 
 struct description_hdr_ref {
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int reserved        : 2;
-	unsigned int referenced_type : FRAME_TYPE_BIT_SIZE; // type of most inner references! NEVER BMX_DSC_TLV_REF
-#elif __BYTE_ORDER == __BIG_ENDIAN
 	unsigned int referenced_type : FRAME_TYPE_BIT_SIZE;
-	unsigned int reserved        : 2;
+	unsigned int is_relevant : FRAME_RELEVANCE_BIT_SIZE;
+	unsigned int reserved : FRAME_ISSHORT_BIT_SIZE;
+
+#elif __BYTE_ORDER == __BIG_ENDIAN
+	unsigned int reserved : FRAME_ISSHORT_BIT_SIZE;
+	unsigned int is_relevant : FRAME_RELEVANCE_BIT_SIZE;
+	unsigned int referenced_type : FRAME_TYPE_BIT_SIZE;
 #else
 # error "Please fix <bits/endian.h>"
 #endif
+
     uint32_t expanded_rframes_data_len; // length of fully expanded (uncompressed, resolved rhash->rdata), without frame header!
     SHA1_T expanded_rframes_data_hash;  // hash over expanded_rframes_data_len data
     struct description_msg_ref msg[];
