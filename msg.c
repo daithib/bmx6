@@ -187,6 +187,69 @@ void register_frame_handler(struct frame_handl *array, int pos, struct frame_han
 }
 
 
+
+
+
+
+STATIC_FUNC
+IDM_T validate_desc_structure(struct description *desc)
+{
+        TRACE_FUNCTION_CALL;
+
+        if (validate_name_string(desc->globalId.name, GLOBAL_ID_NAME_LEN, NULL) == FAILURE) {
+
+                dbg_sys(DBGT_ERR, "illegal hostname ", globalIdAsString(&desc->globalId));
+		goto validate_desc_structure_failure;
+        }
+
+        if (
+                validate_param(desc->comp_version, 0/*(COMPATIBILITY_VERSION-1)*/, (COMPATIBILITY_VERSION+1), "compatibilty version") || //TODOCV18: check exactly !!
+                validate_param(ntohs(desc->ogmSqnRange), _MIN_OGM_SQN_RANGE, _MAX_OGM_SQN_RANGE, ARG_OGM_SQN_RANGE) ||
+                0
+                ) {
+
+		goto validate_desc_structure_failure;
+        }
+
+        return SUCCESS;
+
+validate_desc_structure_failure:
+        dbg_sys(DBGT_ERR, "global_id=%s description with illegal structure or base values",
+	globalIdAsString(&desc->globalId));
+
+        return FAILURE;
+}
+
+
+
+STATIC_FUNC
+IDM_T validate_desc_sqn(struct description *desc, struct orig_node *on)
+{
+        TRACE_FUNCTION_CALL;
+
+	DESC_SQN_T descSqn = ntohl(desc->descSqn);
+
+        if (on) {
+                dbgf_track(DBGT_INFO, "descSQN=%d (old_sqn=%d) from id=%s cv=%d",
+                        descSqn, on->descSqn, globalIdAsString(&desc->globalId), desc->comp_version);
+
+                assertion(-500383, (on->dhn));
+
+                if (((TIME_T) (bmx_time - on->dhn->referred_by_me_timestamp)) < (TIME_T) dad_to) {
+
+                        if (((DESC_SQN_MASK_OLD)&(descSqn - (on->descSqn + 1))) > DEF_DESCRIPTION_DAD_RANGE) {
+
+                                dbgf_sys(DBGT_ERR, "DAD-Alert: new dsc_sqn %d not > old %d + 1",descSqn, on->descSqn);
+
+                                return FAILURE;
+                        }
+                }
+        }
+        return SUCCESS;
+}
+
+
+
 STATIC_FUNC
 struct description * get_cached_description(struct description_hash *dhash, IDM_T remove)
 {
@@ -251,6 +314,8 @@ void cache_description(struct description *desc, struct description_hash *dhash)
 
         dbgf_all( DBGT_INFO, "%8X..", dhash->h.u32[0]);
 
+	if ( validate_desc_structure( desc ) != SUCCESS )
+		return;
 
         assertion(-500261, (description_cache_tree.items <= DEF_DESC0_CACHE_SIZE));
 
@@ -277,7 +342,6 @@ void cache_description(struct description *desc, struct description_hash *dhash)
         memcpy( &dcn->dhash, dhash, HASH_SHA1_LEN );
         dcn->timestamp = bmx_time;
         avl_insert(&description_cache_tree, dcn, -300145);
-
 }
 
 
@@ -2656,7 +2720,7 @@ int32_t rx_frame_description_advs(struct rx_frame_iterator *it)
                 if (neighIID4x <= IID_RSVD_MAX || tlvs_len > MAX_DSC_FRAME_SIZE || pos > it->frame_msgs_length)
                         break;
 
-                dbgf_all( DBGT_INFO, "rcvd desc: global_id=%s via_dev=%s via_ip=%s",
+                dbgf_track( DBGT_INFO, "rcvd desc: global_id=%s via_dev=%s via_ip=%s",
                         globalIdAsString(&desc->globalId), pb->i.iif->label_cfg.str, pb->i.llip_str);
 
                 ShaUpdate(&bmx_sha, (byte*) desc, (sizeof (struct description) +tlvs_len));
@@ -3843,65 +3907,6 @@ void schedule_my_originator_message( void* unused )
 }
 
 
-STATIC_FUNC
-IDM_T validate_description(struct description *desc)
-{
-        TRACE_FUNCTION_CALL;
-
-        if (validate_name_string(desc->globalId.name, GLOBAL_ID_NAME_LEN, NULL) == FAILURE) {
-
-                dbg_sys(DBGT_ERR, "global_id=%s has illegal hostname ", globalIdAsString(&desc->globalId));
-                return FAILURE;
-        }
-
-        if (
-                //validate_param(desc->reservedTtl, MIN_TTL, MAX_TTL, ARG_TTL) || // may be reused for other purpose (eg as capabilities)
-                validate_param(desc->comp_version, 0/*(COMPATIBILITY_VERSION-1)*/, (COMPATIBILITY_VERSION+1), "compatibilty version") || //TODOCV18: check exactly !!
-                validate_param(ntohs(desc->ogmSqnRange), _MIN_OGM_SQN_RANGE, _MAX_OGM_SQN_RANGE, ARG_OGM_SQN_RANGE) ||
-                0
-                ) {
-
-                return FAILURE;
-        }
-
-        return SUCCESS;
-}
-
-STATIC_FUNC
-IDM_T validate_desc_sqn(struct description *desc, struct orig_node *on)
-{
-        TRACE_FUNCTION_CALL;
-
-	DESC_SQN_T descSqn = ntohl(desc->descSqn);
-
-        if (on) {
-                dbgf_track(DBGT_INFO, "descSQN=%d (old_sqn=%d) from id=%s cv=%d via_dev=%s via_ip=%s",
-                        descSqn, on->descSqn, globalIdAsString(&desc->globalId),
-			desc->comp_version, pb->i.iif->label_cfg.str, pb->i.llip_str);
-
-                assertion(-500383, (on->dhn));
-
-                if (((TIME_T) (bmx_time - on->dhn->referred_by_me_timestamp)) < (TIME_T) dad_to) {
-
-                        if (((DESC_SQN_MASK_OLD)&(descSqn - (on->descSqn + 1))) > DEF_DESCRIPTION_DAD_RANGE) {
-
-                                dbgf_sys(DBGT_ERR, "DAD-Alert: new dsc_sqn %d not > old %d + 1",descSqn, on->descSqn);
-
-                                return FAILURE;
-                        }
-
-                        if (ntohs(desc->descSqn) == ((DESC_SQN_T) (on->descSqn + 1)) &&
-                                UXX_LT(OGM_SQN_MASK, ntohs(desc->ogmSqnMin), (on->ogmSqn_rangeMin + _MAX_OGM_SQN_RANGE))) {
-
-                                dbgf_sys(DBGT_ERR, "DAD-Alert: new ogm_sqn_min %d not > old %d + %d",
-                                        ntohs(desc->ogmSqnMin), on->ogmSqn_rangeMin, _MAX_OGM_SQN_RANGE);
-
-                                return FAILURE;
-                        }
-                }
-        }
-        return SUCCESS;
-}
 
 
 
@@ -4221,9 +4226,6 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 
         struct orig_node *on = avl_find_item(&orig_tree, &desc->globalId);
         
-        if ( validate_description( desc ) != SUCCESS )
-                goto process_desc0_error;
-
         if ( validate_desc_sqn( desc, on ) != SUCCESS ) {
 		
 		dbgf_sys(DBGT_WARN, "IGNORED global_id=%s rcvd via_dev=%s via_ip=%s",
