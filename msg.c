@@ -45,7 +45,9 @@ static int32_t ogm_ack_tx_iters = DEF_OGM_ACK_TX_ITERS;
 
 static int32_t desc_req_tx_iters = DEF_DESC_REQ_TX_ITERS;
 static int32_t desc_adv_tx_iters = DEF_DESC_ADV_TX_ITERS;
+
 static int32_t desc_adv_tx_unsolicited = DEF_DESC_ADV_UNSOLICITED;
+static int32_t dref_adv_tx_unsolicited = DEF_DREF_ADV_UNSOLICITED;
 
 static int32_t dhash_req_tx_iters = DEF_DHASH_REQ_TX_ITERS;
 static int32_t dhash_adv_tx_iters = DEF_DHASH_ADV_TX_ITERS;
@@ -1279,7 +1281,7 @@ void ref_node_use(struct desc_extension *dext, struct ref_node *refn)
 
 	assertion(-501578, ((int32_t)ref_tree.items >= ref_tree_items_used));
 
-	if (refn->usage_counter == 1 && desc_adv_tx_unsolicited) {
+	if (refn->usage_counter == 1 && dref_adv_tx_unsolicited) {
 		struct link_dev_node **lndev_arr = lndevs_get_best_tp(NULL);
 		int d;
 
@@ -4556,6 +4558,9 @@ struct opt_type msg_options[]=
         ,
         {ODI, 0, ARG_UNSOLICITED_DESC_ADVS,0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &desc_adv_tx_unsolicited,MIN_UNSOLICITED_DESC_ADVS,MAX_UNSOLICITED_DESC_ADVS,DEF_DESC_ADV_UNSOLICITED,0,0,
 			ARG_VALUE_FORM,	"send unsolicited description advertisements after receiving a new one"}
+        ,
+        {ODI, 0, ARG_DREF_ADV_UNSOLICITED, 0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &dref_adv_tx_unsolicited,MIN_DREF_ADV_UNSOLICITED,MAX_DREF_ADV_UNSOLICITED,DEF_DREF_ADV_UNSOLICITED,0,0,
+			ARG_VALUE_FORM,	"send unsolicited description-reference advertisements after receiving a new one"}
         ,
         {ODI, 0, ARG_DSC0_REQS_TX_ITERS,   0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &desc_req_tx_iters,MIN_DSC0_REQS_TX_ITERS,MAX_DSC0_REQS_TX_ITERS,DEF_DESC_REQ_TX_ITERS,0,0,
 			ARG_VALUE_FORM,	"set tx iterations for description requests"}
