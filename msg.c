@@ -108,8 +108,11 @@ STATIC_FUNC
 struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t *data, uint32_t dlen);
 
 STATIC_FUNC
-int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, uint8_t compression, struct desc_extension *dext, uint8_t *rf_type, uint8_t nest_level )
-;
+int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, uint8_t compression, struct desc_extension *dext, uint8_t *rf_type, uint8_t nest_level );
+
+STATIC_FUNC
+int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it);
+
 
 /***********************************************************
   The core frame/message structures and handlers
@@ -1310,6 +1313,11 @@ STATIC_FUNC
 int create_description_tlv_ref(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
+	// description reference extenstions are created on-demand in:
+	assertion(-500000, ( TEST_FUNCTION(tx_frame_iterate_finish)));
+	// depending on:
+	assertion(-500000, (TEST_VARIABLE( ((struct frame_handl*)0)->do_reference)));
+
         return TLV_TX_DATA_IGNORED;
 }
 
@@ -1318,7 +1326,7 @@ int process_description_tlv_ref(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	// description reference extenstions are processed explicitly via:
+	// description reference extenstions are processed explicitly in:
 	assertion(-500000, ( TEST_FUNCTION(process_description))); //calling:
 	assertion(-500000, ( TEST_FUNCTION(resolve_desc_extensions))); //calling:
 	assertion(-500000, ( TEST_FUNCTION(resolve_ref_frame)) );
@@ -3318,7 +3326,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		// set frame header size and values:
 		struct frame_header_short *fhs = (struct frame_header_short *) (it->frames_out_ptr + it->frames_out_pos);
 		memset(fhs, 0, rf_hdr_size);
-		fhs->type = FRAME_TYPE_REF_ADV;
+		fhs->type = BMX_DSC_TLV_REF_ADV;
 		fhs->is_relevant = handl->is_relevant;
 		fhs->is_short = rf_short;
 		if (rf_short) {
@@ -4122,7 +4130,7 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 	if (unresolved)
 		return (struct desc_extension *) UNRESOLVED_PTR;
 
-	// only if dext is fully resolvable allocate it, so this should always succeed!!!
+	// only if dext is fully resolvable then allocate it, so this should always succeed!!!
 	dext = debugMallocReset(sizeof(struct desc_extension), -300571);
 	LIST_INIT_HEAD(dext->refnl_list, struct refnl_node, list, list);
 	it = it_init;
@@ -4180,7 +4188,9 @@ resolve_desc_extension_error:
 
 	assertion(-500000, (!dext)); //otherwise the check should have failed!
 	//free_desc_extensions(&dext);
-	dbgf_sys(DBGT_ERR, "Failed converting type=%d compression=%d", it.frame_type, it.frame_compression);
+        dbgf_sys(DBGT_ERR, "Failed converting type=%d max_known=%d compression=%d",
+                 it.frame_type, BMX_DSC_TLV_MAX_KNOWN, it.frame_compression);
+
 	return (struct desc_extension *) FAILURE_PTR;
 }
 
