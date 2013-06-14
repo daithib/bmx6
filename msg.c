@@ -3497,8 +3497,11 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 	}
 	if (do_fref || do_fzip ) {
-		dbgf_track(DBGT_INFO, "added %s %s is_relevant=%d length=%d do_fref=%d do_fzip=%d",
-			fhs->is_short ? "SHORT" : "LONG", handl->name, fhs->is_relevant, fhs->is_short ? fhs->length : ntohs(fhl->length), do_fref, do_fzip);
+		dbgf_track(DBGT_INFO, "added %s %s is_relevant=%d length=%d do_fref=%d (%d %d %d) do_fzip=%d (%d %d %d)",
+			fhs->is_short ? "SHORT" : "LONG", handl->name, fhs->is_relevant,
+			fhs->is_short ? fhs->length : ntohs(fhl->length),
+			do_fref, handl->dextReferencing ? *handl->dextReferencing : -1, dextReferencing, DEF_FREF,
+			do_fzip, handl->dextCompression ? *handl->dextCompression : -1, dextCompression, DEF_FZIP );
 	}
 
 
