@@ -148,8 +148,22 @@
 
 #define DEF_DESC0_REQ_STONE_OLD_TO 40000
 
+#define MIN_FREF      0
+#define TYP_FREF_DONT 0
+#define TYP_FREF_DO   1
+#define TYP_FREF_DFLT 2
+#define DEF_FREF      1
+#define MAX_FREF      2
+#define HLP_FREF      "use referenced description extensions 0:disable, 1:enable, 2:dflt"
 
 
+#define MIN_FGZIP      0
+#define TYP_FGZIP_DONT 0
+#define TYP_FGZIP_DO   1
+#define TYP_FGZIP_DFLT 2
+#define DEF_FGZIP      1
+#define MAX_FGZIP      2
+#define HLP_FGZIP      "use gizp-compressed description extensions 0:disable, 1:enable, 2:dflt"
 
 #define FRAME_TYPE_RSVD0        0
 
