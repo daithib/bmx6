@@ -4159,7 +4159,6 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 		uint8_t vf_type = BMX_DSC_TLV_INVALID;
 		int32_t vf_data_len = 0;
 		uint8_t vf_relevant = 0xFF;
-		struct frame_header_virtual *vf_hdr = (struct frame_header_virtual *)(dext->data + dext->dlen);
 		uint32_t dext_dlen_old = dext->dlen;
 
 		dext->dlen += sizeof(struct frame_header_virtual);
@@ -4198,6 +4197,7 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 		dbgf_track(DBGT_INFO, "converted type=%d %s relevant=%d dext_dlen_old=%d frame_data_length=%d to vf_data_len=%d, dext.len=%d",
 		           vf_type, it.handl->name, vf_relevant, dext_dlen_old, it.frame_data_length, vf_data_len, dext->dlen );
 
+		struct frame_header_virtual *vf_hdr = (struct frame_header_virtual *)(dext->data + dext_dlen_old);
 		memset(vf_hdr, 0, sizeof(struct frame_header_virtual));
 		vf_hdr->is_virtual = 1;
 		vf_hdr->is_relevant = vf_relevant;
@@ -4205,7 +4205,7 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 		vf_hdr->length = sizeof(struct frame_header_virtual) + vf_data_len;
 
 		assertion(-500000, (vf_data_len > 0 && vf_type <= BMX_DSC_TLV_MAX && vf_relevant <= 1 ));
-		assertion(-500000, (dext_dlen_old == dext->dlen + vf_hdr->length));
+		assertion(-500000, (dext->dlen == dext_dlen_old + vf_hdr->length));
         }
 
         return dext;
