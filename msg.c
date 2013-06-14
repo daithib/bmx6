@@ -4199,7 +4199,7 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 
 		dext->dlen += vf_data_len;
 
-		dbgf_track(DBGT_INFO, "converted type=%d %s, frame_data_length=%d to %d frame_len=%d, total length=%d",
+		dbgf_track(DBGT_INFO, "converted type=%d %s, frame_data_length=%d to vf_data_len=%d vf_hdr.len=%d, dext.len=%d",
 		           vf_hdr.type, it.handl->name, it.frame_data_length, vf_data_len, vf_hdr.length, dext->dlen );
         }
 
