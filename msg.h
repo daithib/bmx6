@@ -148,22 +148,24 @@
 
 #define DEF_DESC0_REQ_STONE_OLD_TO 40000
 
+#define ARG_FREF      "referencing"
 #define MIN_FREF      0
-#define TYP_FREF_DONT 0
-#define TYP_FREF_DO   1
-#define TYP_FREF_DFLT 2
-#define DEF_FREF      1
+#define TYP_FREF_DFLT 0
+#define TYP_FREF_DONT 1
+#define TYP_FREF_DO   2
+#define DEF_FREF      2
 #define MAX_FREF      2
-#define HLP_FREF      "use referenced description extensions 0:disable, 1:enable, 2:dflt"
+#define HLP_FREF      "use referenced description extensions 0:dflt, 1:disabled, 2:reference"
 
 
-#define MIN_FGZIP      0
-#define TYP_FGZIP_DONT 0
-#define TYP_FGZIP_DO   1
-#define TYP_FGZIP_DFLT 2
-#define DEF_FGZIP      1
-#define MAX_FGZIP      2
-#define HLP_FGZIP      "use gizp-compressed description extensions 0:disable, 1:enable, 2:dflt"
+#define ARG_FZIP     "compression"
+#define MIN_FZIP      0
+#define TYP_FZIP_DFLT 0
+#define TYP_FZIP_DONT 1
+#define TYP_FZIP_DO   2
+#define DEF_FZIP      2
+#define MAX_FZIP      2
+#define HLP_FZIP      "use compressed description extensions 0:dflt, 1:disabled, 2:gzip"
 
 #define FRAME_TYPE_RSVD0        0
 
@@ -784,8 +786,8 @@ struct frame_handl {
 	                     // If irrelevant and unknown frames are rebroadcasted depends on the super_frame logic.
 	                     // i.e.: * unknown packet_frames MUST BE dropped.
 	                     //       * unknown and irrelevant description_tlv_frames MUST BE propagated
-	int32_t *do_compress;
-	int32_t *do_reference;
+	int32_t *dextCompression;
+	int32_t *dextReferencing;
         uint8_t family;
 	uint8_t rx_requires_described_neigh;
         uint16_t data_header_size;
