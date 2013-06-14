@@ -4162,6 +4162,7 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 		uint8_t vf_type = BMX_DSC_TLV_INVALID;
 		int32_t vf_data_len = 0;
 		uint8_t vf_relevant = 0xFF;
+		uint32_t dext_dlen_old = dext->dlen;
 
 		dext->dlen += sizeof(struct frame_header_virtual);
 		// reallocation is done before writing new data
@@ -4173,12 +4174,15 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 			vf_data_len = it.frame_data_length;
 			dext->data = debugRealloc(dext->data, dext->dlen + vf_data_len, -300429 );
                         memcpy(dext->data + dext->dlen, it.frame_data, vf_data_len);
+			dext->dlen += vf_data_len;
+
 
 		} else if (it.frame_type != BMX_DSC_TLV_REF_ADV && it.frame_compression == FRAME_COMPRESSION_GZIP) {
 
 			vf_type = it.frame_type;
 			vf_relevant = it.is_relevant;
 			vf_data_len = z_decompress(it.frame_data, it.frame_data_length, &dext->data, dext->dlen);
+			dext->dlen += vf_data_len;
 
 			assertion(-500000, (vf_data_len > 0));
 			dbgf_track(DBGT_INFO, "Successfully inflated ");
@@ -4193,17 +4197,18 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 			assertion(-500000, 0);
 		}
 
+		dbgf_track(DBGT_INFO, "converted type=%d %s relevant=%d dext_dlen_old=%d frame_data_length=%d to vf_data_len=%d, dext.len=%d",
+		           vf_type, it.handl->name, vf_relevant, dext_dlen_old, it.frame_data_length, vf_data_len, dext->dlen );
+
+		struct frame_header_virtual *vf_hdr = (struct frame_header_virtual *)(dext->data + dext_dlen_old);
+		memset(vf_hdr, 0, sizeof(struct frame_header_virtual));
+		vf_hdr->is_virtual = 1;
+		vf_hdr->is_relevant = vf_relevant;
+		vf_hdr->type = vf_type;
+		vf_hdr->length = sizeof(struct frame_header_virtual) + vf_data_len;
+
 		assertion(-500000, (vf_data_len > 0 && vf_type <= BMX_DSC_TLV_MAX && vf_relevant <= 1 ));
-
-		struct frame_header_virtual vf_hdr = {.is_virtual=1, .is_relevant=vf_relevant, .type=vf_type,
-		                                      .length=sizeof(struct frame_header_virtual)+vf_data_len};
-		
-		*((struct frame_header_virtual*)(dext->data + (dext->dlen - sizeof(struct frame_header_virtual)))) = vf_hdr;
-
-		dext->dlen += vf_data_len;
-
-		dbgf_track(DBGT_INFO, "converted type=%d %s, frame_data_length=%d to %d frame_len=%d, total length=%d",
-		           vf_hdr.type, it.handl->name, it.frame_data_length, vf_data_len, vf_hdr.length, dext->dlen );
+		assertion(-500000, (dext->dlen == dext_dlen_old + vf_hdr->length));
         }
 
         return dext;
