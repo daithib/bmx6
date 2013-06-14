@@ -1263,6 +1263,9 @@ struct ref_node * ref_node_add(uint8_t *frame_data, uint32_t f_data_len, int8_t 
 		memcpy(refn->f_data, frame_data, f_data_len);
 
 		avl_insert(&ref_tree, refn, -300565);
+
+		dbgf_track(DBGT_INFO, "new rhash=%s data_len=%d compression=%d",
+			memAsHexString(&rhash, sizeof(rhash)), f_data_len, compression);
 	}
 
 	return refn;
