@@ -84,6 +84,25 @@
 
 
 
+#define ARG_FZIP     "descCompression"
+#define MIN_FZIP      0
+#define TYP_FZIP_DFLT 0
+#define TYP_FZIP_DONT 1
+#define TYP_FZIP_DO   2
+#define DEF_FZIP      2
+#define MAX_FZIP      2
+#define HLP_FZIP      "use compressed description 0:dflt, 1:disabled, 2:gzip"
+
+#define ARG_FREF      "descReferencing"
+#define MIN_FREF      0
+#define TYP_FREF_DFLT 0
+#define TYP_FREF_DONT 1
+#define TYP_FREF_DO   2
+#define DEF_FREF      2
+#define MAX_FREF      2
+#define HLP_FREF      "use referenced description 0:dflt, 1:disabled, 2:reference"
+
+
 #define MIN_DSC0_ADVS_TX_ITERS 1
 #define MAX_DSC0_ADVS_TX_ITERS 20
 #define DEF_DESC_ADV_TX_ITERS 1
@@ -92,7 +111,12 @@
 #define MIN_UNSOLICITED_DESC_ADVS 0
 #define MAX_UNSOLICITED_DESC_ADVS 1
 #define DEF_DESC_ADV_UNSOLICITED 1
-#define ARG_UNSOLICITED_DESC_ADVS "descUnsolicitedSends"
+#define ARG_UNSOLICITED_DESC_ADVS "unsolicitedDescAdvs"
+
+#define MIN_DREF_ADV_UNSOLICITED 0
+#define MAX_DREF_ADV_UNSOLICITED 1
+#define DEF_DREF_ADV_UNSOLICITED 1
+#define ARG_DREF_ADV_UNSOLICITED "unsolicitedDRefAdvs"
 
 #define MIN_DSC0_REQS_TX_ITERS 1
 #define MAX_DSC0_REQS_TX_ITERS 100
@@ -148,24 +172,6 @@
 
 #define DEF_DESC0_REQ_STONE_OLD_TO 40000
 
-#define ARG_FREF      "referencing"
-#define MIN_FREF      0
-#define TYP_FREF_DFLT 0
-#define TYP_FREF_DONT 1
-#define TYP_FREF_DO   2
-#define DEF_FREF      2
-#define MAX_FREF      2
-#define HLP_FREF      "use referenced description extensions 0:dflt, 1:disabled, 2:reference"
-
-
-#define ARG_FZIP     "compression"
-#define MIN_FZIP      0
-#define TYP_FZIP_DFLT 0
-#define TYP_FZIP_DONT 1
-#define TYP_FZIP_DO   2
-#define DEF_FZIP      2
-#define MAX_FZIP      2
-#define HLP_FZIP      "use compressed description extensions 0:dflt, 1:disabled, 2:gzip"
 
 #define FRAME_TYPE_RSVD0        0
 
