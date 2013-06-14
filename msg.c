@@ -3366,6 +3366,8 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 				((dextReferencing==TYP_FREF_DO) ? 1 :
 					((dextReferencing==TYP_FREF_DONT) ? 0 : DEF_FREF==TYP_FREF_DO )))));
 
+	struct frame_header_short *fhs = (struct frame_header_short *) (it->frames_out_ptr + it->frames_out_pos);
+	struct frame_header_long *fhl = (struct frame_header_long *) fhs;
 
 
         assertion(-500881, (tlv_result >= TLV_TX_DATA_PROCESSED));
@@ -3413,7 +3415,6 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		int32_t rf_hdr_size = rf_short?sizeof (struct frame_header_short):sizeof (struct frame_header_long);
 
 		// set frame header size and values:
-		struct frame_header_short *fhs = (struct frame_header_short *) (it->frames_out_ptr + it->frames_out_pos);
 		memset(fhs, 0, rf_hdr_size);
 		fhs->type = BMX_DSC_TLV_REF_ADV;
 		fhs->is_relevant = description_tlv_handl[BMX_DSC_TLV_REF_ADV].is_relevant ;
@@ -3421,7 +3422,6 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		if (rf_short) {
 			fhs->length = rf_hdr_size + rfd_size;
 		} else {
-			struct frame_header_long *fhl = (struct frame_header_long*) fhs;
 			fhl->length = htons(rf_hdr_size + rfd_size);
 			fhl->compression = do_fzip;
 		}
@@ -3462,9 +3462,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		IDM_T is_long_header = it->use_long_header || it->already_compressed || do_fzip ||
 			(cache_pos > (int)MAX_SHORT_FRAME_DATA_LEN);
 
-		struct frame_header_short *fhs = (struct frame_header_short *) (it->frames_out_ptr + it->frames_out_pos);
-		struct frame_header_long *fhl = (struct frame_header_long *) fhs;
-		memset(fhl, 0, sizeof (struct frame_header_long));
+		memset(fhl, 0, is_long_header ? sizeof (struct frame_header_long) : sizeof (struct frame_header_short));
 
 		fhs->is_short = !is_long_header;
 		fhs->is_relevant = handl->is_relevant;
@@ -3500,9 +3498,11 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 			fhs->length = (cache_pos + sizeof ( struct frame_header_short));
 		}
 
-		dbgf_all(DBGT_INFO, "added %s frame_header type=%s frame_data_length=%d frame_msgs_length=%d",
-			is_long_header ? "LONG" : "SHORT", handl->name, cache_pos, tlv_result);
 	}
+
+	dbgf_track(DBGT_INFO, "added %s %s is_relevant=%d length=%d do_fref=%d do_fzip=%d",
+	fhs->is_short ? "SHORT" : "LONG", handl->name, fhs->is_relevant, fhs->is_short ? fhs->length : fhl->length, do_fref, do_fzip);
+
 
         it->frames_out_num++;
 
