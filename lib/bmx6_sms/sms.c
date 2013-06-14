@@ -54,8 +54,8 @@ static int extensions_wd = -1;
 static AVL_TREE(sms_tree, struct sms_node, name );
 
 
-int32_t sms_gzip = DEF_SMS_GZIP;
-int32_t sms_reference = DEF_SMS_REFER;
+int32_t sms_fzip = DEF_SMS_FZIP;
+int32_t sms_fref = DEF_SMS_FREF;
 
 
 STATIC_FUNC
@@ -401,10 +401,10 @@ static struct opt_type sms_options[]= {
 	
 	{ODI,0,ARG_SMS,	                0,  9,2,A_PM1N,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,0,		opt_json_sms,
 			ARG_FILE_FORM,"add arbitrary file-data to description"},
-	{ODI,0,ARG_SMS_GZIP,            0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	&sms_gzip,       MIN_SMS_GZIP,   MAX_SMS_GZIP,  DEF_SMS_GZIP,0, opt_update_description,
-			ARG_VALUE_FORM, "enable/disable"},
-	{ODI,0,ARG_SMS_REFERENCE,       0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	&sms_reference,  MIN_SMS_REFER,  MAX_SMS_REFER, DEF_SMS_REFER,0,opt_update_description,
-			ARG_VALUE_FORM, "enable/disable"}
+	{ODI,0,ARG_SMS_FREF,       0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	&sms_fref,      MIN_FREF,       MAX_FREF,       DEF_SMS_FREF,0, opt_update_description,
+			ARG_VALUE_FORM, HLP_FREF},
+	{ODI,0,ARG_SMS_FZIP,            0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	&sms_fzip,      MIN_FZIP,       MAX_FZIP,       DEF_SMS_FZIP,0, opt_update_description,
+			ARG_VALUE_FORM, HLP_FZIP}
 };
 
 
@@ -446,8 +446,8 @@ static int32_t sms_init( void ) {
         tlv_handl.min_msg_size = sizeof (struct description_msg_sms);
         tlv_handl.fixed_msg_size = 0;
         tlv_handl.is_relevant = 0;
-	tlv_handl.do_compress = &sms_gzip;
-	tlv_handl.do_reference = &sms_reference;
+	tlv_handl.dextCompression = &sms_fzip;
+	tlv_handl.dextReferencing = &sms_fref;
         tlv_handl.name = "SMS_EXTENSION";
         tlv_handl.tx_frame_handler = create_description_sms;
         tlv_handl.rx_frame_handler = process_description_sms;

@@ -59,6 +59,9 @@ static int32_t link_req_tx_iters = DEF_LINK_REQS_TX_ITERS;
 static int32_t link_adv_tx_iters = DEF_LINK_ADVS_TX_ITERS;
 static int32_t link_adv_tx_unsolicited = DEF_LINK_ADV_UNSOLICITED;
 
+static int32_t dextReferencing = DEF_FREF;
+static int32_t dextCompression = DEF_FZIP;
+
 union schedule_hello_info {
         uint8_t u8[2];
         uint16_t u16;
@@ -1381,7 +1384,7 @@ int create_description_tlv_ref(struct tx_frame_iterator *it)
 	// description reference extenstions are created on-demand in:
 	assertion(-500000, ( TEST_FUNCTION(tx_frame_iterate_finish)));
 	// depending on:
-	assertion(-500000, (TEST_VARIABLE( ((struct frame_handl*)0)->do_reference)));
+	assertion(-500000, (TEST_VARIABLE( ((struct frame_handl*)0)->dextReferencing)));
 
         return TLV_TX_DATA_IGNORED;
 }
@@ -3312,7 +3315,7 @@ int8_t send_udp_packet(struct packet_buff *pb, struct sockaddr_storage *dst, int
 int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 {
 
-	if ( it->handls[it->frame_type].do_reference && *(it->handls[it->frame_type].do_reference) == 1 ) {
+	if ( it->handls[it->frame_type].dextReferencing && *(it->handls[it->frame_type].dextReferencing) == 1 ) {
 
 		//TODO: this works only for a reference depth = 1
 
@@ -3346,7 +3349,19 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
         struct frame_handl *handl = &(it->handls[it->frame_type]);
         int32_t tlv_result = it->frame_cache_msgs_size;
         int32_t cache_pos = tlv_result + handl->data_header_size;
-	uint8_t do_compress = handl->do_compress ? *handl->do_compress : 0;
+	uint8_t do_fzip = (
+		((handl->dextCompression && *handl->dextCompression==TYP_FZIP_DO) ? 1 :
+			((handl->dextCompression && *handl->dextCompression==TYP_FZIP_DONT) ? 0 :
+				((dextCompression==TYP_FZIP_DO) ? 1 :
+					((dextCompression==TYP_FZIP_DONT) ? 0 : DEF_FZIP==TYP_FZIP_DO )))));
+
+	uint8_t do_fref = (
+		((handl->dextReferencing && *handl->dextReferencing==TYP_FREF_DO) ? 1 :
+			((handl->dextReferencing && *handl->dextReferencing==TYP_FREF_DONT) ? 0 :
+				((dextReferencing==TYP_FREF_DO) ? 1 :
+					((dextReferencing==TYP_FREF_DONT) ? 0 : DEF_FREF==TYP_FREF_DO )))));
+
+
 
         assertion(-500881, (tlv_result >= TLV_TX_DATA_PROCESSED));
         assertion(-500786, (tx_iterator_cache_data_space_max(it) >= 0));
@@ -3368,7 +3383,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		it->dext->dlen += (sizeof(struct frame_header_virtual) + cache_pos);
 	}
 
-	if (it->dext && handl->do_reference && *handl->do_reference == 1) {
+	if (it->dext && do_fref) {
 		assertion(-500000, (it->handls==description_tlv_handl));
 		assertion(-501592, (!it->already_compressed));  //unless tx_frame_create already provides precompressed desc extension frames for myself
 		assertion(-501593, (!it->use_long_header));     //yet only used by tx_frame_ref_adv. NOT for creation of my desc frames.
@@ -3381,15 +3396,15 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		assertion(-500000, TEST_STRUCT(struct description_hdr_ref));
 		assertion(-500000, TEST_STRUCT(struct description_msg_ref));
 
-		uint8_t *rfd_agg_data = do_compress ? NULL : it->frame_cache_array;
-		int32_t rfd_zagg_len = do_compress ? z_compress(it->frame_cache_array, cache_pos, &rfd_agg_data, 0, 0, 0) : 0;
-		assertion(-501606, IMPLIES(do_compress, rfd_zagg_len >= 0 && rfd_zagg_len < cache_pos));
+		uint8_t *rfd_agg_data = do_fzip ? NULL : it->frame_cache_array;
+		int32_t rfd_zagg_len = do_fzip ? z_compress(it->frame_cache_array, cache_pos, &rfd_agg_data, 0, 0, 0) : 0;
+		assertion(-501606, IMPLIES(do_fzip, rfd_zagg_len >= 0 && rfd_zagg_len < cache_pos));
 		int32_t rfd_agg_len = rfd_zagg_len > 0 ? rfd_zagg_len : cache_pos;
-		assertion(-501594, IMPLIES(do_compress, rfd_agg_len > 0));
+		assertion(-501594, IMPLIES(do_fzip, rfd_agg_len > 0));
 		int32_t rfd_msgs = rfd_agg_len/PREF_PKT_FRAME_DATA_SIZE + (rfd_agg_len%PREF_PKT_FRAME_DATA_SIZE?1:0);
 		int32_t rfd_size = sizeof(struct description_hdr_ref) + (rfd_msgs*sizeof(struct description_msg_ref));
 
-		uint8_t rf_short = !do_compress && rfd_size <= (int)MAX_SHORT_FRAME_DATA_LEN;
+		uint8_t rf_short = !do_fzip && rfd_size <= (int)MAX_SHORT_FRAME_DATA_LEN;
 		int32_t rf_hdr_size = rf_short?sizeof (struct frame_header_short):sizeof (struct frame_header_long);
 
 		// set frame header size and values:
@@ -3403,7 +3418,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		} else {
 			struct frame_header_long *fhl = (struct frame_header_long*) fhs;
 			fhl->length = htons(rf_hdr_size + rfd_size);
-			fhl->compression = do_compress;
+			fhl->compression = do_fzip;
 		}
 
 		// set: frame-data hdr:
@@ -3439,7 +3454,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 	} else {
 		
-		IDM_T is_long_header = it->use_long_header || it->already_compressed || do_compress ||
+		IDM_T is_long_header = it->use_long_header || it->already_compressed || do_fzip ||
 			(cache_pos > (int)MAX_SHORT_FRAME_DATA_LEN);
 
 		struct frame_header_short *fhs = (struct frame_header_short *) (it->frames_out_ptr + it->frames_out_pos);
@@ -3456,7 +3471,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 			it->frames_out_pos += sizeof ( struct frame_header_long);
 
-			if (!it->already_compressed && do_compress &&
+			if (!it->already_compressed && do_fzip &&
 				(z_size = z_compress(it->frame_cache_array, cache_pos, 0,0, it->frames_out_ptr + it->frames_out_pos, cache_pos)) > 0) {
 
 				assertion(-501597, z_size < cache_pos);
@@ -4533,6 +4548,11 @@ struct opt_type msg_options[]=
         {ODI, 0, ARG_UDPD_SIZE,            0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &pref_udpd_size, MIN_UDPD_SIZE,      MAX_UDPD_SIZE,     DEF_UDPD_SIZE,0,      0,
 			ARG_VALUE_FORM,	"set preferred udp-data size for send packets"}
         ,
+	{ODI,0,ARG_FREF,                   0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,      &dextReferencing,MIN_FREF,           MAX_FREF,          DEF_FREF,0,           opt_update_description,
+			ARG_VALUE_FORM, HLP_FREF},
+	{ODI,0,ARG_FZIP,                   0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,      &dextCompression,MIN_FZIP,           MAX_FZIP,          DEF_FZIP,0,           opt_update_description,
+			ARG_VALUE_FORM, HLP_FZIP},
+
         {ODI, 0, ARG_OGM_SQN_RANGE,        0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &ogmSqnRange,    MIN_OGM_SQN_RANGE,  MAX_OGM_SQN_RANGE, DEF_OGM_SQN_RANGE,0,  0,
 			ARG_VALUE_FORM,	"set average OGM sequence number range (affects frequency of bmx6 description updates)"}
         ,
