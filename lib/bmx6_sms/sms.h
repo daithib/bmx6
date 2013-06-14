@@ -27,14 +27,8 @@
 #define SMS_POLLING_INTERVAL 5000
 
 #define ARG_SMS_GZIP "gzipSms"
-#define DEF_SMS_GZIP 0
-#define MIN_SMS_GZIP 0
-#define MAX_SMS_GZIP 1
 
 #define ARG_SMS_REFERENCE "refSms"
-#define DEF_SMS_REFER 0
-#define MIN_SMS_REFER 0
-#define MAX_SMS_REFER 1
 
 
 struct json_sms {
