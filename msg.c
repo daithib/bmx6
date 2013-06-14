@@ -3496,9 +3496,10 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		}
 
 	}
-
-	dbgf_track(DBGT_INFO, "added %s %s is_relevant=%d length=%d do_fref=%d do_fzip=%d",
-	fhs->is_short ? "SHORT" : "LONG", handl->name, fhs->is_relevant, fhs->is_short ? fhs->length : fhl->length, do_fref, do_fzip);
+	if (do_fref || do_fzip ) {
+		dbgf_track(DBGT_INFO, "added %s %s is_relevant=%d length=%d do_fref=%d do_fzip=%d",
+			fhs->is_short ? "SHORT" : "LONG", handl->name, fhs->is_relevant, fhs->is_short ? fhs->length : fhl->length, do_fref, do_fzip);
+	}
 
 
         it->frames_out_num++;
