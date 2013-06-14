@@ -4070,6 +4070,7 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 	IDM_T unresolved = 0;
         struct desc_extension *dext = NULL;
 	uint8_t dsc_frame_types[BMX_DSC_TLV_ARRSZ] = {0};
+	int32_t tlv_result;
 
         struct rx_frame_iterator it, it_init = {
                 .caller = __FUNCTION__, .on = NULL, .cn = NULL, .op = TLV_OP_PLUGIN_MIN,
@@ -4080,7 +4081,7 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 
 	// First check if dext is fully resolvable::
 	it = it_init;
-        while (rx_frame_iterate(&it) > TLV_RX_DATA_DONE) {
+        while ((tlv_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
 
 		uint8_t vf_type = BMX_DSC_TLV_INVALID;
 		int32_t vf_data_len = 0;
@@ -4126,6 +4127,16 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 				dsc_frame_types[vf_type] = 1;
 		}
 	}
+
+	if (tlv_result != TLV_RX_DATA_DONE) {
+
+                dbgf_sys(DBGT_WARN, "problematic description_ltv from %s, near type=%s frame_data_length=%d  pos=%d tlv_result=%d",
+                        pb ? pb->i.llip_str : DBG_NIL, description_tlv_handl[it.frame_type].name,
+                        it.frame_data_length, it.frames_pos, tlv_result);
+
+		goto resolve_desc_extension_error;
+        }
+
 
 	if (unresolved)
 		return (struct desc_extension *) UNRESOLVED_PTR;
