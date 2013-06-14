@@ -4097,22 +4097,21 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 		int32_t vf_data_len = 0;
 		uint8_t vf_relevant = 0xFF;
 
-                if (it.frame_type != BMX_DSC_TLV_REF_ADV && it.frame_compression == FRAME_COMPRESSION_NONE) {
+                if (it.frame_type != BMX_DSC_TLV_REF_ADV && 
+			(it.frame_compression == FRAME_COMPRESSION_NONE || it.frame_compression == FRAME_COMPRESSION_GZIP)) {
 
 			vf_type = it.frame_type;
 			vf_relevant = it.is_relevant;
-			vf_data_len = it.frame_data_length;
+			vf_data_len = (it.frame_compression == FRAME_COMPRESSION_NONE) ?
+				it.frame_data_length :
+				z_decompress(it.frame_data, it.frame_data_length, NULL, 0);
 
-		} else if (it.frame_type != BMX_DSC_TLV_REF_ADV && it.frame_compression == FRAME_COMPRESSION_GZIP) {
-
-			vf_type = it.frame_type;
-			vf_relevant = it.is_relevant;
-			vf_data_len = z_decompress(it.frame_data, it.frame_data_length, NULL, 0);
-
-			if ( vf_data_len <= 0 || vf_data_len <= it.frame_data_length)
+			if ( vf_data_len <= 0 || vf_data_len < it.frame_data_length)
 				goto resolve_desc_extension_error;
 
-                } else if (it.frame_type == BMX_DSC_TLV_REF_ADV && it.frame_compression == FRAME_COMPRESSION_NONE &&
+
+                } else if (it.frame_type == BMX_DSC_TLV_REF_ADV && 
+			(it.frame_compression == FRAME_COMPRESSION_NONE || it.frame_compression == FRAME_COMPRESSION_GZIP) &&
 			(((struct description_hdr_ref*)(it.frame_data))->expanded_rframes_data_len) > 0) {
 
 			vf_data_len = resolve_ref_frame(pb, it.frame_data, it.frame_data_length, it.frame_compression, NULL, &vf_type, &vf_relevant, 1);
