@@ -89,8 +89,8 @@
 #define TYP_FZIP_DFLT 0
 #define TYP_FZIP_DONT 1
 #define TYP_FZIP_DO   2
-#define DEF_FZIP      2
 #define MAX_FZIP      2
+#define DEF_FZIP      TYP_FZIP_DONT
 #define HLP_FZIP      "use compressed description 0:dflt, 1:disabled, 2:gzip"
 
 #define ARG_FREF      "descReferencing"
@@ -98,8 +98,8 @@
 #define TYP_FREF_DFLT 0
 #define TYP_FREF_DONT 1
 #define TYP_FREF_DO   2
-#define DEF_FREF      2
 #define MAX_FREF      2
+#define DEF_FREF      TYP_FREF_DONT
 #define HLP_FREF      "use referenced description 0:dflt, 1:disabled, 2:reference"
 
 
