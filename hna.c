@@ -83,6 +83,11 @@ IFNAME_T tun_name_prefix = {{DEF_TUN_NAME_PREFIX}};
 static int32_t tun_out_mtu = DEF_TUN_OUT_MTU;
 static int32_t tun_dedicated_to = DEF_TUN_OUT_TO;
 
+int32_t hna6_fzip = TYP_FZIP_DFLT;
+int32_t hna6_fref = TYP_FREF_DFLT;
+int32_t tun6_fzip = TYP_FZIP_DONT;
+int32_t tun6_fref = TYP_FREF_DONT;
+
 
 STATIC_FUNC
 void configure_tun_bit(uint8_t del, struct tun_bit_node *tbn, IDM_T asDfltTun);
@@ -3511,6 +3516,8 @@ int32_t hna_init( void )
         tlv_handl.min_msg_size = sizeof (struct description_msg_hna6);
         tlv_handl.fixed_msg_size = 1;
         tlv_handl.is_relevant = 1;
+	tlv_handl.dextCompression = &hna6_fzip;
+	tlv_handl.dextReferencing = &hna6_fref;
         tlv_handl.family = AF_INET6;
         tlv_handl.name = "HNA6_EXTENSION";
         tlv_handl.tx_frame_handler = create_description_tlv_hna;
@@ -3524,6 +3531,8 @@ int32_t hna_init( void )
         memset(&tlv_handl, 0, sizeof (tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct description_msg_tun6_adv);
         tlv_handl.fixed_msg_size = 1;
+	tlv_handl.dextCompression = &tun6_fzip;
+	tlv_handl.dextReferencing = &tun6_fref;
         tlv_handl.family = AF_INET6;
         tlv_handl.name = "TUN6_EXTENSION";
         tlv_handl.tx_frame_handler = create_description_tlv_tun6_adv;
@@ -3577,6 +3586,8 @@ int32_t hna_init( void )
         memset(&tlv_handl, 0, sizeof (tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct description_msg_tun4in6_net_adv);
         tlv_handl.fixed_msg_size = 1;
+	tlv_handl.dextCompression = &tun6_fzip;
+	tlv_handl.dextReferencing = &tun6_fref;
         tlv_handl.family = AF_INET6;
         tlv_handl.name = "TUN4IN6_NET_EXTENSION";
         tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_net_adv;
@@ -3587,6 +3598,8 @@ int32_t hna_init( void )
         memset(&tlv_handl, 0, sizeof (tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct description_msg_tun6in6_net_adv);
         tlv_handl.fixed_msg_size = 1;
+	tlv_handl.dextCompression = &tun6_fzip;
+	tlv_handl.dextReferencing = &tun6_fref;
         tlv_handl.family = AF_INET6;
         tlv_handl.name = "TUN6IN6_NET_EXTENSION";
         tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_net_adv;
