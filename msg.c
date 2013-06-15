@@ -76,8 +76,8 @@ AVL_TREE( description_cache_tree, struct description_cache_node, dhash );
 static AVL_TREE(ref_tree, struct ref_node, rhash);
 static int32_t ref_tree_items_used = 0;
 
-int32_t ref_nodes_max_unused = 100;
-int32_t ref_nodes_purge_to = 10000;
+int32_t ref_nodes_max_unused = 1000;
+int32_t ref_nodes_purge_to = 100000;
 
 //int my_desc0_tlv_len = 0;
 
@@ -1168,7 +1168,7 @@ struct ref_node* ref_node_get(struct packet_buff *pb, SHA1_T *rhash ) {
         struct ref_node *refn = avl_find_item( &ref_tree, rhash);
 
         if (refn) {
-                refn->last_mentioning = bmx_time;
+                refn->last_usage = bmx_time;
 		return refn;
         } else {
 		if(pb)
@@ -1200,11 +1200,13 @@ void ref_node_purge (IDM_T all_unused)
 
 		if (refn->usage_counter) {
 
-		} else if ( all_unused || ((TIME_T)(bmx_time - refn->last_mentioning)) > (TIME_T) ref_nodes_purge_to ) {
+			refn->last_usage = bmx_time;
+
+		} else if ( all_unused || ((TIME_T)(bmx_time - refn->last_usage)) > (TIME_T) ref_nodes_purge_to ) {
 
 			ref_node_del(refn);
 
-		} else if ( !oldest_unused || U32_LT( refn->last_mentioning, oldest_unused->last_mentioning )) {
+		} else if ( !oldest_unused || U32_LT( refn->last_usage, oldest_unused->last_usage )) {
 
 			oldest_unused = refn;
 		}
@@ -1256,7 +1258,7 @@ struct ref_node * ref_node_add(uint8_t *frame_data, uint32_t f_data_len, int8_t 
 
 		refn->f_compression = compression;
 		refn->f_long = long_hdr;
-		refn->last_mentioning = bmx_time;
+		refn->last_usage = bmx_time;
 		refn->rhash = rhash;
 		refn->f_data_len = f_data_len;
 		refn->f_data = debugMalloc(f_data_len, -300564);
@@ -4554,7 +4556,7 @@ struct ref_status {
 	uint8_t  f_compression;
 	uint8_t  f_long;
         uint32_t f_data_len; // NOT including frame header!!
-        uint32_t last_mention;
+        uint32_t last_usage;
         uint32_t usage_counter;
 };
 
@@ -4563,7 +4565,7 @@ static const struct field_format ref_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, f_compression, 1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, f_long,        1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, f_data_len,    1, FIELD_RELEVANCE_HIGH),
-        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, last_mention,  1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, last_usage,    1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, usage_counter, 1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_END
 };
@@ -4583,7 +4585,7 @@ static int32_t ref_status_creator(struct status_handl *handl, void *data)
 		status[i].f_compression = rfn->f_compression;
 		status[i].f_long = rfn->f_long;
 		status[i].f_data_len = rfn->f_data_len;
-		status[i].last_mention = rfn->last_mentioning;
+		status[i].last_usage = rfn->last_usage;
 		status[i].usage_counter = rfn->usage_counter;
 
 		i++;

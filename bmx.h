@@ -931,7 +931,7 @@ struct ref_node {
 	uint8_t f_long;
 	uint8_t *f_data;
         uint32_t f_data_len; // NOT including frame header!!
-        uint32_t last_mentioning;
+        uint32_t last_usage;
         uint32_t usage_counter;
 };
 
