@@ -3091,9 +3091,12 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                         dbgf_sys(DBGT_WARN, "%s - too small length=%d for type=%s", it->caller, f_len, f_handl->name);
                         return TLV_RX_DATA_FAILURE;
 
-                } else if (f_handl->fixed_msg_size && it->frame_msgs_length % f_handl->min_msg_size) {
+                } else if ((!f_compression ||
+			(it->handls == description_tlv_handl && f_type == BMX_DSC_TLV_REF_ADV) ||
+			(it->handls == packet_frame_handler && f_type == FRAME_TYPE_REF_ADV) ) &&
+			f_handl->fixed_msg_size && it->frame_msgs_length % f_handl->min_msg_size) {
 
-                        dbgf_sys(DBGT_WARN, "%s - nonmaching length=%d for type=%s", it->caller, f_len, f_handl->name);
+                        dbgf_sys(DBGT_WARN, "%s - non-matching length=%d for type=%s", it->caller, f_len, f_handl->name);
                         return TLV_RX_DATA_FAILURE;
 
                 } else if (f_handl->family && f_handl->family != AF_CFG) {
