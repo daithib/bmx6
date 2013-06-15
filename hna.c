@@ -86,8 +86,8 @@ IFNAME_T tun_name_prefix = {{DEF_TUN_NAME_PREFIX}};
 static int32_t tun_out_mtu = DEF_TUN_OUT_MTU;
 static int32_t tun_dedicated_to = DEF_TUN_OUT_TO;
 
-int32_t hna6_fzip = DEF_FZIP;
-int32_t hna6_fref = DEF_FREF;
+int32_t hna6_fzip = TYP_FZIP_DFLT;
+int32_t hna6_fref = TYP_FREF_DFLT;
 int32_t tun6_fzip = TYP_FZIP_DONT;
 int32_t tun6_fref = TYP_FREF_DONT;
 
