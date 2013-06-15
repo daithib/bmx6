@@ -3349,8 +3349,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
         struct frame_handl *handl = &(it->handls[it->frame_type]);
-        int32_t tlv_result = it->frame_cache_msgs_size;
-        int32_t cache_pos = tlv_result + handl->data_header_size;
+        int32_t fdata_in = it->frame_cache_msgs_size + handl->data_header_size;
 	uint8_t do_fzip = (
 		((handl->dextCompression && *handl->dextCompression==TYP_FZIP_DO) ? 1 :
 			((handl->dextCompression && *handl->dextCompression==TYP_FZIP_DONT) ? 0 :
@@ -3367,24 +3366,24 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 	struct frame_header_long *fhl = (struct frame_header_long *) fhs;
 
 
-        assertion(-500881, (tlv_result >= TLV_TX_DATA_PROCESSED));
+        assertion(-500881, (it->frame_cache_msgs_size >= TLV_TX_DATA_PROCESSED));
         assertion(-500786, (tx_iterator_cache_data_space_max(it) >= 0));
-        assertion(-500355, (IMPLIES(handl->fixed_msg_size, !(tlv_result % handl->min_msg_size))));
-        ASSERTION(-501003, (is_zero((it->frame_cache_array + tlv_result + handl->data_header_size), tx_iterator_cache_data_space_max(it))));
-        assertion(-501019, (cache_pos)); // there must be some data to send!!
+        assertion(-500355, (IMPLIES(handl->fixed_msg_size, !(it->frame_cache_msgs_size % handl->min_msg_size))));
+        ASSERTION(-501003, (is_zero((it->frame_cache_array + it->frame_cache_msgs_size + handl->data_header_size), tx_iterator_cache_data_space_max(it))));
+        assertion(-501019, (fdata_in)); // there must be some data to send!!
 
 	if (it->dext) {
 		// this is the dext creation of my description...
 		assertion(-500000, (it->handls==description_tlv_handl));
 
-		it->dext->data = debugReallocReset(it->dext->data, it->dext->dlen + sizeof(struct frame_header_virtual) + cache_pos, -300568);
+		it->dext->data = debugReallocReset(it->dext->data, it->dext->dlen + sizeof(struct frame_header_virtual) + fdata_in, -300568);
 		struct frame_header_virtual *fhv = (struct frame_header_virtual *)(it->dext->data + it->dext->dlen);
 		fhv->is_virtual = 1;
 		fhv->is_relevant = handl->is_relevant;
 		fhv->type = it->frame_type;
-		fhv->length = sizeof(struct frame_header_virtual) + cache_pos;
-		memcpy(it->dext->data + it->dext->dlen + sizeof(struct frame_header_virtual), it->frame_cache_array, cache_pos);
-		it->dext->dlen += (sizeof(struct frame_header_virtual) + cache_pos);
+		fhv->length = sizeof(struct frame_header_virtual) + fdata_in;
+		memcpy(it->dext->data + it->dext->dlen + sizeof(struct frame_header_virtual), it->frame_cache_array, fdata_in);
+		it->dext->dlen += (sizeof(struct frame_header_virtual) + fdata_in);
 	}
 
 	if (it->dext && do_fref) {
@@ -3401,9 +3400,9 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		assertion(-500000, TEST_STRUCT(struct description_msg_ref));
 
 		uint8_t *rfd_agg_data = do_fzip ? NULL : it->frame_cache_array;
-		int32_t rfd_zagg_len = do_fzip ? z_compress(it->frame_cache_array, cache_pos, &rfd_agg_data, 0, 0, 0) : 0;
-		assertion(-501606, IMPLIES(do_fzip, rfd_zagg_len >= 0 && rfd_zagg_len < cache_pos));
-		int32_t rfd_agg_len = rfd_zagg_len > 0 ? rfd_zagg_len : cache_pos;
+		int32_t rfd_zagg_len = do_fzip ? z_compress(it->frame_cache_array, fdata_in, &rfd_agg_data, 0, 0, 0) : 0;
+		assertion(-501606, IMPLIES(do_fzip, rfd_zagg_len >= 0 && rfd_zagg_len < fdata_in));
+		int32_t rfd_agg_len = rfd_zagg_len > 0 ? rfd_zagg_len : fdata_in;
 		assertion(-501594, IMPLIES(do_fzip, rfd_agg_len > 0));
 		int32_t rfd_msgs = rfd_agg_len/PREF_PKT_FRAME_DATA_SIZE + (rfd_agg_len%PREF_PKT_FRAME_DATA_SIZE?1:0);
 		int32_t rfd_size = sizeof(struct description_hdr_ref) + (rfd_msgs*sizeof(struct description_msg_ref));
@@ -3427,8 +3426,8 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		struct description_hdr_ref *rfd_hdr = (struct description_hdr_ref *) ((uint8_t*)fhs + rf_hdr_size);
 		rfd_hdr->referenced_type = it->frame_type;
 		rfd_hdr->is_relevant = handl->is_relevant;
-		rfd_hdr->expanded_rframes_data_len = cache_pos;
-		ShaUpdate(&bmx_sha, (byte*) it->frame_cache_array, cache_pos);
+		rfd_hdr->expanded_rframes_data_len = fdata_in;
+		ShaUpdate(&bmx_sha, (byte*) it->frame_cache_array, fdata_in);
 		ShaFinal(&bmx_sha, (byte*) &rfd_hdr->expanded_rframes_data_hash);
 
 		// set: frame-data msgs:
@@ -3457,7 +3456,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 	} else {
 		
 		IDM_T is_long_header = it->use_long_header || it->already_compressed || do_fzip ||
-			(cache_pos > (int)MAX_SHORT_FRAME_DATA_LEN);
+			(fdata_in > (int)MAX_SHORT_FRAME_DATA_LEN);
 
 		memset(fhl, 0, is_long_header ? sizeof (struct frame_header_long) : sizeof (struct frame_header_short));
 
@@ -3472,34 +3471,34 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 			it->frames_out_pos += sizeof ( struct frame_header_long);
 
 			if (!it->already_compressed && do_fzip &&
-				(z_size = z_compress(it->frame_cache_array, cache_pos, 0,0, it->frames_out_ptr + it->frames_out_pos, cache_pos)) > 0) {
+				(z_size = z_compress(it->frame_cache_array, fdata_in, 0,0, it->frames_out_ptr + it->frames_out_pos, fdata_in)) > 0) {
 
-				assertion(-501597, z_size < cache_pos);
+				assertion(-501597, z_size < fdata_in);
 				it->frames_out_pos += z_size;
 				fhl->length = htons(z_size + sizeof ( struct frame_header_long));
 				fhl->compression = FRAME_COMPRESSION_GZIP;
 
 			} else {
 				assertion(-501607, z_size == 0);
-				memcpy(it->frames_out_ptr + it->frames_out_pos, it->frame_cache_array, cache_pos);
-				it->frames_out_pos += cache_pos;
-				fhl->length = htons(cache_pos + sizeof ( struct frame_header_long));
+				memcpy(it->frames_out_ptr + it->frames_out_pos, it->frame_cache_array, fdata_in);
+				it->frames_out_pos += fdata_in;
+				fhl->length = htons(fdata_in + sizeof ( struct frame_header_long));
 				fhl->compression = it->already_compressed;
 			}
 
 		} else {
 
 			it->frames_out_pos += sizeof ( struct frame_header_short);
-			memcpy(it->frames_out_ptr + it->frames_out_pos, it->frame_cache_array, cache_pos);
-			it->frames_out_pos += cache_pos;
-			fhs->length = (cache_pos + sizeof ( struct frame_header_short));
+			memcpy(it->frames_out_ptr + it->frames_out_pos, it->frame_cache_array, fdata_in);
+			it->frames_out_pos += fdata_in;
+			fhs->length = (fdata_in + sizeof ( struct frame_header_short));
 		}
 
 	}
 	if (do_fref || do_fzip ) {
-		dbgf_track(DBGT_INFO, "added %s %s is_relevant=%d length=%d do_fref=%d (%d %d %d) do_fzip=%d (%d %d %d)",
-			fhs->is_short ? "SHORT" : "LONG", handl->name, fhs->is_relevant,
-			fhs->is_short ? fhs->length : ntohs(fhl->length),
+		dbgf_track(DBGT_INFO, "added %s fdata_in=%d -> %s flen=%d compressed=%d referenced=%d relevant=%d  do_fref=%d (%d %d %d) do_fzip=%d (%d %d %d)",
+			handl->name, fdata_in, fhs->is_short ? "SHORT" : "LONG", fhs->is_short ? fhs->length : ntohs(fhl->length),
+			fhs->is_short ? 0 : fhl->compression, it->dext && fhs->type==BMX_DSC_TLV_REF_ADV, fhs->is_relevant,
 			do_fref, handl->dextReferencing ? *handl->dextReferencing : -1, dextReferencing, DEF_FREF,
 			do_fzip, handl->dextCompression ? *handl->dextCompression : -1, dextCompression, DEF_FZIP );
 	}
@@ -3507,7 +3506,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
         it->frames_out_num++;
 
-        memset(it->frame_cache_array, 0, cache_pos);
+        memset(it->frame_cache_array, 0, fdata_in);
         it->frame_cache_msgs_size = 0;
 
 	it->already_compressed = 0;
