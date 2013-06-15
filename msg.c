@@ -76,8 +76,8 @@ AVL_TREE( description_cache_tree, struct description_cache_node, dhash );
 static AVL_TREE(ref_tree, struct ref_node, rhash);
 static int32_t ref_tree_items_used = 0;
 
-int32_t ref_nodes_max_unused = 100;
-int32_t ref_nodes_purge_to = 10000;
+int32_t ref_nodes_max_unused = 1000;
+int32_t ref_nodes_purge_to = 100000;
 
 //int my_desc0_tlv_len = 0;
 
@@ -1167,7 +1167,7 @@ struct ref_node* ref_node_get(struct packet_buff *pb, SHA1_T *rhash ) {
         struct ref_node *refn = avl_find_item( &ref_tree, rhash);
 
         if (refn) {
-                refn->last_mentioning = bmx_time;
+                refn->last_usage = bmx_time;
 		return refn;
         } else {
 		if(pb)
@@ -1199,11 +1199,13 @@ void ref_node_purge (IDM_T all_unused)
 
 		if (refn->usage_counter) {
 
-		} else if ( all_unused || ((TIME_T)(bmx_time - refn->last_mentioning)) > (TIME_T) ref_nodes_purge_to ) {
+			refn->last_usage = bmx_time;
+
+		} else if ( all_unused || ((TIME_T)(bmx_time - refn->last_usage)) > (TIME_T) ref_nodes_purge_to ) {
 
 			ref_node_del(refn);
 
-		} else if ( !oldest_unused || U32_LT( refn->last_mentioning, oldest_unused->last_mentioning )) {
+		} else if ( !oldest_unused || U32_LT( refn->last_usage, oldest_unused->last_usage )) {
 
 			oldest_unused = refn;
 		}
@@ -1255,7 +1257,7 @@ struct ref_node * ref_node_add(uint8_t *frame_data, uint32_t f_data_len, int8_t 
 
 		refn->f_compression = compression;
 		refn->f_long = long_hdr;
-		refn->last_mentioning = bmx_time;
+		refn->last_usage = bmx_time;
 		refn->rhash = rhash;
 		refn->f_data_len = f_data_len;
 		refn->f_data = debugMalloc(f_data_len, -300564);
@@ -4225,10 +4227,10 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 			assertion(-500000, 0);
 		}
 
-		dbgf_track(DBGT_INFO, "converted type=%d %s f_data_length=%d compression=%d -> type=%d %s relevant=%d vf_data_len=%d, dext.len=%d dext_dlen_old=%d ",
+		dbgf_track(DBGT_INFO, "converted type=%d %s f_data_length=%d compression=%d -> type=%d %s relevant=%d vf_data_len=%d, dext.len=%d",
 		           it.frame_type, it.handl->name, it.frame_data_length, it.frame_compression,
 			   vf_type, vf_type <= it.handl_max ? it.handls[vf_type].name : "???",
-			   vf_relevant, vf_data_len, dext->dlen, dext_dlen_old );
+			   vf_relevant, vf_data_len, dext->dlen );
 
 		struct frame_header_virtual *vf_hdr = (struct frame_header_virtual *)(dext->data + dext_dlen_old);
 		memset(vf_hdr, 0, sizeof(struct frame_header_virtual));
@@ -4475,7 +4477,6 @@ void update_my_description_adv(void)
 }
 
 
-
 STATIC_FUNC
 int32_t opt_show_descriptions(uint8_t cmd, uint8_t _save, struct opt_type *opt,
                               struct opt_parent *patch, struct ctrl_node *cn)
@@ -4554,6 +4555,55 @@ int32_t opt_show_descriptions(uint8_t cmd, uint8_t _save, struct opt_type *opt,
 }
 
 
+
+struct ref_status {
+        SHA1_T   f_hash;
+	uint8_t  f_compression;
+	uint8_t  f_long;
+        uint32_t f_data_len; // NOT including frame header!!
+        uint32_t last_usage;
+        uint32_t usage_counter;
+};
+
+static const struct field_format ref_status_format[] = {
+        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_BINARY, ref_status, f_hash,        1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, f_compression, 1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, f_long,        1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, f_data_len,    1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, last_usage,    1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, usage_counter, 1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_END
+};
+
+static int32_t ref_status_creator(struct status_handl *handl, void *data)
+{
+        struct avl_node *it;
+        struct ref_node *rfn;
+        uint32_t max_size = ref_tree.items * sizeof (struct ref_status);
+        uint32_t i = 0;
+
+        struct ref_status *status = ((struct ref_status*) (handl->data = debugRealloc(handl->data, max_size, -300587)));
+        memset(status, 0, max_size);
+
+        for (it = NULL; (rfn = avl_iterate_item(&ref_tree, &it));) {
+
+		memcpy( &(status[i].f_hash), &rfn->rhash, sizeof(SHA1_T));
+		status[i].f_compression = rfn->f_compression;
+		status[i].f_long = rfn->f_long;
+		status[i].f_data_len = rfn->f_data_len;
+		status[i].last_usage = rfn->last_usage;
+		status[i].usage_counter = rfn->usage_counter;
+
+		i++;
+		assertion(-501225, (max_size >= i * sizeof (struct ref_status)));
+        }
+
+        return i * sizeof (struct ref_status);
+}
+
+
+
+
 STATIC_FUNC
 struct opt_type msg_options[]=
 {
@@ -4571,7 +4621,7 @@ struct opt_type msg_options[]=
         {ODI, 0, ARG_OGM_SQN_RANGE,        0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &ogmSqnRange,    MIN_OGM_SQN_RANGE,  MAX_OGM_SQN_RANGE, DEF_OGM_SQN_RANGE,0,  0,
 			ARG_VALUE_FORM,	"set average OGM sequence number range (affects frequency of bmx6 description updates)"}
         ,
-        {ODI, 0, ARG_OGM_TX_ITERS,         0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &ogm_adv_tx_iters,MIN_OGM_TX_ITERS,MAX_OGM_TX_ITERS,DEF_OGM_TX_ITERS,0,0,
+        {ODI, 0, ARG_OGM_TX_ITERS,         0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &ogm_adv_tx_iters,MIN_OGM_TX_ITERS,MAX_OGM_TX_ITERS,DEF_OGM_TX_ITERS,0,       0,
 			ARG_VALUE_FORM,	"set maximum resend attempts for ogm aggregations"}
         ,
         {ODI, 0, ARG_UNSOLICITED_DESC_ADVS,0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &desc_adv_tx_unsolicited,MIN_UNSOLICITED_DESC_ADVS,MAX_UNSOLICITED_DESC_ADVS,DEF_DESC_ADV_UNSOLICITED,0,0,
@@ -4596,17 +4646,21 @@ struct opt_type msg_options[]=
 			ARG_VALUE_FORM,	"set tx iterations for ogm acknowledgements"}
         ,
 #endif
-	{ODI, 0, ARG_DESCRIPTIONS,	   0,  9,2, A_PS0N,A_USR, A_DYN, A_ARG, A_ANY, 0,                0,                   0,                   0,0,   opt_show_descriptions,
+	{ODI, 0, ARG_DESCRIPTIONS,	   0,  9,2, A_PS0N,A_USR, A_DYN, A_ARG, A_ANY, 0,               0,                  0,                 0,0,                  opt_show_descriptions,
 			0,		HLP_DESCRIPTIONS}
         ,
-	{ODI,ARG_DESCRIPTIONS,ARG_DESCRIPTION_TYPE,'t',9,2,A_CS1,A_USR,A_DYN,A_ARG,A_ANY,	0,	MIN_DESCRIPTION_TYPE, MAX_DESCRIPTION_TYPE, DEF_DESCRIPTION_TYPE,0, opt_show_descriptions,
+	{ODI,ARG_DESCRIPTIONS,ARG_DESCRIPTION_TYPE,'t',9,2,A_CS1,A_USR,A_DYN,A_ARG,A_ANY,0,	        MIN_DESCRIPTION_TYPE,MAX_DESCRIPTION_TYPE,DEF_DESCRIPTION_TYPE,0,opt_show_descriptions,
 			"<TYPE>",	HLP_DESCRIPTION_TYPE}
         ,
-	{ODI,ARG_DESCRIPTIONS,ARG_DESCRIPTION_NAME,'n',9,2,A_CS1,A_USR,A_DYN,A_ARG,A_ANY,	0,		0,	0,0,		0, opt_show_descriptions,
+	{ODI,ARG_DESCRIPTIONS,ARG_DESCRIPTION_NAME,'n',9,2,A_CS1,A_USR,A_DYN,A_ARG,A_ANY,0,		0,	            0,                 0,0,                  opt_show_descriptions,
 			"<NAME>",	"only show description of nodes with given name"}
         ,
-	{ODI,ARG_DESCRIPTIONS,ARG_RELEVANCE,       'r',9,2,A_CS1,A_USR,A_DYN,A_ARG,A_ANY,	0,	MIN_RELEVANCE,	MAX_RELEVANCE,    DEF_RELEVANCE,		0, opt_show_descriptions,
+	{ODI,ARG_DESCRIPTIONS,ARG_RELEVANCE,       'r',9,2,A_CS1,A_USR,A_DYN,A_ARG,A_ANY,0,	        MIN_RELEVANCE,	    MAX_RELEVANCE,     DEF_RELEVANCE,0,      opt_show_descriptions,
 			ARG_VALUE_FORM,	HLP_ARG_RELEVANCE}
+	,
+	{ODI, 0, ARG_REFERENCES,	   0,  9,2, A_PS0N,A_USR, A_DYN, A_ARG, A_ANY, 0,               0,                  0,                 0,0,                  opt_status,
+			0,		HLP_REFERENCES}
+
 
 };
 
@@ -4627,6 +4681,8 @@ int32_t init_msg( void )
         my_packet_sqn = (rand_num(PKT_SQN_MAX - 1) + 1); // dont start with zero because my_link_sqn and my_dev_sqn assume this
 
 	register_options_array( msg_options, sizeof( msg_options ), CODE_CATEGORY_NAME );
+
+        register_status_handl(sizeof (struct ref_status), 1, ref_status_format, ARG_REFERENCES, ref_status_creator);
 
         InitSha(&bmx_sha);
 

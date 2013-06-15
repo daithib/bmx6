@@ -225,6 +225,8 @@
 #define MAX_DESCRIPTION_TYPE     FRAME_TYPE_PROCESS_ALL
 #define HLP_DESCRIPTION_TYPE     "show description extension(s) of given type (0..253=type 254=none 255=all) \n"
 
+#define ARG_REFERENCES          "references"
+#define HLP_REFERENCES          "show cached reference frames\n"
 
 
 struct frame_header_short { // 2 bytes
