@@ -27,10 +27,10 @@
 #define SMS_POLLING_INTERVAL 5000
 
 #define ARG_SMS_FZIP "zipSms"
-#define DEF_SMS_FZIP DEF_FZIP
+#define DEF_SMS_FZIP TYP_FZIP_DFLT
 
 #define ARG_SMS_FREF "refSms"
-#define DEF_SMS_FREF DEF_FREF
+#define DEF_SMS_FREF TYP_FREF_DFLT
 
 
 struct sms_node {
