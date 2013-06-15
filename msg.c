@@ -4222,8 +4222,10 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 			assertion(-500000, 0);
 		}
 
-		dbgf_track(DBGT_INFO, "converted type=%d %s relevant=%d dext_dlen_old=%d frame_data_length=%d to vf_data_len=%d, dext.len=%d",
-		           vf_type, it.handl->name, vf_relevant, dext_dlen_old, it.frame_data_length, vf_data_len, dext->dlen );
+		dbgf_track(DBGT_INFO, "converted type=%d %s f_data_length=%d compression=%d -> type=%d %s relevant=%d vf_data_len=%d, dext.len=%d dext_dlen_old=%d ",
+		           it.frame_type, it.handl->name, it.frame_data_length, it.frame_compression,
+			   vf_type, vf_type <= it.handl_max ? it.handls[vf_type].name : "???",
+			   vf_relevant, vf_data_len, dext->dlen, dext_dlen_old );
 
 		struct frame_header_virtual *vf_hdr = (struct frame_header_virtual *)(dext->data + dext_dlen_old);
 		memset(vf_hdr, 0, sizeof(struct frame_header_virtual));
