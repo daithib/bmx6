@@ -76,8 +76,8 @@ AVL_TREE( description_cache_tree, struct description_cache_node, dhash );
 static AVL_TREE(ref_tree, struct ref_node, rhash);
 static int32_t ref_tree_items_used = 0;
 
-int32_t ref_nodes_max_unused = 1000;
-int32_t ref_nodes_purge_to = 100000;
+int32_t ref_nodes_max_unused = 200;
+int32_t ref_nodes_purge_to = 60000;
 
 //int my_desc0_tlv_len = 0;
 
@@ -4118,14 +4118,18 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
                 .process_filter = FRAME_TYPE_PROCESS_NONE, .custom_data = NULL,
                 .frame_type = -1,.frames_in = data, .frames_length = dlen };
 
+	uint8_t vf_type = BMX_DSC_TLV_INVALID;
+	int32_t vf_data_len = 0;
+	uint8_t vf_relevant = 0xFF;
+	char *vf_error = "???";
 
 	// First check if dext is fully resolvable::
 	it = it_init;
         while ((tlv_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
 
-		uint8_t vf_type = BMX_DSC_TLV_INVALID;
-		int32_t vf_data_len = 0;
-		uint8_t vf_relevant = 0xFF;
+		vf_type = BMX_DSC_TLV_INVALID;
+		vf_data_len = 0;
+		vf_relevant = 0xFF;
 
                 if (it.frame_type != BMX_DSC_TLV_REF_ADV && 
 			(it.frame_compression == FRAME_COMPRESSION_NONE || it.frame_compression == FRAME_COMPRESSION_GZIP)) {
@@ -4136,8 +4140,11 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 				it.frame_data_length :
 				z_decompress(it.frame_data, it.frame_data_length, NULL, 0);
 
-			if ( vf_data_len <= 0 || vf_data_len < it.frame_data_length)
+			if ( vf_data_len <= 0 || vf_data_len < it.frame_data_length) {
+
+				vf_error = "1";
 				goto resolve_desc_extension_error;
+			}
 
 
                 } else if (it.frame_type == BMX_DSC_TLV_REF_ADV && 
@@ -4154,19 +4161,23 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 
 			} else {
 
+				vf_error = "2";
 				goto resolve_desc_extension_error;
 			}
 
                 } else {
+			vf_error = "3";
 			goto resolve_desc_extension_error;
 		}
 
 		if (!unresolved) {
-			if (vf_type > BMX_DSC_TLV_MAX || dsc_frame_types[vf_type] || vf_relevant > 1)
-				goto resolve_desc_extension_error;
-			else
-				dsc_frame_types[vf_type] = 1;
+			if (vf_type > BMX_DSC_TLV_MAX || dsc_frame_types[vf_type] || vf_relevant > 1) {
 
+				vf_error = "4";
+				goto resolve_desc_extension_error;
+			} else {
+				dsc_frame_types[vf_type] = 1;
+			}
 		}
 	}
 
@@ -4189,9 +4200,9 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 	it = it_init;
         while (rx_frame_iterate(&it) > TLV_RX_DATA_DONE) {
 
-		uint8_t vf_type = BMX_DSC_TLV_INVALID;
-		int32_t vf_data_len = 0;
-		uint8_t vf_relevant = 0xFF;
+		vf_type = BMX_DSC_TLV_INVALID;
+		vf_data_len = 0;
+		vf_relevant = 0xFF;
 		uint32_t dext_dlen_old = dext->dlen;
 
 		dext->dlen += sizeof(struct frame_header_virtual);
@@ -4250,8 +4261,8 @@ resolve_desc_extension_error:
 
 	assertion(-500000, (!dext)); //otherwise the check should have failed!
 	//free_desc_extensions(&dext);
-        dbgf_sys(DBGT_ERR, "Failed converting type=%d max_known=%d compression=%d",
-                 it.frame_type, BMX_DSC_TLV_MAX_KNOWN, it.frame_compression);
+        dbgf_sys(DBGT_ERR, "Failed converting type=%d max_known=%d f_data_len=%d compression=%d -> type=%d vf_data_len=%d vf_relevant=%d vf_error=%s",
+                 it.frame_type, BMX_DSC_TLV_MAX_KNOWN, it.frame_data_length, it.frame_compression, vf_type, vf_data_len, vf_relevant, vf_error);
 
 	return (struct desc_extension *) FAILURE_PTR;
 }
