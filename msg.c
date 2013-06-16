@@ -3956,24 +3956,27 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 
 	struct description_hdr_ref *hdr = (struct description_hdr_ref *)data;
         struct description_msg_ref *msg = hdr->msg;
-	int32_t m, msgs = (dlen - sizeof(struct description_hdr_ref)) / sizeof(struct description_msg_ref);
+	int32_t m = 0, msgs = (dlen - sizeof(struct description_hdr_ref)) / sizeof(struct description_msg_ref);
 	int32_t ref_len = 0;
 	struct desc_extension *solvable = dext ? dext : debugMallocReset(sizeof(struct desc_extension), -300000);
 	struct desc_extension *solvable_free = dext ? NULL : solvable;
 	uint32_t solvable_begin = solvable->dlen;
+	char *goto_error_code = "";
+
+#define goto_error( where, what ) { goto_error_code=what; goto where; }
 
 	if (solvable != dext)
 		LIST_INIT_HEAD(solvable->refnl_list, struct refnl_node, list, list);
 
 	if ((++nest_level) > MAX_REF_NESTING)
-		goto resolve_ref_frame_error;
+		goto_error( resolve_ref_frame_error, "exceeded nest level");
 
 	if (hdr->expanded_rframes_data_len == 0 || hdr->expanded_rframes_data_len > MAX_DESC_LEN)
-		goto resolve_ref_frame_error;
+		goto_error( resolve_ref_frame_error, "invalid claimed expanded lenght");
 
 	solvable->max_nesting = nest_level;
 
-        for (m = 0; m < msgs && ref_len < (int32_t)hdr->expanded_rframes_data_len; m++) {
+        for (; m < msgs && ref_len < (int32_t)hdr->expanded_rframes_data_len; m++) {
 
                 struct ref_node *refn = ref_node_get(pb, &(msg[m].rframe_hash));
 
@@ -3986,7 +3989,7 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 			int32_t tmp_len = resolve_ref_frame(pb, refn->f_data, refn->f_data_len, refn->f_compression, solvable, rf_type, rf_relevant, nest_level);
 
 			if (tmp_len < 0)
-				goto resolve_ref_frame_error;
+				goto_error( resolve_ref_frame_error, "failed next recursion");
 			if (tmp_len == 0)
 				solvable = NULL;
 			if (tmp_len > 0)
@@ -4000,7 +4003,7 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 				*rf_type = hdr->referenced_type;
 				*rf_relevant = hdr->is_relevant;
 			} else {
-				goto resolve_ref_frame_error;
+				goto_error( resolve_ref_frame_error, "failed type or relevance resolution");
 			}
 
 			if (solvable) {
@@ -4017,7 +4020,7 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 				} else {
 					int32_t tmp_len;
 					if((tmp_len = z_decompress(refn->f_data, refn->f_data_len, &solvable->data, solvable->dlen)) <= 0)
-						goto resolve_ref_frame_error;
+						goto_error( resolve_ref_frame_error, "failed inner decompression");
 
 					solvable->dlen += tmp_len;
 
@@ -4029,7 +4032,7 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 			}
 
 		} else {
-			goto resolve_ref_frame_error;
+			goto_error( resolve_ref_frame_error, "invalid case");
 		}
 
 		assertion(-501599, IMPLIES(solvable, solvable_begin + ref_len == solvable->dlen));
@@ -4037,7 +4040,7 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
         }
 
 	if (m != msgs)
-		goto resolve_ref_frame_error;
+		goto_error( resolve_ref_frame_error, "invalid msgs");
 
 	if (!solvable)
 		goto resolve_ref_frame_unresolved;
@@ -4047,16 +4050,16 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 	} else if (compression == FRAME_COMPRESSION_GZIP) {
 
 		if ((ref_len = z_decompress(solvable->data + solvable_begin, ref_len, &solvable->data, solvable_begin)) <= 0)
-			goto resolve_ref_frame_error;
+			goto_error( resolve_ref_frame_error, "failed outer decompression");
 
 		solvable->dlen = solvable_begin + ref_len;
 
 	} else {
-		goto resolve_ref_frame_error;
+		goto_error( resolve_ref_frame_error, "invalid outer decompression");
 	}
 
 	if (ref_len != (int32_t)hdr->expanded_rframes_data_len)
-		goto resolve_ref_frame_error;
+		goto_error( resolve_ref_frame_error, "invalid expanded length");
 
 
 	SHA1_T rhash;
@@ -4064,7 +4067,7 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 	ShaFinal(&bmx_sha, (byte*) &rhash);
 
 	if (memcmp(&rhash, &hdr->expanded_rframes_data_hash, sizeof(SHA1_T)))
-		goto resolve_ref_frame_error;
+		goto_error( resolve_ref_frame_error, "invalid expanded hash");
 
 
 	free_desc_extensions(&solvable_free);
@@ -4075,10 +4078,17 @@ resolve_ref_frame_unresolved:
 	return SUCCESS; // 0 == unresolved
 
 resolve_ref_frame_error:
+{
+	dbgf_sys(DBGT_ERR, "dlen=%d compression=%d dext=%d rf_type=%d rf_relevant=%d  msgs=%d exp_rfdlen=%d exp_rfdhash=&s -> nest_level=%d solvable=%d rf_type=%d rf_relevant=%d m=%d ref_len=%d rhash=%s error=%s",
+		dlen, compression, dext?1:0, hdr->referenced_type, hdr->is_relevant, msgs,
+		hdr->expanded_rframes_data_len, memAsHexString(&hdr->expanded_rframes_data_hash, sizeof(SHA1_T)),
+		nest_level, solvable?1:0, *rf_type, *rf_relevant, m, ref_len, memAsHexString(&rhash, sizeof(SHA1_T)),
+		goto_error_code);
+
 	free_desc_extensions(&solvable_free);
 	assertion(-500000, !dext); // this function should only be called if a prior call with dext=NULL succeeded
 	return FAILURE;
-
+}
 }
 
 
