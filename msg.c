@@ -3958,7 +3958,9 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 	struct desc_extension *solvable = dext ? dext : debugMallocReset(sizeof(struct desc_extension), -300000);
 	struct desc_extension *solvable_free = dext ? NULL : solvable;
 	uint32_t solvable_begin = solvable->dlen;
-	char *goto_error_code = "";
+	char *goto_error_code = " ";
+	SHA1_T rhash = {.h.u32 = {0}};
+
 
 #define goto_error( where, what ) { goto_error_code=what; goto where; }
 
@@ -3995,7 +3997,7 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 		} else if (refn->f_compression == FRAME_COMPRESSION_NONE || refn->f_compression == FRAME_COMPRESSION_GZIP) {
 
 			if ( (*rf_type > BMX_DSC_TLV_MAX || *rf_type == hdr->referenced_type) &&
-				(*rf_relevant > 1 || *rf_relevant != hdr->is_relevant)) {
+				(*rf_relevant > 1 || *rf_relevant == hdr->is_relevant)) {
 
 				*rf_type = hdr->referenced_type;
 				*rf_relevant = hdr->is_relevant;
@@ -4059,7 +4061,6 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 		goto_error( resolve_ref_frame_error, "invalid expanded length");
 
 
-	SHA1_T rhash;
 	ShaUpdate(&bmx_sha, (byte*) solvable->data + solvable_begin, ref_len);
 	ShaFinal(&bmx_sha, (byte*) &rhash);
 
