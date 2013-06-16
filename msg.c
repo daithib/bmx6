@@ -203,7 +203,7 @@ IDM_T validate_desc_structure(struct description *desc)
 
         if (validate_name_string(desc->globalId.name, GLOBAL_ID_NAME_LEN, NULL) == FAILURE) {
 
-                dbg_sys(DBGT_ERR, "illegal hostname ", globalIdAsString(&desc->globalId));
+                dbg_sys(DBGT_ERR, "illegal hostname=%s ", globalIdAsString(&desc->globalId));
 		goto validate_desc_structure_failure;
         }
 
@@ -4079,9 +4079,11 @@ resolve_ref_frame_unresolved:
 
 resolve_ref_frame_error:
 {
-	dbgf_sys(DBGT_ERR, "dlen=%d compression=%d dext=%d rf_type=%d rf_relevant=%d  msgs=%d exp_rfdlen=%d exp_rfdhash=&s -> nest_level=%d solvable=%d rf_type=%d rf_relevant=%d m=%d ref_len=%d rhash=%s error=%s",
+	dbgf_sys(DBGT_ERR, "dlen=%d compression=%d dext=%d rf_type=%d rf_relevant=%d  msgs=%d exp_rfdlen=%d exp_rfdhash=%s -> ",
 		dlen, compression, dext?1:0, hdr->referenced_type, hdr->is_relevant, msgs,
-		hdr->expanded_rframes_data_len, memAsHexString(&hdr->expanded_rframes_data_hash, sizeof(SHA1_T)),
+		hdr->expanded_rframes_data_len, memAsHexString(&hdr->expanded_rframes_data_hash, sizeof(SHA1_T)));
+
+	dbgf_sys(DBGT_ERR, " nest_level=%d solvable=%d rf_type=%d rf_relevant=%d m=%d ref_len=%d rhash=%s error=%s",
 		nest_level, solvable?1:0, *rf_type, *rf_relevant, m, ref_len, memAsHexString(&rhash, sizeof(SHA1_T)),
 		goto_error_code);
 
