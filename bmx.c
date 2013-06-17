@@ -1418,7 +1418,7 @@ int64_t field_get_value(const struct field_format *format, uint16_t min_msg_size
 char *field_dbg_value(const struct field_format *format, uint16_t min_msg_size, uint8_t *data, uint32_t pos_bit, uint32_t bits)
 {
 
-        assertion(-501200, (format && min_msg_size && data && bits));
+        assertion(-501200, (format && min_msg_size && data));
 
         uint8_t field_type = format->field_type;
         char *val = NULL;
@@ -1429,7 +1429,11 @@ char *field_dbg_value(const struct field_format *format, uint16_t min_msg_size, 
 
         if (field_type == FIELD_TYPE_UINT || field_type == FIELD_TYPE_HEX || field_type == FIELD_TYPE_STRING_SIZE) {
 
-                if (bits <= 32) {
+		if (bits == 0) {
+
+			val = "";
+
+		} else if (bits <= 32) {
 
                         static char uint32_out[ 16 ] = {0};
 
