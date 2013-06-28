@@ -3348,6 +3348,23 @@ int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 	}
 }
 
+uint8_t use_compression(struct frame_handl *handl)
+{
+	return (((!handl->dextCompression) ? 0 :
+			((*handl->dextCompression==TYP_FZIP_DO) ? 1 :
+				((*handl->dextCompression==TYP_FZIP_DONT) ? 0 :
+					((dextCompression==TYP_FZIP_DO) ? 1 :
+						((dextCompression==TYP_FZIP_DONT) ? 0 : DEF_FZIP==TYP_FZIP_DO ))))));
+}
+
+uint8_t use_referencing(struct frame_handl *handl)
+{
+	return (((!handl->dextReferencing) ? 0 :
+			((*handl->dextReferencing==TYP_FREF_DO) ? 1 :
+				((*handl->dextReferencing==TYP_FREF_DONT) ? 0 :
+					((dextReferencing==TYP_FREF_DO) ? 1 :
+						((dextReferencing==TYP_FREF_DONT) ? 0 : DEF_FREF==TYP_FREF_DO ))))));
+}
 
 STATIC_FUNC
 int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
@@ -3355,19 +3372,8 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
         TRACE_FUNCTION_CALL;
         struct frame_handl *handl = &(it->handls[it->frame_type]);
         int32_t fdata_in = it->frame_cache_msgs_size + handl->data_header_size;
-	uint8_t do_fzip = (
-		((!handl->dextCompression) ? 0 :
-			((*handl->dextCompression==TYP_FZIP_DO) ? 1 :
-				((*handl->dextCompression==TYP_FZIP_DONT) ? 0 :
-					((dextCompression==TYP_FZIP_DO) ? 1 :
-						((dextCompression==TYP_FZIP_DONT) ? 0 : DEF_FZIP==TYP_FZIP_DO ))))));
-
-	uint8_t do_fref = (
-		((!handl->dextReferencing) ? 0 :
-			((*handl->dextReferencing==TYP_FREF_DO) ? 1 :
-				((*handl->dextReferencing==TYP_FREF_DONT) ? 0 :
-					((dextReferencing==TYP_FREF_DO) ? 1 :
-						((dextReferencing==TYP_FREF_DONT) ? 0 : DEF_FREF==TYP_FREF_DO ))))));
+	uint8_t do_fzip = use_compression(handl);
+	uint8_t do_fref = use_referencing(handl);
 
 	struct frame_header_short *fhs = (struct frame_header_short *) (it->frames_out_ptr + it->frames_out_pos);
 	struct frame_header_long *fhl = (struct frame_header_long *) fhs;

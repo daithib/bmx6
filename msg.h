@@ -684,7 +684,7 @@ struct msg_ogm_ack {
 #define BMX_DSC_TLV_TUN6IN6_NET_ADV     0x0A
 #define BMX_DSC_TLV_TUN6_MAX            0x0A
 
-#define BMX_DSC_TLV_JSON_SMS    0x10
+#define BMX_DSC_TLV_SMS                 0x10
 
 #define BMX_DSC_TLV_REF_ADV     (FRAME_TYPE_ARRSZ-1)
 
@@ -895,3 +895,6 @@ void schedule_tx_task(struct link_dev_node *dest_lndev, uint16_t frame_type, int
 void register_frame_handler(struct frame_handl *array, int pos, struct frame_handl *handl);
 
 struct plugin *msg_get_plugin( void );
+
+uint8_t use_compression(struct frame_handl *handl);
+uint8_t use_referencing(struct frame_handl *handl);
