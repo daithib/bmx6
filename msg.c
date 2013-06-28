@@ -3322,10 +3322,28 @@ int8_t send_udp_packet(struct packet_buff *pb, struct sockaddr_storage *dst, int
 
 
 
+uint8_t use_compression(struct frame_handl *handl)
+{
+	return (((!handl->dextCompression) ? 0 :
+			((*handl->dextCompression==TYP_FZIP_DO) ? 1 :
+				((*handl->dextCompression==TYP_FZIP_DONT) ? 0 :
+					((dextCompression==TYP_FZIP_DO) ? 1 :
+						((dextCompression==TYP_FZIP_DONT) ? 0 : DEF_FZIP==TYP_FZIP_DO ))))));
+}
+
+uint8_t use_referencing(struct frame_handl *handl)
+{
+	return (((!handl->dextReferencing) ? 0 :
+			((*handl->dextReferencing==TYP_FREF_DO) ? 1 :
+				((*handl->dextReferencing==TYP_FREF_DONT) ? 0 :
+					((dextReferencing==TYP_FREF_DO) ? 1 :
+						((dextReferencing==TYP_FREF_DONT) ? 0 : DEF_FREF==TYP_FREF_DO ))))));
+}
+
 int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 {
 
-	if ( it->handls[it->frame_type].dextReferencing && *(it->handls[it->frame_type].dextReferencing) == 1 ) {
+	if ( use_referencing( &it->handls[it->frame_type] ) ) {
 
 		//TODO: this works only for a reference depth = 1
 
@@ -3351,23 +3369,6 @@ int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 	}
 }
 
-uint8_t use_compression(struct frame_handl *handl)
-{
-	return (((!handl->dextCompression) ? 0 :
-			((*handl->dextCompression==TYP_FZIP_DO) ? 1 :
-				((*handl->dextCompression==TYP_FZIP_DONT) ? 0 :
-					((dextCompression==TYP_FZIP_DO) ? 1 :
-						((dextCompression==TYP_FZIP_DONT) ? 0 : DEF_FZIP==TYP_FZIP_DO ))))));
-}
-
-uint8_t use_referencing(struct frame_handl *handl)
-{
-	return (((!handl->dextReferencing) ? 0 :
-			((*handl->dextReferencing==TYP_FREF_DO) ? 1 :
-				((*handl->dextReferencing==TYP_FREF_DONT) ? 0 :
-					((dextReferencing==TYP_FREF_DO) ? 1 :
-						((dextReferencing==TYP_FREF_DONT) ? 0 : DEF_FREF==TYP_FREF_DO ))))));
-}
 
 STATIC_FUNC
 int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
@@ -3515,8 +3516,8 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		dbgf_track(DBGT_INFO, "added %s fdata_in=%d -> %s flen=%d compressed=%d referenced=%d relevant=%d  do_fref=%d (%d %d %d) do_fzip=%d (%d %d %d)",
 			handl->name, fdata_in, fhs->is_short ? "SHORT" : "LONG", fhs->is_short ? fhs->length : ntohs(fhl->length),
 			fhs->is_short ? 0 : fhl->compression, it->dext && fhs->type==BMX_DSC_TLV_REF_ADV, fhs->is_relevant,
-			do_fref, handl->dextReferencing ? *handl->dextReferencing : -1, dextReferencing, DEF_FREF,
-			do_fzip, handl->dextCompression ? *handl->dextCompression : -1, dextCompression, DEF_FZIP );
+			do_fref, use_referencing(handl), dextReferencing, DEF_FREF,
+			do_fzip, use_compression(handl), dextCompression, DEF_FZIP );
 	}
 
 
