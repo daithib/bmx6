@@ -69,8 +69,10 @@ void check_for_changed_sms(void *unused)
         struct sms_node * sms = NULL;
         struct avl_node *an = NULL;
 
-        char name[MAX_JSON_SMS_NAME_LEN];
-        char data[MAX_JSON_SMS_DATA_LEN + 1];
+	int32_t max_sms_data_len = (use_referencing(&description_tlv_handl[BMX_DSC_TLV_SMS])) ? MAX_SMS_DATA_LEN_SF : MAX_SMS_DATA_LEN;
+
+        char name[MAX_SMS_NAME_LEN];
+        char data[max_sms_data_len + 1];
 
         dbgf_all(DBGT_INFO, "checking...");
 
@@ -102,10 +104,10 @@ void check_for_changed_sms(void *unused)
                         dbgf_all(DBGT_INFO, "could not open %s - %s", path_name, strerror(errno));
                         continue;
 
-                } else if ((len = read(fd, data, sizeof (data))) < 0 || len > MAX_JSON_SMS_DATA_LEN) {
+                } else if ((len = read(fd, data, sizeof (data))) < 0 || len > max_sms_data_len) {
 
                         dbgf_sys(DBGT_ERR, "sms=%s data_len>=%d MUST BE <=%d bytes! errno: %s",
-                                path_name, len, MAX_JSON_SMS_DATA_LEN, strerror(errno));
+                                path_name, len, max_sms_data_len, strerror(errno));
                         close(fd);
                         continue;
 
@@ -372,7 +374,7 @@ int32_t opt_json_sms(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
                 if (!smsTx_dir)
                         return FAILURE;
 
-                if (strlen(patch->val) >= MAX_JSON_SMS_NAME_LEN)
+                if (strlen(patch->val) >= MAX_SMS_NAME_LEN)
                         return FAILURE;
 
                 if (validate_name_string(patch->val, strlen(patch->val) + 1, NULL) != SUCCESS)
@@ -452,7 +454,7 @@ static int32_t sms_init( void ) {
         tlv_handl.tx_frame_handler = create_description_sms;
         tlv_handl.rx_frame_handler = process_description_sms;
         tlv_handl.msg_format = json_extension_format;
-        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_JSON_SMS, &tlv_handl);
+        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_SMS, &tlv_handl);
 
 	return SUCCESS;
 }
