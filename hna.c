@@ -1636,7 +1636,7 @@ void eval_tun_bit_tree(void  *onlyIfOrderChanged)
 				struct net_key crashRoute = {.af = af, .ip=crashBKey.invRouteKey.ip, .mask=128-crashBKey.invRouteKey.mask};
 				IDM_T break_loop=NO;
 
-                                assertion(-501573, (tbn_crash != tbn_curr) );
+                                assertion(-501610, (tbn_crash != tbn_curr) );
 
 				if (currRoute.mask == crashRoute.mask &&
 					is_ip_net_equal(&currRoute.ip, &crashRoute.ip, crashRoute.mask, af)) {
