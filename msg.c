@@ -5043,6 +5043,8 @@ int32_t init_msg( void )
 STATIC_FUNC
 void cleanup_msg( void )
 {
+	update_my_description_adv();
+	
         schedule_or_purge_ogm_aggregations(YES /*purge_all*/);
 	
 	free_desc_extensions(&self->dext);
