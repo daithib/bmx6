@@ -49,10 +49,10 @@
 #define ARG_VRT_DESC_SIZE_IN   "descVirtSizeIn"
 #define HLP_VRT_DESC_SIZE_IN   "set maximum virtual size for other node descriptions"
 #define MIN_VRT_DESC_SIZE      (MIN_DESC_FRAME_SIZE)
-#define MAX_VRT_DESC_SIZE      (INT32_MAX)
-//#define DEF_VRT_DESC_SIZE    (16384) //any value is possible
-// this should be the default max possible with a reference depth of 1 :
-#define DEF_VRT_DESC_SIZE      (((DEF_DESC_FRAME_SIZE - sizeof(struct frame_header_long) - sizeof (struct msg_description_adv)) - \
+#define DEF_VRT_DESC_SIZE      (16384) //any value less-equal then MAX_VRT_DESC_SIZE
+//#define MAX_VRT_DESC_SIZE      (INT32_MAX)
+// this should be the max possible with a reference depth of 1 :
+#define MAX_VRT_DESC_SIZE      (((DEF_DESC_FRAME_SIZE - sizeof(struct frame_header_long) - sizeof (struct msg_description_adv)) - \
                                (5 * (sizeof(struct frame_header_long) + sizeof(struct description_hdr_ref)) )) / \
 			       sizeof(struct description_msg_ref)) * (DEF_DESC_FRAME_SIZE - sizeof(struct frame_header_long))
 #define     VRT_DESC_SIZE_OUT  (vrt_desc_size_out)
@@ -64,8 +64,8 @@
 #define ARG_VRT_FRAME_DATA_SIZE_IN   "descVirtFrameSizeIn"
 #define HLP_VRT_FRAME_DATA_SIZE_IN   "set maximum virtual size for other description frames"
 #define MIN_VRT_FRAME_DATA_SIZE      (MIN_DESC_FRAME_SIZE - sizeof (struct frame_header_long))
-#define MAX_VRT_FRAME_DATA_SIZE      (INT32_MAX - sizeof(struct frame_header_virtual))
-#define DEF_VRT_FRAME_DATA_SIZE      DEF_VRT_DESC_SIZE //(8192)
+#define DEF_VRT_FRAME_DATA_SIZE      (8192) //any value less then MAX_VRT_FRAME_DATA_SIZE
+#define MAX_VRT_FRAME_DATA_SIZE      (MAX_VRT_DESC_SIZE - sizeof(struct frame_header_virtual))
 #define     VRT_FRAME_DATA_SIZE_OUT  (vrt_frame_data_size_out)
 #define     VRT_FRAME_DATA_SIZE_MAX  MAX(vrt_frame_data_size_in, vrt_frame_data_size_out)
 
