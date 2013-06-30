@@ -1010,7 +1010,7 @@ void rx_packet( struct packet_buff *pb )
         if (    pb->i.total_length < (int) (sizeof (struct packet_header) + sizeof (struct frame_header_long)) ||
                 pkt_length < (int) (sizeof (struct packet_header) + sizeof (struct frame_header_long)) ||
                 ((hdr->comp_version < (COMPATIBILITY_VERSION - 1)) || (hdr->comp_version > (COMPATIBILITY_VERSION + 1))) ||
-                pkt_length > pb->i.total_length || pkt_length > MAX_UDPD_SIZE ||
+                pkt_length > pb->i.total_length || pkt_length > (PKT_FRAMES_SIZE_MAX + sizeof(struct packet_header)) ||
                 pb->i.link_key.dev_idx < DEVADV_IDX_MIN || pb->i.link_key.local_id == LOCAL_ID_INVALID ) {
 
                 goto process_packet_error;
@@ -2196,7 +2196,7 @@ STATIC_FUNC
 void init_bmx(void)
 {
 
-        static uint8_t my_desc0[MAX_PKT_FRAME_DATA_SIZE];
+        static uint8_t my_desc0[PKT_FRAMES_SIZE_MAX - sizeof(struct frame_header_long)];
         static GLOBAL_ID_T id;
         memset(&id, 0, sizeof (id));
 

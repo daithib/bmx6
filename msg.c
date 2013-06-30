@@ -23,6 +23,9 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdint.h>
+#include <netinet/udp.h>
+#include <netinet/ip6.h>
+
 
 #include "bmx.h"
 #include "msg.h"
@@ -37,6 +40,11 @@
 
 
 static int32_t pref_udpd_size = DEF_UDPD_SIZE;
+static int32_t desc_frame_size_out = DEF_DESC_FRAME_SIZE;
+static int32_t vrt_frame_data_size_out = DEF_VRT_FRAME_DATA_SIZE;
+static int32_t vrt_frame_data_size_in =  DEF_VRT_FRAME_DATA_SIZE;
+static int32_t vrt_desc_size_out =       DEF_VRT_DESC_SIZE;
+static int32_t vrt_desc_size_in =        DEF_VRT_DESC_SIZE;
 
 static int32_t ogmSqnRange = DEF_OGM_SQN_RANGE;
 
@@ -1180,7 +1188,7 @@ struct ref_node* ref_node_get(struct packet_buff *pb, SHA1_T *rhash ) {
 STATIC_FUNC
 void ref_node_del (struct ref_node *refn)
 {
-	assertion(-501574, !refn->usage_counter);
+	assertion(-501574, !refn->dext_tree.items);
 	assertion(-501575, ref_tree.items);
 	avl_remove(&ref_tree, &refn->rhash, -300560);
 	debugFree(refn->f_data, -300561);
@@ -1197,7 +1205,7 @@ void ref_node_purge (IDM_T all_unused)
 	while (( refn = avl_next_item(&ref_tree, &rhash) )) {
 		rhash = refn->rhash;
 
-		if (refn->usage_counter) {
+		if (refn->dext_tree.items) {
 
 			refn->last_usage = bmx_time;
 
@@ -1221,6 +1229,9 @@ void ref_node_purge (IDM_T all_unused)
 STATIC_FUNC
 struct ref_node * ref_node_add(uint8_t *frame_data, uint32_t f_data_len, int8_t long_hdr, uint8_t compression)
 {
+
+	assertion(-500000, (f_data_len <= REF_FRAME_DATA_SIZE_MAX));
+
 	uint32_t f_hdr_len;
 	uint8_t f_hdr[sizeof(struct frame_header_long)];
 	memset(&f_hdr, 0, sizeof(f_hdr));
@@ -1254,7 +1265,7 @@ struct ref_node * ref_node_add(uint8_t *frame_data, uint32_t f_data_len, int8_t 
 			ref_node_purge(NO /*all unused*/);
 
 		refn = debugMallocReset(sizeof(struct ref_node), -300563);
-
+		AVL_INIT_TREE(refn->dext_tree, struct dext_tree_node, dext_key);
 		refn->f_compression = compression;
 		refn->f_long = long_hdr;
 		refn->last_usage = bmx_time;
@@ -1273,25 +1284,43 @@ struct ref_node * ref_node_add(uint8_t *frame_data, uint32_t f_data_len, int8_t 
 }
 
 STATIC_FUNC
-void ref_node_use(struct desc_extension *dext, struct ref_node *refn)
+void ref_node_use(struct desc_extension *dext, struct ref_node *refn, uint8_t f_type)
 {
-	if (!refn->usage_counter)
+
+	assertion(-500000, (f_type <= BMX_DSC_TLV_MAX && f_type != BMX_DSC_TLV_REF_ADV));
+
+	struct dext_tree_node *dtn = avl_find_item(&refn->dext_tree, &dext);
+
+	assertion(-500000, (!(dtn && !bit_get(dtn->rf_types, (sizeof(dtn->rf_types) * 8), f_type))));
+
+	if (!refn->dext_tree.items)
 		ref_tree_items_used++;
 
-	refn->usage_counter++;
-	struct refnl_node *rn = debugMallocReset(sizeof(struct refnl_node), -300566);
-	rn->refn = refn;
-	list_add_tail(&dext->refnl_list, &rn->list);
+	if (!dtn) {
+		dtn = debugMalloc(sizeof(struct dext_tree_node), -300000);
+		dtn->dext_key.dext = dext;
+		avl_insert(&refn->dext_tree, dtn, -300000);
 
-	assertion(-501578, ((int32_t)ref_tree.items >= ref_tree_items_used));
+		struct refnl_node *rn = debugMallocReset(sizeof(struct refnl_node), -300566);
+		rn->refn = refn;
+		list_add_tail(&dext->refnl_list, &rn->list);
 
-	if (refn->usage_counter == 1 && dref_adv_tx_unsolicited) {
-		struct link_dev_node **lndev_arr = lndevs_get_best_tp(NULL);
-		int d;
+		assertion(-501578, ((int32_t)ref_tree.items >= ref_tree_items_used));
 
-		for (d = 0; (lndev_arr[d]); d++)
-			schedule_tx_task(lndev_arr[d], FRAME_TYPE_REF_ADV, refn->f_data_len, &refn->rhash, sizeof(SHA1_T), 0, 0);
+		if (dref_adv_tx_unsolicited && refn->dext_tree.items == 1) {
+			struct link_dev_node **lndev_arr = lndevs_get_best_tp(NULL);
+			int d;
+
+			for (d = 0; (lndev_arr[d]); d++)
+				schedule_tx_task(lndev_arr[d], FRAME_TYPE_REF_ADV, refn->f_data_len, &refn->rhash, sizeof(SHA1_T), 0, 0);
+		}
 	}
+
+	assertion(-500000, (avl_find(&refn->dext_tree, &dext)));
+
+	bit_set(dtn->rf_types, (sizeof(dtn->rf_types) * 8), f_type, 1);
+
+
 }
 
 STATIC_FUNC
@@ -1300,10 +1329,15 @@ void ref_node_release( struct desc_extension *dext)
 	struct refnl_node *rn;
 
 	while ((rn = list_del_head(&dext->refnl_list))) {
-		assertion(-501579, (rn->refn->usage_counter > 0));
+		assertion(-501579, (rn->refn->dext_tree.items > 0));
 		assertion(-501580, (ref_tree_items_used > 0));
-		rn->refn->usage_counter--;
-		if(!rn->refn->usage_counter)
+
+		struct dext_tree_node *dtn = avl_remove(&rn->refn->dext_tree, &dext, -300000);
+		assertion(-500000, (dtn && dtn->dext_key.dext == dext));
+		debugFree(dtn, -300000);
+		assertion(-500000, (!avl_find(&rn->refn->dext_tree, &dext)));
+
+		if(!rn->refn->dext_tree.items)
 			ref_tree_items_used--;
 
 		debugFree(rn, -300567);
@@ -1336,7 +1370,7 @@ int32_t rx_msg_ref_request(struct rx_frame_iterator *it)
 	SHA1_T *rhash = &(((struct msg_ref_req*)it->msg)->rframe_hash);
 	struct ref_node *refn = ref_node_get(NULL, rhash);
 
-	if (refn && refn->usage_counter)
+	if (refn && refn->dext_tree.items)
 		schedule_tx_task(it->pb->i.link->local->best_tp_lndev, FRAME_TYPE_REF_ADV, refn->f_data_len, &refn->rhash, sizeof(SHA1_T), 0, 0);
 
 	return sizeof(struct msg_ref_req);
@@ -1353,7 +1387,7 @@ int32_t tx_frame_ref_adv(struct tx_frame_iterator *it)
 
 	assertion(-501581, refn);
 
-	if(refn && refn->usage_counter) {
+	if(refn && refn->dext_tree.items) {
 
 		assertion(-501582, (int)refn->f_data_len <= tx_iterator_cache_data_space_max(it));
 
@@ -1374,6 +1408,9 @@ int32_t rx_frame_ref_adv(struct rx_frame_iterator *it)
         TRACE_FUNCTION_CALL;
 
 	assertion(-501583, !it->is_virtual_header && it->frame_type == FRAME_TYPE_REF_ADV);
+
+	if ( it->frame_data_length > (int32_t)REF_FRAME_DATA_SIZE_MAX )
+		return TLV_RX_DATA_FAILURE;
 
 	ref_node_add(it->frame_data, it->frame_data_length, !it->is_short_header, it->frame_compression);
 
@@ -2727,7 +2764,7 @@ int32_t rx_frame_description_advs(struct rx_frame_iterator *it)
                 neighIID4x = ntohs(adv->transmitterIID4x);
                 pos += (sizeof ( struct msg_description_adv) + tlvs_len);
 
-                if (neighIID4x <= IID_RSVD_MAX || tlvs_len > MAX_DSC_FRAME_SIZE || pos > it->frame_msgs_length)
+                if (neighIID4x <= IID_RSVD_MAX || tlvs_len > DESC_FRAMES_SIZE_MAX || pos > it->frame_msgs_length)
                         break;
 
                 dbgf_track( DBGT_INFO, "rcvd desc: global_id=%s via_dev=%s via_ip=%s",
@@ -3346,18 +3383,28 @@ int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 	if ( use_referencing( &it->handls[it->frame_type] ) ) {
 
 		//TODO: this works only for a reference depth = 1
+		assertion(-500000, (it->dext));
+		struct frame_handl *handl = &(it->handls[it->frame_type]);
 
-		int32_t cache_used = it->handls[it->frame_type].data_header_size + it->frame_cache_msgs_size;
-		int32_t msgs_used = cache_used/PREF_PKT_FRAME_DATA_SIZE + (cache_used%PREF_PKT_FRAME_DATA_SIZE?1:0);
-		int32_t frames_out_used =
+		int32_t used_cache_space = handl->data_header_size + it->frame_cache_msgs_size;
+
+		int32_t used_ref_msgs = used_cache_space/REF_FRAME_DATA_SIZE_OUT + (used_cache_space%REF_FRAME_DATA_SIZE_OUT?1:0);
+
+		int32_t used_frames_space =
 			it->frames_out_pos +
 			(int) sizeof(struct frame_header_long) +
 			(int) sizeof(struct description_hdr_ref) +
-			((int) sizeof(struct description_msg_ref) * msgs_used);
-		int32_t frames_out_avail = it->frames_out_pref - frames_out_used;
-		int32_t ref_out_avail = (frames_out_avail/sizeof(struct description_msg_ref)) * PREF_PKT_FRAME_DATA_SIZE;
+			((int) sizeof(struct description_msg_ref) * used_ref_msgs);
 
-		return min_i32( it->frame_cache_size - cache_used, ref_out_avail );
+		int32_t avail_frames_space = (max ? it->frames_out_max : it->frames_out_pref) - used_frames_space;
+
+		int32_t avail_cache_space_theoretical = (avail_frames_space/sizeof(struct description_msg_ref)) * REF_FRAME_DATA_SIZE_OUT;
+
+		int32_t avail_cache_space_practical = MIN( it->frame_cache_size - used_cache_space, avail_cache_space_theoretical );
+
+		int32_t avail_vrt_desc_space = VRT_DESC_SIZE_OUT - handl->data_header_size - sizeof(struct frame_header_virtual) - it->dext->dlen;
+
+		return MIN(avail_cache_space_practical, avail_vrt_desc_space);
 
 	} else {
 
@@ -3384,6 +3431,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 
         assertion(-500881, (it->frame_cache_msgs_size >= TLV_TX_DATA_PROCESSED));
+	assertion(-500000, (it->frame_cache_msgs_size <= VRT_FRAME_DATA_SIZE_MAX));
         assertion(-500786, (tx_iterator_cache_data_space_max(it) >= 0));
         assertion(-500355, (IMPLIES(handl->fixed_msg_size, !(it->frame_cache_msgs_size % handl->min_msg_size))));
         ASSERTION(-501003, (is_zero((it->frame_cache_array + it->frame_cache_msgs_size + handl->data_header_size), tx_iterator_cache_data_space_max(it))));
@@ -3392,6 +3440,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 	if (it->dext) {
 		// this is the dext creation of my description...
 		assertion(-500000, (it->handls==description_tlv_handl));
+		assertion(-500000, (it->frame_cache_msgs_size <= VRT_FRAME_DATA_SIZE_OUT));
 
 		it->dext->data = debugReallocReset(it->dext->data, it->dext->dlen + sizeof(struct frame_header_virtual) + fdata_in, -300568);
 		struct frame_header_virtual *fhv = (struct frame_header_virtual *)(it->dext->data + it->dext->dlen);
@@ -3401,6 +3450,8 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		fhv->length = sizeof(struct frame_header_virtual) + fdata_in;
 		memcpy(it->dext->data + it->dext->dlen + sizeof(struct frame_header_virtual), it->frame_cache_array, fdata_in);
 		it->dext->dlen += (sizeof(struct frame_header_virtual) + fdata_in);
+
+		assertion(-500000, (it->dext->dlen <= (uint32_t)VRT_DESC_SIZE_OUT));
 	}
 
 	if (it->dext && do_fref) {
@@ -3421,7 +3472,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		assertion(-501606, IMPLIES(do_fzip, rfd_zagg_len >= 0 && rfd_zagg_len < fdata_in));
 		int32_t rfd_agg_len = rfd_zagg_len > 0 ? rfd_zagg_len : fdata_in;
 		assertion(-501594, IMPLIES(do_fzip, rfd_agg_len > 0));
-		int32_t rfd_msgs = rfd_agg_len/PREF_PKT_FRAME_DATA_SIZE + (rfd_agg_len%PREF_PKT_FRAME_DATA_SIZE?1:0);
+		int32_t rfd_msgs = rfd_agg_len/REF_FRAME_DATA_SIZE_OUT + (rfd_agg_len%REF_FRAME_DATA_SIZE_OUT?1:0);
 		int32_t rfd_size = sizeof(struct description_hdr_ref) + (rfd_msgs*sizeof(struct description_msg_ref));
 
 		uint8_t rf_short = !do_fzip && rfd_size <= (int)MAX_SHORT_FRAME_DATA_LEN;
@@ -3453,14 +3504,18 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		// of size
 		assertion(-500000, TEST_VARIABLE(rfd_agg_len));
 		// into pieces of max size
-		assertion(-500000, TEST_VALUE(PREF_PKT_FRAME_DATA_SIZE));
+		assertion(-500000, TEST_VALUE(REF_FRAME_DATA_SIZE_OUT));
 		// and add each's hash as msg
 		int32_t pos, m=0;
-		for (pos=0; pos < rfd_agg_len; pos += PREF_PKT_FRAME_DATA_SIZE) {
-			int32_t rsize = MIN(rfd_agg_len - pos, (int)PREF_PKT_FRAME_DATA_SIZE);
+		for (pos=0; pos < rfd_agg_len; pos += REF_FRAME_DATA_SIZE_OUT) {
+
+			int32_t rsize = MIN(rfd_agg_len - pos, (int)REF_FRAME_DATA_SIZE_OUT);
+
 			struct ref_node *refn = ref_node_add(rfd_agg_data + pos, rsize, 0, 0);
+
 			rfd_hdr->msg[m++].rframe_hash = refn->rhash;
-			ref_node_use(it->dext, refn);
+
+			ref_node_use(it->dext, refn, it->frame_type);
 		}
 
 		if (rfd_agg_data && rfd_agg_data != it->frame_cache_array)
@@ -3470,12 +3525,16 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 		it->frames_out_pos += rf_hdr_size + sizeof(struct description_hdr_ref) + (rfd_msgs * sizeof(struct description_msg_ref)); ///TODO
 
+		assertion(-500000, ( it->frames_out_pos <= (int32_t)DESC_FRAMES_SIZE_OUT));
+
 	} else {
 		
 		IDM_T is_long_header = it->use_long_header || it->already_compressed || do_fzip ||
 			(fdata_in > (int)MAX_SHORT_FRAME_DATA_LEN);
 
-		memset(fhl, 0, is_long_header ? sizeof (struct frame_header_long) : sizeof (struct frame_header_short));
+		uint32_t hdr_size = is_long_header ? sizeof (struct frame_header_long) : sizeof (struct frame_header_short);
+
+		memset(fhl, 0, hdr_size);
 
 		fhs->is_short = !is_long_header;
 		fhs->is_relevant = handl->is_relevant;
@@ -3511,7 +3570,9 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 			fhs->length = (fdata_in + sizeof ( struct frame_header_short));
 		}
 
+		assertion(-500000, ( it->frames_out_pos <= (int32_t)PKT_FRAMES_SIZE_MAX));
 	}
+
 	if (do_fref || do_fzip ) {
 		dbgf_track(DBGT_INFO, "added %s fdata_in=%d -> %s flen=%d compressed=%d referenced=%d relevant=%d  do_fref=%d (%d %d %d) do_fzip=%d (%d %d %d)",
 			handl->name, fdata_in, fhs->is_short ? "SHORT" : "LONG", fhs->is_short ? fhs->length : ntohs(fhl->length),
@@ -3679,7 +3740,7 @@ void tx_packet(void *devp)
 {
         TRACE_FUNCTION_CALL;
 
-        static uint8_t cache_data_array[(MAX_UDPD_SIZE - sizeof (struct packet_header) - sizeof(struct frame_header_long))] = {0};
+        static uint8_t cache_data_array[PKT_FRAMES_SIZE_MAX - sizeof(struct frame_header_long)] = {0};
         static struct packet_buff pb;
         struct dev_node *dev = devp;
 
@@ -3709,9 +3770,9 @@ void tx_packet(void *devp)
         struct tx_frame_iterator it = {
                 .caller = __FUNCTION__, .handls = packet_frame_handler, .handl_max = FRAME_TYPE_MAX,
                 .frames_out_ptr = (pb.packet.data + sizeof (struct packet_header)),
-                .frames_out_max = (MAX_UDPD_SIZE - sizeof (struct packet_header)),
-                .frames_out_pref = (pref_udpd_size - sizeof (struct packet_header)),
-		.frame_cache_size = (MAX_UDPD_SIZE - (sizeof (struct packet_header) + sizeof(struct frame_header_long))),
+                .frames_out_max =  PKT_FRAMES_SIZE_MAX,
+                .frames_out_pref = PKT_FRAMES_SIZE_OUT,
+		.frame_cache_size = PKT_FRAMES_SIZE_MAX - sizeof(struct frame_header_long),
                 .frame_cache_array = cache_data_array,
         };
 
@@ -3971,9 +4032,6 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 	char *goto_error_code = " ";
 	SHA1_T rhash = {.h.u32 = {0}};
 
-
-#define goto_error( where, what ) { goto_error_code=what; goto where; }
-
 	if (solvable != dext)
 		LIST_INIT_HEAD(solvable->refnl_list, struct refnl_node, list, list);
 
@@ -4022,7 +4080,7 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 					solvable->dlen += refn->f_data_len;
 
 					if (solvable == dext)
-						ref_node_use(dext, refn);
+						ref_node_use(dext, refn, *rf_type);
 
 					ref_len += refn->f_data_len;
 
@@ -4034,7 +4092,7 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 					solvable->dlen += tmp_len;
 
 					if (solvable == dext)
-						ref_node_use(dext, refn);
+						ref_node_use(dext, refn, *rf_type);
 
 					ref_len += tmp_len;
 				}
@@ -4141,7 +4199,9 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 	uint8_t vf_type = BMX_DSC_TLV_INVALID;
 	int32_t vf_data_len = 0;
 	uint8_t vf_relevant = 0xFF;
-	char *vf_error = "???";
+//	char *vf_error = "???";
+	char *goto_error_code = "???";
+	int32_t vd_len = 0;
 
 	// First check if dext is fully resolvable::
 	it = it_init;
@@ -4160,11 +4220,8 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 				it.frame_data_length :
 				z_decompress(it.frame_data, it.frame_data_length, NULL, 0);
 
-			if ( vf_data_len <= 0 || vf_data_len < it.frame_data_length) {
-
-				vf_error = "1";
-				goto resolve_desc_extension_error;
-			}
+			if ( vf_data_len <= 0 || vf_data_len < it.frame_data_length || vf_data_len > VRT_FRAME_DATA_SIZE_MAX)
+				goto_error( resolve_desc_extension_error, "1");
 
 
                 } else if (it.frame_type == BMX_DSC_TLV_REF_ADV && 
@@ -4180,25 +4237,23 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 			} else if ( vf_data_len == (int32_t)(((struct description_hdr_ref*)(it.frame_data))->expanded_rframes_data_len)) {
 
 			} else {
-
-				vf_error = "2";
-				goto resolve_desc_extension_error;
+				goto_error( resolve_desc_extension_error, "2");
 			}
 
                 } else {
-			vf_error = "3";
-			goto resolve_desc_extension_error;
+			goto_error( resolve_desc_extension_error, "3");
 		}
 
 		if (!unresolved) {
-			if (vf_type > BMX_DSC_TLV_MAX || dsc_frame_types[vf_type] || vf_relevant > 1) {
-
-				vf_error = "4";
-				goto resolve_desc_extension_error;
-			} else {
+			if (vf_type > BMX_DSC_TLV_MAX || dsc_frame_types[vf_type] || vf_relevant > 1)
+				goto_error( resolve_desc_extension_error, "4");
+			else
 				dsc_frame_types[vf_type] = 1;
-			}
 		}
+
+		if ((vd_len = vd_len + vf_data_len) > VRT_DESC_SIZE_IN)
+			goto_error( resolve_desc_extension_error, "5");
+
 	}
 
 	if (tlv_result != TLV_RX_DATA_DONE) {
@@ -4207,12 +4262,14 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
                         pb ? pb->i.llip_str : DBG_NIL, description_tlv_handl[it.frame_type].name,
                         it.frame_data_length, it.frames_pos, tlv_result);
 
-		goto resolve_desc_extension_error;
+		goto_error( resolve_desc_extension_error, "6");
         }
 
 
 	if (unresolved)
 		return (struct desc_extension *) UNRESOLVED_PTR;
+
+
 
 	// only if dext is fully resolvable then allocate it, so this should always succeed!!!
 	dext = debugMallocReset(sizeof(struct desc_extension), -300571);
@@ -4270,8 +4327,10 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 		vf_hdr->type = vf_type;
 		vf_hdr->length = sizeof(struct frame_header_virtual) + vf_data_len;
 
+		assertion(-500000, (vf_data_len <= VRT_FRAME_DATA_SIZE_MAX));
 		assertion(-500000, (vf_data_len > 0 && vf_type <= BMX_DSC_TLV_MAX && vf_relevant <= 1 ));
 		assertion(-500000, (dext->dlen == dext_dlen_old + vf_hdr->length));
+		assertion(-500000, (dext->dlen <= (uint32_t)VRT_DESC_SIZE_IN));
         }
 
         return dext;
@@ -4282,7 +4341,7 @@ resolve_desc_extension_error:
 	assertion(-500000, (!dext)); //otherwise the check should have failed!
 	//free_desc_extensions(&dext);
         dbgf_sys(DBGT_ERR, "Failed converting type=%d max_known=%d f_data_len=%d compression=%d -> type=%d vf_data_len=%d vf_relevant=%d vf_error=%s",
-                 it.frame_type, BMX_DSC_TLV_MAX_KNOWN, it.frame_data_length, it.frame_compression, vf_type, vf_data_len, vf_relevant, vf_error);
+                 it.frame_type, BMX_DSC_TLV_MAX_KNOWN, it.frame_data_length, it.frame_compression, vf_type, vf_data_len, vf_relevant, goto_error_code);
 
 	return (struct desc_extension *) FAILURE_PTR;
 }
@@ -4363,6 +4422,8 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
         if (on->desc)
                 debugFree(on->desc, -300111);
 
+	assertion(-500000, (!dext->on));
+	dext->on = on;
         on->dext = dext;
 	dext = NULL;
 
@@ -4404,12 +4465,25 @@ process_desc0_error:
 void update_my_description_adv(void)
 {
         TRACE_FUNCTION_CALL;
-        static uint8_t cache_data_array[DEF_VRT_FRAME_DATA_SIZE] = {0};
+//        static uint8_t cache_data_array[PREF_VRT_FRAME_DATA_SIZE_OUT] = {0};
         struct description_hash dhash;
         struct description *dsc = self->desc;
 
-        if (terminating)
+	static uint8_t *frame_cache_array = NULL;
+	static int32_t frame_cache_size = 0;
+
+        if (terminating) {
+		if (frame_cache_size) {
+			frame_cache_size = 0;
+			debugFree(frame_cache_array, -300000);
+		}
                 return;
+
+	} else if (frame_cache_size != VRT_FRAME_DATA_SIZE_OUT) {
+		frame_cache_size = VRT_FRAME_DATA_SIZE_OUT;
+		frame_cache_array = debugReallocReset(frame_cache_array, frame_cache_size, -300000);
+	}
+
 
         if (!initializing)
                 cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, self);
@@ -4456,9 +4530,10 @@ void update_my_description_adv(void)
         struct tx_frame_iterator it = {
                 .caller = __FUNCTION__, .handls = description_tlv_handl, .handl_max = FRAME_TYPE_MAX,
 		.frames_out_ptr = (((uint8_t*) dsc) + sizeof (struct description)),
-                .frames_out_max = MAX_DSC_FRAME_SIZE,
-                .frames_out_pref = MAX_DSC_FRAME_SIZE,
-		.frame_cache_array = cache_data_array, .frame_cache_size = DEF_VRT_FRAME_DATA_SIZE,
+                .frames_out_max = DESC_FRAMES_SIZE_OUT,
+                .frames_out_pref = DESC_FRAMES_SIZE_OUT,
+		.frame_cache_array = frame_cache_array,
+		.frame_cache_size = frame_cache_size,
 		.dext = next_dext
         };
 
@@ -4476,6 +4551,8 @@ void update_my_description_adv(void)
 	}
 
 	free_desc_extensions(&self->dext);
+	assertion(-500000, (!next_dext->on));
+	next_dext->on = self;
 	self->dext = next_dext;
 
         dsc->extensionLen = htons(it.frames_out_pos);
@@ -4594,6 +4671,8 @@ struct ref_status {
         uint32_t f_data_len; // NOT including frame header!!
         uint32_t last_usage;
         uint32_t usage_counter;
+	char ref_types[100];
+	char referencees[100];
 };
 
 static const struct field_format ref_status_format[] = {
@@ -4603,6 +4682,8 @@ static const struct field_format ref_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, f_data_len,    1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, last_usage,    1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, usage_counter, 1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,   ref_status, ref_types,     1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,   ref_status, referencees,   1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_END
 };
 
@@ -4623,7 +4704,35 @@ static int32_t ref_status_creator(struct status_handl *handl, void *data)
 		status[i].f_long = rfn->f_long;
 		status[i].f_data_len = rfn->f_data_len;
 		status[i].last_usage = rfn->last_usage;
-		status[i].usage_counter = rfn->usage_counter;
+		status[i].usage_counter = rfn->dext_tree.items;
+
+		status[i].ref_types[0] = 0;
+		status[i].referencees[0] = 0;
+
+		struct dext_tree_node *dtn = NULL;
+		struct avl_node *an = NULL;
+		char* origs_str = status[i].referencees;
+		char* ref_str = status[i].ref_types;
+		uint8_t rft_bits[sizeof(dtn->rf_types)] = {0};
+		uint16_t rft_pos = 0, rft_max = sizeof(rft_bits);
+		while ((dtn = avl_iterate_item(&rfn->dext_tree, &an))) {
+
+			if (dtn->dext_key.dext->on) {
+				snprintf(origs_str + strlen(origs_str), sizeof(status[i].referencees) - strlen(origs_str),
+					"%s%s", strlen(origs_str) ? " ":"", dtn->dext_key.dext->on->global_id.name  );
+			}
+
+			for (rft_pos=0; rft_pos<rft_max;rft_pos++)
+				rft_bits[rft_pos] |= dtn->rf_types[rft_pos];
+		}
+
+		for (rft_pos=0; rft_pos<(8*rft_max);rft_pos++) {
+			if (bit_get(rft_bits, (8*rft_max), rft_pos)) {
+				char *fstr = description_tlv_handl[rft_pos].min_msg_size ? description_tlv_handl[rft_pos].name : "???";
+				snprintf(ref_str + strlen(ref_str), sizeof(status[i].ref_types) - strlen(ref_str),
+					"%s%s", strlen(ref_str) ? " ":"", fstr  );
+			}
+		}
 
 		i++;
 		assertion(-501225, (max_size >= i * sizeof (struct ref_status)));
@@ -4633,6 +4742,15 @@ static int32_t ref_status_creator(struct status_handl *handl, void *data)
 }
 
 
+int32_t opt_update_dext_method(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
+{
+        TRACE_FUNCTION_CALL;
+
+	if ( cmd == OPT_APPLY )
+		my_description_changed = YES;
+
+	return SUCCESS;
+}
 
 
 STATIC_FUNC
@@ -4642,12 +4760,23 @@ struct opt_type msg_options[]=
 
 #ifndef LESS_OPTIONS
         {ODI, 0, ARG_UDPD_SIZE,            0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &pref_udpd_size, MIN_UDPD_SIZE,      MAX_UDPD_SIZE,     DEF_UDPD_SIZE,0,      0,
-			ARG_VALUE_FORM,	"set preferred udp-data size for send packets"}
+			ARG_VALUE_FORM,	HLP_UDPD_SIZE}
         ,
-	{ODI,0,ARG_FREF,                   0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,      &dextReferencing,MIN_FREF,           MAX_FREF,          DEF_FREF,0,           opt_update_description,
+	{ODI,0,ARG_FREF,                   0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,      &dextReferencing,MIN_FREF,           MAX_FREF,          DEF_FREF,0,           opt_update_dext_method,
 			ARG_VALUE_FORM, HLP_FREF},
-	{ODI,0,ARG_FZIP,                   0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,      &dextCompression,MIN_FZIP,           MAX_FZIP,          DEF_FZIP,0,           opt_update_description,
+	{ODI,0,ARG_FZIP,                   0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,      &dextCompression,MIN_FZIP,           MAX_FZIP,          DEF_FZIP,0,           opt_update_dext_method,
 			ARG_VALUE_FORM, HLP_FZIP},
+
+	{ODI,0,ARG_DESC_FRAME_SIZE,         0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,      &desc_frame_size_out,MIN_DESC_FRAME_SIZE,MAX_DESC_FRAME_SIZE,DEF_DESC_FRAME_SIZE,0,opt_update_dext_method,
+			ARG_VALUE_FORM, HLP_DESC_FRAME_SIZE},
+	{ODI,0,ARG_VRT_FRAME_DATA_SIZE_OUT,0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,      &vrt_frame_data_size_out,MIN_VRT_FRAME_DATA_SIZE,MAX_VRT_FRAME_DATA_SIZE,DEF_VRT_FRAME_DATA_SIZE,0,  opt_update_dext_method,
+			ARG_VALUE_FORM, HLP_VRT_FRAME_DATA_SIZE_OUT},
+	{ODI,0,ARG_VRT_FRAME_DATA_SIZE_IN, 0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,      &vrt_frame_data_size_in,MIN_VRT_FRAME_DATA_SIZE,MAX_VRT_FRAME_DATA_SIZE,DEF_VRT_FRAME_DATA_SIZE,0,  opt_update_dext_method,
+			ARG_VALUE_FORM, HLP_VRT_FRAME_DATA_SIZE_IN},
+	{ODI,0,ARG_VRT_DESC_SIZE_OUT,      0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,      &vrt_desc_size_out,MIN_VRT_DESC_SIZE,MAX_VRT_DESC_SIZE,DEF_VRT_DESC_SIZE,0,   opt_update_dext_method,
+			ARG_VALUE_FORM, HLP_VRT_DESC_SIZE_OUT},
+	{ODI,0,ARG_VRT_DESC_SIZE_IN,       0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,      &vrt_desc_size_in,MIN_VRT_DESC_SIZE,MAX_VRT_DESC_SIZE,DEF_VRT_DESC_SIZE,0,    opt_update_dext_method,
+			ARG_VALUE_FORM, HLP_VRT_DESC_SIZE_IN},
 
         {ODI, 0, ARG_OGM_SQN_RANGE,        0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &ogmSqnRange,    MIN_OGM_SQN_RANGE,  MAX_OGM_SQN_RANGE, DEF_OGM_SQN_RANGE,0,  0,
 			ARG_VALUE_FORM,	"set average OGM sequence number range (affects frequency of bmx6 description updates)"}

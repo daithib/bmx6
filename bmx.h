@@ -392,11 +392,35 @@ typedef uint8_t  FRAME_TYPE_T;
 #define FRAME_TYPE_MASK        XMIN( (0x1F) /*some bits reserved*/, ((1<<FRAME_TYPE_BIT_SIZE)-1))
 #define FRAME_TYPE_ARRSZ       (FRAME_TYPE_MASK+1)
 
+#define BMX_DSC_TLV_MIN         0x00
+#define BMX_DSC_TLV_METRIC      0x00
+
+#define BMX_DSC_TLV_UHNA4       0x01
+#define BMX_DSC_TLV_UHNA6       0x02
+
+#define BMX_DSC_TLV_TUN6_MIN            0x04
+#define BMX_DSC_TLV_TUN6_ADV            0x04
+#define BMX_DSC_TLV_TUN4IN6_INGRESS_ADV 0x05
+#define BMX_DSC_TLV_TUN6IN6_INGRESS_ADV 0x06
+#define BMX_DSC_TLV_TUN4IN6_SRC_ADV     0x07
+#define BMX_DSC_TLV_TUN6IN6_SRC_ADV     0x08
+#define BMX_DSC_TLV_TUN4IN6_NET_ADV     0x09
+#define BMX_DSC_TLV_TUN6IN6_NET_ADV     0x0A
+#define BMX_DSC_TLV_TUN6_MAX            0x0A
+
+#define BMX_DSC_TLV_SMS                 0x10
+
+#define BMX_DSC_TLV_REF_ADV     (FRAME_TYPE_ARRSZ-1)
+
+#define BMX_DSC_TLV_MAX_KNOWN   (FRAME_TYPE_ARRSZ-1)
+#define BMX_DSC_TLV_MAX         (FRAME_TYPE_ARRSZ-1)
+#define BMX_DSC_TLV_ARRSZ       (FRAME_TYPE_ARRSZ)
+#define BMX_DSC_TLV_INVALID     (FRAME_TYPE_ARRSZ)
 
 
 #define HASH_SHA1_LEN SHA_DIGEST_SIZE  // sha.h: 20 bytes
 
-#define MAX_PACKET_SIZE 1500
+#define MAX_UDPD_SIZE 1400
 
 
 
@@ -910,7 +934,14 @@ extern struct avl_tree orig_tree;
 //extern struct avl_tree blocked_tree;
 
 
+struct dext_tree_key {
+    struct desc_extension *dext;
+} __attribute__((packed));
 
+struct dext_tree_node {
+    struct dext_tree_key dext_key;
+    uint8_t rf_types[(BMX_DSC_TLV_ARRSZ/8) + (BMX_DSC_TLV_ARRSZ%8)];
+};
 
 #define MAX_DESC_LEN (INT32_MAX-1)
 #define MAX_REF_NESTING 2
@@ -924,6 +955,7 @@ struct ref_node {
         uint32_t f_data_len; // NOT including frame header!!
         uint32_t last_usage;
         uint32_t usage_counter;
+	struct avl_tree dext_tree;
 };
 
 
@@ -934,10 +966,11 @@ struct refnl_node {
 };
 
 struct desc_extension {
+	struct list_head refnl_list;
+	struct orig_node *on;
         uint8_t max_nesting;
         uint8_t *data;
         uint32_t dlen;
-	struct list_head refnl_list;
 };
 
 struct orig_node {
@@ -1077,7 +1110,7 @@ struct packet_buff {
 
 	union {
 		struct packet_header header;
-		unsigned char data[MAX_PACKET_SIZE + 1];
+		unsigned char data[MAX_UDPD_SIZE + 1];
 	} packet;
 
 };
@@ -1127,6 +1160,7 @@ void rx_packet( struct packet_buff *pb );
 ************************************************************/
 
 
+#define goto_error( where, what ) do { goto_error_code=what; goto where; }while(0)
 
 #ifdef NO_ASSERTIONS
 #define paranoia( ... )
@@ -1198,10 +1232,11 @@ void trace_function_call(const char *);
 
 #define TRACE_FUNCTION_CALL trace_function_call ( __FUNCTION__ )
 
-#define TEST_FUNCTION(X) ( ((void(*)(void*))&trace_function_call) != ((void(*)(void*))&(X)) )
-#define TEST_VALUE(X) 1
-#define TEST_STRUCT(X) 1
-#define TEST_VARIABLE(X) 1
+//#define TEST_FUNCTION(X) ( ((void(*)(void*))&trace_function_call) != ((void(*)(void*))&(X)) )
+#define TEST_FUNCTION(X) ( ((void(*)(void*))&(X)) != NULL )
+#define TEST_VALUE(X) (X != 12345654321)
+#define TEST_STRUCT(X) (sizeof(X) > 0)
+#define TEST_VARIABLE(X) ((void*)&X != NULL )
 
 #else
 

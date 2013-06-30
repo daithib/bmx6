@@ -24,21 +24,73 @@
 
 
 
+#define ARG_UDPD_SIZE "prefUdpSize"
+#define HLP_UDPD_SIZE "set preferred udp-data size for send packets"
 #define MIN_UDPD_SIZE 128 //(6+4+(22+8)+32)+184=72+56=128
-#define DEF_UDPD_SIZE 512 //512
-#define MAX_UDPD_SIZE (XMIN( 1400, MAX_PACKET_SIZE))
-#define ARG_UDPD_SIZE "udpDataSize"
+#define BIG_UDPD_SIZE (1280 /*min IPv6 MTU*/ - sizeof(struct ip6_hdr) - sizeof(struct udphdr))
+#define DEF_UDPD_SIZE (BIG_UDPD_SIZE / 2)
+#define MAX_UDPD_SIZE 1400
 
-#define MAX_PKT_FRAME_DATA_SIZE (MAX_UDPD_SIZE - sizeof(struct packet_header) - sizeof(struct frame_header_long))
-#define PREF_PKT_FRAME_DATA_SIZE (pref_udpd_size - sizeof(struct packet_header) - sizeof(struct frame_header_long))
+#define     PKT_FRAMES_SIZE_OUT     (pref_udpd_size - sizeof(struct packet_header))
+#define     PKT_FRAMES_SIZE_MAX     ( MAX_UDPD_SIZE - sizeof(struct packet_header))
 
-#define MAX_DSC_FRAME_SIZE (MAX_PKT_FRAME_DATA_SIZE - sizeof (struct msg_description_adv))
-#define MAX_DSC_FRAME_DATA_SIZE (MAX_PKT_FRAME_DATA_SIZE - sizeof (struct msg_description_adv) - sizeof(struct frame_header_long))
+#define ARG_DESC_FRAME_SIZE         "descSizeOut"
+#define HLP_DESC_FRAME_SIZE         "set maximum size for own description and reference frames"
+#define MIN_DESC_FRAME_SIZE         (MIN_UDPD_SIZE - sizeof(struct packet_header))
+#define MAX_DESC_FRAME_SIZE         (MAX_UDPD_SIZE - sizeof(struct packet_header))
+#define DEF_DESC_FRAME_SIZE         (BIG_UDPD_SIZE - sizeof(struct packet_header))
+#define     REF_FRAME_DATA_SIZE_OUT (desc_frame_size_out - sizeof(struct frame_header_long))
+#define     REF_FRAME_DATA_SIZE_MAX (MAX_DESC_FRAME_SIZE - sizeof(struct frame_header_long))
+#define     DESC_FRAMES_SIZE_OUT    (desc_frame_size_out - sizeof(struct frame_header_long) - sizeof (struct msg_description_adv))
+#define     DESC_FRAMES_SIZE_MAX    (MAX_DESC_FRAME_SIZE - sizeof(struct frame_header_long) - sizeof (struct msg_description_adv))
 
-#define MIN_VRT_FRAME_DATA_SIZE (MAX_DSC_FRAME_SIZE - sizeof (struct frame_header_long))
-#define DEF_VRT_FRAME_DATA_SIZE 16384
-#define MAX_VRT_FRAME_DATA_SIZE 16384
-#define ARG_VRT_FRAME_DATA_SIZE "myDescriptionSize"
+#define ARG_VRT_DESC_SIZE_OUT  "descVirtSizeOut"
+#define HLP_VRT_DESC_SIZE_OUT  "set maximum virtual size for own description"
+#define ARG_VRT_DESC_SIZE_IN   "descVirtSizeIn"
+#define HLP_VRT_DESC_SIZE_IN   "set maximum virtual size for other node descriptions"
+#define MIN_VRT_DESC_SIZE      (MIN_DESC_FRAME_SIZE)
+#define MAX_VRT_DESC_SIZE      (INT32_MAX)
+//#define DEF_VRT_DESC_SIZE    (16384) //any value is possible
+// this should be the default max possible with a reference depth of 1 :
+#define DEF_VRT_DESC_SIZE      (((DEF_DESC_FRAME_SIZE - sizeof(struct frame_header_long) - sizeof (struct msg_description_adv)) - \
+                               (5 * (sizeof(struct frame_header_long) + sizeof(struct description_hdr_ref)) )) / \
+			       sizeof(struct description_msg_ref)) * (DEF_DESC_FRAME_SIZE - sizeof(struct frame_header_long))
+#define     VRT_DESC_SIZE_OUT  (vrt_desc_size_out)
+#define     VRT_DESC_SIZE_IN   (vrt_desc_size_in)
+
+
+#define ARG_VRT_FRAME_DATA_SIZE_OUT  "descVirtFrameSizeOut"
+#define HLP_VRT_FRAME_DATA_SIZE_OUT  "set maximum virtual size for own description frames"
+#define ARG_VRT_FRAME_DATA_SIZE_IN   "descVirtFrameSizeIn"
+#define HLP_VRT_FRAME_DATA_SIZE_IN   "set maximum virtual size for other description frames"
+#define MIN_VRT_FRAME_DATA_SIZE      (MIN_DESC_FRAME_SIZE - sizeof (struct frame_header_long))
+#define MAX_VRT_FRAME_DATA_SIZE      (INT32_MAX - sizeof(struct frame_header_virtual))
+#define DEF_VRT_FRAME_DATA_SIZE      DEF_VRT_DESC_SIZE //(8192)
+#define     VRT_FRAME_DATA_SIZE_OUT  (vrt_frame_data_size_out)
+#define     VRT_FRAME_DATA_SIZE_MAX  MAX(vrt_frame_data_size_in, vrt_frame_data_size_out)
+
+
+
+#define ARG_FZIP     "descCompression"
+#define MIN_FZIP      0
+#define TYP_FZIP_DFLT 0
+#define TYP_FZIP_DONT 1
+#define TYP_FZIP_DO   2
+#define MAX_FZIP      2
+#define DEF_FZIP      TYP_FZIP_DONT
+#define HLP_FZIP      "use compressed description 0:dflt, 1:disabled, 2:gzip"
+
+#define ARG_FREF      "descReferencing"
+#define MIN_FREF      0
+#define TYP_FREF_DFLT 0
+#define TYP_FREF_DONT 1
+#define TYP_FREF_DO   2
+#define MAX_FREF      2
+#define DEF_FREF      TYP_FREF_DONT
+#define HLP_FREF      "use referenced description 0:dflt, 1:disabled, 2:reference"
+
+
+
 
 #define DEF_TX_TS_TREE_SIZE 150
 #define DEF_TX_TS_TREE_PURGE_FK 3
@@ -83,24 +135,6 @@
 #define ARG_LINK_REQS_TX_ITERS "linkReqSends"
 
 
-
-#define ARG_FZIP     "descCompression"
-#define MIN_FZIP      0
-#define TYP_FZIP_DFLT 0
-#define TYP_FZIP_DONT 1
-#define TYP_FZIP_DO   2
-#define MAX_FZIP      2
-#define DEF_FZIP      TYP_FZIP_DONT
-#define HLP_FZIP      "use compressed description 0:dflt, 1:disabled, 2:gzip"
-
-#define ARG_FREF      "descReferencing"
-#define MIN_FREF      0
-#define TYP_FREF_DFLT 0
-#define TYP_FREF_DONT 1
-#define TYP_FREF_DO   2
-#define MAX_FREF      2
-#define DEF_FREF      TYP_FREF_DONT
-#define HLP_FREF      "use referenced description 0:dflt, 1:disabled, 2:reference"
 
 
 #define MIN_DSC0_ADVS_TX_ITERS 1
@@ -615,11 +649,10 @@ FIELD_FORMAT_END}
 
 #define OGM_JUMPS_PER_AGGREGATION 10
 
-#define OGMS_PER_AGGREG_MAX                                                                                         \
-              ( (pref_udpd_size -                                                                                   \
-                  (sizeof(struct packet_header) + sizeof(struct frame_header_long) + sizeof(struct hdr_ogm_adv) +   \
-                    (OGM_JUMPS_PER_AGGREGATION * sizeof(struct msg_ogm_adv)) ) ) /                              \
-                (sizeof(struct msg_ogm_adv)) )
+#define OGMS_PER_AGGREG_MAX  (PKT_FRAMES_SIZE_OUT - \
+                              (sizeof(struct frame_header_long) + sizeof(struct hdr_ogm_adv) + \
+                               (OGM_JUMPS_PER_AGGREGATION * sizeof(struct msg_ogm_adv)))) \
+			      / sizeof(struct msg_ogm_adv)
 
 #define OGMS_PER_AGGREG_PREF ( OGMS_PER_AGGREG_MAX  / 2 )
 
@@ -667,30 +700,6 @@ struct msg_ogm_ack {
  * - else update_orig(orig_sid, orig_sqn)
  */
 
-#define BMX_DSC_TLV_MIN         0x00
-#define BMX_DSC_TLV_METRIC      0x00
-
-#define BMX_DSC_TLV_UHNA4       0x01
-#define BMX_DSC_TLV_UHNA6       0x02
-
-#define BMX_DSC_TLV_TUN6_MIN            0x04
-#define BMX_DSC_TLV_TUN6_ADV            0x04
-#define BMX_DSC_TLV_TUN4IN6_INGRESS_ADV 0x05
-#define BMX_DSC_TLV_TUN6IN6_INGRESS_ADV 0x06
-#define BMX_DSC_TLV_TUN4IN6_SRC_ADV     0x07
-#define BMX_DSC_TLV_TUN6IN6_SRC_ADV     0x08
-#define BMX_DSC_TLV_TUN4IN6_NET_ADV     0x09
-#define BMX_DSC_TLV_TUN6IN6_NET_ADV     0x0A
-#define BMX_DSC_TLV_TUN6_MAX            0x0A
-
-#define BMX_DSC_TLV_SMS                 0x10
-
-#define BMX_DSC_TLV_REF_ADV     (FRAME_TYPE_ARRSZ-1)
-
-#define BMX_DSC_TLV_MAX_KNOWN   (FRAME_TYPE_ARRSZ-1)
-#define BMX_DSC_TLV_MAX         (FRAME_TYPE_ARRSZ-1)
-#define BMX_DSC_TLV_ARRSZ       (FRAME_TYPE_ARRSZ)
-#define BMX_DSC_TLV_INVALID     (FRAME_TYPE_ARRSZ)
 
 
 
@@ -839,10 +848,10 @@ static inline int32_t tx_iterator_cache_data_space_sched(struct tx_frame_iterato
 	tx_iterator_cache_data_space_max(it) : tx_iterator_cache_data_space_pref(it);
 }
 
-static inline int32_t tx_iterator_cache_msg_space_max(struct tx_frame_iterator *it)
+static inline int32_t tx_iterator_cache_msg_space_pref(struct tx_frame_iterator *it)
 {
         if (it->handls[it->frame_type].min_msg_size && it->handls[it->frame_type].fixed_msg_size)
-                return tx_iterator_cache_data_space_max(it) / it->handls[it->frame_type].min_msg_size;
+                return tx_iterator_cache_data_space_pref(it) / it->handls[it->frame_type].min_msg_size;
         else
                 return 0;
 }
