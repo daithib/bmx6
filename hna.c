@@ -400,7 +400,7 @@ int create_description_tlv_hna(struct tx_frame_iterator *it)
         assertion(-500765, (it->frame_type == BMX_DSC_TLV_UHNA4 || it->frame_type == BMX_DSC_TLV_UHNA6));
 
         uint8_t *data = tx_iterator_cache_msg_ptr(it);
-        uint16_t max_size = tx_iterator_cache_data_space_max(it);
+        uint16_t max_size = tx_iterator_cache_data_space_pref(it);
         uint8_t family = it->frame_type == BMX_DSC_TLV_UHNA4 ? AF_INET : AF_INET6;
         uint8_t max_plen = (family == AF_INET ? 32 : 128);
 
@@ -1711,7 +1711,7 @@ int create_description_tlv_tun6_adv(struct tx_frame_iterator *it)
 
 
 
-	while ((tin = avl_iterate_item(&tun_in_tree, &an)) && m < tx_iterator_cache_msg_space_max(it)) {
+	while ((tin = avl_iterate_item(&tun_in_tree, &an)) && m < tx_iterator_cache_msg_space_pref(it)) {
 
 		if (tin->upIfIdx && tin->tun6Id >= 0) {
 			assertion(-501541, (tin->upIfIdx && tin->tun6Id >= 0));
@@ -1943,7 +1943,7 @@ int create_description_tlv_tunXin6_ingress_adv(struct tx_frame_iterator *it)
 
                 if (tin->upIfIdx && tin->tun6Id >= 0 && tin->ingressPrefix46[isSrc4in6].mask) {
 
-                        if (pos + msg_size > tx_iterator_cache_data_space_max(it)) {
+                        if (pos + msg_size > tx_iterator_cache_data_space_pref(it)) {
                                 memset(tx_iterator_cache_msg_ptr(it), 0, pos);
                                 return TLV_TX_DATA_FULL;
                         }
@@ -2065,7 +2065,7 @@ uint16_t create_description_tlv_tunXin6_net_adv_msg(struct tx_frame_iterator *it
 	assertion(-501442, (adv->bandwidth.val.u8));
 	assertion(-501443, ip_netmask_validate(&adv->network, adv->networkLen, (is4in6 ? AF_INET : AF_INET6), NO /*force*/) == SUCCESS);
 
-	if (tun && m < tx_iterator_cache_msg_space_max(it)) {
+	if (tun && m < tx_iterator_cache_msg_space_pref(it)) {
 
 		if (is4in6) {
 			struct description_msg_tun4in6_net_adv *msg4 =
