@@ -78,7 +78,7 @@ void check_for_changed_sms(void *unused)
 
         if (extensions_fd == -1) {
                 task_remove(check_for_changed_sms, NULL);
-                task_register(SMS_POLLING_INTERVAL, check_for_changed_sms, NULL, 300000);
+                task_register(SMS_POLLING_INTERVAL, check_for_changed_sms, NULL, 300579);
         }
 
 
