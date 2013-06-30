@@ -212,7 +212,7 @@ int create_description_sms(struct tx_frame_iterator *it)
         struct sms_node *sms;
 
         uint8_t *data = tx_iterator_cache_msg_ptr(it);
-        uint16_t max_size = tx_iterator_cache_data_space_max(it);
+        uint16_t max_size = tx_iterator_cache_data_space_pref(it);
         int pos = 0;
 
         while ((sms = avl_iterate_item(&sms_tree, &an))) {
