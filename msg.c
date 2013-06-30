@@ -1298,7 +1298,7 @@ void ref_node_use(struct desc_extension *dext, struct ref_node *refn, uint8_t f_
 		ref_tree_items_used++;
 
 	if (!dtn) {
-		dtn = debugMalloc(sizeof(struct dext_tree_node), -300580);
+		dtn = debugMallocReset(sizeof(struct dext_tree_node), -300580);
 		dtn->dext_key.dext = dext;
 		avl_insert(&refn->dext_tree, dtn, -300581);
 
@@ -4708,7 +4708,7 @@ static int32_t ref_status_creator(struct status_handl *handl, void *data)
 		char* origs_str = status[i].referencees;
 		char* ref_str = status[i].ref_types;
 		uint8_t rft_bits[sizeof(dtn->rf_types)] = {0};
-		uint16_t rft_pos = 0, rft_max = sizeof(rft_bits);
+		uint16_t rft_pos;
 		while ((dtn = avl_iterate_item(&rfn->dext_tree, &an))) {
 
 			if (dtn->dext_key.dext->on) {
@@ -4716,12 +4716,12 @@ static int32_t ref_status_creator(struct status_handl *handl, void *data)
 					"%s%s", strlen(origs_str) ? " ":"", dtn->dext_key.dext->on->global_id.name  );
 			}
 
-			for (rft_pos=0; rft_pos<rft_max;rft_pos++)
+			for (rft_pos=0; rft_pos<sizeof(rft_bits);rft_pos++)
 				rft_bits[rft_pos] |= dtn->rf_types[rft_pos];
 		}
 
-		for (rft_pos=0; rft_pos<(8*rft_max);rft_pos++) {
-			if (bit_get(rft_bits, (8*rft_max), rft_pos)) {
+		for (rft_pos=0; rft_pos<(8*sizeof(rft_bits));rft_pos++) {
+			if (bit_get(rft_bits, (8*sizeof(rft_bits)), rft_pos)) {
 				char *fstr = description_tlv_handl[rft_pos].min_msg_size ? description_tlv_handl[rft_pos].name : "???";
 				snprintf(ref_str + strlen(ref_str), sizeof(status[i].ref_types) - strlen(ref_str),
 					"%s%s", strlen(ref_str) ? " ":"", fstr  );
