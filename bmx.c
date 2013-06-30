@@ -73,6 +73,7 @@ const void* IGNORED_PTR = (void*) & IGNORED_PTR;
 const void* UNRESOLVED_PTR = (void*) & UNRESOLVED_PTR;
 const void* FAILURE_PTR = (void*) & FAILURE_PTR;
 
+uint32_t test_magic_number = 1234543210;
 
 static struct timeval start_time_tv;
 static struct timeval curr_tv;

@@ -1242,9 +1242,11 @@ void trace_function_call(const char *);
 
 #define TRACE_FUNCTION_CALL trace_function_call ( __FUNCTION__ )
 
+extern uint32_t test_magic_number;
+
 //#define TEST_FUNCTION(X) ( ((void(*)(void*))&trace_function_call) != ((void(*)(void*))&(X)) )
 #define TEST_FUNCTION(X) ( ((void(*)(void*))&(X)) != NULL )
-#define TEST_VALUE(X) (X != 12345654321)
+#define TEST_VALUE(X) (((uint32_t)X) != test_magic_number)
 #define TEST_STRUCT(X) (sizeof(X) > 0)
 #define TEST_VARIABLE(X) ((void*)&X != NULL )
 
