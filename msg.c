@@ -182,15 +182,15 @@ void register_frame_handler(struct frame_handl *array, int pos, struct frame_han
         assertion(-501213, IMPLIES(handl->msg_format, handl->min_msg_size ==
                 fields_dbg_lines(NULL, FIELD_RELEVANCE_LOW, 0, NULL, handl->min_msg_size, handl->msg_format)));
 
-	assertion(-500000, IMPLIES(array==description_tlv_handl && pos!=BMX_DSC_TLV_REF_ADV, !handl->data_header_size));
+	assertion(-501611, IMPLIES(array==description_tlv_handl && pos!=BMX_DSC_TLV_REF_ADV, !handl->data_header_size));
 	// this is mandatory to let
-	assertion(-500000, TEST_VALUE(BMX_DSC_TLV_REF_ADV));
+	assertion(-501612, TEST_VALUE(BMX_DSC_TLV_REF_ADV));
 	// messages to point and allow unambiguous concatenation of
-	assertion(-500000, TEST_VALUE(FRAME_TYPE_REF_ADV));
+	assertion(-501613, TEST_VALUE(FRAME_TYPE_REF_ADV));
 	// into
-	assertion(-500000, TEST_STRUCT(struct frame_header_virtual));
+	assertion(-501614, TEST_STRUCT(struct frame_header_virtual));
 	// and
-	assertion(-500000, TEST_STRUCT(struct desc_extension));
+	assertion(-501615, TEST_STRUCT(struct desc_extension));
 	// without potentially conflicting message headers (frame data headers)
 
 
@@ -1230,7 +1230,7 @@ STATIC_FUNC
 struct ref_node * ref_node_add(uint8_t *frame_data, uint32_t f_data_len, int8_t long_hdr, uint8_t compression)
 {
 
-	assertion(-500000, (f_data_len <= REF_FRAME_DATA_SIZE_MAX));
+	assertion(-501616, (f_data_len <= REF_FRAME_DATA_SIZE_MAX));
 
 	uint32_t f_hdr_len;
 	uint8_t f_hdr[sizeof(struct frame_header_long)];
@@ -1287,19 +1287,19 @@ STATIC_FUNC
 void ref_node_use(struct desc_extension *dext, struct ref_node *refn, uint8_t f_type)
 {
 
-	assertion(-500000, (f_type <= BMX_DSC_TLV_MAX && f_type != BMX_DSC_TLV_REF_ADV));
+	assertion(-501617, (f_type <= BMX_DSC_TLV_MAX && f_type != BMX_DSC_TLV_REF_ADV));
 
 	struct dext_tree_node *dtn = avl_find_item(&refn->dext_tree, &dext);
 
-	assertion(-500000, (!(dtn && !bit_get(dtn->rf_types, (sizeof(dtn->rf_types) * 8), f_type))));
+	assertion(-501618, (!(dtn && !bit_get(dtn->rf_types, (sizeof(dtn->rf_types) * 8), f_type))));
 
 	if (!refn->dext_tree.items)
 		ref_tree_items_used++;
 
 	if (!dtn) {
-		dtn = debugMalloc(sizeof(struct dext_tree_node), -300000);
+		dtn = debugMalloc(sizeof(struct dext_tree_node), -300580);
 		dtn->dext_key.dext = dext;
-		avl_insert(&refn->dext_tree, dtn, -300000);
+		avl_insert(&refn->dext_tree, dtn, -300581);
 
 		struct refnl_node *rn = debugMallocReset(sizeof(struct refnl_node), -300566);
 		rn->refn = refn;
@@ -1316,7 +1316,7 @@ void ref_node_use(struct desc_extension *dext, struct ref_node *refn, uint8_t f_
 		}
 	}
 
-	assertion(-500000, (avl_find(&refn->dext_tree, &dext)));
+	assertion(-501619, (avl_find(&refn->dext_tree, &dext)));
 
 	bit_set(dtn->rf_types, (sizeof(dtn->rf_types) * 8), f_type, 1);
 
@@ -1332,10 +1332,10 @@ void ref_node_release( struct desc_extension *dext)
 		assertion(-501579, (rn->refn->dext_tree.items > 0));
 		assertion(-501580, (ref_tree_items_used > 0));
 
-		struct dext_tree_node *dtn = avl_remove(&rn->refn->dext_tree, &dext, -300000);
-		assertion(-500000, (dtn && dtn->dext_key.dext == dext));
-		debugFree(dtn, -300000);
-		assertion(-500000, (!avl_find(&rn->refn->dext_tree, &dext)));
+		struct dext_tree_node *dtn = avl_remove(&rn->refn->dext_tree, &dext, -300582);
+		assertion(-501620, (dtn && dtn->dext_key.dext == dext));
+		debugFree(dtn, -300583);
+		assertion(-501621, (!avl_find(&rn->refn->dext_tree, &dext)));
 
 		if(!rn->refn->dext_tree.items)
 			ref_tree_items_used--;
@@ -1426,9 +1426,9 @@ int create_description_tlv_ref(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 	// description reference extenstions are created on-demand in:
-	assertion(-500000, ( TEST_FUNCTION(tx_frame_iterate_finish)));
+	assertion(-501623, ( TEST_FUNCTION(tx_frame_iterate_finish)));
 	// depending on:
-	assertion(-500000, (TEST_VARIABLE( ((struct frame_handl*)0)->dextReferencing)));
+	assertion(-501624, (TEST_VARIABLE( ((struct frame_handl*)0)->dextReferencing)));
 
         return TLV_TX_DATA_IGNORED;
 }
@@ -1439,22 +1439,22 @@ int process_description_tlv_ref(struct rx_frame_iterator *it)
         TRACE_FUNCTION_CALL;
 
 	// description reference extenstions are processed explicitly in:
-	assertion(-500000, ( TEST_FUNCTION(process_description))); //calling:
-	assertion(-500000, ( TEST_FUNCTION(resolve_desc_extensions))); //calling:
-	assertion(-500000, ( TEST_FUNCTION(resolve_ref_frame)) );
-	assertion(-500000, ( TEST_FUNCTION(ref_node_get)) );
-	assertion(-500000, ( TEST_FUNCTION(ref_node_use)) );
+	assertion(-501625, ( TEST_FUNCTION(process_description))); //calling:
+	assertion(-501626, ( TEST_FUNCTION(resolve_desc_extensions))); //calling:
+	assertion(-501627, ( TEST_FUNCTION(resolve_ref_frame)) );
+	assertion(-501628, ( TEST_FUNCTION(ref_node_get)) );
+	assertion(-501629, ( TEST_FUNCTION(ref_node_use)) );
 	// and must be ignored when processed implicitly via:
-	assertion(-500000, ( TEST_FUNCTION(rx_frame_iterate)) );
+	assertion(-501630, ( TEST_FUNCTION(rx_frame_iterate)) );
 	// either while processing:
-	assertion(-500000, ( TEST_STRUCT(struct description)) );
+	assertion(-501631, ( TEST_STRUCT(struct description)) );
 	// and using:
-	assertion(-500000, ( TEST_VALUE( FRAME_TYPE_PROCESS_NONE )) );
+	assertion(-501632, ( TEST_VALUE( FRAME_TYPE_PROCESS_NONE )) );
 
 	// or while processing:
-	assertion(-500000, ( TEST_STRUCT(struct desc_extension)) );
+	assertion(-501633, ( TEST_STRUCT(struct desc_extension)) );
 	// where type:
-	assertion(-500000, ( TEST_VALUE( BMX_DSC_TLV_REF_ADV )) );
+	assertion(-501634, ( TEST_VALUE( BMX_DSC_TLV_REF_ADV )) );
 	// must not exist anymore because it should have been resolved already!
 
         assertion(-501584, (!it->is_short_header));
@@ -2735,7 +2735,7 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
 		schedule_tx_task(pb->i.link->local->best_tp_lndev, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, 0, 0, 0, neighIID4x);
 
 	} else {
-		assertion(-500000, 0);
+		assertion(-501635, 0);
 	}
 
         return sizeof (struct msg_dhash_adv);
@@ -2798,7 +2798,7 @@ int32_t rx_frame_description_advs(struct rx_frame_iterator *it)
 		} else if (!dhn) {
 			
 		} else {
-			assertion(-500000, 0);
+			assertion(-501636, 0);
 		}
 	}
 
@@ -3383,7 +3383,7 @@ int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 	if ( use_referencing( &it->handls[it->frame_type] ) ) {
 
 		//TODO: this works only for a reference depth = 1
-		assertion(-500000, (it->dext));
+		assertion(-501637, (it->dext));
 		struct frame_handl *handl = &(it->handls[it->frame_type]);
 
 		int32_t used_cache_space = handl->data_header_size + it->frame_cache_msgs_size;
@@ -3431,7 +3431,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 
         assertion(-500881, (it->frame_cache_msgs_size >= TLV_TX_DATA_PROCESSED));
-	assertion(-500000, (it->frame_cache_msgs_size <= VRT_FRAME_DATA_SIZE_MAX));
+	assertion(-501638, (it->frame_cache_msgs_size <= VRT_FRAME_DATA_SIZE_MAX));
         assertion(-500786, (tx_iterator_cache_data_space_max(it) >= 0));
         assertion(-500355, (IMPLIES(handl->fixed_msg_size, !(it->frame_cache_msgs_size % handl->min_msg_size))));
         ASSERTION(-501003, (is_zero((it->frame_cache_array + it->frame_cache_msgs_size + handl->data_header_size), tx_iterator_cache_data_space_max(it))));
@@ -3439,8 +3439,8 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 	if (it->dext) {
 		// this is the dext creation of my description...
-		assertion(-500000, (it->handls==description_tlv_handl));
-		assertion(-500000, (it->frame_cache_msgs_size <= VRT_FRAME_DATA_SIZE_OUT));
+		assertion(-501639, (it->handls==description_tlv_handl));
+		assertion(-501640, (it->frame_cache_msgs_size <= VRT_FRAME_DATA_SIZE_OUT));
 
 		it->dext->data = debugReallocReset(it->dext->data, it->dext->dlen + sizeof(struct frame_header_virtual) + fdata_in, -300568);
 		struct frame_header_virtual *fhv = (struct frame_header_virtual *)(it->dext->data + it->dext->dlen);
@@ -3451,21 +3451,21 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		memcpy(it->dext->data + it->dext->dlen + sizeof(struct frame_header_virtual), it->frame_cache_array, fdata_in);
 		it->dext->dlen += (sizeof(struct frame_header_virtual) + fdata_in);
 
-		assertion(-500000, (it->dext->dlen <= (uint32_t)VRT_DESC_SIZE_OUT));
+		assertion(-501641, (it->dext->dlen <= (uint32_t)VRT_DESC_SIZE_OUT));
 	}
 
 	if (it->dext && do_fref) {
-		assertion(-500000, (it->handls==description_tlv_handl));
+		assertion(-501642, (it->handls==description_tlv_handl));
 		assertion(-501592, (!it->already_compressed));  //unless tx_frame_create already provides precompressed desc extension frames for myself
 		assertion(-501593, (!it->use_long_header));     //yet only used by tx_frame_ref_adv. NOT for creation of my desc frames.
 
 		// calculate description extension frames
-		assertion(-500000, TEST_STRUCT(struct frame_header_short)); // or
-		assertion(-500000, TEST_STRUCT(struct frame_header_long));  // of type
-		assertion(-500000, TEST_VALUE(BMX_DSC_TLV_REF_ADV));
+		assertion(-501643, TEST_STRUCT(struct frame_header_short)); // or
+		assertion(-501644, TEST_STRUCT(struct frame_header_long));  // of type
+		assertion(-501645, TEST_VALUE(BMX_DSC_TLV_REF_ADV));
 		// with frame-data hdr and msgs:
-		assertion(-500000, TEST_STRUCT(struct description_hdr_ref));
-		assertion(-500000, TEST_STRUCT(struct description_msg_ref));
+		assertion(-501646, TEST_STRUCT(struct description_hdr_ref));
+		assertion(-501647, TEST_STRUCT(struct description_msg_ref));
 
 		uint8_t *rfd_agg_data = do_fzip ? NULL : it->frame_cache_array;
 		int32_t rfd_zagg_len = do_fzip ? z_compress(it->frame_cache_array, fdata_in, &rfd_agg_data, 0, 0, 0) : 0;
@@ -3500,11 +3500,11 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 		// set: frame-data msgs:
 		// by splitting potentially huge
-		assertion(-500000, TEST_VARIABLE(rfd_agg_data));
+		assertion(-501648, TEST_VARIABLE(rfd_agg_data));
 		// of size
-		assertion(-500000, TEST_VARIABLE(rfd_agg_len));
+		assertion(-501649, TEST_VARIABLE(rfd_agg_len));
 		// into pieces of max size
-		assertion(-500000, TEST_VALUE(REF_FRAME_DATA_SIZE_OUT));
+		assertion(-501650, TEST_VALUE(REF_FRAME_DATA_SIZE_OUT));
 		// and add each's hash as msg
 		int32_t pos, m=0;
 		for (pos=0; pos < rfd_agg_len; pos += REF_FRAME_DATA_SIZE_OUT) {
@@ -3525,7 +3525,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 		it->frames_out_pos += rf_hdr_size + sizeof(struct description_hdr_ref) + (rfd_msgs * sizeof(struct description_msg_ref)); ///TODO
 
-		assertion(-500000, ( it->frames_out_pos <= (int32_t)DESC_FRAMES_SIZE_OUT));
+		assertion(-501651, ( it->frames_out_pos <= (int32_t)DESC_FRAMES_SIZE_OUT));
 
 	} else {
 		
@@ -3570,7 +3570,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 			fhs->length = (fdata_in + sizeof ( struct frame_header_short));
 		}
 
-		assertion(-500000, ( it->frames_out_pos <= (int32_t)PKT_FRAMES_SIZE_MAX));
+		assertion(-501652, ( it->frames_out_pos <= (int32_t)PKT_FRAMES_SIZE_MAX));
 	}
 
 	if (do_fref || do_fzip ) {
@@ -4026,7 +4026,7 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
         struct description_msg_ref *msg = hdr->msg;
 	int32_t m = 0, msgs = (dlen - sizeof(struct description_hdr_ref)) / sizeof(struct description_msg_ref);
 	int32_t ref_len = 0;
-	struct desc_extension *solvable = dext ? dext : debugMallocReset(sizeof(struct desc_extension), -300000);
+	struct desc_extension *solvable = dext ? dext : debugMallocReset(sizeof(struct desc_extension), -300584);
 	struct desc_extension *solvable_free = dext ? NULL : solvable;
 	uint32_t solvable_begin = solvable->dlen;
 	char *goto_error_code = " ";
@@ -4103,7 +4103,7 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 		}
 
 		assertion(-501599, IMPLIES(solvable, solvable_begin + ref_len == solvable->dlen));
-		assertion(-500000, IMPLIES(solvable, *rf_type <= BMX_DSC_TLV_MAX));
+		assertion(-501653, IMPLIES(solvable, *rf_type <= BMX_DSC_TLV_MAX));
         }
 
 	if (m != msgs)
@@ -4154,7 +4154,7 @@ resolve_ref_frame_error:
 		goto_error_code);
 
 	free_desc_extensions(&solvable_free);
-	assertion(-500000, !dext); // this function should only be called if a prior call with dext=NULL succeeded
+	assertion(-501654, !dext); // this function should only be called if a prior call with dext=NULL succeeded
 	return FAILURE;
 }
 }
@@ -4183,7 +4183,7 @@ STATIC_FUNC
 struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t *data, uint32_t dlen)
 {
         TRACE_FUNCTION_CALL;
-	assertion(-500000, (BMX_DSC_TLV_INVALID > BMX_DSC_TLV_MAX && BMX_DSC_TLV_INVALID <= UINT8_MAX));
+	assertion(-501655, (BMX_DSC_TLV_INVALID > BMX_DSC_TLV_MAX && BMX_DSC_TLV_INVALID <= UINT8_MAX));
 
 	IDM_T unresolved = 0;
         struct desc_extension *dext = NULL;
@@ -4302,17 +4302,17 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 			vf_data_len = z_decompress(it.frame_data, it.frame_data_length, &dext->data, dext->dlen);
 			dext->dlen += vf_data_len;
 
-			assertion(-500000, (vf_data_len > 0));
+			assertion(-501656, (vf_data_len > 0));
 			dbgf_track(DBGT_INFO, "Successfully inflated ");
 
                 } else if (it.frame_type == BMX_DSC_TLV_REF_ADV) {
 
 			vf_data_len = resolve_ref_frame(pb, it.frame_data, it.frame_data_length, it.frame_compression, dext, &vf_type, &vf_relevant, 1);
 
-			assertion(-500000,  (vf_data_len == (int32_t)(((struct description_hdr_ref*)(it.frame_data))->expanded_rframes_data_len)));
+			assertion(-501657,  (vf_data_len == (int32_t)(((struct description_hdr_ref*)(it.frame_data))->expanded_rframes_data_len)));
 
                 } else {
-			assertion(-500000, 0);
+			assertion(-501658, 0);
 		}
 
 		dbgf_track(DBGT_INFO, "converted type=%d %s f_data_length=%d compression=%d -> type=%d %s relevant=%d vf_data_len=%d, dext.len=%d",
@@ -4327,10 +4327,10 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 		vf_hdr->type = vf_type;
 		vf_hdr->length = sizeof(struct frame_header_virtual) + vf_data_len;
 
-		assertion(-500000, (vf_data_len <= VRT_FRAME_DATA_SIZE_MAX));
-		assertion(-500000, (vf_data_len > 0 && vf_type <= BMX_DSC_TLV_MAX && vf_relevant <= 1 ));
-		assertion(-500000, (dext->dlen == dext_dlen_old + vf_hdr->length));
-		assertion(-500000, (dext->dlen <= (uint32_t)VRT_DESC_SIZE_IN));
+		assertion(-501659, (vf_data_len <= VRT_FRAME_DATA_SIZE_MAX));
+		assertion(-501660, (vf_data_len > 0 && vf_type <= BMX_DSC_TLV_MAX && vf_relevant <= 1 ));
+		assertion(-501661, (dext->dlen == dext_dlen_old + vf_hdr->length));
+		assertion(-501662, (dext->dlen <= (uint32_t)VRT_DESC_SIZE_IN));
         }
 
         return dext;
@@ -4338,7 +4338,7 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 	
 resolve_desc_extension_error:
 
-	assertion(-500000, (!dext)); //otherwise the check should have failed!
+	assertion(-501663, (!dext)); //otherwise the check should have failed!
 	//free_desc_extensions(&dext);
         dbgf_sys(DBGT_ERR, "Failed converting type=%d max_known=%d f_data_len=%d compression=%d -> type=%d vf_data_len=%d vf_relevant=%d vf_error=%s",
                  it.frame_type, BMX_DSC_TLV_MAX_KNOWN, it.frame_data_length, it.frame_compression, vf_type, vf_data_len, vf_relevant, goto_error_code);
@@ -4422,7 +4422,7 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
         if (on->desc)
                 debugFree(on->desc, -300111);
 
-	assertion(-500000, (!dext->on));
+	assertion(-501664, (!dext->on));
 	dext->on = on;
         on->dext = dext;
 	dext = NULL;
@@ -4475,13 +4475,13 @@ void update_my_description_adv(void)
         if (terminating) {
 		if (frame_cache_size) {
 			frame_cache_size = 0;
-			debugFree(frame_cache_array, -300000);
+			debugFree(frame_cache_array, -300585);
 		}
                 return;
 
 	} else if (frame_cache_size != VRT_FRAME_DATA_SIZE_OUT) {
 		frame_cache_size = VRT_FRAME_DATA_SIZE_OUT;
-		frame_cache_array = debugReallocReset(frame_cache_array, frame_cache_size, -300000);
+		frame_cache_array = debugReallocReset(frame_cache_array, frame_cache_size, -300586);
 	}
 
 
@@ -4551,7 +4551,7 @@ void update_my_description_adv(void)
 	}
 
 	free_desc_extensions(&self->dext);
-	assertion(-500000, (!next_dext->on));
+	assertion(-501665, (!next_dext->on));
 	next_dext->on = self;
 	self->dext = next_dext;
 
