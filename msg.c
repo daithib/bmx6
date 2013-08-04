@@ -1188,8 +1188,8 @@ struct ref_node* ref_node_get(struct packet_buff *pb, SHA1_T *rhash ) {
 STATIC_FUNC
 void ref_node_del (struct ref_node *refn)
 {
-	assertion(-501574, !refn->dext_tree.items);
-	assertion(-501575, ref_tree.items);
+	assertion(-501667, !refn->dext_tree.items);
+	assertion(-501668, ref_tree.items);
 	avl_remove(&ref_tree, &refn->rhash, -300560);
 	debugFree(refn->f_data, -300561);
 	debugFree(refn, -300562);
@@ -1220,7 +1220,7 @@ void ref_node_purge (IDM_T all_unused)
 	}
 
 	if ((int32_t)ref_tree.items - ref_tree_items_used >= ref_nodes_max_unused) {
-		assertion(-501576, oldest_unused);
+		assertion(-501669, oldest_unused);
 		ref_node_del(oldest_unused);
 	}
 }
