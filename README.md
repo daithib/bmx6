@@ -43,6 +43,17 @@ The following Linux-kernel modules are needed (depending on used bmx6 features)
 * tunnel6
 * ip6_tunnel
 
+The cyassl embedded ssl library is needed for cryptographic operations:
+Tested with debian and cyassl-2.8.0 from :
+<pre>
+wget  http://www.yassl.com/cyassl-2.8.0.zip
+unzip cyassl-2.8.0.zip
+cd cyassl-2.8.0
+./configure --enable-fastmath=no --enable-keygen=yes
+make
+sudo make install
+</pre>
+
 ### Downloading
 
 Latest development sources are available from bmx6 git repository:

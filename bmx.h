@@ -27,6 +27,7 @@
 #include <cyassl/sha.h>
 #include <cyassl/random.h>
 
+
 /*
  * from other headers:
  * TODO: partly move this to system.h
@@ -410,6 +411,9 @@ typedef uint8_t  FRAME_TYPE_T;
 
 #define BMX_DSC_TLV_SMS                 0x10
 
+#define BMX_DSC_TLV_PUBKEY      (FRAME_TYPE_ARRSZ-3)
+#define BMX_DSC_TLV_SIGNATURE   (FRAME_TYPE_ARRSZ-2)
+
 #define BMX_DSC_TLV_REF_ADV     (FRAME_TYPE_ARRSZ-1)
 
 #define BMX_DSC_TLV_MAX_KNOWN   (FRAME_TYPE_ARRSZ-1)
@@ -419,6 +423,7 @@ typedef uint8_t  FRAME_TYPE_T;
 
 
 #define HASH_SHA1_LEN SHA_DIGEST_SIZE  // sha.h: 20 bytes
+#define RSA1024_SIGN_LEN (1024/8) //128 bytes
 
 #define MAX_UDPD_SIZE 1400
 

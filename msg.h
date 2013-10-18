@@ -217,7 +217,7 @@
 
 #define FRAME_TYPE_DEV_REQ      6
 #define FRAME_TYPE_DEV_ADV      7
-#define FRAME_TYPE_LINK_REQ_ADV     8
+#define FRAME_TYPE_LINK_REQ_ADV 8
 #define FRAME_TYPE_LINK_ADV     9
 
 #define FRAME_TYPE_RP_ADV      11
@@ -580,8 +580,6 @@ struct description_hdr_ref {
 
 
 
-
-
 #define msg_description_request msg_dhash_request
 #define hdr_description_request hdr_dhash_request
 
@@ -629,7 +627,6 @@ struct msg_description_adv { // IPv6: >= 92 bytes
 
 } __attribute__((packed));
 
-
 #define DESCRIPTION_MSG_FORMAT { \
 {FIELD_TYPE_UINT,             -1, (8*sizeof(IID_T)),       0, FIELD_RELEVANCE_MEDI, "transmitterIid4x"}, \
 {FIELD_TYPE_GLOBAL_ID,        -1, (8*sizeof(GLOBAL_ID_T)), 1, FIELD_RELEVANCE_HIGH, "globalId"},  \
@@ -644,7 +641,6 @@ struct msg_description_adv { // IPv6: >= 92 bytes
 {FIELD_TYPE_STRING_SIZE,      -1, 16,                      0, FIELD_RELEVANCE_LOW,  "extensionLen" }, \
 {FIELD_TYPE_STRING_BINARY,    -1, 0,                       1, FIELD_RELEVANCE_LOW,  "extensionData" }, \
 FIELD_FORMAT_END}
-
 
 
 #define OGM_JUMPS_PER_AGGREGATION 10
@@ -858,6 +854,7 @@ static inline int32_t tx_iterator_cache_msg_space_pref(struct tx_frame_iterator 
 
 
 
+extern const int32_t always_fref;
 
 
 extern uint32_t ogm_aggreg_pending;

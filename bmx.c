@@ -32,6 +32,10 @@
 #include <linux/rtnetlink.h>
 #include <time.h>
 
+#include <cyassl/sha.h>
+#include <cyassl/random.h>
+//#include <cyassl/ctaocrypt/rsa.h>
+
 #include "bmx.h"
 #include "msg.h"
 #include "ip.h"

@@ -26,7 +26,6 @@
 #include <netinet/udp.h>
 #include <netinet/ip6.h>
 
-
 #include "bmx.h"
 #include "msg.h"
 #include "z.h"
@@ -83,6 +82,9 @@ AVL_TREE( description_cache_tree, struct description_cache_node, dhash );
 
 static AVL_TREE(ref_tree, struct ref_node, rhash);
 static int32_t ref_tree_items_used = 0;
+
+const int32_t always_fref = TYP_FREF_DO;
+
 
 int32_t ref_nodes_max_unused = 200;
 int32_t ref_nodes_purge_to = 60000;
@@ -1419,6 +1421,7 @@ int32_t rx_frame_ref_adv(struct rx_frame_iterator *it)
 
 	return it->frame_data_length;
 }
+
 
 
 STATIC_FUNC
@@ -2777,7 +2780,7 @@ int32_t rx_frame_description_advs(struct rx_frame_iterator *it)
 
                         return FAILURE;
 			
-		} else if (dhn == IGNORED_PTR || dhn == UNRESOLVED_PTR) {
+		} else if (dhn == UNRESOLVED_PTR || dhn == IGNORED_PTR) {
 
 		} else if (dhn) {
 
@@ -4932,8 +4935,6 @@ int32_t init_msg( void )
         handl.rx_frame_handler = rx_frame_description_advs;
         handl.msg_format = description_format;
         register_frame_handler(packet_frame_handler, FRAME_TYPE_DESC_ADV, &handl);
-
-        
 
         handl.name = "DHASH_REQ";
         handl.is_destination_specific_frame = 1;
