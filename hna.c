@@ -3551,7 +3551,6 @@ int32_t hna_init( void )
         memset(&tlv_handl, 0, sizeof (tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct description_msg_tun6_adv);
         tlv_handl.fixed_msg_size = 1;
-        tlv_handl.is_relevant = 1;
         tlv_handl.family = AF_INET6;
         tlv_handl.name = "TUN6_EXTENSION";
         tlv_handl.tx_frame_handler = create_description_tlv_tun6_adv;
@@ -3563,7 +3562,6 @@ int32_t hna_init( void )
         memset(&tlv_handl, 0, sizeof (tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct description_msg_tun4in6_ingress_adv);
         tlv_handl.fixed_msg_size = 1;
-        tlv_handl.is_relevant = 1;
         tlv_handl.family = AF_INET6;
         tlv_handl.name = "TUN4IN6_INGRESS_EXTENSION";
         tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_ingress_adv;
@@ -3574,7 +3572,6 @@ int32_t hna_init( void )
         memset(&tlv_handl, 0, sizeof (tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct description_msg_tun6in6_ingress_adv);
         tlv_handl.fixed_msg_size = 1;
-        tlv_handl.is_relevant = 1;
         tlv_handl.family = AF_INET6;
         tlv_handl.name = "TUN6IN6_INGRESS_EXTENSION";
         tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_ingress_adv;
@@ -3586,7 +3583,6 @@ int32_t hna_init( void )
         memset(&tlv_handl, 0, sizeof (tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct description_msg_tun4in6_src_adv);
         tlv_handl.fixed_msg_size = 1;
-        tlv_handl.is_relevant = 1;
         tlv_handl.family = AF_INET6;
         tlv_handl.name = "TUN4IN6_SRC_EXTENSION";
         tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_src_adv;
@@ -3597,7 +3593,6 @@ int32_t hna_init( void )
         memset(&tlv_handl, 0, sizeof (tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct description_msg_tun6in6_src_adv);
         tlv_handl.fixed_msg_size = 1;
-        tlv_handl.is_relevant = 1;
         tlv_handl.family = AF_INET6;
         tlv_handl.name = "TUN6IN6_SRC_EXTENSION";
         tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_src_adv;
@@ -3609,7 +3604,6 @@ int32_t hna_init( void )
         memset(&tlv_handl, 0, sizeof (tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct description_msg_tun4in6_net_adv);
         tlv_handl.fixed_msg_size = 1;
-        tlv_handl.is_relevant = 1;
         tlv_handl.family = AF_INET6;
         tlv_handl.name = "TUN4IN6_NET_EXTENSION";
         tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_net_adv;
@@ -3620,7 +3614,6 @@ int32_t hna_init( void )
         memset(&tlv_handl, 0, sizeof (tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct description_msg_tun6in6_net_adv);
         tlv_handl.fixed_msg_size = 1;
-        tlv_handl.is_relevant = 1;
         tlv_handl.family = AF_INET6;
         tlv_handl.name = "TUN6IN6_NET_EXTENSION";
         tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_net_adv;
