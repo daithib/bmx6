@@ -3400,11 +3400,11 @@ int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 
 		int32_t avail_cache_space_theoretical = (avail_frames_space/sizeof(struct description_msg_ref)) * REF_FRAME_DATA_SIZE_OUT;
 
-		int32_t avail_cache_space_practical = MIN( it->frame_cache_size - used_cache_space, avail_cache_space_theoretical );
+		int32_t avail_cache_space_practical = XMIN( it->frame_cache_size - used_cache_space, avail_cache_space_theoretical );
 
 		int32_t avail_vrt_desc_space = VRT_DESC_SIZE_OUT - handl->data_header_size - sizeof(struct frame_header_virtual) - it->dext->dlen;
 
-		return MIN(avail_cache_space_practical, avail_vrt_desc_space);
+		return XMIN(avail_cache_space_practical, avail_vrt_desc_space);
 
 	} else {
 
@@ -3509,7 +3509,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		int32_t pos, m=0;
 		for (pos=0; pos < rfd_agg_len; pos += REF_FRAME_DATA_SIZE_OUT) {
 
-			int32_t rsize = MIN(rfd_agg_len - pos, (int)REF_FRAME_DATA_SIZE_OUT);
+			int32_t rsize = XMIN(rfd_agg_len - pos, (int)REF_FRAME_DATA_SIZE_OUT);
 
 			struct ref_node *refn = ref_node_add(rfd_agg_data + pos, rsize, 0, 0);
 
