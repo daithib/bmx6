@@ -4254,7 +4254,7 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
                 on = init_orig_node(&desc->globalId);
 
         on->updated_timestamp = bmx_time;
-        on->descSqn = descSqn;
+        on->descSqn = ntohl(desc->descSqn);
         on->ogmSqn_rangeMin = ntohs(desc->ogmSqnMin);
         on->ogmSqn_rangeSize = ntohs(desc->ogmSqnRange);
         on->ogmSqn_maxRcvd = (OGM_SQN_MASK & (on->ogmSqn_rangeMin - OGM_SQN_STEP));
