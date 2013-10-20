@@ -279,6 +279,7 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, str
         dbgf_track(DBGT_INFO, "op=%s id=%s cv=%d revision=%d dsc_sqn=%X size=%d, filter=%d",
                 tlv_op_str(op), globalIdAsString(&desc->globalId), desc->comp_version, ntohs(desc->revision),
 		ntohl(desc->descSqn), dsc_tlvs_len, filter);
+on changes
 
 
         while ((tlv_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE);
@@ -3372,6 +3373,7 @@ IDM_T validate_description(struct description *desc)
         if (
                 //validate_param(desc->reservedTtl, MIN_TTL, MAX_TTL, ARG_TTL) || // may be reused for other purpose (eg as capabilities)
                 validate_param(desc->comp_version, 0/*(COMPATIBILITY_VERSION-1)*/, (COMPATIBILITY_VERSION+1), "compatibilty version") || //TODOCV18: check exactly !!
+on changes
                 validate_param(ntohs(desc->ogmSqnRange), _MIN_OGM_SQN_RANGE, _MAX_OGM_SQN_RANGE, ARG_OGM_SQN_RANGE) ||
                 0
                 ) {
