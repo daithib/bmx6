@@ -3373,7 +3373,6 @@ IDM_T validate_description(struct description *desc)
         if (
                 //validate_param(desc->reservedTtl, MIN_TTL, MAX_TTL, ARG_TTL) || // may be reused for other purpose (eg as capabilities)
                 validate_param(desc->comp_version, 0/*(COMPATIBILITY_VERSION-1)*/, (COMPATIBILITY_VERSION+1), "compatibilty version") || //TODOCV18: check exactly !!
-on changes
                 validate_param(ntohs(desc->ogmSqnRange), _MIN_OGM_SQN_RANGE, _MAX_OGM_SQN_RANGE, ARG_OGM_SQN_RANGE) ||
                 0
                 ) {
