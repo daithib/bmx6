@@ -2921,7 +2921,7 @@ int32_t rx_msg_hello_adv(struct rx_frame_iterator *it)
 
 int32_t get_desc_frame_data(uint8_t **frame_data, uint8_t *desc_ext_data, int32_t desc_ext_len, uint8_t frame_type) {
 
-//	assertion(-500000, (frame_type != BMX_DSC_TLV_REF_ADV));
+	assertion(-500000, (frame_type != BMX_DSC_TLV_REF_ADV));
 
 	int32_t frame_data_len = 0;
 
@@ -2939,7 +2939,7 @@ int32_t get_desc_frame_data(uint8_t **frame_data, uint8_t *desc_ext_data, int32_
         while ((tlv_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
 
 		if ( it.frame_type == frame_type
-//			|| (it.frame_type == BMX_DSC_TLV_REF_ADV && ((struct description_hdr_ref*)(it.frame_data))->final_type == frame_type)
+			|| (it.frame_type == BMX_DSC_TLV_REF_ADV && ((struct description_hdr_ref*)(it.frame_data))->final_type == frame_type)
 			) {
 
 			if( frame_data_len )
@@ -2995,12 +2995,15 @@ void process_description_tlvs_del( struct orig_node *on, uint8_t ft_start, uint8
 
 	for (t = ft_start; t <= ft_end; t++) {
 
+		if (t == BMX_DSC_TLV_REF_ADV)
+			continue;
+
 		int32_t df_len = get_desc_frame_data(NULL, ((uint8_t*)(on->desc)) + sizeof(struct description), ntohs(on->desc->extensionLen), t);
 
 		assertion(-500000, (df_len >= 0));
 
 		if (df_len > 0) {
-			int tlv_result = process_description_tlvs(NULL, on, on->desc, TLV_OP_DEL, t, NULL, NULL);
+			int tlv_result = process_description_tlvs(NULL, on, on->desc, on->dext, TLV_OP_DEL, t, NULL, NULL);
 			assertion(-501360, (tlv_result == TLV_RX_DATA_DONE));
 		}
 	}
