@@ -2969,7 +2969,7 @@ int32_t opt_tun_in_dev(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct 
 
 					return FAILURE;
 
-				} else if ((hna = find_overlapping_hna(&net.ip, net.mask, self))) {
+				} else if (net.af == AF_CFG && (hna = find_overlapping_hna(&net.ip, net.mask, self))) {
 
 					dbgf_cn(cn, DBGL_SYS, DBGT_ERR, "%s=%s /%s=%s already used by orig=%s hna=%s",
 						opt->name, patch->val, c->opt->name, netAsStr(&net), globalIdAsString(&hna->on->global_id), netAsStr(&hna->key));
