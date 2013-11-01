@@ -85,8 +85,8 @@ static int32_t tun_dedicated_to = DEF_TUN_OUT_TO;
 
 int32_t hna6_fzip = TYP_FZIP_DFLT;
 int32_t hna6_fref = TYP_FREF_DFLT;
-int32_t tun6_fzip = TYP_FZIP_DONT;
-int32_t tun6_fref = TYP_FREF_DONT;
+int32_t tun6_fzip = TYP_FZIP_DFLT;
+int32_t tun6_fref = TYP_FREF_DFLT;
 
 
 STATIC_FUNC
