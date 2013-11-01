@@ -569,9 +569,22 @@ struct description_hdr_ref {
 # error "Please fix <bits/endian.h>"
 #endif
 
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+	unsigned int expanded_referenced_type : FRAME_TYPE_BIT_SIZE;
+	unsigned int expanded_is_relevant : FRAME_RELEVANCE_BIT_SIZE;
+	unsigned int expanded_reserved : FRAME_ISSHORT_BIT_SIZE;
+
+#elif __BYTE_ORDER == __BIG_ENDIAN
+	unsigned int expanded_reserved : FRAME_ISSHORT_BIT_SIZE;
+	unsigned int expanded_is_relevant : FRAME_RELEVANCE_BIT_SIZE;
+	unsigned int expanded_referenced_type : FRAME_TYPE_BIT_SIZE;
+#else
+# error "Please fix <bits/endian.h>"
+#endif
+
     uint32_t expanded_rframes_data_len; // length of fully expanded (uncompressed, resolved rhash->rdata), without frame header!
-    SHA1_T expanded_rframes_data_hash;  // hash over expanded_rframes_data_len data
-    struct description_msg_ref msg[];
+    SHA1_T   expanded_rframes_data_hash;  // hash over expanded_rframes_data_len data
+    struct   description_msg_ref msg[];
 } __attribute__((packed));
 
 #define DESCRIPTION_MSG_REF_FORMAT { \
