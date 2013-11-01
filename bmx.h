@@ -396,7 +396,6 @@ typedef uint8_t  FRAME_TYPE_T;
 #define BMX_DSC_TLV_MIN         0x00
 #define BMX_DSC_TLV_METRIC      0x00
 
-#define BMX_DSC_TLV_UHNA4       0x01
 #define BMX_DSC_TLV_UHNA6       0x02
 
 #define BMX_DSC_TLV_TUN6_MIN            0x04

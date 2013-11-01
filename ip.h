@@ -240,17 +240,8 @@ extern const struct net_key ZERO_NET6_KEY;
 extern struct net_key autoconf_prefix_cfg;
 extern struct tun_in_node default_tun_in;
 
-#ifdef NO_ASSERTIONS
-extern uint8_t __af_cfg;
-#define AF_CFG __af_cfg
-extern struct net_key __ZERO_NETCFG_KEY;
-#define ZERO_NETCFG_KEY __ZERO_NETCFG_KEY
-#else
-uint8_t _af_cfg(const char *func);
-#define AF_CFG _af_cfg(__FUNCTION__)
-struct net_key _ZERO_NETCFG_KEY(const char *func);
-#define ZERO_NETCFG_KEY _ZERO_NETCFG_KEY(__FUNCTION__)
-#endif
+#define AF_CFG AF_INET6
+#define ZERO_NETCFG_KEY ZERO_NET6_KEY
 
 extern const IP6_T   IP6_ALLROUTERS_MC_ADDR;
 extern const IP6_T   IP6_LOOPBACK_ADDR;
@@ -633,10 +624,9 @@ char *family2Str(uint8_t family);
 
 
 char *ipXAsStr(int family, const IPX_T *addr);
-char *ipFAsStr(const IPX_T *addr);
 char *ip4AsStr( IP4_T addr );
 void  ipXToStr(int family, const IPX_T *addr, char *str);
-void ipFToStr(const IPX_T *addr, char *str);
+void ip6ToStr(const IPX_T *addr, char *str);
 char *netAsStr(const struct net_key *net);
 
 

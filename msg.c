@@ -449,7 +449,7 @@ void purge_tx_task_list(struct list_head *tx_task_lists, struct link_node *only_
 
                                 dbgf_all(DBGT_INFO, "removed frame_type=%d ln=%s dev=%s tx_tasks_list.items=%d",
                                         tx_task->task.type,
-                                        ipFAsStr(tx_task->task.link ? &tx_task->task.link->link_ip : &ZERO_IP),
+                                        ip6AsStr(tx_task->task.link ? &tx_task->task.link->link_ip : &ZERO_IP),
                                         tx_task->task.dev->label_cfg.str, tx_task_lists[tx_task->task.type].items);
 
                                 debugFree(tx_task, -300066);
@@ -590,7 +590,7 @@ struct tx_task_node *tx_task_new(struct link_dev_node *dest_lndev, struct tx_tas
 
                 dbgf_track(DBGT_INFO, "added %s to lndev local_id=%X link_ip=%s dev=%s tx_tasks_list.items=%d",
                         handl->name, ntohl(dest_lndev->key.link->key.local_id),
-                        ipFAsStr(&dest_lndev->key.link->link_ip),
+                        ip6AsStr(&dest_lndev->key.link->link_ip),
                         dest_lndev->key.dev->label_cfg.str, dest_lndev->tx_task_lists[test->task.type].items);
 
         } else {
@@ -639,7 +639,7 @@ void schedule_tx_task(struct link_dev_node *dest_lndev, uint16_t frame_type, int
                 ? DBGL_CHANGES : DBGL_ALL), DBGT_INFO,
                  "%s to NB=%s local_id=0x%X via dev=%s frame_msgs_len=%d data=%s myIID4x=%d neighIID4x=%d ",
                 handl->name,
-                dest_lndev->key.link ? ipFAsStr(&dest_lndev->key.link->link_ip) : DBG_NIL,
+                dest_lndev->key.link ? ip6AsStr(&dest_lndev->key.link->link_ip) : DBG_NIL,
                 dest_lndev->key.link ? dest_lndev->key.link->local->local_id : 0,
                 dest_lndev->key.dev->label_cfg.str, frame_msgs_len, memAsHexString(data, dlen), myIID4x, neighIID4x);
 
@@ -955,7 +955,7 @@ struct link_dev_node **lndevs_get_unacked_ogm_neighbors(struct ogm_aggreg_node *
                                 dbg_track(DBGT_WARN, "schedule ogm_aggregation_sqn=%3d msgs=%2d dest_bytes=%d tx_attempt=%2d/%d via dev=%s to NB=%s",
                                         oan->sqn, oan->aggregated_msgs, oan->ogm_dest_bytes, (oan->tx_attempt + 1),
                                         ogm_adv_tx_iters, best_lndev->key.dev->label_cfg.str,
-                                        ipFAsStr(&best_lndev->key.link->link_ip));
+                                        ip6AsStr(&best_lndev->key.link->link_ip));
                         }
                 }
         }
@@ -3144,9 +3144,6 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                         dbgf_sys(DBGT_WARN, "%s - non-matching length=%d for type=%s", it->caller, f_len, f_handl->name);
                         return TLV_RX_DATA_FAILURE;
 
-                } else if (f_handl->family && f_handl->family != AF_CFG) {
-
-                        return f_handl->is_relevant ? TLV_RX_DATA_FAILURE : TLV_RX_DATA_IGNORED;
                 }
 
                 if (f_handl->is_relevant != fhs->is_relevant) {
@@ -3632,9 +3629,6 @@ int32_t tx_frame_iterate(IDM_T iterate_msg, struct tx_frame_iterator *it)
                 it->caller, iterate_msg ? "YES" : "NO ", it->frame_type,
                 it->frame_cache_msgs_size, tx_iterator_cache_data_space_pref(it), it->frames_out_pos, it->frames_out_pref);
 
-        if (handl->family && handl->family != AF_CFG)
-                return TLV_TX_DATA_IGNORED;
-
         if (handl->tx_frame_handler || iterate_msg) {
 
                 if (handl->min_msg_size > tx_iterator_cache_data_space_pref(it))
@@ -3732,7 +3726,7 @@ void next_tx_task_list(struct dev_node *dev, struct tx_frame_iterator *it, struc
                                 dbgf_track(DBGT_INFO,
                                         "found %s   link nb: nb_local_id=%X nb_dev_idx=%d nbIP=%s   via lndev: my_dev=%s my_dev_idx=%d with lndev->tx_tasks_list[].items=%d",
                                         it->handls[it->frame_type].name,
-                                        ntohl(link->key.local_id), link->key.dev_idx, ipFAsStr(&link->link_ip),
+                                        ntohl(link->key.local_id), link->key.dev_idx, ip6AsStr(&link->link_ip),
                                         dev->label_cfg.str, dev->llip_key.idx, it->tx_task_list->items);
 
                                 return;

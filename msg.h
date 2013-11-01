@@ -814,7 +814,6 @@ struct frame_handl {
 	                     //       * unknown and irrelevant description_tlv_frames MUST BE propagated
 	int32_t *dextCompression;
 	int32_t *dextReferencing;
-        uint8_t family;
 	uint8_t rx_requires_described_neigh;
         uint16_t data_header_size;
         uint16_t min_msg_size;

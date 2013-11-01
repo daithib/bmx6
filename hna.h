@@ -182,18 +182,6 @@ struct hna_node {
         uint8_t flags;
 };
 
-struct description_msg_hna4 {
-	uint8_t prefixlen;
-	uint8_t flags;
-	IP4_T    ip4;
-} __attribute__((packed));
-
-#define DESCRIPTION_MSG_HNA4_FORMAT { \
-{FIELD_TYPE_UINT, -1,  8, 1, FIELD_RELEVANCE_HIGH, "prefixlen"}, \
-{FIELD_TYPE_UINT, -1,  8, 1, FIELD_RELEVANCE_LOW,  "reserved"},  \
-{FIELD_TYPE_IP4,  -1, 32, 1, FIELD_RELEVANCE_HIGH, "address" },  \
-FIELD_FORMAT_END }
-
 struct description_msg_hna6 {
 	uint8_t prefixlen;
 	uint8_t flags;
