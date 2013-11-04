@@ -384,7 +384,7 @@ int create_description_tlv_hna(struct tx_frame_iterator *it)
 
         for (an = NULL; (dev = avl_iterate_item(&dev_ip_tree, &an));) {
 
-                if (dev->active && dev->announce)
+                if (dev->active)
                         pos = _create_tlv_hna(data, max_size, pos, setNet(NULL, AF_INET6, 128, &dev->if_global_addr->ip_addr), 0);
         }
 

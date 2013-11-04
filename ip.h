@@ -83,10 +83,6 @@ typedef struct ifname IFNAME_T;
 #define HLP_DEV_LLOCAL_PREFIX   "specify link-local prefix for interface"
 
 
-#define ARG_DEV_ANNOUNCE        "announce"
-#define DEF_DEV_ANNOUNCE        YES
-#define HLP_DEV_ANNOUNCE        "disable/enable announcement of interface IP"
-
 #define DEV_LO "lo"
 #define DEV_UNKNOWN "unknown"
 
@@ -433,8 +429,6 @@ struct dev_node {
 
 	struct list_head tx_task_lists[FRAME_TYPE_ARRSZ]; // scheduled frames and messages
 	struct avl_tree tx_task_interval_tree;
-
-	int8_t announce;
 
 	int8_t linklayer_conf;
 	int8_t linklayer;

@@ -1985,7 +1985,7 @@ void dev_reconfigure_soft(struct dev_node *dev)
 
         assertion(-500611, (dev->active));
         assertion(-500612, (dev->if_llocal_addr));
-        assertion(-500613, IMPLIES(dev->announce, dev->if_global_addr));
+        assertion(-500613, (dev->if_global_addr));
         assertion(-500614, IMPLIES(dev == primary_dev, dev->if_global_addr));
         assertion(-500615, IMPLIES(dev->linklayer == TYP_DEV_LL_LO, dev->if_global_addr));
         
@@ -2130,8 +2130,7 @@ void dev_deactivate( struct dev_node *dev )
         if (dev->dev_adv_msg > DEVADV_MSG_IGNORED)
                 update_my_dev_adv();
 
-        if (dev->announce)
-                my_description_changed = YES;
+	my_description_changed = YES;
 
         if (dev == primary_dev || dev == primary_phy) {
                 struct avl_node *an = NULL;
@@ -2147,7 +2146,7 @@ void dev_deactivate( struct dev_node *dev )
                         primary_phy = NULL;
 
                 while ((ipdev = avl_iterate_item(&dev_ip_tree, &an))) {
-                        if (ipdev->active && ipdev->announce && ipdev->if_global_addr) {
+                        if (ipdev->active && ipdev->if_global_addr) {
                                 if(!primary_dev) {
                                         primary_dev = ipdev;
                                         self->primary_ip = ipdev->if_global_addr->ip_addr;
@@ -2392,13 +2391,13 @@ void dev_activate( struct dev_node *dev )
 
         ip6ToStr(&dev->if_llocal_addr->ip_mcast, dev->ip_brc_str);
 
-        if (!primary_dev && dev->announce && dev->if_global_addr) {
+        if (!primary_dev && dev->if_global_addr) {
                 primary_dev = dev;
                 self->primary_ip = dev->if_global_addr->ip_addr;
                 ip6ToStr(&dev->if_global_addr->ip_addr, self->primary_ip_str);
         }
 
-        if (!primary_phy && dev->linklayer != TYP_DEV_LL_LO && dev->announce && dev->if_global_addr)
+        if (!primary_phy && dev->linklayer != TYP_DEV_LL_LO && dev->if_global_addr)
                 primary_phy = dev;
 
 
@@ -2729,19 +2728,16 @@ void dev_if_fix(void)
                                 }
                         }
 
-                        if (dev->announce) {
+			if (!is_ip6llocal && autoIP6.mask) {
 
-                                if (!is_ip6llocal && autoIP6.mask) {
+				if (is_ip_equal(&autoIP6.ip, &ian->ip_addr) && autoIP6.mask == ian->ifa.ifa_prefixlen) {
 
-                                        if (is_ip_equal(&autoIP6.ip, &ian->ip_addr) && autoIP6.mask == ian->ifa.ifa_prefixlen) {
-
-                                                dev->if_global_addr = ian;
-                                        }
-                                }
-                        }
+					dev->if_global_addr = ian;
+				}
+			}
                 }
 
-                if (autoIP6.mask && dev->announce && !dev->if_global_addr) {
+                if (autoIP6.mask && !dev->if_global_addr) {
 
 			dbgf_sys(DBGT_INFO, "Autoconfiguring dev=%s idx=%d ip=%s", dev->label_cfg.str, dev->if_link->index, netAsStr(&autoIP6));
 
@@ -2775,17 +2771,14 @@ void dev_if_fix(void)
                         dev->if_global_addr = NULL;
 
                 } else {
-                        if (/*dev == primary_dev_cfg ||*/ dev->announce) {
+			dbgf_mute(30, DBGL_SYS, DBGT_ERR,
+				"No global IP for %s=%s ! DEACTIVATING !!!", ARG_DEV, dev->label_cfg.str);
 
-                                dbgf_mute(30, DBGL_SYS, DBGT_ERR,
-                                        "No global IP for %s=%s ! DEACTIVATING !!!", ARG_DEV, dev->label_cfg.str);
-
-                                if (dev->if_llocal_addr) {
-                                        dev->if_llocal_addr->dev = NULL;
-                                        dev->if_llocal_addr = NULL;
-                                }
-                        }
-                }
+			if (dev->if_llocal_addr) {
+				dev->if_llocal_addr->dev = NULL;
+				dev->if_llocal_addr = NULL;
+			}
+		}
         }
 }
 
@@ -2855,7 +2848,7 @@ static void dev_check(void *kernel_ip_config_changed)
 
                                 dbgf_sys(DBGT_ERR, "%s=%s activation delayed", ARG_DEV, dev->label_cfg.str);
 
-                        } else if (dev->announce && !dev->if_global_addr) {
+                        } else if (!dev->if_global_addr) {
 
                                 dbgf_sys(DBGT_ERR, "%s=%s %s but no global addr", ARG_DEV, dev->label_cfg.str, "to-be announced");
 
@@ -3126,7 +3119,6 @@ struct dev_status {
         char *multicastIp;
         HELLO_SQN_T helloSqn;
         uint8_t primary;
-        uint8_t announced;
 };
 
 static const struct field_format dev_status_format[] = {
@@ -3141,7 +3133,6 @@ static const struct field_format dev_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,              dev_status, multicastIp, 1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,                      dev_status, helloSqn,    1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,                      dev_status, primary,     1, FIELD_RELEVANCE_HIGH),
-        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,                      dev_status, announced,   1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_END
 };
 
@@ -3173,7 +3164,6 @@ static int32_t dev_status_creator(struct status_handl *handl, void* data)
                 status[i].multicastIp = dev->ip_brc_str;
                 status[i].helloSqn = dev->link_hello_sqn;
                 status[i].primary = (dev == primary_dev);
-                status[i].announced = dev->announce;
 
                 i++;
         }
@@ -3376,13 +3366,6 @@ int32_t opt_dev(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_par
 
                         avl_insert(&dev_name_tree, dev, -300144);
 
-/*
-                        if (dev == primary_dev_cfg)
-                                dev->announce = YES;
-                        else
-*/
-                                dev->announce = DEF_DEV_ANNOUNCE;
-
                         // some configurable interface values - initialized to unspecified:
                         dev->linklayer_conf = OPT_CHILD_UNDEFINED;
                         dev->channel_conf = OPT_CHILD_UNDEFINED;
@@ -3494,14 +3477,6 @@ int32_t opt_dev(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_par
                                 } else {
                                         dev->umetric_min_conf = OPT_CHILD_UNDEFINED;
                                 }
-
-
-                        } else if (!strcmp(c->opt->name, ARG_DEV_ANNOUNCE) && cmd == OPT_APPLY) {
-
-                                if (c->val)
-                                        dev->announce = strtol(c->val, NULL, 10);
-
-                                dev->hard_conf_changed = YES;
                         }
                 }
 
@@ -3574,9 +3549,6 @@ static struct opt_type ip_options[]=
 
 	{ODI,0,ARG_DEV,		        'i',9,2,A_PM1N,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0, 		0,		0,0, 		opt_dev,
 			"<interface-name>", HLP_DEV},
-
-	{ODI,ARG_DEV,ARG_DEV_ANNOUNCE,  'a',9,1,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		1,		DEF_DEV_ANNOUNCE,0,opt_dev,
-			ARG_VALUE_FORM,	HLP_DEV_ANNOUNCE},
 
 	{ODI,ARG_DEV,ARG_DEV_LL,	 'l',9,0,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,	0,		MIN_DEV_LL,	MAX_DEV_LL,     DEF_DEV_LL,0,	opt_dev,
 			ARG_VALUE_FORM,	HLP_DEV_LL},
