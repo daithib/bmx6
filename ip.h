@@ -79,9 +79,6 @@ typedef struct ifname IFNAME_T;
 #define ARG_DEV  		"dev"
 #define HLP_DEV                 "add or change interface device or its configuration"
 
-#define ARG_DEV_GLOBAL_PREFIX   "globalPrefix"
-#define HLP_DEV_GLOBAL_PREFIX   "specify global prefix for interface"
-
 #define ARG_DEV_LLOCAL_PREFIX   "llocalPrefix"
 #define HLP_DEV_LLOCAL_PREFIX   "specify link-local prefix for interface"
 
@@ -453,7 +450,6 @@ struct dev_node {
 //	UMETRIC_T umetric_max_configured;
 	UMETRIC_T umetric_max;
 
-        struct net_key global_prefix_conf_;
         struct net_key llocal_prefix_conf_;
 
 //	IPX_T global_prefix_conf;
