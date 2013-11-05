@@ -343,22 +343,21 @@ void reconfigure_tun_ins(void)
 	for (an = NULL; (tin = avl_iterate_item(&tun_in_tree, &an));)
 		configure_tunnel_in(DEL, tin, -1);
 
-	if (primary_phy && primary_phy->if_link) {
-		struct net_key autoRemotePrefix = bmx6AutoEUI64Ip6(primary_phy->if_link->addr, &autoconf_prefix_cfg);
-		autoRemotePrefix.ip.s6_addr[6] = DEF_TUN_REMOTE_BYTE6;
+//	if (primary_phy && primary_phy->if_link) {
 
 		int16_t m = 0;
 		for (an = NULL; (tin = avl_iterate_item(&tun_in_tree, &an));) {
 
 			if (!tin->remote_manual) {
-				tin->remote = autoRemotePrefix.ip;
-				tin->remote.s6_addr[7] = m;
+				tin->remote = self->primary_ip;
+				tin->remote.s6_addr[(autoconf_prefix_cfg.mask/8)-1] = DEF_TUN_REMOTE_BYTE6 + m;
 			}
 
 			configure_tunnel_in(ADD, tin, m++);
+			assertion(-500000, (m<=MAX_TUN_REMOTE_IPS));
 			assertion(-501237, (tin->upIfIdx && tin->tun6Id >= 0));
 		}
-	}
+//	}
 }
 
 
@@ -374,20 +373,12 @@ int create_description_tlv_hna(struct tx_frame_iterator *it)
 
         int pos = 0;
         struct avl_node *an;
-        struct dev_node *dev;
         struct hna_node *un;
 
         if (!is_ip_set(&self->primary_ip))
                 return TLV_TX_DATA_IGNORED;
 
         pos = _create_tlv_hna(data, max_size, pos, setNet(NULL, AF_INET6, 128, &self->primary_ip), 0);
-
-        for (an = NULL; (dev = avl_iterate_item(&dev_ip_tree, &an));) {
-
-                if (dev->active)
-                        pos = _create_tlv_hna(data, max_size, pos, setNet(NULL, AF_INET6, 128, &dev->if_global_addr->ip_addr), 0);
-        }
-
 
 	struct tun_in_node *tin;
 
@@ -1640,11 +1631,7 @@ int create_description_tlv_tun6_adv(struct tx_frame_iterator *it)
         struct avl_node *an = NULL;
         struct description_msg_tun6_adv *adv = (struct description_msg_tun6_adv *) tx_iterator_cache_msg_ptr(it);
 
-
-        if (!is_ip_set(&self->primary_ip))
-                return TLV_TX_DATA_IGNORED;
-
-
+        assertion(-500000, is_ip_set(&self->primary_ip));
 
 	while ((tin = avl_iterate_item(&tun_in_tree, &an)) && m < tx_iterator_cache_msg_space_pref(it)) {
 

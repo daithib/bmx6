@@ -62,16 +62,20 @@ typedef struct ifname IFNAME_T;
 
 
 #define DEF_AUTO_MASK_DISABLED   0  // DO NOT CHANGE THIS
+#define DEF_AUTO_MASK_MIN        8
+#define DEF_AUTO_MASK_MAX        64
+#define DEF_AUTO_MASK_MOD        8
 
-#define DEF_AUTO_IP6_PREFIX      "fd66:66:66::/56"
-#define DEF_AUTO_IP6_MASK        56 // DO NOT CHANGE THIS
+
+#define DEF_AUTO_IP6_PREFIX      "fd66:66:66::/64"
+#define DEF_AUTO_IP6_MASK        64 // DO NOT CHANGE THIS
 #define ARG_AUTO_IP6_PREFIX      "ipAutoPrefix"
-#define HLP_AUTO_IP6_PREFIX      "Autoconfigure IPv6 addresses (MUST be something/56 to enable or ::/0 to disable)"
+#define HLP_AUTO_IP6_PREFIX      "Autoconfigure IPv6 addresses (MUST be something/64)"
 #define DEF_AUTO_IP6_BYTE6       0x00
 #define DEF_AUTO_IP6_DEVMASK     64
 
-#define MAX_TUN_REMOTE_IPS       255 // limited by 8-bit tun6Id range and (65 - DEF_AUTO_REMOTE_MASK) bit size
-#define DEF_TUN_REMOTE_BYTE6     0xFF
+#define MAX_TUN_REMOTE_IPS       0x0F // limited by 8-bit tun6Id range and (65 - DEF_AUTO_REMOTE_MASK) bit size
+#define DEF_TUN_REMOTE_BYTE6     0xF0
 
 #define ARG_INTERFACES "interfaces"
 
@@ -674,8 +678,6 @@ IDM_T iproute(uint8_t cmd, int8_t del, uint8_t quiet, const struct net_key *dst,
 
 void ip_flush_routes(uint8_t family, int32_t table_macro);
 void ip_flush_rules(uint8_t family, int32_t table_macro);
-
-struct net_key bmx6AutoEUI64Ip6(ADDR_T mac, struct net_key *prefix);
 
 IDM_T check_proc_sys_net(char *file, int32_t desired);
 

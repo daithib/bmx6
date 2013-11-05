@@ -2212,6 +2212,7 @@ void init_bmx(void)
         }
 
 	RNG_GenerateBlock(&rng, &(id.pkid.u8[GLOBAL_ID_PKID_RAND_POS]), GLOBAL_ID_PKID_RAND_LEN);
+	RNG_GenerateBlock(&rng, &(id.pkid.u8[0]), sizeof(id.pkid));
 
         self = init_orig_node(&id);
 
