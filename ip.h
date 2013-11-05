@@ -252,8 +252,6 @@ extern const uint8_t IP6_MC_PLEN;
 
 extern int dev_lo_idx;
 
-extern struct dev_node *primary_dev;
-extern struct dev_node *primary_phy;
 
 
 extern int32_t ip_prio_hna_cfg;

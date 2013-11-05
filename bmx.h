@@ -520,8 +520,6 @@ struct metric_record {
 
 #define GLOBAL_ID_NAME_LEN 32
 #define GLOBAL_ID_PKID_LEN HASH_SHA1_LEN
-#define GLOBAL_ID_PKID_RAND_POS (GLOBAL_ID_PKID_LEN / 2)
-#define GLOBAL_ID_PKID_RAND_LEN (GLOBAL_ID_PKID_LEN / 2)
 
 
 struct GLOBAL_ID {

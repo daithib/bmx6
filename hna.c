@@ -343,21 +343,18 @@ void reconfigure_tun_ins(void)
 	for (an = NULL; (tin = avl_iterate_item(&tun_in_tree, &an));)
 		configure_tunnel_in(DEL, tin, -1);
 
-//	if (primary_phy && primary_phy->if_link) {
+	int16_t m = 0;
+	for (an = NULL; (tin = avl_iterate_item(&tun_in_tree, &an));) {
 
-		int16_t m = 0;
-		for (an = NULL; (tin = avl_iterate_item(&tun_in_tree, &an));) {
-
-			if (!tin->remote_manual) {
-				tin->remote = self->primary_ip;
-				tin->remote.s6_addr[(autoconf_prefix_cfg.mask/8)-1] = DEF_TUN_REMOTE_BYTE6 + m;
-			}
-
-			configure_tunnel_in(ADD, tin, m++);
-			assertion(-500000, (m<=MAX_TUN_REMOTE_IPS));
-			assertion(-501237, (tin->upIfIdx && tin->tun6Id >= 0));
+		if (!tin->remote_manual) {
+			tin->remote = self->primary_ip;
+			tin->remote.s6_addr[(autoconf_prefix_cfg.mask/8)-1] = DEF_TUN_REMOTE_BYTE6 + m;
 		}
-//	}
+
+		configure_tunnel_in(ADD, tin, m++);
+		assertion(-500000, (m<=MAX_TUN_REMOTE_IPS));
+		assertion(-501237, (tin->upIfIdx && tin->tun6Id >= 0));
+	}
 }
 
 
@@ -3379,12 +3376,11 @@ void hna_dev_event_hook(int32_t cb_id, void* unused)
                 }
         }
 
-	static ADDR_T prev_primary_mac;
-	ADDR_T curr_primary_mac = (primary_phy && primary_phy->if_link) ? primary_phy->if_link->addr : ZERO_ADDR;
+	static IP6_T prev_primary_ip;
 
-	if ( memcmp(&prev_primary_mac, &curr_primary_mac, sizeof(ADDR_T))) {
+	if ( memcmp(&prev_primary_ip, &self->primary_ip, sizeof(IP6_T))) {
 
-		prev_primary_mac = curr_primary_mac;
+		prev_primary_ip = self->primary_ip;
 
 		reconfigure_tun_ins();
 	}

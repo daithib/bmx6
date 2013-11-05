@@ -121,9 +121,6 @@ struct rtnl_handle ip_rth2 = { .fd = -1 };
 
 static IDM_T opt_dev_changed = YES;
 
-struct dev_node *primary_dev = NULL;
-struct dev_node *primary_phy = NULL;
-
 
 AVL_TREE(if_link_tree, struct if_link_node, index);
 
@@ -1986,7 +1983,6 @@ void dev_reconfigure_soft(struct dev_node *dev)
         assertion(-500611, (dev->active));
         assertion(-500612, (dev->if_llocal_addr));
         assertion(-500613, (dev->if_global_addr));
-        assertion(-500614, IMPLIES(dev == primary_dev, dev->if_global_addr));
         assertion(-500615, IMPLIES(dev->linklayer == TYP_DEV_LL_LO, dev->if_global_addr));
         
         if (!initializing) {
@@ -2131,30 +2127,6 @@ void dev_deactivate( struct dev_node *dev )
                 update_my_dev_adv();
 
 	my_description_changed = YES;
-
-        if (dev == primary_dev || dev == primary_phy) {
-                struct avl_node *an = NULL;
-                struct dev_node *ipdev;
-
-                if (dev == primary_dev) {
-                        primary_dev = NULL;
-                }
-
-                if (dev == primary_phy)
-                        primary_phy = NULL;
-
-                while ((ipdev = avl_iterate_item(&dev_ip_tree, &an))) {
-                        if (ipdev->active && ipdev->if_global_addr) {
-                                if(!primary_dev) {
-                                        primary_dev = ipdev;
-                                }
-
-                                if (!primary_phy && ipdev->linklayer != TYP_DEV_LL_LO)
-                                        primary_phy = ipdev;
-                        }
-
-                }
-        }
 
         if (dev->autoIP6Configured.mask && !dev->activate_again) {
                 //if (dev->if_llocal_addr && dev->if_llocal_addr->iln->flags & IFF_UP)
@@ -2386,15 +2358,6 @@ void dev_activate( struct dev_node *dev )
                 ip6ToStr(&dev->if_global_addr->ip_addr, dev->ip_global_str);
 
         ip6ToStr(&dev->if_llocal_addr->ip_mcast, dev->ip_brc_str);
-
-        if (!primary_dev && dev->if_global_addr) {
-                primary_dev = dev;
-        }
-
-        if (!primary_phy && dev->linklayer != TYP_DEV_LL_LO && dev->if_global_addr)
-                primary_phy = dev;
-
-
 
         dev->active = YES;
         dev->activate_again = NO;
@@ -2796,8 +2759,7 @@ static void dev_check(void *kernel_ip_config_changed)
 
                 if (dev->hard_conf_changed && dev->active) {
 
-                        dbgf_sys(DBGT_WARN, "detected changed but used %sprimary dev=%s ! Deactivating now...",
-                                (dev == primary_dev ? "" : "non-"), dev->label_cfg.str);
+                        dbgf_sys(DBGT_WARN, "detected changed but used dev=%s ! Deactivating now!", dev->label_cfg.str);
 
                         dev_deactivate(dev);
                 }
@@ -3104,7 +3066,6 @@ struct dev_status {
         char globalIp[IPX_PREFIX_STR_LEN];
         char *multicastIp;
         HELLO_SQN_T helloSqn;
-        uint8_t primary;
 };
 
 static const struct field_format dev_status_format[] = {
@@ -3118,7 +3079,6 @@ static const struct field_format dev_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,               dev_status, globalIp,    1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,              dev_status, multicastIp, 1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,                      dev_status, helloSqn,    1, FIELD_RELEVANCE_MEDI),
-        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,                      dev_status, primary,     1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_END
 };
 
@@ -3149,7 +3109,6 @@ static int32_t dev_status_creator(struct status_handl *handl, void* data)
                 sprintf(status[i].globalIp, "%s/%d", dev->ip_global_str, dev->if_global_addr ? dev->if_global_addr->ifa.ifa_prefixlen : -1);
                 status[i].multicastIp = dev->ip_brc_str;
                 status[i].helloSqn = dev->link_hello_sqn;
-                status[i].primary = (dev == primary_dev);
 
                 i++;
         }
