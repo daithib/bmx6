@@ -574,28 +574,16 @@ struct description_msg_ref {
 } __attribute__((packed));
 
 struct description_hdr_ref {
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int referenced_type : FRAME_TYPE_BIT_SIZE;
-	unsigned int is_relevant : FRAME_RELEVANCE_BIT_SIZE;
-	unsigned int reserved : FRAME_ISSHORT_BIT_SIZE;
-
-#elif __BYTE_ORDER == __BIG_ENDIAN
-	unsigned int reserved : FRAME_ISSHORT_BIT_SIZE;
-	unsigned int is_relevant : FRAME_RELEVANCE_BIT_SIZE;
-	unsigned int referenced_type : FRAME_TYPE_BIT_SIZE;
-#else
-# error "Please fix <bits/endian.h>"
-#endif
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int expanded_referenced_type : FRAME_TYPE_BIT_SIZE;
+	unsigned int expanded_type : FRAME_TYPE_BIT_SIZE;
 	unsigned int expanded_is_relevant : FRAME_RELEVANCE_BIT_SIZE;
-	unsigned int expanded_reserved : FRAME_ISSHORT_BIT_SIZE;
+	unsigned int more_ref_levels : 1;
 
 #elif __BYTE_ORDER == __BIG_ENDIAN
-	unsigned int expanded_reserved : FRAME_ISSHORT_BIT_SIZE;
+	unsigned int more_ref_levels : 1;
 	unsigned int expanded_is_relevant : FRAME_RELEVANCE_BIT_SIZE;
-	unsigned int expanded_referenced_type : FRAME_TYPE_BIT_SIZE;
+	unsigned int expanded_type : FRAME_TYPE_BIT_SIZE;
 #else
 # error "Please fix <bits/endian.h>"
 #endif
