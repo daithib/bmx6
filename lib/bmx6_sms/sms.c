@@ -27,7 +27,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdint.h>
-//#include <json/json.h>
 #include <dirent.h>
 #include <sys/inotify.h>
 
@@ -36,9 +35,7 @@
 #include "plugin.h"
 #include "schedule.h"
 #include "tools.h"
-//#include "ip.h"
 #include "sms.h"
-//#include "hna.h"
 
 
 #define CODE_CATEGORY_NAME "sms"
