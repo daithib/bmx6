@@ -3444,8 +3444,9 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		// this is the dext creation of my description...
 		assertion(-501639, (it->handls==description_tlv_handl));
 		assertion(-501640, (it->frame_cache_msgs_size <= VRT_FRAME_DATA_SIZE_OUT));
-
-		it->dext->data = debugReallocReset(it->dext->data, it->dext->dlen + sizeof(struct frame_header_virtual) + fdata_in, -300568);
+		if (it->dext->data)
+			debugFree( it->dext->data, -300568);
+		it->dext->data = debugMallocReset(it->dext->dlen + sizeof(struct frame_header_virtual) + fdata_in, -300568);
 		struct frame_header_virtual *fhv = (struct frame_header_virtual *)(it->dext->data + it->dext->dlen);
 		fhv->is_virtual = 1;
 		fhv->is_relevant = handl->is_relevant;
@@ -4483,8 +4484,10 @@ void update_my_description_adv(void)
                 return;
 
 	} else if (frame_cache_size != VRT_FRAME_DATA_SIZE_OUT) {
+		if (frame_cache_size)
+			debugFree(frame_cache_array, -300586);
 		frame_cache_size = VRT_FRAME_DATA_SIZE_OUT;
-		frame_cache_array = debugReallocReset(frame_cache_array, frame_cache_size, -300586);
+		frame_cache_array = debugMallocReset(frame_cache_size, -300586);
 	}
 
 
