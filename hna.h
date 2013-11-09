@@ -15,6 +15,7 @@
  * 02110-1301, USA
  */
 
+#include "sec.h"
 
 #define ARG_UHNA "unicastHna"
 
@@ -315,6 +316,37 @@ struct tunXin6_net_adv_node {
         struct net_key net;
 	char *tunInDev;
 };
+
+
+// requirements:
+// - lightweight possibilty for gw to check client ID and request authenticity (no other client send it)
+//   -> include: ClientPubSHA, reqSignature
+// - lightweight possibilty for gw to check gw authenticity request (meant for this gw)
+//   -> include: GwPubSHA
+// - let client request tunnel endpoints
+// - lightweight possibilty for gw to check request against non-replication (ogm-sqn)
+//   -> include: descSqn and recent ogmSqn
+// - lightweight possibilty for gw to check request shared-key integritiy (if includes a shared key)
+//   -> include: gwPubKey encrypted shared-key, maybe also tunnel endpoints and src networks
+// optional:
+// - let client request tunneled src networks (routes via tunnel from gw to client)
+//   -> explicit routes or refHash
+struct dedicated_msg_tun6_req {
+        SHA1_T clientRoutesRefSha;
+} __attribute__((packed));
+
+struct dedicated_hdr_tun6_req {
+//  SHA1_T     clientPubSha; // from packet header
+    SHA1_T     gwPubSha;
+    IP6_T      gwTun6Ip;
+    IP6_T      clientTun6Ip;
+    DESC_SQN_T clientDescSqn;
+    OGM_SQN_T  clientOgmSqn;
+    SIGN1_T    encTunKey;
+    SIGN1_T    clientSign;
+} __attribute__((packed));
+
+
 
 
 
