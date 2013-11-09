@@ -263,6 +263,24 @@
 #define HLP_REFERENCES          "show cached reference frames\n"
 
 
+// Future generic tlv header:
+struct tlv_header { // 3 bytes
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+	unsigned int length :   11;
+	unsigned int mandatory : 1; // is relevant
+	unsigned int encoding :  4; // is compressed, is reference, ...
+	unsigned int type :      8;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+	unsigned int type :      8;
+	unsigned int encoding :  4; // is compressed, is reference, ...
+	unsigned int mandatory : 1; // is relevant
+	unsigned int length :   11;
+#else
+# error "Please fix <bits/endian.h>"
+#endif
+} __attribute__((packed));
+
+
 struct frame_header_short { // 2 bytes
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
