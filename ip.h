@@ -202,6 +202,16 @@ typedef struct ifname IFNAME_T;
 #define SYSCTL_IP4_SEND_REDIRECT 0
 #define SYSCTL_IP4_ACCEPT_LOCAL 1
 
+#define DEF_TUN_OUT_PERSIST 1
+
+#define ARG_EXPORT_DISTANCE "exportDistance"
+#define TYP_EXPORT_DISTANCE_INFINITE 256
+#define MIN_EXPORT_DISTANCE 0
+#define MAX_EXPORT_DISTANCE TYP_EXPORT_DISTANCE_INFINITE
+#define DEF_EXPORT_DISTANCE TYP_EXPORT_DISTANCE_INFINITE
+
+
+
 #define B64_SIZE 64
 
 #define IP6NET_STR_LEN (INET6_ADDRSTRLEN+4)  // eg ::1/128
@@ -235,7 +245,6 @@ extern const struct net_key ZERO_NET6_KEY;
 
 
 extern struct net_key autoconf_prefix_cfg;
-extern struct tun_in_node default_tun_in;
 
 #define AF_CFG AF_INET6
 #define ZERO_NETCFG_KEY ZERO_NET6_KEY

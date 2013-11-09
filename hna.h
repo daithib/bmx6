@@ -61,7 +61,6 @@ extern struct avl_tree tun_in_tree;
 #define MIN_TUN_OUT_TO 0
 #define MAX_TUN_OUT_TO 3600000
 #define DEF_TUN_OUT_TO 60000
-#define DEF_TUN_OUT_PERSIST 1
 
 #define TDN_STATE_CATCHALL 1
 #define TDN_STATE_DEDICATED 0
@@ -161,11 +160,6 @@ extern struct avl_tree tun_in_tree;
 #define MIN_TUN_OUT_MTU 1280
 #define MAX_TUN_OUT_MTU 65535
 
-#define ARG_EXPORT_DISTANCE "exportDistance"
-#define TYP_EXPORT_DISTANCE_INFINITE 256
-#define MIN_EXPORT_DISTANCE 0
-#define MAX_EXPORT_DISTANCE TYP_EXPORT_DISTANCE_INFINITE
-#define DEF_EXPORT_DISTANCE TYP_EXPORT_DISTANCE_INFINITE
 
 #define ARG_EXPORT_ONLY   "exportOnly"
 #define DEF_EXPORT_ONLY   0

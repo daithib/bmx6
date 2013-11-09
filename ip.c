@@ -47,7 +47,6 @@
 #include "plugin.h"
 #include "tools.h"
 #include "metrics.h"
-#include "hna.h"
 
 #define CODE_CATEGORY_NAME "ip"
 
@@ -91,7 +90,6 @@ const ADDR_T ZERO_ADDR = {{0}};
 //TODO: make this configurable
 static struct net_key llocal_prefix_cfg;
 struct net_key autoconf_prefix_cfg;
-struct tun_in_node default_tun_in;
 
 
 //#define IN6ADDR_ANY_INIT { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 } } }
