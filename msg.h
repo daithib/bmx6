@@ -53,8 +53,8 @@
 //#define MAX_VRT_DESC_SIZE      (INT32_MAX)
 // this should be the max possible with a reference depth of 1 :
 #define MAX_VRT_DESC_SIZE      (((DEF_DESC_FRAME_SIZE - sizeof(struct frame_header_long) - sizeof (struct msg_description_adv)) - \
-                               (5 * (sizeof(struct frame_header_long) + sizeof(struct description_hdr_ref)) )) / \
-			       sizeof(struct description_msg_ref)) * (DEF_DESC_FRAME_SIZE - sizeof(struct frame_header_long))
+                               (5 * (sizeof(struct frame_header_long) + sizeof(struct hdr_rhash_adv)) )) / \
+			       sizeof(struct msg_rhash_adv)) * (DEF_DESC_FRAME_SIZE - sizeof(struct frame_header_long))
 #define     VRT_DESC_SIZE_OUT  (vrt_desc_size_out)
 #define     VRT_DESC_SIZE_IN   (vrt_desc_size_in)
 
@@ -263,22 +263,6 @@
 #define HLP_REFERENCES          "show cached reference frames\n"
 
 
-// Future generic tlv header:
-struct tlv_header { // 3 bytes
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int length :   11;
-	unsigned int mandatory : 1; // is relevant
-	unsigned int encoding :  4; // is compressed, is reference, ...
-	unsigned int type :      8;
-#elif __BYTE_ORDER == __BIG_ENDIAN
-	unsigned int type :      8;
-	unsigned int encoding :  4; // is compressed, is reference, ...
-	unsigned int mandatory : 1; // is relevant
-	unsigned int length :   11;
-#else
-# error "Please fix <bits/endian.h>"
-#endif
-} __attribute__((packed));
 
 
 struct frame_header_short { // 2 bytes
@@ -345,6 +329,56 @@ struct frame_header_virtual { // 6 bytes
 } __attribute__((packed));
 
 //#define SHORT_FRAME_DATA_MAX (XMIN( 500, ((int)((((sizeof( ((struct frame_header_short*)NULL)->length_TLV_DATA_STEPS ))<<8)-1)*TLV_DATA_STEPS))))
+
+
+// Future generic tlv header:
+struct tlv_header { // 3 bytes
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+	unsigned int length :   11;
+	unsigned int mandatory : 1; // is relevant
+	unsigned int encoding :  4; // is compressed
+	unsigned int type :      8;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+	unsigned int type :      8;
+	unsigned int encoding :  4; // is compressed
+	unsigned int mandatory : 1; // is relevant
+	unsigned int length :   11;
+#else
+# error "Please fix <bits/endian.h>"
+#endif
+} __attribute__((packed));
+
+
+// for BMX_DSC_TLV_RHASH_ADV:
+struct msg_rhash_adv {
+//? uint32_t rframe_position; // position of to-be-resolved frame in hdr_rhash_adv->expanded_len area
+    SHA1_T rframe_hash;       // hash over full frame (including frame-header and data) as transmitted
+} __attribute__((packed));
+
+struct hdr_rhash_adv {
+
+    uint8_t expanded_type;
+
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+	unsigned int reserved : 6;
+	unsigned int more_ref_levels : 1;
+	unsigned int expanded_mandatory :1;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+	unsigned int expanded_mandatory : 1;
+	unsigned int more_ref_levels : 1;
+	unsigned int reserved : 6;
+#else
+# error "Please fix <bits/endian.h>"
+#endif
+
+    uint32_t expanded_rframes_data_len; // length of fully expanded (uncompressed, resolved rhash->rdata), without frame header!
+    SHA1_T   expanded_rframes_data_hash;  // hash over expanded_rframes_data_len data
+    struct   msg_rhash_adv msg[];
+} __attribute__((packed));
+
+#define MSG_RHASH_ADV_FORMAT { \
+{FIELD_TYPE_STRING_BINARY, -1, 160, 1, FIELD_RELEVANCE_LOW,  "rframe_hash"},  \
+	FIELD_FORMAT_END }
 
 
 
@@ -567,35 +601,6 @@ struct msg_ref_req {
 
 
 
-// for BMX_DSC_TLV_REF_ADV:
-struct description_msg_ref {
-//? uint32_t rframe_position; // position of to-be-resolved frame in hdr_rhash_adv->expanded_len area
-    SHA1_T rframe_hash;       // hash over full frame (including frame-header and data) as transmitted
-} __attribute__((packed));
-
-struct description_hdr_ref {
-
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int expanded_type : FRAME_TYPE_BIT_SIZE;
-	unsigned int expanded_is_relevant : FRAME_RELEVANCE_BIT_SIZE;
-	unsigned int more_ref_levels : 1;
-
-#elif __BYTE_ORDER == __BIG_ENDIAN
-	unsigned int more_ref_levels : 1;
-	unsigned int expanded_is_relevant : FRAME_RELEVANCE_BIT_SIZE;
-	unsigned int expanded_type : FRAME_TYPE_BIT_SIZE;
-#else
-# error "Please fix <bits/endian.h>"
-#endif
-
-    uint32_t expanded_rframes_data_len; // length of fully expanded (uncompressed, resolved rhash->rdata), without frame header!
-    SHA1_T   expanded_rframes_data_hash;  // hash over expanded_rframes_data_len data
-    struct   description_msg_ref msg[];
-} __attribute__((packed));
-
-#define DESCRIPTION_MSG_REF_FORMAT { \
-{FIELD_TYPE_STRING_BINARY, -1, 160, 1, FIELD_RELEVANCE_LOW,  "rframe_hash"},  \
-	FIELD_FORMAT_END }
 
 
 
