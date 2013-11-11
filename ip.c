@@ -1862,7 +1862,6 @@ IDM_T iproute(uint8_t cmd, int8_t del, uint8_t quiet, const struct net_key *dst,
                 return SUCCESS;
 
 
-
         if (iptrack(dst, cmd, quiet, del, table, prio, oif_idx, via, src, metric, rte) == NO)
                 return SUCCESS;
 
@@ -3114,10 +3113,10 @@ int32_t opt_ip_version(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct 
 
 		// add rule for hosts and announced interfaces and networks
 
-		ip_flush_routes(AF_INET, RT_TABLE_HNA);
-		ip_flush_rules(AF_INET, RT_TABLE_HNA);
+		//ip_flush_routes(AF_INET, RT_TABLE_HNA);
+		//ip_flush_rules(AF_INET, RT_TABLE_HNA);
 
-		iproute(IP_RULE_DEFAULT, ADD, NO, &ZERO_NET4_KEY, RT_TABLE_HNA, RT_PRIO_HNA, 0, 0, 0, 0, NULL);
+		//iproute(IP_RULE_DEFAULT, ADD, NO, &ZERO_NET4_KEY, RT_TABLE_HNA, RT_PRIO_HNA, 0, 0, 0, 0, NULL);
 		//iproute(IP_RULE_DEFAULT, ADD, NO, &ZERO_NET4_KEY, RT_TABLE_TUN, RT_PRIO_TUNS, 0, 0, 0, 0, NULL);
 
 		ip_flush_routes(AF_INET6, RT_TABLE_HNA);
@@ -3744,7 +3743,7 @@ void cleanup_ip(void)
 
 	// flush all routes in this bmx6 tables (there should be NOTHING!):
 	ip_flush_routes(AF_INET6, RT_TABLE_HNA);
-	ip_flush_routes(AF_INET, RT_TABLE_HNA);
+	//ip_flush_routes(AF_INET, RT_TABLE_HNA);
 
 	// flush default routes installed by bmx6:
 	ip_flush_tracked( IP_RULE_FLUSH );
@@ -3752,7 +3751,7 @@ void cleanup_ip(void)
 
 	// flush all rules pointing to bmx6 tables (there should be NOTHING!):
 	ip_flush_rules(AF_INET6, RT_TABLE_HNA);
-	ip_flush_rules(AF_INET, RT_TABLE_HNA);
+	//ip_flush_rules(AF_INET, RT_TABLE_HNA);
 
 
         kernel_get_if_config_post(YES,0);
