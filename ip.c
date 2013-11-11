@@ -79,10 +79,6 @@ int32_t policy_routing = POLICY_RT_UNSET;
 
 static int32_t base_port = DEF_BASE_PORT;
 
-#ifdef WITH_UNUSED
-static int32_t Lo_rule = DEF_LO_RULE;
-#endif
-
 const IPX_T  ZERO_IP = { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 } } };
 const MAC_T  ZERO_MAC = {{0}};
 const ADDR_T ZERO_ADDR = {{0}};
@@ -3481,30 +3477,18 @@ static struct opt_type ip_options[]=
 
 	{ODI,ARG_IP,ARG_IP_RULE_HNA,	 0, 3,1,A_CS1,A_ADM,A_INI,A_CFA,A_ANY,	&ip_prio_hna_cfg,	MIN_IP_RULE_HNA,MAX_IP_RULE_HNA,DEF_IP_RULE_HNA,0,opt_ip_version,
 			ARG_VALUE_FORM,	"specify iproute2 rule preference offset for hna networks"},
-/*
-	{ODI,ARG_IP,ARG_IP_RULE_TUN,	 0, 3,1,A_CS1,A_ADM,A_INI,A_CFA,A_ANY,	&ip_prio_tun_cfg,	MIN_IP_RULE_TUN,MAX_IP_RULE_TUN,DEF_IP_RULE_TUN,0,opt_ip_version,
-			ARG_VALUE_FORM,	"specify iproute2 rule preference offset for tunnel networks"},
-*/
+
 	{ODI,ARG_IP,ARG_IP_TABLE_HNA, 0, 3,1,A_CS1,A_ADM,A_INI,A_CFA,A_ANY,	&ip_table_hna_cfg,	MIN_IP_TABLE_HNA,   MAX_IP_TABLE_HNA,   DEF_IP_TABLE_HNA,0,     opt_ip_version,
 			ARG_VALUE_FORM,	"specify iproute2 table for hna networks"},
-/*
-	{ODI,ARG_IP,ARG_IP_TABLE_TUN, 0, 3,1,A_CS1,A_ADM,A_INI,A_CFA,A_ANY,	&ip_table_tun_cfg,	MIN_IP_TABLE_TUN,   MAX_IP_TABLE_TUN,   DEF_IP_TABLE_TUN,0,     opt_ip_version,
-			ARG_VALUE_FORM,	"specify iproute2 table for tunnel networks"},
-*/
 
-#ifdef WITH_UNUSED
-
-        {ODI,0,"lo_rule",		0,  4,0,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	&Lo_rule,	0, 		1,		DEF_LO_RULE,0,	0,
-			ARG_VALUE_FORM,	"disable/enable autoconfiguration of lo rule"},
-#endif
 
 	{ODI,0,ARG_INTERFACES,	        0,  9,2,A_PS0,A_USR,A_DYN,A_ARG,A_ANY,	0,		0, 		0,		0,0, 		opt_status,
 			0,		"show interfaces\n"},
 
-	{ODI,0,ARG_LLOCAL_PREFIX,	0,  9,2,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,0,		opt_dev_prefix,
+	{ODI,0,ARG_LLOCAL_PREFIX,	0,  9,1,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,0,		opt_dev_prefix,
 			ARG_NETW_FORM,HLP_LLOCAL_PREFIX},
 
-	{ODI,0,ARG_AUTO_IP6_PREFIX,     0,  4,2,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,      	0,      	0,              0,DEF_AUTO_IP6_PREFIX,opt_auto_prefix,
+	{ODI,0,ARG_AUTO_IP6_PREFIX,     0,  4,1,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,      	0,      	0,              0,DEF_AUTO_IP6_PREFIX,opt_auto_prefix,
 			ARG_VALUE_FORM,	HLP_AUTO_IP6_PREFIX},
 
 	{ODI,0,ARG_DEV,		        'i',9,2,A_PM1N,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0, 		0,		0,0, 		opt_dev,

@@ -136,8 +136,6 @@ typedef struct ifname IFNAME_T;
 #define DEF_IP_PRIO_RULES 1
 
 
-#define DEF_LO_RULE 1
-
 #define RT_PRIO_MAX    -1
 //#define RT_PRIO_HOSTS  -1
 #define RT_PRIO_HNA   -1
