@@ -2565,6 +2565,7 @@ int update_interface_rules(void)
 	return SUCCESS;
 }
 
+#ifdef WITH_UNUSED
 STATIC_FUNC
 struct net_key bmx6AutoEUI64Ip6(ADDR_T mac, struct net_key *prefix)
 {
@@ -2592,6 +2593,7 @@ struct net_key bmx6AutoEUI64Ip6(ADDR_T mac, struct net_key *prefix)
 
         return autoPrefix;
 }
+#endif
 
 STATIC_INLINE_FUNC
 void dev_if_fix(void)
