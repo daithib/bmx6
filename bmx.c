@@ -2395,13 +2395,15 @@ int main(int argc, char *argv[])
         init_tools();
 	init_control();
         init_avl();
-
 	init_bmx();
         init_ip();
 
 	//init_schedule();
 
         if (init_plugin() == SUCCESS) {
+
+                struct plugin * sec_get_plugin(void);
+                activate_plugin((sec_get_plugin()), NULL, NULL);
 
                 activate_plugin((msg_get_plugin()), NULL, NULL);
 

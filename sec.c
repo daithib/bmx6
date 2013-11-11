@@ -220,9 +220,46 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 }
 
 
+char key_dir[MAX_PATH_SIZE] = DEF_KEY_DIR;
+
+STATIC_FUNC
+int32_t opt_key_dir(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
+{
+
+	char tmp_dir[MAX_PATH_SIZE] = "";
+
+	if ( cmd == OPT_CHECK  ||  cmd == OPT_APPLY ) {
+
+		if ( wordlen( patch->val )+1 >= MAX_PATH_SIZE  ||  patch->val[0] != '/' )
+			return FAILURE;
+
+		snprintf( tmp_dir, wordlen(patch->val)+1, "%s", patch->val );
+
+		if ( check_dir( tmp_dir, YES/*create*/, YES/*writable*/ ) == FAILURE )
+			return FAILURE;
+
+                strcpy(key_dir, tmp_dir);
+
+
+	} else 	if ( cmd == OPT_SET_POST  &&  initializing ) {
+
+		if ( check_dir( key_dir, YES/*create*/, YES/*writable*/ ) == FAILURE )
+			return FAILURE;
+
+		dbgf_sys(DBGT_INFO, "created %s=%s", ARG_KEY_DIR, key_dir);
+
+		cleanup_all(0);
+        }
+
+	return SUCCESS;
+}
+
+
 STATIC_FUNC
 struct opt_type msg_options[]=
 {
+	{ODI,0,ARG_KEY_DIR,		0,  4,1,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,		0,		0,		0,DEF_KEY_DIR,	opt_key_dir,
+			ARG_DIR_FORM,	"set key DIR"},
 
 };
 
@@ -242,7 +279,7 @@ int32_t init_sec( void )
         handl.min_msg_size = sizeof (struct description_msg_pubkey);
         handl.fixed_msg_size = 0;
         handl.is_relevant = 0;
-	handl.dextReferencing = &always_fref;
+	handl.dextReferencing = (int32_t*)&always_fref;
         handl.tx_frame_handler = create_description_tlv_pubkey;
         handl.rx_frame_handler = process_description_tlv_pubkey;
 //	handl.msg_format = ref_format;

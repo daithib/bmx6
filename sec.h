@@ -20,6 +20,8 @@
 #include <netinet/in.h>
 #include <linux/if.h>
 
+#define ARG_KEY_DIR "keyDir"
+#define DEF_KEY_DIR "/etc/bmx6"
 
 struct desc_signature1 {
 	union {
