@@ -3175,27 +3175,10 @@ struct opt_type hna_options[]= {
 
 	{ODI,0,ARG_UHNA,	 	'u',9,2,A_PM1N,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,0,		opt_uhna,
 			ARG_NETW_FORM,"specify host-network announcement (HNA) for defined ip range"}
-/*
-        ,
-	{ODI,ARG_UHNA,ARG_UHNA_NETWORK,	'n',9,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,0,		opt_uhna,
-			ARG_NETW_FORM, 	"specify network of announcement"}
-        ,
-	{ODI,ARG_UHNA,ARG_UHNA_PREFIXLEN,'p',9,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,0,		opt_uhna,
-			ARG_MASK_FORM, 	"specify network prefix of announcement"}
-        ,
-	{ODI,ARG_UHNA,ARG_UHNA_METRIC,   'm',9,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,	0,		MIN_UHNA_METRIC,MAX_UHNA_METRIC,DEF_UHNA_METRIC,0,opt_uhna,
-			ARG_VALUE_FORM, "specify hna-metric of announcement (0 means highest preference)"}
-*/
         ,
 	{ODI,0,ARG_TUN_NAME_PREFIX,    	0,8,1,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,		0,		0,	0,DEF_TUN_NAME_PREFIX,	opt_tun_name_prefix,
 			ARG_NAME_FORM, "specify first letters of local tunnel-interface names"},
 
-/*
-	{ODI,0,ARG_TUN4_ADDRESS,        0,  9,2,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,0,		opt_tun_address,
-			ARG_PREFIX_FORM,HLP_TUN4_ADDRESS},
-	{ODI,0,ARG_TUN6_ADDRESS,        0,  9,2,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,0,		opt_tun_address,
-			ARG_PREFIX_FORM,HLP_TUN6_ADDRESS},
-*/
 
 	{ODI,0,ARG_TUN_OUT_TIMEOUT,     0,  9,2,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	0,              MIN_TUN_OUT_TO,MAX_TUN_OUT_TO,DEF_TUN_OUT_TO,0, opt_tun_state_dedicated_to,
 			ARG_VALUE_FORM, "timeout for reactive (dedicated) outgoing tunnels"},
@@ -3215,6 +3198,7 @@ struct opt_type hna_options[]= {
 			ARG_ADDR_FORM,HLP_TUN_DEV_ADDR4},
 	{ODI,ARG_TUN_DEV,ARG_TUN_DEV_ADDR6,  0,9,2,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,0,	        0,	        0,              0,0,            opt_tun_in_dev,
 			ARG_ADDR_FORM,HLP_TUN_DEV_ADDR6},
+#ifndef LESS_OPTIONS
 	{ODI,ARG_TUN_DEV,ARG_TUN_DEV_REMOTE,0,9,1,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,0,		0,	        0,              0,0,            opt_tun_in_dev,
 			ARG_IP_FORM,	"remote dummy ip of tunnel interface"},
 	{ODI,ARG_TUN_DEV,ARG_TUN_DEV_INGRESS4,  0,9,1,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,0,	        0,	        0,              0,0,            opt_tun_in_dev,
@@ -3229,7 +3213,7 @@ struct opt_type hna_options[]= {
 			ARG_VALUE_FORM, "IPv6 source address type (0 = static/global, 1 = static, 2 = auto, 3 = AHCP)"},
 	{ODI,ARG_TUN_DEV,ARG_TUN_DEV_SRC6_MIN,0,9,0,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,0,	        0,	        128,            0,0,            opt_tun_in_dev,
 			ARG_VALUE_FORM, "IPv6 source prefix len usable for address auto configuration (0 = NO autoconfig)"},
-        
+#endif
         {ODI,0,ARG_TUN_IN,	 	0,9,2,A_PM1N,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,0,	        opt_tun_in,
 			ARG_NAME_FORM,"arbitrary but unique name for tunnel network to be announced with given sub criterias"},
 	{ODI,ARG_TUN_IN,ARG_TUN_IN_NET,'n',9,2,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,  0,               0,              0,              0,0,            opt_tun_in,
@@ -3244,17 +3228,14 @@ struct opt_type hna_options[]= {
 	{ODI,ARG_TUN_OUT,ARG_TUN_OUT_NET,'n',9,2,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,0,               0,              0,              0,0,            opt_tun_search,
 			ARG_NETW_FORM,"network to be searched via outgoing tunnel (mandatory)"},
 
-/*
-	{ODI,ARG_TUN_OUT,ARG_TUN_DEV,   0,9,1,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,   0,		0,              0,              0,0,            opt_tun_search,
-			ARG_NAME_FORM,	"related tunnel device (and addressed) to-be used for sending data over outgoing tunnel"},
-*/
-
 	{ODI,ARG_TUN_OUT,ARG_TUN_OUT_SRCRT,0,9,2,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,0,	        0,              0,              0,0,            opt_tun_search,
 			ARG_NETW_FORM,"additional source-address range to-be routed via tunnel"},
 
 
+#ifndef LESS_OPTIONS
 	{ODI,ARG_TUN_OUT,ARG_TUN_OUT_TYPE,0,9,0,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,0,      TUN_SRC_TYPE_MIN,TUN_SRC_TYPE_MAX,TUN_SRC_TYPE_UNDEF,0,   opt_tun_search,
 			ARG_VALUE_FORM, "tunnel ip allocation mechanism (0 = static/global, 1 = static, 2 = auto, 3 = AHCP)"},
+#endif
 	{ODI,ARG_TUN_OUT,ARG_TUN_OUT_HOSTNAME,0,9,2,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,0,	        0,              0,              0,0,            opt_tun_search,
 			ARG_NAME_FORM,  "hostname of remote tunnel endpoint"},
 	{ODI,ARG_TUN_OUT,ARG_TUN_OUT_PREFIX_MIN,0,9,2,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,0,MIN_TUN_OUT_PREFIX,MAX_TUN_OUT_PREFIX,DEF_TUN_OUT_PREFIX_MIN,0,opt_tun_search,
@@ -3278,6 +3259,7 @@ struct opt_type hna_options[]= {
 	{ODI,ARG_TUN_OUT,ARG_TUN_OUT_TRULE,0,9,1,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,   0,	          0,              0,         0,DEF_TUN_OUT_TRULE,opt_tun_search,
 			FORM_TUN_OUT_TRULE, "ip rules tabel and preference to maintain matching tunnels"},
 
+#ifndef LESS_OPTIONS
 	{ODI,ARG_TUN_OUT,ARG_ROUTE_REDIRECT, 0,9,1,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,0,              0,              1,              0,0,          opt_tun_search,
 			ARG_VALUE_FORM, HLP_TUN_OUT_TYPE},
 	{ODI,ARG_TUN_OUT,ARG_ROUTE_KERNEL,0,9,2,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,   0,              0,              1,              0,0,          opt_tun_search,
@@ -3333,10 +3315,12 @@ struct opt_type hna_options[]= {
 	{ODI,ARG_TUN_OUT,ARG_ROUTE_BATMAN,0,9,1,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,   0,              0,              1,              0,0,          opt_tun_search,
 			ARG_VALUE_FORM, HLP_TUN_OUT_TYPE},
 
-	{ODI,ARG_TUN_OUT,ARG_EXPORT_DISTANCE,0,9,2,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,0,MIN_EXPORT_DISTANCE,MAX_EXPORT_DISTANCE,DEF_EXPORT_DISTANCE,0,opt_tun_search,
-			ARG_VALUE_FORM,	"export distance to network (256 == no export). Requires quagga plugin!"},
 	{ODI,ARG_TUN_OUT,ARG_EXPORT_ONLY,  0,9,1,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,  0,            MIN_EXPORT_ONLY,MAX_EXPORT_ONLY,DEF_EXPORT_ONLY,0,opt_tun_search,
 			ARG_VALUE_FORM,"do not add route to bmx6 tun table!  Requires quagga plugin!"},
+#endif
+	{ODI,ARG_TUN_OUT,ARG_EXPORT_DISTANCE,0,9,2,A_CS1,A_ADM,A_DYI,A_CFA,A_ANY,0,MIN_EXPORT_DISTANCE,MAX_EXPORT_DISTANCE,DEF_EXPORT_DISTANCE,0,opt_tun_search,
+			ARG_VALUE_FORM,	"export distance to network (256 == no export). Requires quagga plugin!"},
+
 	{ODI,0,ARG_TUNS,	        0,9,2,A_PS0,A_USR,A_DYN,A_ARG,A_ANY,	0,		0, 		0,		0,0, 		opt_status,
 			0,		"show announced and used tunnels and related networks"}
 
