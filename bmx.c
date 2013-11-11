@@ -53,9 +53,6 @@ int32_t drop_all_packets = DEF_DROP_ALL_PACKETS;
 
 int32_t dad_to = DEF_DAD_TO;
 
-int32_t my_ttl = DEF_TTL;
-
-
 static int32_t ogm_purge_to = DEF_OGM_PURGE_TO;
 
 int32_t my_tx_interval = DEF_TX_INTERVAL;
@@ -2122,9 +2119,6 @@ static struct opt_type bmx_options[]=
 			0,		"show links\n"},
 	{ODI,0,ARG_ORIGINATORS,	        0,  9,2,A_PS0N,A_USR,A_DYN,A_ARG,A_ANY,	0,		0, 		0,		0,0, 		opt_status,
 			0,		"show originators\n"}
-        ,
-	{ODI,0,ARG_TTL,			't',9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	&my_ttl,	MIN_TTL,	MAX_TTL,	DEF_TTL,0,	opt_update_description,
-			ARG_VALUE_FORM,	"set time-to-live (TTL) for OGMs"}
         ,
         {ODI,0,ARG_TX_INTERVAL,         0,  9,1, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &my_tx_interval, MIN_TX_INTERVAL, MAX_TX_INTERVAL, DEF_TX_INTERVAL,0, opt_update_description,
 			ARG_VALUE_FORM,	"set aggregation interval (SHOULD be smaller than the half of your and others OGM interval)"}
