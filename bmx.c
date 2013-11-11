@@ -2120,6 +2120,10 @@ static struct opt_type bmx_options[]=
 	{ODI,0,ARG_ORIGINATORS,	        0,  9,2,A_PS0N,A_USR,A_DYN,A_ARG,A_ANY,	0,		0, 		0,		0,0, 		opt_status,
 			0,		"show originators\n"}
         ,
+	{ODI,0,"flushAll",		0,  9,2,A_PS0,A_ADM,A_DYN,A_ARG,A_ANY,	0,		0, 		0,		0,0, 		opt_purge,
+			0,		"purge all neighbors and routes on the fly"}
+        ,
+#ifndef LESS_OPTIONS
         {ODI,0,ARG_TX_INTERVAL,         0,  9,1, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &my_tx_interval, MIN_TX_INTERVAL, MAX_TX_INTERVAL, DEF_TX_INTERVAL,0, opt_update_description,
 			ARG_VALUE_FORM,	"set aggregation interval (SHOULD be smaller than the half of your and others OGM interval)"}
         ,
@@ -2135,15 +2139,12 @@ static struct opt_type bmx_options[]=
 	{ODI,0,ARG_DAD_TO,        	0,  9,1,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	&dad_to,	MIN_DAD_TO,	MAX_DAD_TO,	DEF_DAD_TO,0,	0,
 			ARG_VALUE_FORM,	"duplicate address (DAD) detection timout in ms"}
         ,
-	{ODI,0,"flushAll",		0,  9,2,A_PS0,A_ADM,A_DYN,A_ARG,A_ANY,	0,		0, 		0,		0,0, 		opt_purge,
-			0,		"purge all neighbors and routes on the fly"}
-        ,
 	{ODI,0,ARG_DROP_ALL_FRAMES,     0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	&drop_all_frames,	MIN_DROP_ALL_FRAMES,	MAX_DROP_ALL_FRAMES,	DEF_DROP_ALL_FRAMES,0,	0,
 			ARG_VALUE_FORM,	"drop all received frames (but process packet header)"}
         ,
 	{ODI,0,ARG_DROP_ALL_PACKETS,     0, 9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	&drop_all_packets,	MIN_DROP_ALL_PACKETS,	MAX_DROP_ALL_PACKETS,	DEF_DROP_ALL_PACKETS,0,	0,
 			ARG_VALUE_FORM,	"drop all received packets"}
-
+#endif
 };
 
 
