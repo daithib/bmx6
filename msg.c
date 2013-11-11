@@ -218,7 +218,7 @@ IDM_T validate_desc_structure(struct description *desc)
         }
 
         if (
-                validate_param(desc->comp_version, 0/*(COMPATIBILITY_VERSION-1)*/, (COMPATIBILITY_VERSION+1), "compatibilty version") || //TODOCV18: check exactly !!
+                validate_param(desc->comp_version, my_compatibility>=CV17?(my_compatibility-1):0, (my_compatibility+1), "compatibilty version") ||
                 validate_param(ntohs(desc->ogmSqnRange), _MIN_OGM_SQN_RANGE, _MAX_OGM_SQN_RANGE, ARG_OGM_SQN_RANGE) ||
                 0
                 ) {
@@ -252,7 +252,7 @@ IDM_T validate_desc_sqn(struct description *desc, struct orig_node *on)
 
                 if (((TIME_T) (bmx_time - on->dhn->referred_by_me_timestamp)) < (TIME_T) dad_to) {
 
-                        if (((DESC_SQN_MASK_OLD)&(descSqn - (on->descSqn + 1))) > DEF_DESCRIPTION_DAD_RANGE) {
+                        if (((my_compatibility==CV16?DESC_SQN_MASK_CV16:DESC_SQN_MASK)&(descSqn - (on->descSqn + 1))) > DEF_DESCRIPTION_DAD_RANGE) {
 
                                 dbgf_sys(DBGT_ERR, "DAD-Alert: new dsc_sqn %d not > old %d + 1",descSqn, on->descSqn);
 
@@ -2235,21 +2235,14 @@ int32_t tx_frame_problem_adv(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 	struct problem_type *problem = it->ttn ? (struct problem_type *)it->ttn->task.data : NULL;
-        struct msg_problem_adv *adv = ((struct msg_problem_adv*) tx_iterator_cache_msg_ptr(it));
+//      struct msg_problem_adv *adv = ((struct msg_problem_adv*) tx_iterator_cache_msg_ptr(it));
         assertion(-500860, (problem && problem->local_id ));
         assertion(-500936, (problem->local_id > LOCAL_ID_INVALID));
 
         dbgf_all(DBGT_INFO, "FRAME_TYPE_PROBLEM_CODE=%d local_id=0x%X", problem->problem_code, problem->local_id);
 
         if (problem->problem_code == FRAME_TYPE_PROBLEM_CODE_DUP_LINK_ID) {
-		//TODOCV18: purge:
-                
-                adv->reserved = 0;
-                adv->code = problem->problem_code;
-                adv->local_id = problem->local_id;
-
-                return sizeof (struct msg_problem_adv);
-
+		assertion(-500000, 0);
         } else {
 
                 assertion(-500846, (0));
@@ -2268,24 +2261,25 @@ int32_t rx_frame_problem_adv(struct rx_frame_iterator *it)
         struct msg_problem_adv *adv = (struct msg_problem_adv *) it->frame_data;
 
         if (adv->code == FRAME_TYPE_PROBLEM_CODE_DUP_LINK_ID) {
-		//TODOCV18: purge:
 
-                if (it->frame_data_length != sizeof (struct msg_problem_adv)) {
+#if MIN_COMPATIBILITY <= CV16
+		if ( my_compatibility <= CV16 ) {
 
-                        dbgf_sys(DBGT_ERR,"frame_data_length=%d !!", it->frame_data_length);
-                        return TLV_RX_DATA_FAILURE;
-                }
+			if (it->frame_data_length != sizeof (struct msg_problem_adv)) {
+				dbgf_sys(DBGT_ERR,"frame_data_length=%d !!", it->frame_data_length);
+				return TLV_RX_DATA_FAILURE;
+			}
 
-                if (adv->local_id == my_local_id) {
+			if (adv->local_id == my_local_id) {
+				if (new_local_id(NULL) == LOCAL_ID_INVALID) {
+					return TLV_RX_DATA_FAILURE;
+				}
 
-                        if (new_local_id(NULL) == LOCAL_ID_INVALID) {
-                                return TLV_RX_DATA_FAILURE;
-                        }
-
-                        dbgf_sys(DBGT_ERR, "reselect my_local_id=%X (old %X) as signalled by NB=%s via dev=%s",
-                                ntohl(my_local_id), ntohl(adv->local_id), it->pb->i.llip_str, it->pb->i.iif->label_cfg.str);
-
-                }
+				dbgf_sys(DBGT_ERR, "reselect my_local_id=%X (old %X) as signalled by NB=%s via dev=%s",
+					ntohl(my_local_id), ntohl(adv->local_id), it->pb->i.llip_str, it->pb->i.iif->label_cfg.str);
+			}
+		}
+#endif
 
         } else {
                 return TLV_RX_DATA_IGNORED;
@@ -3911,7 +3905,7 @@ void tx_packet(void *devp)
 
                         memset(packet_hdr, 0, sizeof (struct packet_header));
 
-                        packet_hdr->comp_version = COMPATIBILITY_VERSION;
+                        packet_hdr->comp_version = my_compatibility;
                         packet_hdr->pkt_length = htons(pb.i.total_length);
                         packet_hdr->transmitterIID = htons(myIID4me);
                         packet_hdr->link_adv_sqn = htons(my_link_adv_sqn);
@@ -4520,7 +4514,7 @@ void update_my_description_adv(void)
         sscanf(rev_string, "%4X", &rev_u32);
 
         dsc->revision = htons(rev_u32);
-        dsc->comp_version = COMPATIBILITY_VERSION;
+        dsc->comp_version = my_compatibility;
         dsc->descSqn = htonl(++(self->descSqn));
 
 	struct desc_extension *next_dext = debugMallocReset(sizeof(struct desc_extension), -300572);

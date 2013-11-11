@@ -37,7 +37,13 @@
 #define BMX_BRANCH "BMX6"
 #define BRANCH_VERSION "0.1-alpha" //put exactly one distinct word inside the string like "0.3-pre-alpha" or "0.3-rc1" or "0.3"
 
-#define COMPATIBILITY_VERSION 16
+#define CV16 16 // 0.1-alpha version, introducing elastic cv, passively using CV17 features
+#define CV17 17 // 0.2-alpha version, actively using CV17 features
+#define MIN_COMPATIBILITY CV16
+#define MAX_COMPATIBILITY CV17
+#define DEF_COMPATIBILITY CV16
+#define ARG_COMPATIBILITY "compatibility"
+extern int32_t my_compatibility;
 
 #ifndef GIT_REV
 #define GIT_REV "0"             // to be incremented after each critical code change
@@ -379,7 +385,7 @@ typedef uint16_t HELLO_SQN_T;
 typedef uint32_t DESC_SQN_T;
 #define DESC_SQN_BIT_SIZE   (8*sizeof(DESC_SQN_T))
 #define DESC_SQN_MASK       ((DESC_SQN_T)-1)
-#define DESC_SQN_MASK_OLD   ((uint16_t)-1)     //TODOCV18: replace with DESC_SQN_MASK
+#define DESC_SQN_MASK_CV16  ((uint16_t)-1)
 #define DESC_SQN_MAX        DESC_SQN_MASK
 
 #define DEF_DESCRIPTION_DAD_RANGE 8192
@@ -427,7 +433,7 @@ typedef uint8_t  FRAME_TYPE_T;
 #define MAX_UDPD_SIZE 1400
 
 
-
+#if MIN_COMPATIBILITY <= CV16
 struct packet_header // 17 bytes
 {
 	uint8_t    comp_version;     //  8
@@ -438,7 +444,7 @@ struct packet_header // 17 bytes
 
 	LINKADV_SQN_T link_adv_sqn;  // 16 used for processing: link_adv, lq_adv, rp_adv, ogm_adv, ogm_ack
 
-	//TODOCV18: merge pkt_sqn and local_id into single uint64_t local_id
+	//TODOCV17: merge pkt_sqn and local_id into single uint64_t local_id
 	PKT_SQN_T  pkt_sqn;          // 32
 	LOCAL_ID_T local_id;         // 32
 	
@@ -447,7 +453,9 @@ struct packet_header // 17 bytes
 //	uint8_t    reserved_for_2byte_alignement;  //  8
 
 } __attribute__((packed));
-
+#else
+// use generic tlv_header instead...
+#endif
 
 
 

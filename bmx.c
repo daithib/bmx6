@@ -47,6 +47,8 @@
 
 #define CODE_CATEGORY_NAME "general"
 
+int32_t my_compatibility = DEF_COMPATIBILITY;
+
 int32_t drop_all_frames = DEF_DROP_ALL_FRAMES;
 int32_t drop_all_packets = DEF_DROP_ALL_PACKETS;
 
@@ -838,6 +840,7 @@ struct link_node *get_link_node(struct packet_buff *pb)
 
                 if (link && !is_ip_equal(&pb->i.llip, &link->link_ip)) {
 
+/*
                         if (((TIME_T) (bmx_time - link->pkt_time_max)) < (TIME_T) dad_to) {
 
                                 dbgf_sys(DBGT_WARN,
@@ -857,9 +860,7 @@ struct link_node *get_link_node(struct packet_buff *pb)
                                 // its safer to purge the old one, otherwise we might end up with hundrets
                                 //return NULL;
                         }
-
-
-
+*/
                         dbgf_sys(DBGT_WARN, "Reinitialized! NB=%s via dev=%s "
                                 "cached llIP=%s local_id=%X dev_idx=0x%X ! Reinitializing link_node...",
                                 pb->i.llip_str, pb->i.iif->label_cfg.str, ip6AsStr( &link->link_ip),
@@ -1007,7 +1008,7 @@ void rx_packet( struct packet_buff *pb )
 	// we acceppt longer packets than specified by pos->size to allow padding for equal packet sizes
         if (    pb->i.total_length < (int) (sizeof (struct packet_header) + sizeof (struct frame_header_long)) ||
                 pkt_length < (int) (sizeof (struct packet_header) + sizeof (struct frame_header_long)) ||
-                ((hdr->comp_version < (COMPATIBILITY_VERSION - 1)) || (hdr->comp_version > (COMPATIBILITY_VERSION + 1))) ||
+                ((hdr->comp_version < (my_compatibility - 1)) || (hdr->comp_version > (my_compatibility + 1))) ||
                 pkt_length > pb->i.total_length || pkt_length > (PKT_FRAMES_SIZE_MAX + sizeof(struct packet_header)) ||
                 pb->i.link_key.dev_idx < DEVADV_IDX_MIN || pb->i.link_key.local_id == LOCAL_ID_INVALID ) {
 
@@ -1094,7 +1095,7 @@ process_packet_error:
                 "(version=%i, local_id=%X dev_idx=0x%X, reserved=0x%X, pkt_size=%i), udp_len=%d my_version=%d, max_udpd_size=%d",
                 pb->i.llip_str, iif->label_cfg.str, hdr->comp_version,
                 ntohl(pb->i.link_key.local_id), pb->i.link_key.dev_idx, hdr->capabilities, pkt_length, pb->i.total_length,
-                COMPATIBILITY_VERSION, MAX_UDPD_SIZE);
+                my_compatibility, MAX_UDPD_SIZE);
 
         blacklist_neighbor(pb);
 
@@ -1806,7 +1807,7 @@ static int32_t bmx_status_creator(struct status_handl *handl, void *data)
 	struct tun_in_node *tin = avl_first_item(&tun_in_tree);
         struct bmx_status *status = (struct bmx_status *) (handl->data = debugRealloc(handl->data, sizeof (struct bmx_status), -300365));
         sprintf(status->version, "%s-%s", BMX_BRANCH, BRANCH_VERSION);
-        status->compat = COMPATIBILITY_VERSION;
+        status->compat = my_compatibility;
 	snprintf(status->revision, 8, GIT_REV);
         status->name = self->global_id.name;
         status->globalId = &self->global_id;
@@ -2018,7 +2019,7 @@ int32_t opt_version(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt
         assertion(-501257, !strcmp(opt->name, ARG_VERSION));
 
         dbg_printf(cn, "%s-%s comPatibility=%d revision=%s\n",
-                        BMX_BRANCH, BRANCH_VERSION, COMPATIBILITY_VERSION, GIT_REV);
+                        BMX_BRANCH, BRANCH_VERSION, my_compatibility, GIT_REV);
 
         if (initializing)
                 cleanup_all(CLEANUP_SUCCESS);
@@ -2106,7 +2107,11 @@ static struct opt_type bmx_options[]=
 	{ODI,0,ARG_VERSION,		'v',9,2,A_PS0,A_USR,A_DYI,A_ARG,A_ANY,	0,		0, 		0,		0,0, 		opt_version,
 			0,		"show version"},
 
-	{ODI,0,ARG_SHOW,		's',  9,2,A_PS1N,A_USR,A_DYN,A_ARG,A_ANY,	0,		0, 		0,		0,0, 		opt_status,
+        {ODI,0,ARG_COMPATIBILITY,       0,  3,1,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,   &my_compatibility,MIN_COMPATIBILITY,MAX_COMPATIBILITY,DEF_COMPATIBILITY,0, 0,
+			ARG_VALUE_FORM,	"set (elastic) compatibility version"},
+
+
+	{ODI,0,ARG_SHOW,		's', 9,2,A_PS1N,A_USR,A_DYN,A_ARG,A_ANY,	0,		0, 		0,		0,0, 		opt_status,
 			ARG_VALUE_FORM,		"show status information about given context. E.g.:" ARG_STATUS ", " ARG_INTERFACES ", " ARG_LINKS ", " ARG_ORIGINATORS ", ..." "\n"},
 	{ODI,ARG_SHOW,ARG_RELEVANCE,'r',9,1,A_CS1,A_USR,A_DYN,A_ARG,A_ANY,	0,	       MIN_RELEVANCE,   MAX_RELEVANCE,  DEF_RELEVANCE,0, opt_status,
 			ARG_VALUE_FORM,	HLP_ARG_RELEVANCE}
