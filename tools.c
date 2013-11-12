@@ -34,13 +34,13 @@
 #include "ip.h"
 #include "tools.h"
 
-char* memAsHexStringSep( const void* mem, uint32_t len, uint16_t separator)
+char* memAsHexStringSep( const void* mem, uint32_t len, uint16_t seperationLen, char *seperator)
 {
 #define MEMASSTR_BUFF_SIZE 2048
 #define MEMASSTR_BUFFERS 2
 #define MEMASSTR_STEP_SIZE 2
 #define TRAILER_LEN 4
-        separator = separator ? separator : MEMASSTR_BUFF_SIZE;
+        seperationLen = seperationLen ? seperationLen : MEMASSTR_BUFF_SIZE;
 	static uint8_t c=0;
         static char out[MEMASSTR_BUFFERS][MEMASSTR_BUFF_SIZE];
         uint32_t i = 0, l = 0;
@@ -52,7 +52,7 @@ char* memAsHexStringSep( const void* mem, uint32_t len, uint16_t separator)
 
         while (l < len && i < (MEMASSTR_BUFF_SIZE - TRAILER_LEN)) {
 
-                i += sprintf(&(out[c][i]), "%s%.2X", ((l && !(l % separator)) ? " " : ""), ((uint8_t*) mem)[l]);
+                i += sprintf(&(out[c][i]), "%s%.2X", ((l && !(l % seperationLen)) ? (seperator?seperator:" ") : ""), ((uint8_t*) mem)[l]);
                 l++;
         }
 
@@ -66,7 +66,7 @@ char* memAsHexStringSep( const void* mem, uint32_t len, uint16_t separator)
 
 char* memAsHexString( const void* mem, uint32_t len)
 {
-        return memAsHexStringSep(mem, len, 0);
+        return memAsHexStringSep(mem, len, 0, NULL);
 }
 
 IDM_T hexStrToMem(char *s, uint8_t *m, uint16_t mLen)

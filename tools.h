@@ -51,7 +51,7 @@ static inline uint64_t ntoh64(uint64_t x) {
 
 IDM_T hexStrToMem(char *s, uint8_t *m, uint16_t mLen);
 char* memAsHexString( const void* mem, uint32_t len);
-char* memAsHexStringSep( const void* mem, uint32_t len, uint16_t separator);
+char* memAsHexStringSep( const void* mem, uint32_t len, uint16_t seperationLen, char *seperator);
 char* memAsCharString( const char* mem, uint32_t len);
 
 IDM_T check_string(char*s, char *okChars, char replaceChar);

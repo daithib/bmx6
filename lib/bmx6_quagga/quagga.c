@@ -331,11 +331,11 @@ void zsock_read_handler(void * nothing)
                                         list_add_tail(&zdata_read_list, &zd->list);
 
                                         dbgf_all(DBGT_INFO, "full ZAPI len=%d data=%s",
-                                                zcfg.zread_buff_len, memAsHexStringSep(zcfg.zread_buff, zcfg.zread_buff_len, 4));
+                                                zcfg.zread_buff_len, memAsHexStringSep(zcfg.zread_buff, zcfg.zread_buff_len, 4, NULL));
 
                                 } else {
                                         dbgf_sys(DBGT_ERR, "Invalid ZAPI len=%d data=%s",
-                                                zcfg.zread_buff_len, memAsHexStringSep(zcfg.zread_buff, zcfg.zread_buff_len, 4));
+                                                zcfg.zread_buff_len, memAsHexStringSep(zcfg.zread_buff, zcfg.zread_buff_len, 4, NULL));
 
                                         debugFree(zcfg.zread_buff, -300481);
                                 }
@@ -665,7 +665,7 @@ int zsock_read(char* buff, int max)
         int err = errno;
 
         if (rlen >= 0) {
-                dbgf_all(DBGT_INFO, "read len=%d data=%s", rlen, memAsHexStringSep(buff, rlen, 4));
+                dbgf_all(DBGT_INFO, "read len=%d data=%s", rlen, memAsHexStringSep(buff, rlen, 4, NULL));
 
         } else {
 
@@ -729,7 +729,7 @@ void zsock_write( void* zpacket )
                         errno = 0;
 
                         dbgf_track(DBGT_INFO, "write len=%d tot=%d data=%s",
-                                len - zwn->send, len, memAsHexStringSep(zwn->zpacket + zwn->send, len - zwn->send, 4));
+                                len - zwn->send, len, memAsHexStringSep(zwn->zpacket + zwn->send, len - zwn->send, 4, NULL));
 
                         if ((ret = write(zcfg.socket, zwn->zpacket + zwn->send, len - zwn->send)) < 0) {
 
