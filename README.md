@@ -49,7 +49,8 @@ Tested with debian and cyassl-2.8.0:
 wget  http://www.yassl.com/cyassl-2.8.0.zip
 unzip cyassl-2.8.0.zip
 cd cyassl-2.8.0
-./configure --enable-fastmath=no --enable-keygen=yes --enable-ecc=yes
+./configure --enable-fastmath=no --enable-ecc=yes --enable-keygen=yes --enable-certgen=yes --enable-testcert=yes
+#--enable-opensslextra=yes
 make
 sudo make install
 sudo ldconfig

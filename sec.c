@@ -24,6 +24,10 @@
 #include <errno.h>
 #include <stdint.h>
 
+#define CYASSL_KEY_GEN
+#define CYASSL_TEST_CERT
+#define CYASSL_CERT_GEN
+
 #include <cyassl/ctaocrypt/settings.h>
 
 /*
@@ -48,7 +52,15 @@
 #include <cyassl/ctaocrypt/pwdbased.h>
 #include <cyassl/ctaocrypt/ripemd.h>
 */
+
 #include <cyassl/ctaocrypt/rsa.h>
+#include <cyassl/ctaocrypt/asn_public.h>
+#include <cyassl/ctaocrypt/asn.h>
+#include <cyassl/ctaocrypt/ecc.h>
+
+
+#include <cyassl/ssl.h>
+//#include <cyassl/internal.h>
 
 
 #include "bmx.h"
@@ -220,35 +232,285 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 }
 
 
-char key_dir[MAX_PATH_SIZE] = DEF_KEY_DIR;
+uint8_t * clone_to_nbo(void *in, uint32_t len) {
+	uint8_t *out = debugMallocReset(len, -300000);
+	uint32_t i;
+
+	if ( htonl(47) == 47 ) {
+		memcpy(out, in, len);
+	} else {
+		for (i=0; i<len; i++)
+			out[i] = ((uint8_t*)in)[len-i-1];
+	}
+
+	return out;
+}
+
+char key_path[MAX_PATH_SIZE] = DEF_KEY_PATH;
+
+
+int32_t rsa_test(void) {
+
+	// test with: ./bmx6 f=0 d=0 --keyDir=$(pwdd)/rsa-test/key.der
+
+	{
+		uint64_t tho = 0x0123456789abcdef;
+		uint64_t tno = htobe64(tho);
+		uint8_t *tp = clone_to_nbo(&tho, sizeof(tho));
+		dbgf_sys(DBGT_INFO, "tno=%s tp=%s",
+			memAsHexString(&tno, sizeof(tno)),
+			memAsHexString(tp, sizeof(uint64_t)));
+		debugFree(tp, -300000);
+	}
+
+	int    ret;
+	RNG    rng;
+#define FOURK_BUF 4096
+
+
+	if ((ret = InitRng(&rng)) != 0)
+		return FAILURE;
+
+        RsaKey key;
+
+
+	byte  der[FOURK_BUF];
+	int   derSz = 0;
+	FILE* keyFile;
+
+	InitRsaKey(&key, 0);
+
+	if (!(keyFile = fopen(key_path, "rb"))) {
+
+		int keyBitSize = 512
+
+		dbgf_sys(DBGT_INFO, "Creating new %d bit key to %s!", keyBitSize, key_path);
+
+		if ((ret = MakeRsaKey(&key, keyBitSize, 65537, &rng)) != 0) {
+			dbgf_sys(DBGT_ERR, "Failed making rsa key! ret=%d", ret)
+			return FAILURE;
+		}
+
+		dbgf_sys(DBGT_INFO, "NEW Key: alloc=%d sign=%d used=%d sizeof=%ld len=%ld bits=%ld N:\n%s",
+			key.n.alloc, key.n.sign, key.n.used, sizeof(key.n.dp[0]), (key.n.used * sizeof(key.n.dp[0])), (key.n.used * sizeof(key.n.dp[0]))*8,
+			memAsHexStringSep( key.n.dp, (key.n.used * sizeof(key.n.dp[0])), 16, "\n")
+//			memAsHexStringSep( nbo, (key.n.used * sizeof(key.n.dp[0])), 8, "\n")
+			);
+
+		if ((derSz = RsaKeyToDer(&key, der, FOURK_BUF)) < 0) {
+			dbgf_sys(DBGT_ERR, "Failed translating rsa key to der! derSz=%d", derSz)
+			return FAILURE;
+		}
+
+		// read this with:
+		//    dumpasn1 key.der
+		//    note that all first INTEGER bytes are not zero (unlike with openssl certificates), but after conversion they are.
+		// convert to pem with openssl:
+		//    openssl rsa -in rsa-test/key.der -inform DER -out rsa-test/openssl.pem -outform PEM
+
+		if (!(keyFile = fopen(key_path, "wb"))) {
+			dbgf_sys(DBGT_ERR, "Failed writing %s! ret=%d", key_path, ret)
+			return FAILURE;
+		}
+
+		if ((ret = (int)fwrite(der, 1, derSz, keyFile)) != derSz)
+			return FAILURE;
+
+		fclose(keyFile);
+	}
+
+	if (0) { //translate to pem:
+		byte*  pem;
+		int    pemSz = 0;
+		FILE* pemFile;
+		char tmp_path[MAX_PATH_SIZE] = "";
+
+		if ((pem = (byte*)malloc(FOURK_BUF)) == NULL)
+			return FAILURE;
+
+		if((pemSz = DerToPem(der, derSz, pem, FOURK_BUF, PRIVATEKEY_TYPE)) < 0)
+			return FAILURE;
+
+		sprintf(tmp_path, "%s%s",key_path, ".pem");
+		// read this with:
+		//    cat key.pem
+		// convert to pem with openssl:
+		//    openssl rsa -in rsa-test/key.der.pem -inform PEM -out rsa-test/openssl.der -outform DER
+
+		if (!(pemFile = fopen(tmp_path, "wb")))
+			return FAILURE;
+
+		ret = (int)fwrite(pem, 1, pemSz, pemFile);
+		fclose(pemFile);
+
+		free(pem);
+	}
+
+	FreeRsaKey(&key);
+
+
+	InitRsaKey(&key, 0);
+
+	{
+		word32 idx = 0;
+
+		if (!(keyFile = fopen(key_path, "rb"))) {
+			dbgf_sys(DBGT_ERR, "can not open %s: %s", key_path, strerror(errno));
+			return FAILURE;
+		}
+
+		if(((derSz = (int)fread(der, 1, sizeof(der), keyFile)) <= 0) || derSz == sizeof(der)) {
+			dbgf_sys(DBGT_ERR, "can not read %s: %s", key_path, strerror(errno));
+			return FAILURE;
+		} else {
+			dbgf_sys(DBGT_INFO, "read %d bytes from %s", derSz, key_path);
+		}
+
+		fclose(keyFile);
+
+		if ((ret = RsaPrivateKeyDecode(der, &idx, &key, derSz)) != 0) {
+			dbgf_sys(DBGT_ERR, "can not decode %s: %d", key_path, ret);
+			return FAILURE;
+		}
+
+		uint8_t *nbo = clone_to_nbo((uint8_t*)key.n.dp, (key.n.used * sizeof(key.n.dp[0])));
+
+		dbgf_sys(DBGT_INFO, "pub Key: alloc=%d sign=%d used=%d sizeof=%ld len=%ld bits=%ld N:\n%s",
+			key.n.alloc, key.n.sign, key.n.used, sizeof(key.n.dp[0]), (key.n.used * sizeof(key.n.dp[0])), (key.n.used * sizeof(key.n.dp[0]))*8,
+//			memAsHexStringSep( key.n.dp, (key.n.used * sizeof(key.n.dp[0])), 16, "\n")
+			memAsHexStringSep( nbo, (key.n.used * sizeof(key.n.dp[0])), 8, "\n")
+			);
+
+		debugFree(nbo, -300000);
+
+		dbgf_sys(DBGT_INFO, "alloc=%d sign=%d used=%d sizeof=%ld len=%ld E:\n%s",
+			key.e.alloc, key.e.sign, key.e.used, sizeof(key.e.dp[0]), (key.e.used * sizeof(key.e.dp[0])),
+			memAsHexStringSep( key.e.dp, (key.e.used * sizeof(key.e.dp[0])), 4, NULL));
+
+		dbgf_sys(DBGT_INFO, "E=%ld", key.e.dp[0]);
+
+	}
+
+
+	{
+		Cert  myCert;
+		byte  derCert[FOURK_BUF];
+		FILE* derFile;
+		int   certSz;
+		char  tmp_path[MAX_PATH_SIZE] = "";
+		sprintf(tmp_path, "%s%s",key_path, ".cert");
+
+		InitCert(&myCert);
+
+		strncpy(myCert.subject.country, "US", CTC_NAME_SIZE);
+		strncpy(myCert.subject.state, "OR", CTC_NAME_SIZE);
+		strncpy(myCert.subject.locality, "Portland", CTC_NAME_SIZE);
+		strncpy(myCert.subject.org, "yaSSL", CTC_NAME_SIZE);
+		strncpy(myCert.subject.unit, "Development", CTC_NAME_SIZE);
+		strncpy(myCert.subject.commonName, "www.yassl.com", CTC_NAME_SIZE);
+		strncpy(myCert.subject.email, "info@yassl.com", CTC_NAME_SIZE);
+		myCert.isCA    = 1;
+		myCert.sigType = CTC_SHA256wRSA;
+
+		if ((certSz = MakeSelfCert(&myCert, derCert, FOURK_BUF, &key, &rng)) < 0) {
+			dbgf_sys(DBGT_ERR,"Failed creating cert %s, certSz=%d", tmp_path, certSz);
+			return FAILURE;
+		}
+
+
+		if (!(derFile = fopen(tmp_path, "wb"))) {
+			dbgf_sys(DBGT_ERR,"Failed opening %s", tmp_path);
+			return FAILURE;
+		}
+		
+		if ((ret = (int)fwrite(derCert, 1, certSz, derFile)) != certSz) {
+			dbgf_sys(DBGT_ERR,"Failed writing %s", tmp_path);
+			return FAILURE;
+		}
+		fclose(derFile);
+	}
+        FreeRsaKey(&key);
+
+	{
+
+		byte  derCert[FOURK_BUF];
+		FILE* derFile;
+		int   certSz;
+		char  tmp_path[MAX_PATH_SIZE] = "";
+		sprintf(tmp_path, "%s%s",key_path, ".cert");
+
+		if (!(derFile = fopen(tmp_path, "rb"))) {
+			dbgf_sys(DBGT_ERR,"Failed opening %s", tmp_path);
+			return FAILURE;
+		}
+
+		if ((certSz = (int)fread(derCert, 1, sizeof(derCert), derFile)) <= 0) {
+			dbgf_sys(DBGT_ERR,"Failed reading %s", tmp_path);
+			return FAILURE;
+		}
+		fclose(derFile);
+
+		DecodedCert decode;
+		InitDecodedCert(&decode, derCert, certSz, 0);
+		if ((ret = ParseCert(&decode, CERT_TYPE, NO_VERIFY, 0)) != 0) {
+			dbgf_sys(DBGT_ERR,"Failed testing cert %s, ret=%d", tmp_path, ret);
+			return FAILURE;
+		}
+
+		RsaKey key;
+		InitRsaKey(&key, 0);
+		word32 idx = 0;
+
+		if((ret = RsaPublicKeyDecode(decode.publicKey, &idx, &key, decode.pubKeySize)) != 0 ) {
+			dbgf_sys(DBGT_ERR,"Failed using cert %s, ret=%d", tmp_path, ret);
+			return FAILURE;
+		}
+
+/*		dbgf_sys(DBGT_INFO, "certKey: alloc=%d sign=%d used=%d sizeof=%ld len=%ld bits=%ld N:\n%s",
+			key.n.alloc, key.n.sign, key.n.used, sizeof(key.n.dp[0]), (key.n.used * sizeof(key.n.dp[0])), (key.n.used * sizeof(key.n.dp[0]))*8,
+			memAsHexStringSep( key.n.dp, (key.n.used * sizeof(key.n.dp[0])), 16, "\n")
+			//			memAsHexStringSep( nbo, (key.n.used * sizeof(key.n.dp[0])), 8, "\n")
+			);
+*/
+		FreeDecodedCert(&decode);
+		FreeRsaKey(&key);
+
+//		CYASSL_CERT_MANAGER *cm = CyaSSL_CertManagerNew();
+	}
+
+
+	cleanup_all(0);
+	
+	return SUCCESS;
+}
 
 STATIC_FUNC
-int32_t opt_key_dir(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
+int32_t opt_key_path(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
 {
 
-	char tmp_dir[MAX_PATH_SIZE] = "";
+	char tmp_path[MAX_PATH_SIZE] = "";
 
-	if ( cmd == OPT_CHECK  ||  cmd == OPT_APPLY ) {
+	if ( cmd == OPT_CHECK ) {
 
 		if ( wordlen( patch->val )+1 >= MAX_PATH_SIZE  ||  patch->val[0] != '/' )
 			return FAILURE;
 
-		snprintf( tmp_dir, wordlen(patch->val)+1, "%s", patch->val );
+		snprintf( tmp_path, wordlen(patch->val)+1, "%s", patch->val );
 
-		if ( check_dir( tmp_dir, YES/*create*/, YES/*writable*/ ) == FAILURE )
-			return FAILURE;
+//		if ( check_file( tmp_path, YES/*regular*/,YES/*read*/, NO/*writable*/, NO/*executable*/ ) == FAILURE )
+//			return FAILURE;
 
-                strcpy(key_dir, tmp_dir);
+                strcpy(key_path, tmp_path);
+		dbgf_sys(DBGT_INFO, "testing rsa crypto in %s=%s", ARG_KEY_PATH, key_path);
+
+		return rsa_test();
 
 
 	} else 	if ( cmd == OPT_SET_POST  &&  initializing ) {
 
-		if ( check_dir( key_dir, YES/*create*/, YES/*writable*/ ) == FAILURE )
-			return FAILURE;
+//		if ( check_file( key_path, YES/*regular*/,YES/*read*/, NO/*writable*/, NO/*executable*/ ) == FAILURE )
+//			return FAILURE;
 
-		dbgf_sys(DBGT_INFO, "created %s=%s", ARG_KEY_DIR, key_dir);
-
-		cleanup_all(0);
         }
 
 	return SUCCESS;
@@ -256,10 +518,10 @@ int32_t opt_key_dir(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt
 
 
 STATIC_FUNC
-struct opt_type msg_options[]=
+struct opt_type sec_options[]=
 {
-	{ODI,0,ARG_KEY_DIR,		0,  4,1,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,		0,		0,		0,DEF_KEY_DIR,	opt_key_dir,
-			ARG_DIR_FORM,	"set key DIR"},
+	{ODI,0,ARG_KEY_PATH,		0,  4,1,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,		0,		0,		0,DEF_KEY_PATH,	opt_key_path,
+			ARG_DIR_FORM,	"set path to rsa der-encoded private key file (used as permanent public ID"},
 
 };
 
@@ -268,7 +530,7 @@ STATIC_FUNC
 int32_t init_sec( void )
 {
 
-	register_options_array( msg_options, sizeof( msg_options ), CODE_CATEGORY_NAME );
+	register_options_array( sec_options, sizeof( sec_options ), CODE_CATEGORY_NAME );
 
         struct frame_handl handl;
         memset(&handl, 0, sizeof ( handl));
