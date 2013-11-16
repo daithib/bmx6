@@ -72,6 +72,15 @@
 
 #define CODE_CATEGORY_NAME "sec"
 
+char key_path[MAX_PATH_SIZE] = DEF_KEY_PATH;
+
+RNG    rng;
+
+#define XKEY_N_MOD 256
+#define XKEY_E_VAL 65537
+#define XKEY_DP_SZ sizeof( mp_digit)
+#define XDER_BUF_SZ 4096
+
 
 
 #ifdef UNDEFINED
@@ -248,11 +257,6 @@ void * clone_to_nbo(void *in, uint32_t len) {
 	return (void*)out;
 }
 
-char key_path[MAX_PATH_SIZE] = DEF_KEY_PATH;
-
-#define XKEY_N_MOD 256
-#define XKEY_E_VAL 65537
-#define XKEY_DP_SZ sizeof( mp_digit)
 
 STATIC_FUNC
 uint8_t * mp_int_get_raw( mp_int *in, uint32_t *rawLen) {
@@ -408,31 +412,18 @@ void bmx_cyassl_free_key( RsaKey *key ) {
 	debugFree(key, -300000);
 }
 
+int32_t rsa_create( int keyBitSize ) {
 
-int32_t rsa_test(void) {
-
-	// test with: ./bmx6 f=0 d=0 --keyDir=$(pwdd)/rsa-test/key.der
-
-	int    ret;
-	RNG    rng;
-#define FOURK_BUF 4096
-
-
-	if ((ret = InitRng(&rng)) != 0)
-		return FAILURE;
-
-        RsaKey key;
-
-
-	byte  der[FOURK_BUF];
-	int   derSz = 0;
 	FILE* keyFile;
-
-	InitRsaKey(&key, 0);
 
 	if (!(keyFile = fopen(key_path, "rb"))) {
 
-		int keyBitSize = 2048
+		RsaKey key;
+		byte  der[XDER_BUF_SZ];
+		int   derSz = 0;
+		int ret;
+
+		InitRsaKey(&key, 0);
 
 		dbgf_sys(DBGT_INFO, "Creating new %d bit key to %s!", keyBitSize, key_path);
 
@@ -447,7 +438,7 @@ int32_t rsa_test(void) {
 //			memAsHexStringSep( nbo, (key.n.used * sizeof(key.n.dp[0])), 8, "\n")
 			);
 
-		if ((derSz = RsaKeyToDer(&key, der, FOURK_BUF)) < 0) {
+		if ((derSz = RsaKeyToDer(&key, der, XDER_BUF_SZ)) < 0) {
 			dbgf_sys(DBGT_ERR, "Failed translating rsa key to der! derSz=%d", derSz)
 			return FAILURE;
 		}
@@ -468,10 +459,24 @@ int32_t rsa_test(void) {
 		if ((ret = (int)fwrite(der, 1, derSz, keyFile)) != derSz)
 			return FAILURE;
 
-		fclose(keyFile);
+		FreeRsaKey(&key);
 	}
+	
+	fclose(keyFile);
 
-	FreeRsaKey(&key);
+	return SUCCESS;
+}
+
+int32_t rsa_test(void) {
+
+	// test with: ./bmx6 f=0 d=0 --keyDir=$(pwdd)/rsa-test/key.der
+
+	int    ret;
+	RsaKey key;
+
+	byte  der[XDER_BUF_SZ];
+	int   derSz = 0;
+	FILE* keyFile;
 
 
 	InitRsaKey(&key, 0);
@@ -499,14 +504,66 @@ int32_t rsa_test(void) {
 		}
 
 
-		uint32_t rawNLen = 0;
-		uint8_t *rawN = bmx_cyassl_get_raw_pubKey(&key, &rawNLen);
+		uint32_t pubRawLen = 0;
+		uint8_t *pubRaw = bmx_cyassl_get_raw_pubKey(&key, &pubRawLen);
+		RsaKey *pubKey = bmx_cyassl_get_pubKey(pubRaw, pubRawLen);
 
-		RsaKey *test = bmx_cyassl_get_pubKey(rawN, rawNLen);
+		assertion(-500000, !memcmp(key.n.dp, pubKey->n.dp, (key.n.used * sizeof(key.n.dp[0]))));
 
-		assertion(-500000, !memcmp(key.n.dp, test->n.dp, (key.n.used * sizeof(key.n.dp[0]))));
-		debugFree(rawN, -300000);
-		bmx_cyassl_free_key( test );
+
+		byte   in[] = "Everyone gets Friday off.";
+		word32 inLen = (word32)strlen((char*)in);
+		byte   enc[256];
+		int    encLen;
+		byte   plain[256];
+
+		int i, repetitions = 100;
+
+		for (i=0; i<repetitions; i++) {
+
+		memset(plain, 0, sizeof(plain));
+
+		if ((encLen = RsaPublicEncrypt(in, inLen, enc, sizeof(enc), pubKey, &rng)) < 0) {
+			dbgf_sys(DBGT_ERR, "Failed RsaPublicEncrypt");
+			return FAILURE;
+		} else {
+			dbgf_track(DBGT_INFO, "Succeeded RsaPublicEncrypt inLen=%d outLen=%d inData=%s outData=%s",
+				inLen, encLen, memAsHexString((char*)in, inLen), memAsHexString((char*)enc, encLen));
+		}
+
+		if ((ret = RsaPrivateDecrypt(enc, encLen, plain, sizeof(plain), &key)) < 0 || memcmp(plain, in, inLen)) {
+			dbgf_sys(DBGT_ERR, "Failed RsaPrivateDecrypt");
+			return FAILURE;
+		} else {
+			dbgf_track(DBGT_INFO, "Succeeded RsaPrivateDecrypt inLen=%d outLen=%d inData=%s outData=%s",
+				encLen, ret, memAsHexString((char*)enc, encLen), memAsHexString((char*)plain, ret));
+		}
+
+
+
+		memset(plain, 0, sizeof(plain));
+
+		if ((encLen = RsaSSL_Sign(in, inLen, enc, sizeof(enc), &key, &rng)) < 0) {
+			dbgf_sys(DBGT_ERR, "Failed RsaSSL_Sign");
+			return FAILURE;
+		} else {
+			dbgf_track(DBGT_INFO, "Succeeded RsaSSL_Sign inLen=%d outLen=%d inData=%s outData=%s",
+				inLen, encLen, memAsHexString((char*)in, inLen), memAsHexString((char*)enc, encLen));
+		}
+
+		if ((ret = RsaSSL_Verify(enc, encLen, plain, sizeof(plain), pubKey)) < 0 || memcmp(plain, in, inLen)) {
+			dbgf_sys(DBGT_ERR, "Failed RsaSSL_Verify");
+			return FAILURE;
+		} else {
+			dbgf_track(DBGT_INFO, "Succeeded RsaSSL_Verify inLen=%d outLen=%d inData=%s outData=%s",
+				encLen, ret, memAsHexString((char*)enc, encLen), memAsHexString((char*)plain, ret));
+		}
+
+		}
+
+
+		debugFree(pubRaw, -300000);
+		bmx_cyassl_free_key( pubKey );
 
 	}
 
@@ -537,6 +594,9 @@ int32_t opt_key_path(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
                 strcpy(key_path, tmp_path);
 		dbgf_sys(DBGT_INFO, "testing rsa crypto in %s=%s", ARG_KEY_PATH, key_path);
 
+		if (rsa_create(1024) != SUCCESS)
+			return FAILURE;
+		
 		return rsa_test();
 
 
@@ -563,6 +623,8 @@ struct opt_type sec_options[]=
 STATIC_FUNC
 int32_t init_sec( void )
 {
+	if ((InitRng(&rng)) != 0)
+		return FAILURE;
 
 	register_options_array( sec_options, sizeof( sec_options ), CODE_CATEGORY_NAME );
 
