@@ -232,7 +232,7 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 }
 
 
-uint8_t * clone_to_nbo(void *in, uint32_t len) {
+void * clone_to_nbo(void *in, uint32_t len) {
 	uint8_t *out = debugMallocReset(len, -300000);
 	uint32_t i;
 
@@ -243,7 +243,7 @@ uint8_t * clone_to_nbo(void *in, uint32_t len) {
 			out[i] = ((uint8_t*)in)[len-i-1];
 	}
 
-	return out;
+	return (void*)out;
 }
 
 char key_path[MAX_PATH_SIZE] = DEF_KEY_PATH;
@@ -282,7 +282,7 @@ int32_t rsa_test(void) {
 
 	if (!(keyFile = fopen(key_path, "rb"))) {
 
-		int keyBitSize = 512
+		int keyBitSize = 2048
 
 		dbgf_sys(DBGT_INFO, "Creating new %d bit key to %s!", keyBitSize, key_path);
 
@@ -307,6 +307,8 @@ int32_t rsa_test(void) {
 		//    note that all first INTEGER bytes are not zero (unlike with openssl certificates), but after conversion they are.
 		// convert to pem with openssl:
 		//    openssl rsa -in rsa-test/key.der -inform DER -out rsa-test/openssl.pem -outform PEM
+		// extract public key with openssl:
+		//    openssl rsa -in rsa-test/key.der -inform DER -pubout -out rsa-test/openssl.der.pub -outform DER
 
 		if (!(keyFile = fopen(key_path, "wb"))) {
 			dbgf_sys(DBGT_ERR, "Failed writing %s! ret=%d", key_path, ret)
@@ -373,15 +375,70 @@ int32_t rsa_test(void) {
 			return FAILURE;
 		}
 
-		uint8_t *nbo = clone_to_nbo((uint8_t*)key.n.dp, (key.n.used * sizeof(key.n.dp[0])));
+		int u = key.n.used;
+		int s = sizeof(key.n.dp[0]);
 
-		dbgf_sys(DBGT_INFO, "pub Key: alloc=%d sign=%d used=%d sizeof=%ld len=%ld bits=%ld N:\n%s",
-			key.n.alloc, key.n.sign, key.n.used, sizeof(key.n.dp[0]), (key.n.used * sizeof(key.n.dp[0])), (key.n.used * sizeof(key.n.dp[0]))*8,
-//			memAsHexStringSep( key.n.dp, (key.n.used * sizeof(key.n.dp[0])), 16, "\n")
-			memAsHexStringSep( nbo, (key.n.used * sizeof(key.n.dp[0])), 8, "\n")
-			);
+
+		mp_digit *nbo = clone_to_nbo(key.n.dp, (u*s));
+		mp_digit *nbf = debugMallocReset(u*s, -300000);
+
+		int i = u-1; // i:= u-1 .. 0
+		int r = 0;   // r:= 0 .. u-1
+		while (i>=0) {
+			if (s==8) {
+				*((uint64_t*)(((uint8_t*)&(nbf[i]))+(r/2))) = nbo[i];
+				if (i>=1)
+					*((uint64_t*)(((uint8_t*)&(nbf[i-1]))+1+(r/2))) = htobe64( (be64toh(nbo[i-1])<<4) | (be64toh(nbo[i])>>((s-1)*8)));
+			} else if (s==4) {
+				*((uint32_t*)(((uint8_t*)&(nbf[i]))+(r/2))) = nbo[i];
+				if (i>=1)
+					*((uint32_t*)(((uint8_t*)&(nbf[i-1]))+1+(r/2))) = htobe32( (be32toh(nbo[i-1])<<4) | (be32toh(nbo[i])>>((s-1)*8)));
+			} else {
+				cleanup_all(-500000);
+			}
+			i-=2;
+			r+=2;
+		}
+
+		mp_digit *nbF = debugMallocReset(u*s, -300000);
+
+		i = u-1; // i:= u-1 .. 0
+		r = 0;   // r:= 0 .. u-1
+		while (i>=0) {
+			if (s==8) {
+				nbF[i] = htobe64( ((be64toh( *((uint64_t*)(((uint8_t*)&(nbf[i]))+(r/2)))))<<4)>>4 );
+				if (i>=1)
+					nbF[i-1] = htobe64( (be64toh(*((uint64_t*)(((uint8_t*)&(nbf[i-1]))+1+(r/2)))))>>4);
+			} else if (s==4) {
+				nbF[i] = htobe32( ((be32toh( *((uint32_t*)(((uint8_t*)&(nbf[i]))+(r/2)))))<<4)>>4 );
+				if (i>=1)
+					nbF[i-1] = htobe32( (be32toh(*((uint32_t*)(((uint8_t*)&(nbf[i-1]))+1+(r/2)))))>>4);
+			} else {
+				cleanup_all(-500000);
+			}
+			i-=2;
+			r+=2;
+		}
+
+
+		mp_digit *nbO = clone_to_nbo(nbF, (u*s));
+
+
+
+		dbgf_sys(DBGT_INFO, "pub Key: alloc=%d sign=%d used=%d sizeof=%ld len=%ld bits=%ld",
+			key.n.alloc, key.n.sign, key.n.used, sizeof(key.n.dp[0]), (key.n.used * sizeof(key.n.dp[0])), (key.n.used * sizeof(key.n.dp[0]))*8 );
+		
+		dbgf_sys(DBGT_INFO, "nbo:\n%s", memAsHexStringSep( nbo, (u*s), 16, "\n"));
+		dbgf_sys(DBGT_INFO, "nbf:\n%s", memAsHexStringSep( nbf, (u*s), 16, "\n"));
+		dbgf_sys(DBGT_INFO, "nbF:\n%s", memAsHexStringSep( nbF, (u*s), 16, "\n"));
+
+		assertion(-500000, !memcmp(key.n.dp,nbO,(u*s)));
 
 		debugFree(nbo, -300000);
+		debugFree(nbf, -300000);
+		debugFree(nbF, -300000);
+		debugFree(nbO, -300000);
+
 
 		dbgf_sys(DBGT_INFO, "alloc=%d sign=%d used=%d sizeof=%ld len=%ld E:\n%s",
 			key.e.alloc, key.e.sign, key.e.used, sizeof(key.e.dp[0]), (key.e.used * sizeof(key.e.dp[0])),
