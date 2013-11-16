@@ -417,33 +417,6 @@ int32_t rsa_test(void) {
 		fclose(keyFile);
 	}
 
-	if (0) { //translate to pem:
-		byte*  pem;
-		int    pemSz = 0;
-		FILE* pemFile;
-		char tmp_path[MAX_PATH_SIZE] = "";
-
-		if ((pem = (byte*)malloc(FOURK_BUF)) == NULL)
-			return FAILURE;
-
-		if((pemSz = DerToPem(der, derSz, pem, FOURK_BUF, PRIVATEKEY_TYPE)) < 0)
-			return FAILURE;
-
-		sprintf(tmp_path, "%s%s",key_path, ".pem");
-		// read this with:
-		//    cat key.pem
-		// convert to pem with openssl:
-		//    openssl rsa -in rsa-test/key.der.pem -inform PEM -out rsa-test/openssl.der -outform DER
-
-		if (!(pemFile = fopen(tmp_path, "wb")))
-			return FAILURE;
-
-		ret = (int)fwrite(pem, 1, pemSz, pemFile);
-		fclose(pemFile);
-
-		free(pem);
-	}
-
 	FreeRsaKey(&key);
 
 
@@ -471,121 +444,48 @@ int32_t rsa_test(void) {
 			return FAILURE;
 		}
 
-		int keyLen = (key.n.used * sizeof(key.n.dp[0]));
+		int keyNLen = (key.n.used * sizeof(key.n.dp[0]));
+		int keyELen = (key.e.used * sizeof(key.e.dp[0]));
 
-		dbgf_sys(DBGT_INFO, "pub Key: alloc=%d sign=%d used=%d sizeof=%ld len=%ld bits=%ld",
-			key.n.alloc, key.n.sign, key.n.used, sizeof(key.n.dp[0]), keyLen, keyLen*8 );
+		dbgf_sys(DBGT_INFO, "pub N: alloc=%d sign=%d used=%d sizeof=%d len=%d bits=%d",
+			key.n.alloc, key.n.sign, key.n.used, sizeof(key.n.dp[0]), keyNLen, keyNLen*8 );
 
+		dbgf_sys(DBGT_INFO, "pub E: alloc=%d sign=%d used=%d sizeof=%d len=%d bits=%d E:\n%s",
+			key.e.alloc, key.e.sign, key.e.used, sizeof(key.e.dp[0]), keyELen, keyELen*8,
+			memAsHexStringSep( key.e.dp, keyELen, 4, NULL));
 
-		uint32_t rawLen = 0;
-		uint8_t *raw = mp_int_get_raw(&key.n, &rawLen);
+		uint32_t rawNLen = 0;
+		uint8_t *rawN = mp_int_get_raw(&key.n, &rawNLen);
+		uint32_t rawELen = 0;
+		uint8_t *rawE = mp_int_get_raw(&key.e, &rawELen);
+
 		RsaKey test;
 		InitRsaKey(&test,0);
-		mp_int_put_raw( &test.n, raw, rawLen );
+		mp_int_put_raw( &test.n, rawN, rawNLen );
+		mp_int_put_raw( &test.e, rawE, rawELen );
 
-		assertion(-500000, !memcmp(key.n.dp, test.n.dp, keyLen));
+		assertion(-500000, !memcmp(key.n.dp, test.n.dp, keyNLen));
+		assertion(-500000, !memcmp(key.e.dp, test.e.dp, keyELen));
 
-		debugFree(raw, -300000);
+		debugFree(rawN, -300000);
+		debugFree(rawE, -300000);
+
 		debugFree(test.n.dp, -300000);
 		test.n.dp = NULL;
+
+		debugFree(test.e.dp, -300000);
+		test.e.dp = NULL;
+
 		FreeRsaKey(&test);
 
 
-		dbgf_sys(DBGT_INFO, "alloc=%d sign=%d used=%d sizeof=%ld len=%ld E:\n%s",
-			key.e.alloc, key.e.sign, key.e.used, sizeof(key.e.dp[0]), (key.e.used * sizeof(key.e.dp[0])),
-			memAsHexStringSep( key.e.dp, (key.e.used * sizeof(key.e.dp[0])), 4, NULL));
 
 		dbgf_sys(DBGT_INFO, "E=%ld", key.e.dp[0]);
 
 	}
 
 
-	{
-		Cert  myCert;
-		byte  derCert[FOURK_BUF];
-		FILE* derFile;
-		int   certSz;
-		char  tmp_path[MAX_PATH_SIZE] = "";
-		sprintf(tmp_path, "%s%s",key_path, ".cert");
-
-		InitCert(&myCert);
-
-		strncpy(myCert.subject.country, "US", CTC_NAME_SIZE);
-		strncpy(myCert.subject.state, "OR", CTC_NAME_SIZE);
-		strncpy(myCert.subject.locality, "Portland", CTC_NAME_SIZE);
-		strncpy(myCert.subject.org, "yaSSL", CTC_NAME_SIZE);
-		strncpy(myCert.subject.unit, "Development", CTC_NAME_SIZE);
-		strncpy(myCert.subject.commonName, "www.yassl.com", CTC_NAME_SIZE);
-		strncpy(myCert.subject.email, "info@yassl.com", CTC_NAME_SIZE);
-		myCert.isCA    = 1;
-		myCert.sigType = CTC_SHA256wRSA;
-
-		if ((certSz = MakeSelfCert(&myCert, derCert, FOURK_BUF, &key, &rng)) < 0) {
-			dbgf_sys(DBGT_ERR,"Failed creating cert %s, certSz=%d", tmp_path, certSz);
-			return FAILURE;
-		}
-
-
-		if (!(derFile = fopen(tmp_path, "wb"))) {
-			dbgf_sys(DBGT_ERR,"Failed opening %s", tmp_path);
-			return FAILURE;
-		}
-		
-		if ((ret = (int)fwrite(derCert, 1, certSz, derFile)) != certSz) {
-			dbgf_sys(DBGT_ERR,"Failed writing %s", tmp_path);
-			return FAILURE;
-		}
-		fclose(derFile);
-	}
         FreeRsaKey(&key);
-
-	{
-
-		byte  derCert[FOURK_BUF];
-		FILE* derFile;
-		int   certSz;
-		char  tmp_path[MAX_PATH_SIZE] = "";
-		sprintf(tmp_path, "%s%s",key_path, ".cert");
-
-		if (!(derFile = fopen(tmp_path, "rb"))) {
-			dbgf_sys(DBGT_ERR,"Failed opening %s", tmp_path);
-			return FAILURE;
-		}
-
-		if ((certSz = (int)fread(derCert, 1, sizeof(derCert), derFile)) <= 0) {
-			dbgf_sys(DBGT_ERR,"Failed reading %s", tmp_path);
-			return FAILURE;
-		}
-		fclose(derFile);
-
-		DecodedCert decode;
-		InitDecodedCert(&decode, derCert, certSz, 0);
-		if ((ret = ParseCert(&decode, CERT_TYPE, NO_VERIFY, 0)) != 0) {
-			dbgf_sys(DBGT_ERR,"Failed testing cert %s, ret=%d", tmp_path, ret);
-			return FAILURE;
-		}
-
-		RsaKey key;
-		InitRsaKey(&key, 0);
-		word32 idx = 0;
-
-		if((ret = RsaPublicKeyDecode(decode.publicKey, &idx, &key, decode.pubKeySize)) != 0 ) {
-			dbgf_sys(DBGT_ERR,"Failed using cert %s, ret=%d", tmp_path, ret);
-			return FAILURE;
-		}
-
-/*		dbgf_sys(DBGT_INFO, "certKey: alloc=%d sign=%d used=%d sizeof=%ld len=%ld bits=%ld N:\n%s",
-			key.n.alloc, key.n.sign, key.n.used, sizeof(key.n.dp[0]), (key.n.used * sizeof(key.n.dp[0])), (key.n.used * sizeof(key.n.dp[0]))*8,
-			memAsHexStringSep( key.n.dp, (key.n.used * sizeof(key.n.dp[0])), 16, "\n")
-			//			memAsHexStringSep( nbo, (key.n.used * sizeof(key.n.dp[0])), 8, "\n")
-			);
-*/
-		FreeDecodedCert(&decode);
-		FreeRsaKey(&key);
-
-//		CYASSL_CERT_MANAGER *cm = CyaSSL_CertManagerNew();
-	}
-
 
 	cleanup_all(0);
 	
