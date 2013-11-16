@@ -232,13 +232,15 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 }
 
 
+STATIC_FUNC
 void * clone_to_nbo(void *in, uint32_t len) {
-	uint8_t *out = debugMallocReset(len, -300000);
+	uint8_t *out;
 	uint32_t i;
 
 	if ( htonl(47) == 47 ) {
-		memcpy(out, in, len);
+		out = in;
 	} else {
+		out = debugMallocReset(len, -300000);
 		for (i=0; i<len; i++)
 			out[i] = ((uint8_t*)in)[len-i-1];
 	}
@@ -248,20 +250,114 @@ void * clone_to_nbo(void *in, uint32_t len) {
 
 char key_path[MAX_PATH_SIZE] = DEF_KEY_PATH;
 
+#define KEY_LEN_MOD 256
+
+STATIC_FUNC
+uint8_t * mp_int_get_raw( mp_int *in, uint32_t *rawLen) {
+
+	int s = sizeof( ((mp_int*)NULL)->dp[0]);
+	int u = in->used;
+	*rawLen = ( ( ((s*u*8)-(u*4)) / KEY_LEN_MOD ) *KEY_LEN_MOD) / 8;
+//	int b = ((*rawLen*8) + ((*rawLen/s)*4));
+	int w = ((*rawLen*8) / ((s*8)-4)) + (((*rawLen*8) % ((s*8)-4)) ? 1 : 0);
+	int zeros = (s*u)-(*rawLen);
+
+
+	dbgf_sys(DBGT_INFO, "s=%d u=%d rawLen=%d w=%d zeros=%d", s, u, *rawLen, w, zeros );
+	dbgf_all(DBGT_INFO, " in:\n%s", memAsHexStringSep( in->dp, (u*s), 16, "\n"));
+
+	assertion(-500000, (u == w));
+
+	mp_digit *nbo = clone_to_nbo(in->dp, (u*s));
+	mp_digit *tmp = debugMallocReset(u*s, -300000);
+
+	int i = u-1; // i:= u-1 .. 0
+	int r = 0;   // r:= 0 .. u-1
+	while (i>=0) {
+		if (s==8) {
+			*((uint64_t*)(((uint8_t*)&(tmp[i]))+(r/2))) = nbo[i];
+			if (i>=1)
+				*((uint64_t*)(((uint8_t*)&(tmp[i-1]))+1+(r/2))) = htobe64( (be64toh(nbo[i-1])<<4) | (be64toh(nbo[i])>>((s-1)*8)));
+		} else if (s==4) {
+			*((uint32_t*)(((uint8_t*)&(tmp[i]))+(r/2))) = nbo[i];
+			if (i>=1)
+				*((uint32_t*)(((uint8_t*)&(tmp[i-1]))+1+(r/2))) = htobe32( (be32toh(nbo[i-1])<<4) | (be32toh(nbo[i])>>((s-1)*8)));
+		} else {
+			cleanup_all(-500000);
+		}
+		i-=2;
+		r+=2;
+	}
+
+	if (nbo != in->dp)
+		debugFree(nbo, -300000);
+
+	uint8_t *begin = ((uint8_t*)tmp) + zeros;
+	
+	assertion(-500000, (*rawLen >= (KEY_LEN_MOD/8))); // too small key!?
+	assertion(-500000, (!is_zero( begin, 4))); // strange key with 4 leading octets!
+	assertion(-500000, (is_zero(tmp, zeros)));
+
+	uint8_t *raw = debugMalloc(*rawLen, -300000);
+	memcpy(raw, begin, *rawLen);
+	
+	debugFree(tmp, -300000);
+
+	dbgf_all(DBGT_INFO, "raw:\n%s", memAsHexStringSep( raw, *rawLen, 16, "\n"));
+
+	return raw;
+}
+
+
+STATIC_FUNC
+void mp_int_put_raw( mp_int *out, uint8_t *raw, uint32_t rawLen) {
+
+	int s = sizeof( ((mp_int*)NULL)->dp[0]);
+	int u = ((rawLen*8) / ((s*8)-4)) + (((rawLen*8) % ((s*8)-4)) ? 1 : 0);
+	int zeros = (s*u)-(rawLen);
+
+	mp_digit *in  = debugMallocReset(u*s, -300000);
+	memcpy( (((uint8_t*)in)+zeros), raw, rawLen );
+
+	mp_digit *tmp = debugMallocReset(u*s, -300000);
+
+	int i = u-1; // i:= u-1 .. 0
+	int r = 0;   // r:= 0 .. u-1
+	while (i>=0) {
+		if (s==8) {
+			tmp[i] = htobe64( ((be64toh( *((uint64_t*)(((uint8_t*)&(in[i]))+(r/2)))))<<4)>>4 );
+
+			if (i>=1)
+				tmp[i-1] = htobe64( (be64toh(*((uint64_t*)(((uint8_t*)&(in[i-1]))+1+(r/2)))))>>4);
+
+		} else if (s==4) {
+
+			tmp[i] = htobe32( ((be32toh( *((uint32_t*)(((uint8_t*)&(in[i]))+(r/2)))))<<4)>>4 );
+
+			if (i>=1)
+				tmp[i-1] = htobe32( (be32toh(*((uint32_t*)(((uint8_t*)&(in[i-1]))+1+(r/2)))))>>4);
+			
+		} else {
+			cleanup_all(-500000);
+		}
+		i-=2;
+		r+=2;
+	}
+
+	debugFree(in, -300000);
+	dbgf_all(DBGT_INFO, "tmp:\n%s", memAsHexStringSep( tmp, (u*s), 16, "\n"));
+
+	out->dp = clone_to_nbo(tmp, (u*s));
+
+	dbgf_all(DBGT_INFO, "out:\n%s", memAsHexStringSep( out->dp, (u*s), 16, "\n"));
+
+	if (out->dp != tmp)
+		debugFree(tmp, -300000);
+}
 
 int32_t rsa_test(void) {
 
 	// test with: ./bmx6 f=0 d=0 --keyDir=$(pwdd)/rsa-test/key.der
-
-	{
-		uint64_t tho = 0x0123456789abcdef;
-		uint64_t tno = htobe64(tho);
-		uint8_t *tp = clone_to_nbo(&tho, sizeof(tho));
-		dbgf_sys(DBGT_INFO, "tno=%s tp=%s",
-			memAsHexString(&tno, sizeof(tno)),
-			memAsHexString(tp, sizeof(uint64_t)));
-		debugFree(tp, -300000);
-	}
 
 	int    ret;
 	RNG    rng;
@@ -375,69 +471,24 @@ int32_t rsa_test(void) {
 			return FAILURE;
 		}
 
-		int u = key.n.used;
-		int s = sizeof(key.n.dp[0]);
-
-
-		mp_digit *nbo = clone_to_nbo(key.n.dp, (u*s));
-		mp_digit *nbf = debugMallocReset(u*s, -300000);
-
-		int i = u-1; // i:= u-1 .. 0
-		int r = 0;   // r:= 0 .. u-1
-		while (i>=0) {
-			if (s==8) {
-				*((uint64_t*)(((uint8_t*)&(nbf[i]))+(r/2))) = nbo[i];
-				if (i>=1)
-					*((uint64_t*)(((uint8_t*)&(nbf[i-1]))+1+(r/2))) = htobe64( (be64toh(nbo[i-1])<<4) | (be64toh(nbo[i])>>((s-1)*8)));
-			} else if (s==4) {
-				*((uint32_t*)(((uint8_t*)&(nbf[i]))+(r/2))) = nbo[i];
-				if (i>=1)
-					*((uint32_t*)(((uint8_t*)&(nbf[i-1]))+1+(r/2))) = htobe32( (be32toh(nbo[i-1])<<4) | (be32toh(nbo[i])>>((s-1)*8)));
-			} else {
-				cleanup_all(-500000);
-			}
-			i-=2;
-			r+=2;
-		}
-
-		mp_digit *nbF = debugMallocReset(u*s, -300000);
-
-		i = u-1; // i:= u-1 .. 0
-		r = 0;   // r:= 0 .. u-1
-		while (i>=0) {
-			if (s==8) {
-				nbF[i] = htobe64( ((be64toh( *((uint64_t*)(((uint8_t*)&(nbf[i]))+(r/2)))))<<4)>>4 );
-				if (i>=1)
-					nbF[i-1] = htobe64( (be64toh(*((uint64_t*)(((uint8_t*)&(nbf[i-1]))+1+(r/2)))))>>4);
-			} else if (s==4) {
-				nbF[i] = htobe32( ((be32toh( *((uint32_t*)(((uint8_t*)&(nbf[i]))+(r/2)))))<<4)>>4 );
-				if (i>=1)
-					nbF[i-1] = htobe32( (be32toh(*((uint32_t*)(((uint8_t*)&(nbf[i-1]))+1+(r/2)))))>>4);
-			} else {
-				cleanup_all(-500000);
-			}
-			i-=2;
-			r+=2;
-		}
-
-
-		mp_digit *nbO = clone_to_nbo(nbF, (u*s));
-
-
+		int keyLen = (key.n.used * sizeof(key.n.dp[0]));
 
 		dbgf_sys(DBGT_INFO, "pub Key: alloc=%d sign=%d used=%d sizeof=%ld len=%ld bits=%ld",
-			key.n.alloc, key.n.sign, key.n.used, sizeof(key.n.dp[0]), (key.n.used * sizeof(key.n.dp[0])), (key.n.used * sizeof(key.n.dp[0]))*8 );
-		
-		dbgf_sys(DBGT_INFO, "nbo:\n%s", memAsHexStringSep( nbo, (u*s), 16, "\n"));
-		dbgf_sys(DBGT_INFO, "nbf:\n%s", memAsHexStringSep( nbf, (u*s), 16, "\n"));
-		dbgf_sys(DBGT_INFO, "nbF:\n%s", memAsHexStringSep( nbF, (u*s), 16, "\n"));
+			key.n.alloc, key.n.sign, key.n.used, sizeof(key.n.dp[0]), keyLen, keyLen*8 );
 
-		assertion(-500000, !memcmp(key.n.dp,nbO,(u*s)));
 
-		debugFree(nbo, -300000);
-		debugFree(nbf, -300000);
-		debugFree(nbF, -300000);
-		debugFree(nbO, -300000);
+		uint32_t rawLen = 0;
+		uint8_t *raw = mp_int_get_raw(&key.n, &rawLen);
+		RsaKey test;
+		InitRsaKey(&test,0);
+		mp_int_put_raw( &test.n, raw, rawLen );
+
+		assertion(-500000, !memcmp(key.n.dp, test.n.dp, keyLen));
+
+		debugFree(raw, -300000);
+		debugFree(test.n.dp, -300000);
+		test.n.dp = NULL;
+		FreeRsaKey(&test);
 
 
 		dbgf_sys(DBGT_INFO, "alloc=%d sign=%d used=%d sizeof=%ld len=%ld E:\n%s",
