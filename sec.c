@@ -250,21 +250,22 @@ void * clone_to_nbo(void *in, uint32_t len) {
 
 char key_path[MAX_PATH_SIZE] = DEF_KEY_PATH;
 
-#define KEY_LEN_MOD 256
+#define XKEY_N_MOD 256
+#define XKEY_E_VAL 65537
+#define XKEY_DP_SZ sizeof( mp_digit)
 
 STATIC_FUNC
 uint8_t * mp_int_get_raw( mp_int *in, uint32_t *rawLen) {
 
-	int s = sizeof( ((mp_int*)NULL)->dp[0]);
+	int s = XKEY_DP_SZ;
 	int u = in->used;
-	*rawLen = ( ( ((s*u*8)-(u*4)) / KEY_LEN_MOD ) *KEY_LEN_MOD) / 8;
-//	int b = ((*rawLen*8) + ((*rawLen/s)*4));
+	*rawLen = ( ( ((s*u*8)-((u)*4)) / XKEY_N_MOD ) * XKEY_N_MOD) / 8;
 	int w = ((*rawLen*8) / ((s*8)-4)) + (((*rawLen*8) % ((s*8)-4)) ? 1 : 0);
 	int zeros = (s*u)-(*rawLen);
 
 
 	dbgf_sys(DBGT_INFO, "s=%d u=%d rawLen=%d w=%d zeros=%d", s, u, *rawLen, w, zeros );
-	dbgf_all(DBGT_INFO, " in:\n%s", memAsHexStringSep( in->dp, (u*s), 16, "\n"));
+	dbgf_sys(DBGT_INFO, " in:\n%s", memAsHexStringSep( in->dp, (u*s), 16, "\n"));
 
 	assertion(-500000, (u == w));
 
@@ -294,25 +295,25 @@ uint8_t * mp_int_get_raw( mp_int *in, uint32_t *rawLen) {
 
 	uint8_t *begin = ((uint8_t*)tmp) + zeros;
 	
-	assertion(-500000, (*rawLen >= (KEY_LEN_MOD/8))); // too small key!?
-	assertion(-500000, (!is_zero( begin, 4))); // strange key with 4 leading octets!
-	assertion(-500000, (is_zero(tmp, zeros)));
-
 	uint8_t *raw = debugMalloc(*rawLen, -300000);
 	memcpy(raw, begin, *rawLen);
 	
+	dbgf_sys(DBGT_INFO, "raw:\n%s", memAsHexStringSep( raw, *rawLen, 16, "\n"));
+
+	assertion(-500000, (*rawLen >= (XKEY_N_MOD/8))); // too small key!?
+	assertion(-500000, (!is_zero( begin, 4))); // strange key with 4 leading octets!
+	assertion(-500000, (is_zero(tmp, zeros)));
+
 	debugFree(tmp, -300000);
 
-	dbgf_all(DBGT_INFO, "raw:\n%s", memAsHexStringSep( raw, *rawLen, 16, "\n"));
 
 	return raw;
 }
 
-
 STATIC_FUNC
-void mp_int_put_raw( mp_int *out, uint8_t *raw, uint32_t rawLen) {
+int mp_int_put_raw( mp_int *out, uint8_t *raw, uint32_t rawLen) {
 
-	int s = sizeof( ((mp_int*)NULL)->dp[0]);
+	int s = XKEY_DP_SZ;
 	int u = ((rawLen*8) / ((s*8)-4)) + (((rawLen*8) % ((s*8)-4)) ? 1 : 0);
 	int zeros = (s*u)-(rawLen);
 
@@ -353,7 +354,60 @@ void mp_int_put_raw( mp_int *out, uint8_t *raw, uint32_t rawLen) {
 
 	if (out->dp != tmp)
 		debugFree(tmp, -300000);
+
+	return u;
 }
+
+
+uint8_t* bmx_cyassl_get_raw_pubKey(RsaKey *key, uint32_t *rawNLen) {
+
+	int keyNLen = (key->n.used * XKEY_DP_SZ);
+	int keyELen = (key->e.used * XKEY_DP_SZ);
+
+	dbgf_sys(DBGT_INFO, "type=%d",key->type);
+	dbgf_sys(DBGT_INFO, "pub N: alloc=%d sign=%d used=%d sizeof=%d len=%d bits=%d",
+		key->n.alloc, key->n.sign, key->n.used, XKEY_DP_SZ, keyNLen, keyNLen*8 );
+
+	dbgf_sys(DBGT_INFO, "pub E: alloc=%d sign=%d used=%d sizeof=%d len=%d bits=%d E:\n%s",
+		key->e.alloc, key->e.sign, key->e.used, XKEY_DP_SZ, keyELen, keyELen*8,
+		memAsHexStringSep( key->e.dp, keyELen, 4, NULL));
+
+	dbgf_sys(DBGT_INFO, "E=%d", (uint32_t)key->e.dp[0]);
+
+	assertion(-500000, (key->type == RSA_PUBLIC || key->type == RSA_PRIVATE));
+	assertion(-500000, (key->e.dp[0] == XKEY_E_VAL));
+
+	return mp_int_get_raw(&key->n, rawNLen);
+}
+
+RsaKey *bmx_cyassl_get_pubKey( uint8_t *rawN, uint32_t rawNLen) {
+
+	RsaKey *key = debugMalloc(sizeof(RsaKey), -300000);
+
+	key->type = RSA_PUBLIC;
+
+	key->e.dp = debugMallocReset(sizeof (mp_digit) * 4, -300000);
+	key->e.dp[0] = XKEY_E_VAL;
+	key->e.alloc = 4;
+	key->e.used  = 1;
+	key->e.sign  = MP_ZPOS;
+
+	int used = mp_int_put_raw( &key->n, rawN, rawNLen );
+	key->n.alloc = used;
+	key->n.used  = used;
+	key->n.sign  = MP_ZPOS;
+
+	return key;
+}
+
+
+void bmx_cyassl_free_key( RsaKey *key ) {
+
+	debugFree(key->n.dp, -300000);
+	debugFree(key->e.dp, -300000);
+	debugFree(key, -300000);
+}
+
 
 int32_t rsa_test(void) {
 
@@ -444,43 +498,15 @@ int32_t rsa_test(void) {
 			return FAILURE;
 		}
 
-		int keyNLen = (key.n.used * sizeof(key.n.dp[0]));
-		int keyELen = (key.e.used * sizeof(key.e.dp[0]));
-
-		dbgf_sys(DBGT_INFO, "pub N: alloc=%d sign=%d used=%d sizeof=%d len=%d bits=%d",
-			key.n.alloc, key.n.sign, key.n.used, sizeof(key.n.dp[0]), keyNLen, keyNLen*8 );
-
-		dbgf_sys(DBGT_INFO, "pub E: alloc=%d sign=%d used=%d sizeof=%d len=%d bits=%d E:\n%s",
-			key.e.alloc, key.e.sign, key.e.used, sizeof(key.e.dp[0]), keyELen, keyELen*8,
-			memAsHexStringSep( key.e.dp, keyELen, 4, NULL));
 
 		uint32_t rawNLen = 0;
-		uint8_t *rawN = mp_int_get_raw(&key.n, &rawNLen);
-		uint32_t rawELen = 0;
-		uint8_t *rawE = mp_int_get_raw(&key.e, &rawELen);
+		uint8_t *rawN = bmx_cyassl_get_raw_pubKey(&key, &rawNLen);
 
-		RsaKey test;
-		InitRsaKey(&test,0);
-		mp_int_put_raw( &test.n, rawN, rawNLen );
-		mp_int_put_raw( &test.e, rawE, rawELen );
+		RsaKey *test = bmx_cyassl_get_pubKey(rawN, rawNLen);
 
-		assertion(-500000, !memcmp(key.n.dp, test.n.dp, keyNLen));
-		assertion(-500000, !memcmp(key.e.dp, test.e.dp, keyELen));
-
+		assertion(-500000, !memcmp(key.n.dp, test->n.dp, (key.n.used * sizeof(key.n.dp[0]))));
 		debugFree(rawN, -300000);
-		debugFree(rawE, -300000);
-
-		debugFree(test.n.dp, -300000);
-		test.n.dp = NULL;
-
-		debugFree(test.e.dp, -300000);
-		test.e.dp = NULL;
-
-		FreeRsaKey(&test);
-
-
-
-		dbgf_sys(DBGT_INFO, "E=%ld", key.e.dp[0]);
+		bmx_cyassl_free_key( test );
 
 	}
 

@@ -40,7 +40,7 @@ char* memAsHexStringSep( const void* mem, uint32_t len, uint16_t seperationLen, 
 #define MEMASSTR_BUFFERS 2
 #define MEMASSTR_STEP_SIZE 2
 #define TRAILER_LEN 4
-        seperationLen = seperationLen ? seperationLen : MEMASSTR_BUFF_SIZE;
+        seperationLen = (seperationLen && seperationLen<len) ? seperationLen : MEMASSTR_BUFF_SIZE;
 	static uint8_t c=0;
         static char out[MEMASSTR_BUFFERS][MEMASSTR_BUFF_SIZE];
         uint32_t i = 0, l = 0;
