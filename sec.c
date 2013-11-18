@@ -517,10 +517,6 @@ int32_t rsa_test(void) {
 		int    encLen;
 		byte   plain[256];
 
-		int i, repetitions = 100;
-
-		for (i=0; i<repetitions; i++) {
-
 		memset(plain, 0, sizeof(plain));
 
 		if ((encLen = RsaPublicEncrypt(in, inLen, enc, sizeof(enc), pubKey, &rng)) < 0) {
@@ -559,8 +555,6 @@ int32_t rsa_test(void) {
 				encLen, ret, memAsHexString((char*)enc, encLen), memAsHexString((char*)plain, ret));
 		}
 
-		}
-
 
 		debugFree(pubRaw, -300000);
 		bmx_cyassl_free_key( pubKey );
@@ -570,7 +564,7 @@ int32_t rsa_test(void) {
 
         FreeRsaKey(&key);
 
-	cleanup_all(0);
+	//cleanup_all(0);
 	
 	return SUCCESS;
 }
