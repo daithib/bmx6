@@ -26,28 +26,35 @@
 #include <linux/if.h>
 
 #define ARG_KEY_PATH "keyPath"
-#define DEF_KEY_PATH "/etc/bmx6/rsa.pem"
+#define DEF_KEY_PATH "/etc/bmx6/rsa.der"
 
-struct desc_signature1 {
+#define XKEY_N_MOD 256
+#define XKEY_E_VAL 65537
+#define XKEY_DP_SZ sizeof( mp_digit)
+#define XDER_BUF_SZ 4096
+
+
+
+struct rsa1024 {
 	union {
 		uint8_t u8[RSA1024_SIGN_LEN];
 		uint32_t u32[RSA1024_SIGN_LEN/sizeof(uint32_t)];
 	} h;
 };
 
-typedef struct desc_signature1 SIGN1_T;
+typedef struct rsa1024 RSA1024_T;
 
 struct description_msg_signature {
-	uint8_t type;
-	uint8_t reserved;
-//	SIGN1_T signature;        // 128 bytes
+	uint8_t   type;
+	uint8_t   reserved;
+	RSA1024_T signature;        // 128 bytes
 } __attribute__((packed));
 
 
 struct description_msg_pubkey {
-	uint8_t type;
-	uint8_t reserved;
-//	SIGN1_T pubkey;
+	uint8_t   type;
+	uint8_t   reserved;
+	RSA1024_T pubkey;
 } __attribute__((packed));
 
 

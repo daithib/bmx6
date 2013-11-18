@@ -342,8 +342,8 @@ struct dedicated_hdr_tun6_req {
     IP6_T      clientTun6Ip;
     DESC_SQN_T clientDescSqn;
     OGM_SQN_T  clientOgmSqn;
-    SIGN1_T    encTunKey;
-    SIGN1_T    clientSign;
+    RSA1024_T  encTunKey;
+    RSA1024_T  clientSign;
 } __attribute__((packed));
 
 
