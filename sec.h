@@ -15,6 +15,11 @@
  * 02110-1301, USA
  */
 
+/*
+ * Alternative cryptographic libraries are:
+ * libtomcrypt and gcrypt
+ */
+
 #include <stdint.h>
 #include <sys/types.h>
 #include <netinet/in.h>
