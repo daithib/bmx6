@@ -444,7 +444,6 @@ static int32_t sms_init( void ) {
         memset( &tlv_handl, 0, sizeof(tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct description_msg_sms);
         tlv_handl.fixed_msg_size = 0;
-        tlv_handl.is_relevant = 0;
 	tlv_handl.dextCompression = &sms_fzip;
 	tlv_handl.dextReferencing = &sms_fref;
         tlv_handl.name = "SMS_EXTENSION";

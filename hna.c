@@ -3423,7 +3423,6 @@ int32_t hna_init( void )
         memset( &tlv_handl, 0, sizeof(tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct description_msg_hna6);
         tlv_handl.fixed_msg_size = 1;
-        tlv_handl.is_relevant = 1;
 	tlv_handl.dextCompression = &hna6_fzip;
 	tlv_handl.dextReferencing = &hna6_fref;
         tlv_handl.name = "HNA6_EXTENSION";

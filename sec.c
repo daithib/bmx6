@@ -636,7 +636,6 @@ int32_t init_sec( void )
         handl.name = "PUBKEY";
         handl.min_msg_size = sizeof (struct description_msg_pubkey);
         handl.fixed_msg_size = 0;
-        handl.is_relevant = 0;
 	handl.dextReferencing = (int32_t*)&always_fref;
         handl.tx_frame_handler = create_description_tlv_pubkey;
         handl.rx_frame_handler = process_description_tlv_pubkey;
@@ -646,7 +645,6 @@ int32_t init_sec( void )
         handl.name = "SIGNATURE";
         handl.min_msg_size = sizeof (struct description_msg_signature);
         handl.fixed_msg_size = 0;
-        handl.is_relevant = 0;
         handl.tx_frame_handler = create_description_tlv_signature;
         handl.rx_frame_handler = process_description_tlv_signature;
         register_frame_handler(description_tlv_handl, BMX_DSC_TLV_SIGNATURE, &handl);

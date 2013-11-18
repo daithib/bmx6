@@ -269,12 +269,12 @@ struct frame_header_short { // 2 bytes
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 	unsigned int type : FRAME_TYPE_BIT_SIZE;
-	unsigned int is_relevant : FRAME_RELEVANCE_BIT_SIZE;
+	unsigned int reserved : 2;
 	unsigned int is_short : FRAME_ISSHORT_BIT_SIZE;
 
 #elif __BYTE_ORDER == __BIG_ENDIAN
 	unsigned int is_short : FRAME_ISSHORT_BIT_SIZE;
-	unsigned int is_relevant : FRAME_RELEVANCE_BIT_SIZE;
+	unsigned int reserved : FRAME_RELEVANCE_BIT_SIZE;
 	unsigned int type : FRAME_TYPE_BIT_SIZE;
 #else
 # error "Please fix <bits/endian.h>"
@@ -287,29 +287,17 @@ struct frame_header_short { // 2 bytes
 struct frame_header_long { // 4 bytes
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 	unsigned int type : FRAME_TYPE_BIT_SIZE;
-	unsigned int is_relevant : FRAME_RELEVANCE_BIT_SIZE;
+	unsigned int reserved : 2;
 	unsigned int is_short : FRAME_ISSHORT_BIT_SIZE;
 #elif __BYTE_ORDER == __BIG_ENDIAN
 	unsigned int is_short : FRAME_ISSHORT_BIT_SIZE;
-	unsigned int is_relevant : FRAME_RELEVANCE_BIT_SIZE;
+	unsigned int reserved : FRAME_RELEVANCE_BIT_SIZE;
 	unsigned int type : FRAME_TYPE_BIT_SIZE;
 #else
 # error "Please fix <bits/endian.h>"
 #endif
 
-//	uint8_t  reserved;
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int is_virtual  : 1;
-	unsigned int compression : 3; // 0:= NO compresson, 1:= gzip compression, 2-7:=reserved; only data field is compressed
-	                              // if (frame) type == BMX_DSC_TLV_REF_ADV then all resolved data fields are compressed (NOT the hashes)
-	unsigned int reserved    : 4;
-#elif __BYTE_ORDER == __BIG_ENDIAN
-	unsigned int reserved    : 4;
-	unsigned int compression : 3;
-	unsigned int is_virtual  : 1;
-#else
-# error "Please fix <bits/endian.h>"
-#endif
+	uint8_t  is_virtual;
 
 	uint16_t length;  // lenght of (compressed) frame in 1-Byte steps, including frame_header and variable data field
 //	uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
@@ -318,7 +306,7 @@ struct frame_header_long { // 4 bytes
 
 struct frame_header_virtual { // 6 bytes
 	unsigned int type : FRAME_TYPE_BIT_SIZE;
-	unsigned int is_relevant : FRAME_RELEVANCE_BIT_SIZE;
+	unsigned int reserved1 : 2;
 	unsigned int is_short : FRAME_ISSHORT_BIT_SIZE;
 
 	unsigned int is_virtual  : 1;
@@ -332,41 +320,46 @@ struct frame_header_virtual { // 6 bytes
 
 
 // Future generic tlv header:
-struct tlv_header { // 3 bytes
+struct tlv_hdr { // 2 bytes
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int length :   11;
-	unsigned int mandatory : 1; // is relevant
-	unsigned int encoding :  4; // is compressed
-	unsigned int type :      8;
+	unsigned int length :    11;
+	unsigned int type :       5;
 #elif __BYTE_ORDER == __BIG_ENDIAN
-	unsigned int type :      8;
-	unsigned int encoding :  4; // is compressed
-	unsigned int mandatory : 1; // is relevant
-	unsigned int length :   11;
+	unsigned int type :       5;
+	unsigned int length :    11;
 #else
 # error "Please fix <bits/endian.h>"
 #endif
+//	uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
 } __attribute__((packed));
-
 
 // for BMX_DSC_TLV_RHASH_ADV:
 struct msg_rhash_adv {
+
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+	unsigned int compression : 2; // 0:= NO compresson, 1:= gzip compression, 2-7:=reserved; only data field is compressed
+	unsigned int nested : 1;
+	unsigned int reserved : 5;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+	unsigned int reserved : 5;
+	unsigned int nested : 1;
+	unsigned int compression : 2;
+#else
+# error "Please fix <bits/endian.h>"
+#endif
 //? uint32_t rframe_position; // position of to-be-resolved frame in hdr_rhash_adv->expanded_len area
     SHA1_T rframe_hash;       // hash over full frame (including frame-header and data) as transmitted
 } __attribute__((packed));
 
 struct hdr_rhash_adv {
 
-    uint8_t expanded_type;
-
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int reserved : 6;
-	unsigned int more_ref_levels : 1;
-	unsigned int expanded_mandatory :1;
+	unsigned int compression : 2; // 0:= NO compresson, 1:= gzip compression, 2-7:=reserved; only data field is compressed
+	                              // all resolved and aggregated data fields are compressed (NOT the hashes)
+	unsigned int expanded_type : 6;
 #elif __BYTE_ORDER == __BIG_ENDIAN
-	unsigned int expanded_mandatory : 1;
-	unsigned int more_ref_levels : 1;
-	unsigned int reserved : 6;
+	unsigned int expanded_type : 6;
+	unsigned int compression : 2;
 #else
 # error "Please fix <bits/endian.h>"
 #endif
@@ -377,6 +370,9 @@ struct hdr_rhash_adv {
 } __attribute__((packed));
 
 #define MSG_RHASH_ADV_FORMAT { \
+{FIELD_TYPE_UINT,          -1, 5,   1, FIELD_RELEVANCE_LOW,  "reserved" }, \
+{FIELD_TYPE_UINT,          -1, 1,   1, FIELD_RELEVANCE_LOW,  "nested" }, \
+{FIELD_TYPE_UINT,          -1, 2,   1, FIELD_RELEVANCE_LOW,  "compression" }, \
 {FIELD_TYPE_STRING_BINARY, -1, 160, 1, FIELD_RELEVANCE_LOW,  "rframe_hash"},  \
 	FIELD_FORMAT_END }
 
@@ -757,9 +753,7 @@ struct rx_frame_iterator {
 
         // set by rx..iterate(), and consumed by handl[].rx_tlv_handler
         uint8_t is_short_header;
-        uint8_t is_relevant;
         uint8_t is_virtual_header;
-	uint8_t frame_compression;
         int32_t frame_data_length;
         int32_t frame_length;
         int32_t frame_msgs_length;
@@ -804,7 +798,6 @@ struct tx_frame_iterator {
 
 	// optionally set by tx_frame_handler():
 	uint8_t              use_long_header;
-	uint8_t              already_compressed;
 
 //#define tx_iterator_cache_data_space( it ) (((it)->frames_out_max) - ((it)->frames_out_pos + (it)->cache_msg_pos + ((int)(sizeof (struct frame_header_long)))))
 //#define tx_iterator_cache_hdr_ptr( it ) ((it)->cache_data_array)
@@ -815,14 +808,6 @@ struct tx_frame_iterator {
 struct frame_handl {
         uint8_t is_advertisement;              // NO link information required for tx_frame_...(), dev is enough
 	uint8_t is_destination_specific_frame; // particularly: is NO advertisement AND individual frames are created for each destination
-	uint8_t is_relevant; // if local implementation differs from received value for given frame: then local value is used.
-	                     // if set to ONE specifies: frame MUST BE processed or in case of unknown frame type:
-	                     // then whole super_frame MUST be dropped. If set to ZERO the frame can be ignored.
-	                     // if frame->is_relevant==1 and unknown and super_frame->is_relevant==1:
-	                     // then the whole super_frame MUST BE dropped as well.
-	                     // If irrelevant and unknown: then frame propagation depends on the super_frame logic.
-	                     // i.e.: * unknown packet_frames MUST BE dropped.
-	                     //       * unknown and irrelevant description_tlv_frames MUST BE propagated
 	int32_t *dextCompression;
 	int32_t *dextReferencing;
 	uint8_t rx_requires_described_neigh;

@@ -394,9 +394,8 @@ typedef uint32_t DESC_SQN_T;
 typedef uint8_t  FRAME_TYPE_T;
 
 #define FRAME_ISSHORT_BIT_SIZE   (1)
-#define FRAME_RELEVANCE_BIT_SIZE  (1)
-#define FRAME_TYPE_BIT_SIZE    ((8*sizeof(FRAME_TYPE_T)) - FRAME_ISSHORT_BIT_SIZE - FRAME_RELEVANCE_BIT_SIZE)
-#define FRAME_TYPE_MASK        XMIN( (0x1F) /*some bits reserved*/, ((1<<FRAME_TYPE_BIT_SIZE)-1))
+#define FRAME_TYPE_BIT_SIZE    (5)
+#define FRAME_TYPE_MASK        ((1<<FRAME_TYPE_BIT_SIZE)-1)
 #define FRAME_TYPE_ARRSZ       (FRAME_TYPE_MASK+1)
 
 #define BMX_DSC_TLV_MIN         0x00
@@ -959,7 +958,6 @@ struct dext_tree_node {
 struct ref_node {
         SHA1_T rhash;
         //struct frame_header_long *frame_hdr;
-	uint8_t f_compression;
 	uint8_t f_long;
 	uint8_t *f_data;
         uint32_t f_data_len; // NOT including frame header!!
