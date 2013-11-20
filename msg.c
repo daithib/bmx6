@@ -3494,10 +3494,10 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 			struct ref_node *refn = ref_node_add(rfd_agg_data + pos, rsize, 0);
 
-			rfd_hdr->msg[m++].rframe_hash = refn->rhash;
-			rfd_hdr->msg[m++].compression = NO; //Not supported yet!
-			rfd_hdr->msg[m++].nested = NO; //only level-1 references supported yet!
-
+			rfd_hdr->msg[m].rframe_hash = refn->rhash;
+			rfd_hdr->msg[m].compression = NO; //Not supported yet!
+			rfd_hdr->msg[m].nested = NO; //only level-1 references supported yet!
+			m++;
 			ref_node_use(it->dext, refn, it->frame_type);
 		}
 
