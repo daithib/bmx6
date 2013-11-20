@@ -3455,6 +3455,11 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		uint8_t rf_short = rfd_size <= (int)MAX_SHORT_FRAME_DATA_LEN;
 		int32_t rf_hdr_size = rf_short?sizeof (struct frame_header_short):sizeof (struct frame_header_long);
 
+		dbgf_track(DBGT_INFO, "added %s fdata_in=%d -> %s msgs=%d rfd_size=%d flen=%d referenced=%d  do_fref=%d (%d %d %d) do_fzip=%d (%d %d %d)",
+			handl->name, fdata_in, rf_short ? "SHORT" : "LONG", rfd_msgs, rfd_size, rf_hdr_size + rfd_size, !!it->dext,
+			do_fref, use_referencing(handl), dextReferencing, DEF_FREF,
+			do_fzip, use_compression(handl), dextCompression, DEF_FZIP );
+
 		// set frame header size and values:
 		memset(fhs, 0, rf_hdr_size);
 		fhs->type = BMX_DSC_TLV_RHASH_ADV;
@@ -3499,7 +3504,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		if (rfd_agg_data && rfd_agg_data != it->frame_cache_array)
 			debugFree(rfd_agg_data, -501595);
 
-		assertion(-501596, (m == rfd_msgs));
+		assertion_dbg(-501596, (m == rfd_msgs), "m=%d rfd_msgs=%d", m, rfd_msgs);
 
 		it->frames_out_pos += rf_hdr_size + sizeof(struct hdr_rhash_adv) + (rfd_msgs * sizeof(struct msg_rhash_adv)); ///TODO
 
@@ -3536,14 +3541,6 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		}
 
 		assertion(-501652, ( it->frames_out_pos <= (int32_t)PKT_FRAMES_SIZE_MAX));
-	}
-
-	if (do_fref || do_fzip ) {
-		dbgf_track(DBGT_INFO, "added %s fdata_in=%d -> %s flen=%d referenced=%d  do_fref=%d (%d %d %d) do_fzip=%d (%d %d %d)",
-			handl->name, fdata_in, fhs->is_short ? "SHORT" : "LONG", fhs->is_short ? fhs->length : ntohs(fhl->length),
-			it->dext && fhs->type==BMX_DSC_TLV_RHASH_ADV,
-			do_fref, use_referencing(handl), dextReferencing, DEF_FREF,
-			do_fzip, use_compression(handl), dextCompression, DEF_FZIP );
 	}
 
 
