@@ -455,10 +455,15 @@ int32_t opt_key_path(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
 
 	if ( (cmd == OPT_CHECK || cmd == OPT_SET_POST) && initializing && !checked ) {
 
-		if ( wordlen( patch->val )+1 >= MAX_PATH_SIZE  ||  patch->val[0] != '/' )
-			return FAILURE;
+		if (cmd == OPT_CHECK) {
+			if ( wordlen( patch->val )+1 >= MAX_PATH_SIZE  ||  patch->val[0] != '/' )
+				return FAILURE;
 
-		snprintf( tmp_path, wordlen(patch->val)+1, "%s", patch->val );
+			snprintf( tmp_path, wordlen(patch->val)+1, "%s", patch->val );
+		} else {
+			strcpy( tmp_path, key_path );
+		}
+
 		char *slash = strrchr(tmp_path, '/');
 		if (slash) {
 			*slash = 0;
