@@ -36,6 +36,7 @@
 #include <cyassl/random.h>
 //#include <cyassl/ctaocrypt/rsa.h>
 
+#include "crypt.h"
 #include "bmx.h"
 #include "msg.h"
 #include "ip.h"
@@ -1329,6 +1330,7 @@ void cleanup_all(int32_t status)
 
                 purge_dhash_invalid_list(YES);
 
+		cleanup_crypt();
 
 		// last, close debugging system and check for forgotten resources...
 
@@ -2395,6 +2397,7 @@ int main(int argc, char *argv[])
         init_tools();
 	init_control();
         init_avl();
+	init_crypt();
 	init_bmx();
         init_ip();
 
