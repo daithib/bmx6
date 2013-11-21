@@ -76,7 +76,6 @@ union schedule_hello_info {
         uint16_t u16;
 };
 
-Sha bmx_sha;
 
 AVL_TREE( description_cache_tree, struct description_cache_node, dhash );
 
@@ -266,7 +265,7 @@ IDM_T validate_desc_sqn(struct description *desc, struct orig_node *on)
 
 
 STATIC_FUNC
-struct description * get_cached_description(struct description_hash *dhash, IDM_T remove)
+struct description * get_cached_description(DHASH_T *dhash, IDM_T remove)
 {
         TRACE_FUNCTION_CALL;
         struct description_cache_node *dcn;
@@ -289,8 +288,8 @@ struct description_cache_node *purge_cached_descriptions(IDM_T purge_all)
         TRACE_FUNCTION_CALL;
         struct description_cache_node *dcn;
         struct description_cache_node *dcn_min = NULL;
-        struct description_hash tmp_dhash;
-        memset( &tmp_dhash, 0, sizeof(struct description_hash));
+        DHASH_T tmp_dhash;
+        memset( &tmp_dhash, 0, sizeof(DHASH_T));
 
         dbgf_all( DBGT_INFO, "%s", purge_all ? "purge_all" : "only_expired");
 
@@ -315,7 +314,7 @@ struct description_cache_node *purge_cached_descriptions(IDM_T purge_all)
 }
 
 STATIC_FUNC
-void cache_description(struct description *desc, struct description_hash *dhash)
+void cache_description(struct description *desc, DHASH_T *dhash)
 {
         TRACE_FUNCTION_CALL;
         struct description_cache_node *dcn;
@@ -1252,11 +1251,10 @@ struct ref_node * ref_node_add(uint8_t *frame_data, uint32_t f_data_len, int8_t 
 		fhs->length = f_hdr_len + f_data_len;
 	}
 
-
 	SHA1_T rhash;
-	ShaUpdate(&bmx_sha, (byte*) &f_hdr, f_hdr_len);
-	ShaUpdate(&bmx_sha, (byte*) frame_data, f_data_len);
-	ShaFinal(&bmx_sha, (byte*) &rhash);
+	cryptShaNew(&f_hdr, f_hdr_len);
+	cryptShaUpdate(frame_data, f_data_len);
+	cryptShaFinal(&rhash);
 
 	struct ref_node *refn = ref_node_get(NULL, &rhash);
 
@@ -1602,7 +1600,7 @@ int32_t tx_msg_dhash_adv(struct tx_frame_iterator *it)
                 return TLV_TX_DATA_DONE;
         }
 
-        memcpy((char*) & adv->dhash, (char*) & dhn->dhash, sizeof ( struct description_hash));
+        memcpy((char*) & adv->dhash, (char*) & dhn->dhash, sizeof(DHASH_T));
 
         dbgf_track(DBGT_INFO, "id=%s", globalIdAsString(&dhn->on->global_id));
 
@@ -2583,7 +2581,7 @@ int32_t rx_frame_ogm_acks(struct rx_frame_iterator *it)
 
 STATIC_FUNC
 struct dhash_node *process_dhash_description_neighIID4x
-(struct packet_buff *pb, struct description_hash *dhash, struct description *dsc, IID_T neighIID4x)
+(struct packet_buff *pb, DHASH_T *dhash, struct description *dsc, IID_T neighIID4x)
 {
         TRACE_FUNCTION_CALL;
         struct dhash_node *orig_dhn = NULL;
@@ -2751,7 +2749,7 @@ int32_t rx_frame_description_advs(struct rx_frame_iterator *it)
 
                 struct msg_description_adv *adv = ((struct msg_description_adv*) (it->frame_data + pos));
                 struct description *desc = &adv->desc;
-                struct description_hash dhash0;
+                DHASH_T dhash0;
                 struct dhash_node *dhn;
 
                 tlvs_len = ntohs(desc->extensionLen);
@@ -2764,8 +2762,7 @@ int32_t rx_frame_description_advs(struct rx_frame_iterator *it)
                 dbgf_track( DBGT_INFO, "rcvd desc: global_id=%s via_dev=%s via_ip=%s",
                         globalIdAsString(&desc->globalId), pb->i.iif->label_cfg.str, pb->i.llip_str);
 
-                ShaUpdate(&bmx_sha, (byte*) desc, (sizeof (struct description) +tlvs_len));
-                ShaFinal(&bmx_sha, (byte*) & dhash0);
+		cryptShaAtomic(desc, (sizeof(struct description) +tlvs_len), &dhash0);
 
                 if ((dhn = process_dhash_description_neighIID4x(pb, &dhash0, desc, neighIID4x)) == FAILURE_PTR) {
 
@@ -3474,10 +3471,9 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		struct hdr_rhash_adv *rfd_hdr = (struct hdr_rhash_adv *) ((uint8_t*)fhs + rf_hdr_size);
 		rfd_hdr->compression = do_fzip;
 		rfd_hdr->expanded_type = it->frame_type;
-
 		rfd_hdr->expanded_rframes_data_len = fdata_in;
-		ShaUpdate(&bmx_sha, (byte*) it->frame_cache_array, fdata_in);
-		ShaFinal(&bmx_sha, (byte*) &rfd_hdr->expanded_rframes_data_hash);
+
+		cryptShaAtomic(it->frame_cache_array, fdata_in, &rfd_hdr->expanded_rframes_data_hash);
 
 		// set: frame-data msgs:
 		// by splitting potentially huge
@@ -4077,9 +4073,7 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 	if (ref_len != (int32_t)hdr->expanded_rframes_data_len)
 		goto_error( resolve_ref_frame_error, "invalid expanded length");
 
-
-	ShaUpdate(&bmx_sha, (byte*) solvable->data + solvable_begin, ref_len);
-	ShaFinal(&bmx_sha, (byte*) &rhash);
+	cryptShaAtomic(solvable->data + solvable_begin, ref_len, &rhash);
 
 	if (memcmp(&rhash, &hdr->expanded_rframes_data_hash, sizeof(SHA1_T)))
 		goto_error( resolve_ref_frame_error, "invalid expanded hash");
@@ -4281,7 +4275,7 @@ resolve_desc_extension_error:
 	return (struct desc_extension *) FAILURE_PTR;
 }
 
-struct dhash_node * process_description(struct packet_buff *pb, struct description *desc, struct description_hash *dhash)
+struct dhash_node * process_description(struct packet_buff *pb, struct description *desc, DHASH_T *dhash)
 {
         TRACE_FUNCTION_CALL;
         assertion(-500262, (pb && pb->i.link && desc));
@@ -4401,7 +4395,7 @@ void update_my_description_adv(void)
 {
         TRACE_FUNCTION_CALL;
 //        static uint8_t cache_data_array[PREF_VRT_FRAME_DATA_SIZE_OUT] = {0};
-        struct description_hash dhash;
+        DHASH_T dhash;
         struct description *dsc = self->desc;
 
 	static uint8_t *frame_cache_array = NULL;
@@ -4496,9 +4490,7 @@ void update_my_description_adv(void)
 
         dbgf_all(DBGT_INFO, "added description_tlv_size=%d ", it.frames_out_pos);
 
-        // calculate hash: like shown in CTaoCrypt Usage Reference:
-        ShaUpdate(&bmx_sha, (byte*) dsc, (it.frames_out_pos + sizeof (struct description)));
-        ShaFinal(&bmx_sha, (byte*) & dhash);
+	cryptShaAtomic(dsc, (it.frames_out_pos + sizeof (struct description)), &dhash);
 
         update_neigh_dhash( self, &dhash );
 
@@ -4766,7 +4758,7 @@ int32_t init_msg( void )
 	assertion(-501567, (FRAME_TYPE_MASK >= FRAME_TYPE_MAX_KNOWN));
 	assertion(-501568, (FRAME_TYPE_MASK >= BMX_DSC_TLV_MAX_KNOWN));
 
-        assertion(-500347, (sizeof (struct description_hash) == HASH_SHA1_LEN));
+        assertion(-500347, (sizeof (DHASH_T) == HASH_SHA1_LEN));
         assertion(-501146, (OGM_DEST_ARRAY_BIT_SIZE == ((OGM_DEST_ARRAY_BIT_SIZE / 8)*8)));
 
         memset(description_tlv_handl, 0, sizeof(description_tlv_handl));
@@ -4778,8 +4770,6 @@ int32_t init_msg( void )
 	register_options_array( msg_options, sizeof( msg_options ), CODE_CATEGORY_NAME );
 
         register_status_handl(sizeof (struct ref_status), 1, ref_status_format, ARG_REFERENCES, ref_status_creator);
-
-        InitSha(&bmx_sha);
 
         task_register(my_ogm_interval, schedule_my_originator_message, NULL, -300356);
 

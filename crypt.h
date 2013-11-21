@@ -26,6 +26,16 @@
 #define XKEY_N_MOD 256
 #define XKEY_E_VAL 65537
 
+#define HASH_SHA1_LEN 20
+#define RSA1024_SIGN_LEN (1024/8) //128 bytes
+
+typedef struct CRYPTSHA1_T {
+	union {
+		uint8_t u8[HASH_SHA1_LEN];
+		uint32_t u32[HASH_SHA1_LEN/sizeof(uint32_t)];
+	} h;
+} CRYPTSHA1_T;
+
 
 typedef struct CRYPTKEY_T {
     uint8_t nativeBackendKey;
@@ -47,6 +57,14 @@ int cryptEncrypt( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRY
 int cryptDecrypt(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *privKey);
 int cryptSign( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *privKey);
 int cryptVerify(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *pubKey);
+
+void cryptRand( void *out, int32_t outLen);
+
+void cryptShaAtomic( void *in, int32_t len, CRYPTSHA1_T *sha);
+void cryptShaNew( void *in, int32_t len);
+void cryptShaUpdate( void *in, int32_t len);
+void cryptShaFinal( CRYPTSHA1_T *sha);
+
 
 void init_crypt(void);
 void cleanup_crypt(void);

@@ -26,10 +26,12 @@
 
 #include "bmx.h"
 #include "tools.h"
-#include "crypt.h"
+//#include "crypt.h"
 
 
 const CRYPTKEY_T CYRYPTKEY_ZERO = { .nativeBackendKey=0, .backendKey=NULL, .rawKeyLen=0, .rawKey=NULL };
+
+static uint8_t shaClean = NO;
 
 /******************* accessing cyassl: ***************************************/
 #if BMX6_CRYPTLIB == CYASSL
@@ -50,6 +52,7 @@ const CRYPTKEY_T CYRYPTKEY_ZERO = { .nativeBackendKey=0, .backendKey=NULL, .rawK
 #include <cyassl/ssl.h>
 
 RNG cryptRng;
+Sha cryptSha;
 
 STATIC_FUNC
 void * clone_to_nbo(void *in, uint32_t len) {
@@ -176,16 +179,6 @@ int mp_int_put_raw( mp_int *out, uint8_t *raw, uint32_t rawLen) {
 
 
 
-STATIC_FUNC
-void cryptRngInit( void ) {
-
-	if ((InitRng(&cryptRng)) != 0)
-		cleanup_all(-500000);
-}
-
-STATIC_FUNC
-void cryptRngFree( void ) {
-}
 
 
 void cryptKeyFree( CRYPTKEY_T *cryptKey ) {
@@ -377,6 +370,54 @@ int cryptVerify(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPT
 		return SUCCESS;
 }
 
+STATIC_FUNC
+void cryptRngInit( void ) {
+
+	if ((InitRng(&cryptRng)) != 0)
+		cleanup_all(-500525);
+}
+
+STATIC_FUNC
+void cryptRngFree( void ) {
+}
+
+void cryptRand( void *out, int32_t outLen) {
+	RNG_GenerateBlock(&cryptRng, (byte*)out, outLen);
+}
+
+
+STATIC_FUNC
+void cryptShaInit( void ) {
+	InitSha(&cryptSha);
+	shaClean = YES;
+}
+
+STATIC_FUNC
+void cryptShaFree( void ) {
+}
+
+void cryptShaAtomic( void *in, int32_t len, CRYPTSHA1_T *sha) {
+	assertion(-500000, (shaClean==YES));
+	ShaUpdate(&cryptSha, (byte*) in, len);
+	ShaFinal(&cryptSha, (byte*) sha);
+}
+
+void cryptShaNew( void *in, int32_t len) {
+	assertion(-500000, (shaClean==YES));
+	shaClean = NO;
+	ShaUpdate(&cryptSha, (byte*) in, len);
+}
+
+void cryptShaUpdate( void *in, int32_t len) {
+	assertion(-500000, (shaClean==NO));
+	ShaUpdate(&cryptSha, (byte*)in, len);
+}
+
+void cryptShaFinal( CRYPTSHA1_T *sha) {
+	assertion(-500000, (shaClean==NO));
+	ShaFinal(&cryptSha, (byte*) sha);
+	shaClean = YES;
+}
 
 /******************* accessing polarssl: *************************************/
 #elif BMX6_CRYPTLIB == POLARSSL
@@ -393,9 +434,11 @@ int cryptVerify(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPT
 void init_crypt(void) {
 	
 	cryptRngInit();
+	cryptShaInit();
 }
 
 void cleanup_crypt(void) {
 
 	cryptRngFree();
+	cryptShaFree();
 }

@@ -24,9 +24,7 @@
 #include <linux/if.h>
 #include <linux/rtnetlink.h>
 
-#include <cyassl/sha.h>
-#include <cyassl/random.h>
-
+#include "crypt.h"
 
 /*
  * from other headers:
@@ -50,6 +48,10 @@ extern int32_t my_compatibility;
 #endif
 extern uint32_t rev_u32;
 
+
+#define SHA1_T CRYPTSHA1_T
+typedef CRYPTSHA1_T DHASH_T;
+typedef CRYPTSHA1_T RHASH_T;
 /*
  * from iid.h:
  */
@@ -426,8 +428,6 @@ typedef uint8_t  FRAME_TYPE_T;
 #define BMX_DSC_TLV_INVALID     (FRAME_TYPE_ARRSZ)
 
 
-#define HASH_SHA1_LEN SHA_DIGEST_SIZE  // sha.h: 20 bytes
-#define RSA1024_SIGN_LEN (1024/8) //128 bytes
 
 #define MAX_UDPD_SIZE 1400
 
@@ -542,14 +542,7 @@ typedef struct GLOBAL_ID GLOBAL_ID_T;
 
 
 
-struct description_hash {
-	union {
-		uint8_t u8[HASH_SHA1_LEN];
-		uint32_t u32[HASH_SHA1_LEN/sizeof(uint32_t)];
-	} h;
-};
 
-typedef struct description_hash SHA1_T;
 
 
 
@@ -1040,7 +1033,7 @@ extern struct avl_tree dhash_invalid_tree;
 
 struct dhash_node {
 
-	struct description_hash dhash;
+	DHASH_T dhash;
 
 	TIME_T referred_by_me_timestamp; // last time this dhn was referred
 
@@ -1058,7 +1051,7 @@ extern struct avl_tree blacklisted_tree;
 
 struct black_node {
 
-	struct description_hash dhash;
+	DHASH_T dhash;
 };
 
 
@@ -1144,7 +1137,7 @@ IDM_T equal_link_key( struct link_dev_key *a, struct link_dev_key *b );
 
 void blacklist_neighbor(struct packet_buff *pb);
 
-IDM_T blacklisted_neighbor(struct packet_buff *pb, struct description_hash *dhash);
+IDM_T blacklisted_neighbor(struct packet_buff *pb, DHASH_T *dhash);
 
 struct neigh_node *is_described_neigh( struct link_node *link, IID_T transmittersIID4x );
 
@@ -1156,7 +1149,7 @@ struct orig_node * init_orig_node(GLOBAL_ID_T *id);
 void purge_local_node(struct local_node *local);
 
 IDM_T update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn);
-void update_neigh_dhash(struct orig_node *on, struct description_hash *dhash);
+void update_neigh_dhash(struct orig_node *on, DHASH_T *dhash);
 
 LOCAL_ID_T new_local_id(struct dev_node *dev);
 

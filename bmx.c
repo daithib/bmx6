@@ -32,11 +32,7 @@
 #include <linux/rtnetlink.h>
 #include <time.h>
 
-#include <cyassl/sha.h>
-#include <cyassl/random.h>
-//#include <cyassl/ctaocrypt/rsa.h>
 
-#include "crypt.h"
 #include "bmx.h"
 #include "msg.h"
 #include "ip.h"
@@ -84,8 +80,6 @@ uint32_t test_magic_number = 1234543210;
 static struct timeval start_time_tv;
 static struct timeval curr_tv;
 
-
-static RNG rng;
 
 TIME_T bmx_time = 0;
 TIME_SEC_T bmx_time_sec = 0;
@@ -137,7 +131,7 @@ void blacklist_neighbor(struct packet_buff *pb)
 }
 
 
-IDM_T blacklisted_neighbor(struct packet_buff *pb, struct description_hash *dhash)
+IDM_T blacklisted_neighbor(struct packet_buff *pb, DHASH_T *dhash)
 {
         TRACE_FUNCTION_CALL;
         //dbgf_all(DBGT_INFO, "%s via %s", pb->i.neigh_str, pb->i.iif->label_cfg.str);
@@ -188,7 +182,7 @@ struct neigh_node *is_described_neigh( struct link_node *link, IID_T transmitter
 
 
 STATIC_FUNC
-struct dhash_node* create_dhash_node(struct description_hash *dhash, struct orig_node *on)
+struct dhash_node* create_dhash_node(DHASH_T *dhash, struct orig_node *on)
 {
         TRACE_FUNCTION_CALL;
 
@@ -270,8 +264,8 @@ void free_dhash_node( struct dhash_node *dhn )
 
         // It must be ensured that I am not reusing this IID for a while, so it must be invalidated
         // but the description and its' resulting dhash might become valid again, so I give it a unique and illegal value.
-        memset(&dhn->dhash, 0, sizeof ( struct description_hash));
-        dhn->dhash.h.u32[(sizeof ( struct description_hash) / sizeof (uint32_t)) - 1] = blocked_counter++;
+        memset(&dhn->dhash, 0, sizeof ( DHASH_T));
+        dhn->dhash.h.u32[(sizeof ( DHASH_T) / sizeof (uint32_t)) - 1] = blocked_counter++;
 
         avl_insert(&dhash_invalid_tree, dhn, -300168);
         plist_add_tail(&dhash_invalid_plist, dhn);
@@ -301,7 +295,7 @@ void invalidate_dhash_node( struct dhash_node *dhn )
 }
 
 
-void update_neigh_dhash(struct orig_node *on, struct description_hash *dhash)
+void update_neigh_dhash(struct orig_node *on, DHASH_T *dhash)
 {
 
         struct neigh_node *neigh = NULL;
@@ -2213,7 +2207,7 @@ void init_bmx(void)
                 cleanup_all(-500272);
         }
 
-	RNG_GenerateBlock(&rng, &(id.pkid.u8[0]), sizeof(id.pkid));
+	cryptRand( &(id.pkid.u8[0]), sizeof(id.pkid) );
 
         self = init_orig_node(&id);
 
@@ -2374,14 +2368,9 @@ int main(int argc, char *argv[])
 
 	My_pid = getpid();
 
-
-        if ( InitRng(&rng) != 0 ) {
-                cleanup_all( -500525 );
-        }
-
         unsigned int random;
 
-        RNG_GenerateBlock(&rng, (byte*)&random, sizeof (random));
+        cryptRand( &random, sizeof (random));
 
 	srand( random );
 

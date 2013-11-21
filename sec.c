@@ -24,17 +24,12 @@
 #include <errno.h>
 #include <stdint.h>
 
-#define CYASSL_KEY_GEN
-#define CYASSL_TEST_CERT
-#define CYASSL_CERT_GEN
-
 
 #include "bmx.h"
 #include "msg.h"
 #include "schedule.h"
 #include "tools.h"
 #include "plugin.h"
-#include "crypt.h"
 #include "sec.h"
 #include "ip.h"
 
@@ -94,8 +89,8 @@ int32_t rsa_create( char *tmp_path, uint16_t keyBitSize ) {
 	if (!(keyFile = fopen(tmp_path, "rb"))) {
 
 		CRYPTKEY_T key;
-		byte  der[XDER_BUF_SZ];
-		int   derSz = XDER_BUF_SZ;
+		uint8_t der[XDER_BUF_SZ];
+		int derSz = XDER_BUF_SZ;
 		int ret;
 
 		dbgf_sys(DBGT_INFO, "Creating new %d bit key to %s!", keyBitSize, tmp_path);
@@ -122,8 +117,8 @@ int32_t rsa_test( char *tmp_path, CRYPTKEY_T *cryptKey ) {
 
 	// test with: ./bmx6 f=0 d=0 --keyDir=$(pwdd)/rsa-test/key.der
 
-	byte  der[XDER_BUF_SZ];
-	int   derSz = 0;
+	uint8_t der[XDER_BUF_SZ];
+	int derSz = 0;
 	FILE* keyFile;
 
 	dbgf_sys(DBGT_INFO, "testing %s=%s", ARG_KEY_PATH, tmp_path);
@@ -148,11 +143,11 @@ int32_t rsa_test( char *tmp_path, CRYPTKEY_T *cryptKey ) {
 	cryptKeyFromRaw( &pubKey, cryptKey->rawKey, cryptKey->rawKeyLen);
 
 
-	byte   in[] = "Everyone gets Friday off.";
+	uint8_t in[] = "Everyone gets Friday off.";
 	int32_t inLen = strlen((char*)in);
-	byte   enc[256];
+	uint8_t enc[256];
 	int32_t encLen;
-	byte   plain[256];
+	uint8_t plain[256];
 	int32_t plainLen;
 
 	encLen = sizeof(enc);

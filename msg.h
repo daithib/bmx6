@@ -584,7 +584,7 @@ struct hdr_dhash_request { // 4 bytes
 
 struct msg_dhash_adv { // 2 + X bytes
 	IID_T transmitterIID4x;
-	struct description_hash dhash;
+	DHASH_T dhash;
 } __attribute__((packed));
 
 
@@ -720,7 +720,7 @@ struct msg_ogm_ack {
 
 
 struct description_cache_node {
-	struct description_hash dhash;
+	DHASH_T dhash;
         TIME_T timestamp;
         struct description *description;
 };
@@ -875,7 +875,6 @@ extern TIME_T myIID4me_timestamp;
 extern struct frame_handl packet_frame_handler[FRAME_TYPE_ARRSZ];
 extern struct frame_handl description_tlv_handl[BMX_DSC_TLV_ARRSZ];
 
-extern Sha bmx_sha;
 
 /***********************************************************
   The core frame/message structures and handlers
@@ -888,7 +887,7 @@ void update_my_dev_adv(void);
 void update_my_link_adv(uint32_t changes);
 
 void free_desc_extensions(struct desc_extension **dext);
-struct dhash_node * process_description(struct packet_buff *pb, struct description *desc, struct description_hash *dhash);
+struct dhash_node * process_description(struct packet_buff *pb, struct description *desc, DHASH_T *dhash);
 IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, struct description *desc, struct desc_extension *dext,
         uint8_t op, uint8_t filter, void *custom, struct ctrl_node *cn);
 int32_t get_desc_frame_data(uint8_t **frame_data, uint8_t *desc_ext_data, int32_t desc_ext_len, uint8_t frame_type);
