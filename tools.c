@@ -31,7 +31,7 @@
 
 
 #include "bmx.h"
-#include "ip.h"
+//#include "ip.h"
 #include "tools.h"
 
 char* memAsHexStringSep( const void* mem, uint32_t len, uint16_t seperationLen, char *seperator)
@@ -428,103 +428,6 @@ uint8_t is_zero(void *data, int len)
 
 
 
-
-
-
-IDM_T str2netw(char* args, IPX_T *ipX,  struct ctrl_node *cn, uint8_t *maskp, uint8_t *familyp, uint8_t is_addr)
-{
-
-        const char delimiter = '/';
-	char *slashptr = NULL;
-        uint8_t family;
-
-        char switch_arg[IP6NET_STR_LEN] = {0};
-
-	if ( wordlen( args ) < 1 || wordlen( args ) >= IP6NET_STR_LEN )
-		return FAILURE;
-
-	wordCopy( switch_arg, args );
-	switch_arg[wordlen( args )] = '\0';
-
-	if ( maskp ) {
-
-                if ((slashptr = strchr(switch_arg, delimiter))) {
-			char *end = NULL;
-
-			*slashptr = '\0';
-
-			errno = 0;
-                        int mask = strtol(slashptr + 1, &end, 10);
-
-			if ( ( errno == ERANGE ) || mask > 128 || mask < 0 ) {
-
-				dbgf_cn( cn, DBGL_SYS, DBGT_ERR, "invalid argument %s %s",
-				         args, strerror( errno ) );
-
-				return FAILURE;
-
-			} else if ( end==slashptr+1 ||  wordlen(end) ) {
-
-				dbgf_cn( cn, DBGL_SYS, DBGT_ERR, "invalid argument trailer %s", end );
-				return FAILURE;
-			}
-
-                        *maskp = mask;
-
-		} else {
-
-			dbgf_cn( cn, DBGL_SYS, DBGT_ERR, "invalid argument %s! Fix you parameters!", switch_arg );
-			return FAILURE;
-		}
-	}
-
-	errno = 0;
-
-        struct in_addr in4;
-        struct in6_addr in6;
-
-        if ((inet_pton(AF_INET, switch_arg, &in4) == 1) && (!maskp || *maskp <= 32)) {
-
-                *ipX = ip4ToX(in4.s_addr);
-                family = AF_INET;
-
-        } else if ((inet_pton(AF_INET6, switch_arg, &in6) == 1) && (!maskp || *maskp <= 128)) {
-
-                *ipX = in6;
-                family = AF_INET6;
-
-        } else {
-
-                dbgf_all(DBGT_WARN, "invalid argument: %s: %s", args, strerror(errno));
-                return FAILURE;
-
-        }
-
-        if (is_addr) {
-                IPX_T netw = *ipX;
-                if ((ip_netmask_validate(&netw, (maskp ? *maskp : (family == AF_INET ? 32 : 128)), family, YES) == FAILURE) ||
-			(maskp && *maskp != (family == AF_INET ? 32 : 128) && !memcmp(&netw, ipX, sizeof (netw)))) {
-			dbgf_cn( cn, DBGL_SYS, DBGT_ERR, "Address required! NOT network!");
-                        return FAILURE;
-		}
-
-        } else {
-                if (ip_netmask_validate(ipX, (maskp ? *maskp : (family == AF_INET ? 32 : 128)), family, NO) == FAILURE) {
-			dbgf_cn( cn, DBGL_SYS, DBGT_ERR, "Network required! NOT address!");
-                        return FAILURE;
-		}
-        }
-
-        if (familyp && (*familyp == AF_INET || *familyp == AF_INET6) && *familyp != family) {
-		dbgf_cn( cn, DBGL_SYS, DBGT_ERR, "%s required!", family2Str(*familyp));
-	}
-
-        if (familyp)
-                *familyp = family;
-
-        return SUCCESS;
-
-}
 
 int32_t check_file(char *path, uint8_t regular, uint8_t read, uint8_t write, uint8_t exec) {
 

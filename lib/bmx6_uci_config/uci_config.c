@@ -28,9 +28,10 @@
 #include <errno.h>
 #include <uci.h>
 
-#include "../../bmx.h"
-#include "../../plugin.h"
-#include "../../tools.h"
+#include "bmx.h"
+#include "node.h"
+#include "plugin.h"
+#include "tools.h"
 #include "uci_config.h"
 
 #define CODE_CATEGORY_NAME "uci_config"

@@ -32,6 +32,7 @@
 //#include <sys/inotify.h>
 
 #include "bmx.h"
+#include "node.h"
 #include "msg.h"
 #include "plugin.h"
 #include "schedule.h"

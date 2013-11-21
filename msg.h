@@ -22,6 +22,15 @@
 
 
 
+#define DEF_DROP_ALL_FRAMES 0
+#define MIN_DROP_ALL_FRAMES 0
+#define MAX_DROP_ALL_FRAMES 1
+#define ARG_DROP_ALL_FRAMES "dropAllFrames"
+
+#define DEF_DROP_ALL_PACKETS 0
+#define MIN_DROP_ALL_PACKETS 0
+#define MAX_DROP_ALL_PACKETS 1
+#define ARG_DROP_ALL_PACKETS "dropAllPackets"
 
 
 #define ARG_UDPD_SIZE "prefUdpSize"
@@ -726,7 +735,6 @@ struct description_cache_node {
 };
 
 
-
 /*
  * this iterator is given the beginning of a frame area (e.g. the end of the packet_header)
  * then it iterates over the frames in that area */
@@ -899,6 +907,7 @@ void tx_packets( void *unused );
 IDM_T rx_frames(struct packet_buff *pb);
 int32_t rx_frame_iterate(struct rx_frame_iterator* it);
 
+void rx_packet( struct packet_buff *pb );
 
 #define SCHEDULE_UNKNOWN_MSGS_SIZE 0
 #define SCHEDULE_MIN_MSG_SIZE -1
@@ -912,3 +921,4 @@ struct plugin *msg_get_plugin( void );
 
 uint8_t use_compression(struct frame_handl *handl);
 uint8_t use_referencing(struct frame_handl *handl);
+

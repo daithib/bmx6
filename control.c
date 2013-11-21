@@ -32,6 +32,7 @@
 #include <paths.h>
 
 #include "bmx.h"
+#include "node.h"
 #include "ip.h"
 #include "plugin.h"
 #include "schedule.h"

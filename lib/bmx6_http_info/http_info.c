@@ -31,12 +31,14 @@
 
 
 #include "bmx.h"
+#include "node.h"
 //#include "os.h"
 //#include "originator.h"
 #include "plugin.h"
 //#include "metrics.h"
 #include "schedule.h"
 #include "tools.h"
+#include "iptools.h"
 #include "ip.h"
 //#include "control.h"
 //#include "list.h"

@@ -18,6 +18,33 @@
 
 #define REGISTER_TASK_TIMEOUT_MAX XMIN( 100000, TIME_MAX>>2)
 
+struct task_node {
+	struct list_node list;
+	TIME_T expire;
+	void (* task) (void *fpara); // pointer to the function to be executed
+	void *data; //NULL or pointer to data to be given to function. Data will be freed after functio is called.
+};
+
+#define TX_TASK_MAX_DATA_LEN 20
+
+struct tx_task_content {
+	struct dev_node *dev; // the outgoing interface to be used for transmitting
+	struct link_node *link;
+	uint8_t data[TX_TASK_MAX_DATA_LEN];
+	IID_T myIID4x;
+	IID_T neighIID4x;
+	uint16_t type;
+} __attribute__((packed));
+
+struct tx_task_node {
+	struct list_node list;
+
+	struct tx_task_content task;
+	uint16_t frame_msgs_length;
+	int16_t  tx_iterations;
+	TIME_T considered_ts;
+	TIME_T send_ts;
+};
 
 //void init_schedule( void );
 void change_selects( void );

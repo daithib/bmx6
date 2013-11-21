@@ -26,6 +26,7 @@
 
 
 #include "bmx.h"
+#include "node.h"
 #include "msg.h"
 #include "schedule.h"
 #include "tools.h"

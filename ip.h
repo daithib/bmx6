@@ -210,16 +210,9 @@ typedef struct ifname IFNAME_T;
 
 
 
-#define B64_SIZE 64
-
-#define IP6NET_STR_LEN (INET6_ADDRSTRLEN+4)  // eg ::1/128
-#define IPXNET_STR_LEN IP6NET_STR_LEN
-
-#define IP4_MAX_PREFIXLEN 32
-#define IP6_MAX_PREFIXLEN 128
 
 
-#define IP2S_ARRAY_LEN 10
+
 
 
 //#define IPV6_MC_ALL_ROUTERS "FF02::2"
@@ -227,19 +220,9 @@ typedef struct ifname IFNAME_T;
 //#define IPV6_LINK_LOCAL_UNICAST_U32 0xFE800000
 //#define IPV6_MULTICAST_U32 0xFF000000
 
-extern const IPX_T  ZERO_IP;
-extern const MAC_T  ZERO_MAC;
-extern const ADDR_T ZERO_ADDR;
 
 extern const struct link_dev_key ZERO_LINK_KEY;
 
-#define ZERO_NET_KEY_INIT {.af = 0}
-extern const struct net_key ZERO_NET_KEY;
-
-#define ZERO_NET4_KEY_INIT {.af = AF_INET}
-extern const struct net_key ZERO_NET4_KEY;
-#define ZERO_NET6_KEY_INIT {.af = AF_INET6}
-extern const struct net_key ZERO_NET6_KEY;
 
 
 extern struct net_key autoconf_prefix_cfg;
@@ -248,7 +231,6 @@ extern struct net_key autoconf_prefix_cfg;
 #define ZERO_NETCFG_KEY ZERO_NET6_KEY
 
 extern const IP6_T   IP6_ALLROUTERS_MC_ADDR;
-extern const IP6_T   IP6_LOOPBACK_ADDR;
 
 extern const IP6_T   IP6_LINKLOCAL_UC_PREF;
 extern const uint8_t IP6_LINKLOCAL_UC_PLEN;
@@ -619,38 +601,6 @@ struct rtnl_get_node {
 //usefult IP tools:
 
 
-char *family2Str(uint8_t family);
-
-
-char *ipXAsStr(int family, const IPX_T *addr);
-char *ip4AsStr( IP4_T addr );
-void  ipXToStr(int family, const IPX_T *addr, char *str);
-void ip6ToStr(const IPX_T *addr, char *str);
-char *netAsStr(const struct net_key *net);
-
-
-#define ipXto4( ipx ) ((ipx).s6_addr32[3])
-IPX_T ip4ToX(IP4_T ip4);
-
-char* macAsStr(const MAC_T* mac);
-
-#define ip6AsStr( addr_ptr ) ipXAsStr( AF_INET6, addr_ptr)
-
-struct net_key * setNet(struct net_key *netp, uint8_t family, uint8_t prefixlen, IPX_T *ip);
-
-
-IDM_T is_mac_equal(const MAC_T *a, const MAC_T *b);
-
-IDM_T is_ip_equal(const IPX_T *a, const IPX_T *b);
-IDM_T is_ip_set(const IPX_T *ip);
-
-IDM_T is_ip_valid( const IPX_T *ip, const uint8_t family );
-IDM_T is_ip_local(IPX_T *ip);
-
-IDM_T ip_netmask_validate(IPX_T *ipX, uint8_t mask, uint8_t family, uint8_t force);
-
-IDM_T is_ip_net_equal(const IPX_T *netA, const IPX_T *netB, const uint8_t plen, const uint8_t family);
-
 
 
 // core:
@@ -692,6 +642,7 @@ void sysctl_config(struct dev_node *dev_node);
 int8_t track_rule_and_proceed(uint32_t network, int16_t mask, uint32_t prio, int16_t rt_table, char* iif,
                                       int16_t rule_type, int8_t del, int8_t cmd);
 
+IDM_T is_ip_local(IPX_T *ip);
 
 
 void init_ip(void);

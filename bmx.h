@@ -49,19 +49,6 @@ extern int32_t my_compatibility;
 extern uint32_t rev_u32;
 
 
-#define SHA1_T CRYPTSHA1_T
-typedef CRYPTSHA1_T DHASH_T;
-typedef CRYPTSHA1_T RHASH_T;
-/*
- * from iid.h:
- */
-typedef uint16_t IID_T;
-
-typedef struct neigh_node IID_NEIGH_T;
-
-typedef struct dhash_node IID_NODE_T;
-
-
 
 /*
  * from ip.h:
@@ -120,6 +107,17 @@ typedef union {
 	uint8_t   u8[MAC_ADDR_LEN];
 	uint16_t u16[MAC_ADDR_LEN / sizeof(uint16_t)];
 } MAC_T;
+
+extern const IPX_T  ZERO_IP;
+extern const MAC_T  ZERO_MAC;
+extern const ADDR_T ZERO_ADDR;
+
+#define ZERO_NET_KEY_INIT {.af = 0}
+extern const struct net_key ZERO_NET_KEY;
+#define ZERO_NET4_KEY_INIT {.af = AF_INET}
+extern const struct net_key ZERO_NET4_KEY;
+#define ZERO_NET6_KEY_INIT {.af = AF_INET6}
+extern const struct net_key ZERO_NET6_KEY;
 
 
 /*
@@ -251,11 +249,6 @@ extern int32_t my_tx_interval;
 extern int32_t my_ogm_interval;
 
 
-#define MIN_OGM_PURGE_TO  (MAX_OGM_INTERVAL + MAX_TX_INTERVAL)
-#define MAX_OGM_PURGE_TO  864000000 /*10 days*/
-#define DEF_OGM_PURGE_TO  100000
-#define ARG_OGM_PURGE_TO  "purgeTimeout"
-// extern int32_t purge_to;
 
 #define DEF_DAD_TO 20000//(MAX_OGM_INTERVAL + MAX_TX_INTERVAL)
 #define MIN_DAD_TO 100
@@ -263,15 +256,6 @@ extern int32_t my_ogm_interval;
 #define ARG_DAD_TO "dadTimeout"
 extern int32_t dad_to;
 
-#define DEF_DROP_ALL_FRAMES 0
-#define MIN_DROP_ALL_FRAMES 0
-#define MAX_DROP_ALL_FRAMES 1
-#define ARG_DROP_ALL_FRAMES "dropAllFrames"
-
-#define DEF_DROP_ALL_PACKETS 0
-#define MIN_DROP_ALL_PACKETS 0
-#define MAX_DROP_ALL_PACKETS 1
-#define ARG_DROP_ALL_PACKETS "dropAllPackets"
 
 
 #define MIN_DHASH_TO 300000
@@ -375,10 +359,6 @@ typedef uint16_t HELLO_SQN_T;
 //#define RP_PURGE_ITERATIONS MAX_LINK_WINDOW
 
 
-#define DEF_LINK_PURGE_TO  100000
-#define MIN_LINK_PURGE_TO  (MAX_TX_INTERVAL*2)
-#define MAX_LINK_PURGE_TO  864000000 /*10 days*/
-#define ARG_LINK_PURGE_TO  "linkPurgeTimeout"
 
 
 
@@ -432,29 +412,6 @@ typedef uint8_t  FRAME_TYPE_T;
 #define MAX_UDPD_SIZE 1400
 
 
-#if MIN_COMPATIBILITY <= CV16
-struct packet_header // 17 bytes
-{
-	uint8_t    comp_version;     //  8
-	uint8_t    capabilities;     //  8  reserved
-	uint16_t   pkt_length; 	     // 16 the relevant data size in bytes (including the bmx_header)
-
-	IID_T      transmitterIID;   // 16 IID of transmitter node
-
-	LINKADV_SQN_T link_adv_sqn;  // 16 used for processing: link_adv, lq_adv, rp_adv, ogm_adv, ogm_ack
-
-	//TODOCV17: merge pkt_sqn and local_id into single uint64_t local_id
-	PKT_SQN_T  pkt_sqn;          // 32
-	LOCAL_ID_T local_id;         // 32
-	
-	DEVADV_IDX_T   dev_idx;      //  8
-
-//	uint8_t    reserved_for_2byte_alignement;  //  8
-
-} __attribute__((packed));
-#else
-// use generic tlv_header instead...
-#endif
 
 
 
@@ -519,7 +476,6 @@ struct metric_record {
 
 #include "avl.h"
 #include "list.h"
-#include "iid.h"
 #include "control.h"
 #include "allocate.h"
 
@@ -779,280 +735,9 @@ uint32_t field_iterate(struct field_iterator *it);
 void register_status_handl(uint16_t min_msg_size, IDM_T multiline, const struct field_format* format, char *name,
                             int32_t(*creator) (struct status_handl *status_handl, void *data));
 
-struct task_node {
-	struct list_node list;
-	TIME_T expire;
-	void (* task) (void *fpara); // pointer to the function to be executed
-	void *data; //NULL or pointer to data to be given to function. Data will be freed after functio is called.
-};
 
-#define TX_TASK_MAX_DATA_LEN 20
 
-struct tx_task_content {
-	struct dev_node *dev; // the outgoing interface to be used for transmitting
-	struct link_node *link;
-	uint8_t data[TX_TASK_MAX_DATA_LEN];
-	IID_T myIID4x;
-	IID_T neighIID4x;
-	uint16_t type;
-} __attribute__((packed));
 
-struct tx_task_node {
-	struct list_node list;
-
-	struct tx_task_content task;
-	uint16_t frame_msgs_length; 
-	int16_t  tx_iterations;
-	TIME_T considered_ts;
-	TIME_T send_ts;
-};
-
-
-
-extern struct avl_tree local_tree;
-
-struct local_node {
-
-	LOCAL_ID_T local_id;
-	struct avl_tree link_tree;
-	struct link_dev_node *best_rp_lndev;
-	struct link_dev_node *best_tp_lndev;
-	struct link_dev_node *best_lndev;
-	struct neigh_node *neigh; // to be set when confirmed, use carefully
-
-	TIME_T packet_time;
-	LINKADV_SQN_T packet_link_sqn_ref; //indicating the maximum existing link_adv_sqn
-
-	// the latest received link_adv:
-	LINKADV_SQN_T link_adv_sqn;
-	TIME_T link_adv_time;
-	uint16_t link_adv_msgs;
-	int16_t link_adv_msg_for_me;
-	int16_t link_adv_msg_for_him;
-	struct msg_link_adv *link_adv;
-	DEVADV_SQN_T link_adv_dev_sqn_ref;
-
-	// the latest received dev_adv:
-	DEVADV_SQN_T dev_adv_sqn;
-	uint16_t dev_adv_msgs;
-	struct msg_dev_adv *dev_adv;
-
-	// the latest received rp_adv:
-	TIME_T rp_adv_time;
-	IDM_T rp_ogm_request_rcvd;
-	int32_t orig_routes;
-} __attribute__((packed));
-
-
-extern struct avl_tree link_tree;
-
-struct link_node_key {
-	DEVADV_IDX_T dev_idx;
-	LOCAL_ID_T local_id;
-} __attribute__((packed));
-
-struct link_node {
-
-	struct link_node_key key;
-
-	IPX_T link_ip;
-
-	TIME_T pkt_time_max;
-	TIME_T hello_time_max;
-
-	HELLO_SQN_T hello_sqn_max;
-
-	struct local_node *local; // set immediately
-	
-	struct list_head lndev_list; // list with one link_node_dev element per link
-};
-
-
-struct link_dev_key {
-	struct link_node *link;
-	struct dev_node *dev;
-} __attribute__((packed));
-
-struct router_node {
-
-//	struct link_dev_key key_2BRemoved;
-
-	struct local_node *local_key;
-
-	struct metric_record mr;
-	OGM_SQN_T ogm_sqn_last;
-	UMETRIC_T ogm_umetric_last;
-	
-	UMETRIC_T path_metric_best; //TODO removed
-	struct link_dev_node *path_lndev_best;
-};
-
-
-extern struct avl_tree link_dev_tree;
-
-struct link_dev_node {
-	struct list_node list;
-	struct link_dev_key key;
-
-	UMETRIC_T tx_probe_umetric;
-	UMETRIC_T timeaware_tx_probe;
-	struct lndev_probe_record rx_probe_record;
-	UMETRIC_T timeaware_rx_probe;
-
-	struct list_head tx_task_lists[FRAME_TYPE_ARRSZ]; // scheduled frames and messages
-	int16_t link_adv_msg;
-	TIME_T pkt_time_max;
-};
-
-
-
-extern struct avl_tree neigh_tree;
-
-struct neigh_node {
-
-	struct neigh_node *nnkey;
-	struct dhash_node *dhn; // confirmed dhash
-
-	struct local_node *local; // to be set when confirmed, use carefully
-
-	// filled in by ???:
-
-	IID_T neighIID4me;
-
-	struct iid_repos neighIID4x_repos;
-
-//	AGGREG_SQN_T ogm_aggregation_rcvd_set;
-        TIME_T ogm_new_aggregation_rcvd;
-	AGGREG_SQN_T ogm_aggregation_cleard_max;
-	uint8_t ogm_aggregations_not_acked[AGGREG_ARRAY_BYTE_SIZE];
-	uint8_t ogm_aggregations_rcvd[AGGREG_ARRAY_BYTE_SIZE];
-};
-
-
-
-
-
-extern struct avl_tree orig_tree;
-//extern struct avl_tree blocked_tree;
-
-
-struct dext_tree_key {
-    struct desc_extension *dext;
-} __attribute__((packed));
-
-struct dext_tree_node {
-    struct dext_tree_key dext_key;
-    uint8_t rf_types[(BMX_DSC_TLV_ARRSZ/8) + (BMX_DSC_TLV_ARRSZ%8)];
-};
-
-#define MAX_DESC_LEN (INT32_MAX-1)
-#define MAX_REF_NESTING 2
-
-struct ref_node {
-        SHA1_T rhash;
-        //struct frame_header_long *frame_hdr;
-	uint8_t f_long;
-	uint8_t *f_data;
-        uint32_t f_data_len; // NOT including frame header!!
-        uint32_t last_usage;
-        uint32_t usage_counter;
-	struct avl_tree dext_tree;
-};
-
-
-
-struct refnl_node {
-    	struct list_node list;
-	struct ref_node *refn;
-};
-
-struct desc_extension {
-	struct list_head refnl_list;
-	struct orig_node *on;
-        uint8_t max_nesting;
-        uint8_t *data;
-        uint32_t dlen;
-};
-
-struct orig_node {
-	// filled in by validate_new_link_desc0():
-
-	GLOBAL_ID_T global_id;
-
-	struct dhash_node *dhn;
-	struct description *desc;
-	struct desc_extension *dext;
-
-
-	TIME_T updated_timestamp; // last time this on's desc was succesfully updated
-
-	DESC_SQN_T descSqn;
-
-	OGM_SQN_T ogmSqn_rangeMin;
-	OGM_SQN_T ogmSqn_rangeSize;
-
-
-
-	// filled in by process_desc0_tlvs()->
-	IPX_T primary_ip;
-	char primary_ip_str[IPX_STR_LEN];
-	uint8_t blocked; // blocked description
-        uint8_t added;   // added description
-
-
-	struct host_metricalgo *path_metricalgo;
-
-	// calculated by update_path_metric()
-
-	OGM_SQN_T ogmSqn_maxRcvd;
-
-	OGM_SQN_T ogmSqn_next;
-	UMETRIC_T ogmMetric_next;
-
-	OGM_SQN_T ogmSqn_send;
-//	UMETRIC_T ogmMetric_send;
-
-	UMETRIC_T *metricSqnMaxArr;          // TODO: remove
-
-	struct avl_tree rt_tree;
-
-	struct router_node * best_rt_local;  // TODO: remove
-	struct router_node *curr_rt_local;   // the currently used local neighbor for routing
-	struct link_dev_node *curr_rt_lndev; // the configured route in the kernel!
-
-	//size of plugin data is defined during intialization and depends on registered PLUGIN_DATA_ORIG hooks
-	void *plugin_data[];
-
-};
-
-
-
-
-extern struct avl_tree dhash_tree;
-extern struct avl_tree dhash_invalid_tree;
-
-struct dhash_node {
-
-	DHASH_T dhash;
-
-	TIME_T referred_by_me_timestamp; // last time this dhn was referred
-
-	struct neigh_node *neigh;
-
-	IID_T myIID4orig;
-
-
-	struct orig_node *on;
-};
-
-
-
-extern struct avl_tree blacklisted_tree;
-
-struct black_node {
-
-	DHASH_T dhash;
-};
 
 
 
@@ -1083,38 +768,6 @@ struct ogm_aggreg_node {
 	uint8_t  tx_attempt;
 };
 
-struct packet_buff {
-
-	struct packet_buff_info {
-		//filled by wait4Event()
-		struct sockaddr_storage addr;
-		struct timeval tv_stamp;
-		struct dev_node *iif;
-		int total_length;
-		uint8_t unicast;
-
-		//filled in by rx_packet()
-		uint32_t rx_counter;
-		IID_T transmittersIID;
-		LINKADV_SQN_T link_sqn;
-
-		struct link_node_key link_key;
-
-		IPX_T llip;
-		char llip_str[INET6_ADDRSTRLEN];
-		struct dev_node *oif;
-		struct link_dev_node *lndev;
-		struct link_node *link;
-
-//		struct neigh_node *described_neigh; // might be updated again process_dhash_description_neighIID4x()
-	} i;
-
-	union {
-		struct packet_header header;
-		unsigned char data[MAX_UDPD_SIZE + 1];
-	} packet;
-
-};
 
 
 
@@ -1129,31 +782,6 @@ enum {
 	CLEANUP_RETURN
 };
 
-
-/***********************************************************
- Data Infrastructure
- ************************************************************/
-IDM_T equal_link_key( struct link_dev_key *a, struct link_dev_key *b );
-
-void blacklist_neighbor(struct packet_buff *pb);
-
-IDM_T blacklisted_neighbor(struct packet_buff *pb, DHASH_T *dhash);
-
-struct neigh_node *is_described_neigh( struct link_node *link, IID_T transmittersIID4x );
-
-void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired);
-void block_orig_node(IDM_T block, struct orig_node *on);
-void free_orig_node(struct orig_node *on);
-struct orig_node * init_orig_node(GLOBAL_ID_T *id);
-
-void purge_local_node(struct local_node *local);
-
-IDM_T update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn);
-void update_neigh_dhash(struct orig_node *on, DHASH_T *dhash);
-
-LOCAL_ID_T new_local_id(struct dev_node *dev);
-
-void rx_packet( struct packet_buff *pb );
 
 
 /***********************************************************

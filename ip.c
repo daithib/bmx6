@@ -41,11 +41,13 @@
 
 
 #include "bmx.h"
-#include "ip.h"
+#include "node.h"
 #include "msg.h"
+#include "ip.h"
 #include "schedule.h"
 #include "plugin.h"
 #include "tools.h"
+#include "iptools.h"
 #include "metrics.h"
 
 #define CODE_CATEGORY_NAME "ip"
@@ -53,9 +55,6 @@
 uint8_t __af_cfg = DEF_IP_FAMILY;
 struct net_key __ZERO_NETCFG_KEY = {.af = DEF_IP_FAMILY};
 
-const struct net_key ZERO_NET_KEY = ZERO_NET_KEY_INIT;
-const struct net_key ZERO_NET4_KEY = ZERO_NET4_KEY_INIT;
-const struct net_key ZERO_NET6_KEY = ZERO_NET6_KEY_INIT;
 
 
 const IFNAME_T ZERO_IFNAME = {{0}};
@@ -79,9 +78,6 @@ int32_t policy_routing = POLICY_RT_UNSET;
 
 static int32_t base_port = DEF_BASE_PORT;
 
-const IPX_T  ZERO_IP = { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 } } };
-const MAC_T  ZERO_MAC = {{0}};
-const ADDR_T ZERO_ADDR = {{0}};
 
 //TODO: make this configurable
 static struct net_key llocal_prefix_cfg;
@@ -90,8 +86,7 @@ struct net_key autoconf_prefix_cfg;
 
 //#define IN6ADDR_ANY_INIT { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 } } }
 //#define IN6ADDR_LOOPBACK_INIT { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } }
-
-const IP6_T IP6_LOOPBACK_ADDR = { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } };
+//const IP6_T IP6_LOOPBACK_ADDR = { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } };
 
 
 //const IP6_T   IP6_ALLROUTERS_MC_ADDR = {.s6_addr[0] = 0xFF, .s6_addr[1] = 0x02, .s6_addr[15] = 0x02};
@@ -137,7 +132,6 @@ static void dev_check(void *kernel_ip_config_changed);
 static void (*ipexport) (int8_t del, const struct net_key *dst, uint32_t oif_idx, IPX_T *via, uint32_t metric, uint8_t distance) = NULL;
 
 struct sys_route_dict bmx6_rt_dict[BMX6_ROUTE_MAX];
-
 
 
 STATIC_FUNC
@@ -408,253 +402,6 @@ char *trackt2str(uint8_t cmd)
 	} 
 
         return "TRACK_ILLEGAL";
-}
-
-char *family2Str(uint8_t family)
-{
-        static char b[B64_SIZE];
-
-        switch (family) {
-        case AF_INET:
-                return "IPv4";
-        case AF_INET6:
-                return "IPv6";
-        default:
-                sprintf( b, "%d ???", family);
-                return b;
-        }
-}
-
-
-
-
-void ipXToStr(int family, const IPX_T *addr, char *str)
-{
-        assertion(-500583, (str));
-        uint32_t *a;
-
-        if (!addr && (family == AF_INET6 || family == AF_INET)) {
-
-                strcpy(str, "---");
-                return;
-
-        } else if (family == AF_INET) {
-
-                a = (uint32_t *)&(addr->s6_addr32[3]);
-
-        } else if (family == AF_INET6) {
-                
-                a = (uint32_t *)&(addr->s6_addr32[0]);
-
-        } else {
-                strcpy(str, "ERROR");
-                return;
-        }
-
-        inet_ntop(family, a, str, family == AF_INET ? INET_ADDRSTRLEN : INET6_ADDRSTRLEN);
-	return;
-}
-
-void ip6ToStr(const IPX_T *addr, char *str)
-{
-        ipXToStr(AF_INET6, addr, str);
-}
-
-IPX_T ip4ToX(IP4_T ip4)
-{
-        IPX_T ip = ZERO_IP;
-        ip.s6_addr32[3] = ip4;
-        return ip;
-}
-
-char *ipXAsStr(int family, const IPX_T *addr)
-{
-	static uint8_t c=0;
-        static char str[IP2S_ARRAY_LEN][INET6_ADDRSTRLEN];
-
-	c = (c+1) % IP2S_ARRAY_LEN;
-
-        ipXToStr(family, addr, str[c]);
-
-        return str[c];
-}
-
-
-char *ip4AsStr( IP4_T addr )
-{
-
-	static uint8_t c=0;
-	static char str[IP2S_ARRAY_LEN][INET_ADDRSTRLEN];
-
-	c = (c+1) % IP2S_ARRAY_LEN;
-
-	inet_ntop( AF_INET, &addr, str[c], INET_ADDRSTRLEN );
-
-	return str[c];
-}
-
-char *netAsStr(const struct net_key *net)
-{
-	static uint8_t c=0;
-        static char str[IP2S_ARRAY_LEN][IPXNET_STR_LEN];
-
-	c = (c+1) % IP2S_ARRAY_LEN;
-
-        if(net) {
-                ipXToStr(net->af, &net->ip, str[c]);
-                sprintf(&((str[c]) [ strlen(str[c])]), "/%d", net->mask);
-        } else {
-                sprintf(str[c], "---");
-        }
-
-        return str[c];
-}
-
-struct net_key * setNet(struct net_key *netp, uint8_t family, uint8_t prefixlen, IPX_T *ip)
-{
-        static struct net_key net;
-        netp = netp ? netp : &net;
-        *netp = ZERO_NET_KEY;
-        netp->af = family;
-        netp->mask = prefixlen;
-        netp->ip = ip ? *ip : ZERO_IP;
-        return netp;
-}
-
-char* macAsStr(const MAC_T* mac)
-{
-        return memAsHexString( mac, sizeof(MAC_T));
-}
-
-IDM_T is_mac_equal(const MAC_T *a, const MAC_T *b)
-{
-        return (a->u16[2] == b->u16[2] &&
-                a->u16[1] == b->u16[1] &&
-                a->u16[0] == b->u16[0]);
-
-}
-
-
-IDM_T is_ip_equal(const IPX_T *a, const IPX_T *b)
-{
-        return (a->s6_addr32[3] == b->s6_addr32[3] &&
-                a->s6_addr32[2] == b->s6_addr32[2] &&
-                a->s6_addr32[1] == b->s6_addr32[1] &&
-                a->s6_addr32[0] == b->s6_addr32[0]);
-
-}
-
-IDM_T is_ip_net_equal(const IPX_T *netA, const IPX_T *netB, const uint8_t plen, const uint8_t family)
-{
-
-        IPX_T aprefix = *netA;
-        IPX_T bprefix = *netB;
-
-        ip_netmask_validate(&aprefix, plen, family, YES /*force*/);
-        ip_netmask_validate(&bprefix, plen, family, YES /*force*/);
-
-        return is_ip_equal(&aprefix, &bprefix);
-}
-
-
-
-
-IDM_T is_ip_set(const IPX_T *ip)
-{
-        return (ip && !is_ip_equal(ip, &ZERO_IP));
-}
-
-IDM_T is_ip_valid( const IPX_T *ip, const uint8_t family )
-{
-	TRACE_FUNCTION_CALL;
-
-        if (!is_ip_set(ip))
-                return NO;
-
-        if (family != (is_zero((void*) ip, sizeof ( IPX_T) - sizeof (IP4_T)) ? AF_INET : AF_INET6))
-                return NO;
-
-        if (family == AF_INET6 ) {
-
-                if (!is_ip_equal(ip, &IP6_LOOPBACK_ADDR))
-                        return YES;
-                
-
-        } else if (family == AF_INET ) {
-
-                if (ipXto4(*ip) != INADDR_LOOPBACK && ipXto4(*ip) != INADDR_NONE)
-                        return YES;
-        }
-
-        return NO;
-}
-
-IDM_T is_ip_local(IPX_T *ip)
-{
-
-        struct if_link_node *iln;
-        struct avl_node *lan = NULL;
-
-        while ((iln = avl_iterate_item(&if_link_tree, &lan))) {
-
-                if (iln->flags & IFF_UP)
-                        continue;
-
-                struct if_addr_node *ian;
-                struct avl_node *aan = NULL;
-
-                while ((ian = avl_iterate_item(&iln->if_addr_tree, &aan))) {
-                        if (is_ip_equal(&ian->ip_addr, ip))
-                                return YES;
-                }
-        }
-        return NO;
-}
-
-IDM_T ip_netmask_validate(IPX_T *ipX, uint8_t mask, uint8_t family, uint8_t force)
-{
-	TRACE_FUNCTION_CALL;
-        uint8_t nmask = mask;
-        int i;
-        IP4_T ip32 = 0, m32 = 0;
-
-        if (nmask > (family == AF_INET ? 32 : 128))
-                goto validate_netmask_error;
-
-        if (family == AF_INET)
-                nmask += (IP6_MAX_PREFIXLEN - IP4_MAX_PREFIXLEN);
-
-        for (i = 3; i >= 0 && i >= (nmask / 32); i--) {
-
-                if (!(ip32 = ipX->s6_addr32[i]))
-                        continue;
-
-                if ( force ) {
-
-                        if (nmask <= (i * 32))
-                                ipX->s6_addr32[i] = 0;
-                        else
-                                ipX->s6_addr32[i] = (ip32 & (m32 = htonl(0xFFFFFFFF << (32 - (nmask - (i * 32))))));
-
-                } else {
-
-                        if (nmask <= (i * 32))
-                                goto validate_netmask_error;
-
-                        else if (ip32 != (ip32 & (m32 = htonl(0xFFFFFFFF << (32 - (nmask - (i * 32)))))))
-                                goto validate_netmask_error;
-                }
-        }
-
-
-        return SUCCESS;
-validate_netmask_error:
-
-        dbgf_sys(DBGT_ERR, "inconsistent network prefix %s/%d (force=%d  nmask=%d, ip32=%s m32=%s)",
-                ipXAsStr(family, ipX), mask, force, nmask, ip4AsStr(ip32), ip4AsStr(m32));
-
-        return FAILURE;
-
 }
 
 
@@ -1039,6 +786,28 @@ void kernel_get_if_addr_config(struct nlmsghdr *nh, void *index_sqnp)
 
 }
 
+
+IDM_T is_ip_local(IPX_T *ip)
+{
+
+        struct if_link_node *iln;
+        struct avl_node *lan = NULL;
+
+        while ((iln = avl_iterate_item(&if_link_tree, &lan))) {
+
+                if (iln->flags & IFF_UP)
+                        continue;
+
+                struct if_addr_node *ian;
+                struct avl_node *aan = NULL;
+
+                while ((ian = avl_iterate_item(&iln->if_addr_tree, &aan))) {
+                        if (is_ip_equal(&ian->ip_addr, ip))
+                                return YES;
+                }
+        }
+        return NO;
+}
 
 STATIC_FUNC
 void kernel_get_if_link_config(struct nlmsghdr *nh, void *update_sqnp)

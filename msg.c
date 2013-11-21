@@ -27,15 +27,20 @@
 #include <netinet/ip6.h>
 
 #include "bmx.h"
+#include "node.h"
 #include "msg.h"
 #include "z.h"
 #include "ip.h"
 #include "metrics.h"
 #include "schedule.h"
 #include "tools.h"
+#include "iptools.h"
 #include "plugin.h"
 
 #define CODE_CATEGORY_NAME "message"
+
+static int32_t drop_all_frames = DEF_DROP_ALL_FRAMES;
+static int32_t drop_all_packets = DEF_DROP_ALL_PACKETS;
 
 
 static int32_t pref_udpd_size = DEF_UDPD_SIZE;
@@ -199,6 +204,9 @@ void register_frame_handler(struct frame_handl *array, int pos, struct frame_han
 
         memset(handl, 0, sizeof ( struct frame_handl ) );
 }
+
+
+
 
 
 
@@ -4679,6 +4687,137 @@ int32_t opt_update_dext_method(uint8_t cmd, uint8_t _save, struct opt_type *opt,
 	return SUCCESS;
 }
 
+void rx_packet( struct packet_buff *pb )
+{
+        TRACE_FUNCTION_CALL;
+
+        struct dev_node *iif = pb->i.iif;
+
+        if (drop_all_packets)
+                return;
+
+        assertion(-500841, ((iif->active && iif->if_llocal_addr)));
+
+        struct packet_header *hdr = &pb->packet.header;
+        uint16_t pkt_length = ntohs(hdr->pkt_length);
+        pb->i.transmittersIID = ntohs(hdr->transmitterIID);
+        pb->i.link_sqn = ntohs(hdr->link_adv_sqn);
+
+        pb->i.link_key.local_id = hdr->local_id;
+        pb->i.link_key.dev_idx = hdr->dev_idx;
+
+	pb->i.llip = (*((struct sockaddr_in6*) &(pb->i.addr))).sin6_addr;
+
+	if (!is_ip_net_equal(&pb->i.llip, &IP6_LINKLOCAL_UC_PREF, IP6_LINKLOCAL_UC_PLEN, AF_INET6)) {
+		dbgf_all(DBGT_ERR, "non-link-local IPv6 source address %s", ip6AsStr(&pb->i.llip));
+		return;
+	}
+
+        //TODO: check broadcast source!!
+
+
+
+        ip6ToStr(&pb->i.llip, pb->i.llip_str);
+
+        dbgf_all(DBGT_INFO, "via %s %s %s size %d", iif->label_cfg.str, iif->ip_llocal_str, pb->i.llip_str, pkt_length);
+
+	// immediately drop invalid packets...
+	// we acceppt longer packets than specified by pos->size to allow padding for equal packet sizes
+        if (    pb->i.total_length < (int) (sizeof (struct packet_header) + sizeof (struct frame_header_long)) ||
+                pkt_length < (int) (sizeof (struct packet_header) + sizeof (struct frame_header_long)) ||
+                ((hdr->comp_version < (my_compatibility - 1)) || (hdr->comp_version > (my_compatibility + 1))) ||
+                pkt_length > pb->i.total_length || pkt_length > (PKT_FRAMES_SIZE_MAX + sizeof(struct packet_header)) ||
+                pb->i.link_key.dev_idx < DEVADV_IDX_MIN || pb->i.link_key.local_id == LOCAL_ID_INVALID ) {
+
+                goto process_packet_error;
+        }
+
+
+	struct dev_ip_key any_key = { .ip = pb->i.llip, .idx = 0 };
+	struct dev_node *anyIf;
+        if (((anyIf = avl_find_item(&dev_ip_tree, &any_key)) || (anyIf = avl_next_item(&dev_ip_tree, &any_key))) &&
+		is_ip_equal(&pb->i.llip, &anyIf->llip_key.ip)) {
+
+		struct dev_ip_key outIf_key = { .ip = pb->i.llip, .idx = pb->i.link_key.dev_idx };
+		struct dev_node *outIf = avl_find_item(&dev_ip_tree, &outIf_key);
+		anyIf = outIf ? outIf : anyIf;
+		if (!outIf || (((my_local_id != pb->i.link_key.local_id || anyIf->llip_key.idx != pb->i.link_key.dev_idx) &&
+                        (((TIME_T) (bmx_time - my_local_id_timestamp)) > (4 * (TIME_T) my_tx_interval))) ||
+                        ((myIID4me != pb->i.transmittersIID) && (((TIME_T) (bmx_time - myIID4me_timestamp)) > (4 * (TIME_T) my_tx_interval))))) {
+
+                        // my local_id  or myIID4me might have just changed and then, due to delay,
+                        // I might receive my own packet back containing my previous (now non-matching) local_id of myIID4me
+                        dbgf_mute(60, DBGL_SYS, DBGT_ERR, "DAD-Alert (duplicate Address) from NB=%s via dev=%s  "
+				"iifIdx=0X%X aifIdx=0X%X rcvdIdx=0x%X  myLocalId=%X rcvdLocalId=%X  myIID4me=%d rcvdIID=%d "
+				"oif=%d aif=%d dipt=%d time=%d mlidts=%d txintv=%d mi4mts=%d",
+                                pb->i.llip_str, iif->label_cfg.str,
+				iif->llip_key.idx, anyIf->llip_key.idx, pb->i.link_key.dev_idx,
+                                ntohl(my_local_id), ntohl(pb->i.link_key.local_id),
+                                myIID4me, pb->i.transmittersIID, outIf?1:0, anyIf?1:0, dev_ip_tree.items,
+				bmx_time, my_local_id_timestamp, my_tx_interval, myIID4me_timestamp);
+
+                        goto process_packet_error;
+
+                } else if (outIf && outIf != iif && is_ip_equal(&outIf->llip_key.ip, &iif->llip_key.ip)) {
+
+			//ASSERTION(-500840, (oif == iif)); // so far, only unique own interface IPs are allowed!!
+                        dbgf_mute(60, DBGL_SYS, DBGT_ERR, "Link-Alert! Rcvd my own packet on different dev=%s idx=0x%X than send dev=%s idx=0x%X "
+				"with same link-local ip=%s my_local_id=%X ! Separate links or fix link-local IPs!!!",
+                                iif->label_cfg.str, iif->llip_key.idx, outIf->label_cfg.str, outIf->llip_key.idx,
+				iif->ip_llocal_str, ntohl(my_local_id));
+		}
+
+                return;
+        }
+
+        if (my_local_id == pb->i.link_key.local_id) {
+
+                if (new_local_id(NULL) == LOCAL_ID_INVALID) {
+                        goto process_packet_error;
+                }
+
+                dbgf_sys(DBGT_WARN, "DAD-Alert (duplicate link ID, this can happen) via dev=%s NB=%s "
+                        "is using my local_id=%X dev_idx=0x%X!  Choosing new local_id=%X dev_idx=0x%X for myself, dropping packet",
+                        iif->label_cfg.str, pb->i.llip_str, ntohl(pb->i.link_key.local_id), pb->i.link_key.dev_idx, ntohl(my_local_id), iif->llip_key.idx);
+
+                return;
+        }
+
+
+        if (!(pb->i.lndev = get_link_dev_node(pb)))
+                return;
+
+
+        dbgf_all(DBGT_INFO, "version=%i, reserved=%X, size=%i IID=%d rcvd udp_len=%d via NB %s %s %s",
+                hdr->comp_version, hdr->capabilities, pkt_length, pb->i.transmittersIID,
+                pb->i.total_length, pb->i.llip_str, iif->label_cfg.str, pb->i.unicast ? "UNICAST" : "BRC");
+
+
+        cb_packet_hooks(pb);
+
+        if (blacklisted_neighbor(pb, NULL))
+                return;
+
+        if (drop_all_frames)
+                return;
+
+        if (rx_frames(pb) == SUCCESS)
+                return;
+
+
+process_packet_error:
+
+        dbgf_sys(DBGT_WARN,
+                "Drop (remaining) packet: rcvd problematic packet via NB=%s dev=%s "
+                "(version=%i, local_id=%X dev_idx=0x%X, reserved=0x%X, pkt_size=%i), udp_len=%d my_version=%d, max_udpd_size=%d",
+                pb->i.llip_str, iif->label_cfg.str, hdr->comp_version,
+                ntohl(pb->i.link_key.local_id), pb->i.link_key.dev_idx, hdr->capabilities, pkt_length, pb->i.total_length,
+                my_compatibility, MAX_UDPD_SIZE);
+
+        blacklist_neighbor(pb);
+
+        return;
+}
 
 STATIC_FUNC
 struct opt_type msg_options[]=
@@ -4688,6 +4827,12 @@ struct opt_type msg_options[]=
 #ifndef LESS_OPTIONS
         {ODI, 0, ARG_UDPD_SIZE,            0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &pref_udpd_size, MIN_UDPD_SIZE,      MAX_UDPD_SIZE,     DEF_UDPD_SIZE,0,      0,
 			ARG_VALUE_FORM,	HLP_UDPD_SIZE}
+        ,
+	{ODI,0,ARG_DROP_ALL_FRAMES,     0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	&drop_all_frames,	MIN_DROP_ALL_FRAMES,	MAX_DROP_ALL_FRAMES,	DEF_DROP_ALL_FRAMES,0,	0,
+			ARG_VALUE_FORM,	"drop all received frames (but process packet header)"}
+        ,
+	{ODI,0,ARG_DROP_ALL_PACKETS,     0, 9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	&drop_all_packets,	MIN_DROP_ALL_PACKETS,	MAX_DROP_ALL_PACKETS,	DEF_DROP_ALL_PACKETS,0,	0,
+			ARG_VALUE_FORM,	"drop all received packets"}
         ,
 	{ODI,0,ARG_FREF,                   0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,      &dextReferencing,MIN_FREF,           MAX_FREF,          DEF_FREF,0,           opt_update_dext_method,
 			ARG_VALUE_FORM, HLP_FREF},

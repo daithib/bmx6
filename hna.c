@@ -40,11 +40,13 @@
 #include <netinet/ip6.h>
 
 #include "bmx.h"
+#include "node.h"
 #include "msg.h"
 #include "ip.h"
 #include "plugin.h"
 #include "hna.h"
 #include "tools.h"
+#include "iptools.h"
 #include "metrics.h"
 #include "schedule.h"
 
