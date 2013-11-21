@@ -34,7 +34,7 @@ typedef struct CRYPTKEY_T {
     uint8_t *rawKey;
 } CRYPTKEY_T;
 
-
+extern const CRYPTKEY_T CYRYPTKEY_ZERO;
 
 void cryptKeyMake( CRYPTKEY_T *key, int32_t keyBitSize );
 void cryptKeyFromDer( CRYPTKEY_T *key, uint8_t *der, int32_t derSz);

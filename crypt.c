@@ -29,6 +29,7 @@
 #include "crypt.h"
 
 
+const CRYPTKEY_T CYRYPTKEY_ZERO = { .nativeBackendKey=0, .backendKey=NULL, .rawKeyLen=0, .rawKey=NULL };
 
 /******************* accessing cyassl: ***************************************/
 #if BMX6_CRYPTLIB == CYASSL
@@ -201,13 +202,13 @@ void cryptKeyFree( CRYPTKEY_T *cryptKey ) {
 		}
 
 		debugFree(cryptKey->backendKey, -300000);
-		cryptKey->backendKey = NULL;
 	}
 
 	if (cryptKey->rawKey) {
 		debugFree(cryptKey->rawKey, -300000);
-		cryptKey->rawKey = NULL;
 	}
+	
+	*cryptKey = CYRYPTKEY_ZERO;
 }
 
 void cryptKeyFromRaw( CRYPTKEY_T *cryptKey, uint8_t *rawKey, uint32_t rawKeyLen ) {
@@ -261,7 +262,7 @@ void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
 	cryptKey->rawKeyLen = 0;
 	cryptKey->rawKey = mp_int_get_raw(&key->n, &cryptKey->rawKeyLen);
 
-	CRYPTKEY_T test;
+	CRYPTKEY_T test = CYRYPTKEY_ZERO;
 	cryptKeyFromRaw(&test, cryptKey->rawKey, cryptKey->rawKeyLen);
 	assertion(-500000, !memcmp(((RsaKey*)(cryptKey->backendKey))->n.dp, ((RsaKey*)(test.backendKey))->n.dp, (((RsaKey*)(cryptKey->backendKey))->n.used * XKEY_DP_SZ)));
 	cryptKeyFree(&test);
@@ -361,9 +362,9 @@ int cryptSign( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTK
 	RsaKey *key = privKey->backendKey;
 
 	if ((*outLen = RsaSSL_Sign(in, inLen, out, *outLen, key, &cryptRng)) < 0)
-		return SUCCESS;
-	else
 		return FAILURE;
+	else
+		return SUCCESS;
 }
 
 int cryptVerify(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *pubKey) {

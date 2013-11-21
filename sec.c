@@ -36,6 +36,7 @@
 #include "plugin.h"
 #include "crypt.h"
 #include "sec.h"
+#include "ip.h"
 
 #define CODE_CATEGORY_NAME "sec"
 
@@ -158,23 +159,17 @@ int32_t rsa_test( char *tmp_path, CRYPTKEY_T *cryptKey ) {
 	plainLen = sizeof(plain);
 	memset(plain, 0, sizeof(plain));
 
-	if (cryptEncrypt(in, inLen, enc, &encLen, &pubKey) < 0) {
-		dbgf_sys(DBGT_ERR, "Failed Encrypt");
-		return FAILURE;
-	} else {
-		dbgf_track(DBGT_INFO, "Succeeded Encrypt inLen=%d outLen=%d inData=%s outData=%s",
+	if (cryptEncrypt(in, inLen, enc, &encLen, &pubKey) != SUCCESS) {
+		dbgf_sys(DBGT_ERR, "Failed Encrypt inLen=%d outLen=%d inData=%s outData=%s",
 			inLen, encLen, memAsHexString((char*)in, inLen), memAsHexString((char*)enc, encLen));
-
+		return FAILURE;
 	}
 
-
-	if (cryptDecrypt(enc, encLen, plain, &plainLen, cryptKey) < 0 ||
+	if (cryptDecrypt(enc, encLen, plain, &plainLen, cryptKey) != SUCCESS ||
 		inLen != plainLen || memcmp(plain, in, inLen)) {
-		dbgf_sys(DBGT_ERR, "Failed Decrypt");
-		return FAILURE;
-	} else {
-		dbgf_track(DBGT_INFO, "Succeeded Decrypt inLen=%d outLen=%d inData=%s outData=%s",
+		dbgf_sys(DBGT_ERR, "Failed Decrypt inLen=%d outLen=%d inData=%s outData=%s",
 			encLen, plainLen, memAsHexString((char*)enc, encLen), memAsHexString((char*)plain, plainLen));
+		return FAILURE;
 	}
 
 
@@ -183,22 +178,17 @@ int32_t rsa_test( char *tmp_path, CRYPTKEY_T *cryptKey ) {
 	plainLen = sizeof(plain);
 	memset(plain, 0, sizeof(plain));
 
-	if (cryptSign(in, inLen, enc, &encLen, cryptKey) < 0) {
-		dbgf_sys(DBGT_ERR, "Failed Sign");
-		return FAILURE;
-	} else {
-		dbgf_track(DBGT_INFO, "Succeeded Sign inLen=%d outLen=%d inData=%s outData=%s",
+	if (cryptSign(in, inLen, enc, &encLen, cryptKey) != SUCCESS) {
+		dbgf_sys(DBGT_ERR, "Failed Sign inLen=%d outLen=%d inData=%s outData=%s",
 			inLen, encLen, memAsHexString((char*)in, inLen), memAsHexString((char*)enc, encLen));
+		return FAILURE;
 	}
 
-
-	if (cryptVerify(enc, encLen, plain, &plainLen, &pubKey) < 0 ||
-		encLen != plainLen || memcmp(plain, in, inLen)) {
-		dbgf_sys(DBGT_ERR, "Failed Verify");
-		return FAILURE;
-	} else {
-		dbgf_track(DBGT_INFO, "Succeeded Verify inLen=%d outLen=%d inData=%s outData=%s",
+	if (cryptVerify(enc, encLen, plain, &plainLen, &pubKey) != SUCCESS ||
+		inLen != plainLen || memcmp(plain, in, inLen)) {
+		dbgf_sys(DBGT_ERR, "Failed Verify inLen=%d outLen=%d inData=%s outData=%s",
 			encLen, plainLen, memAsHexString((char*)enc, encLen), memAsHexString((char*)plain, plainLen));
+		return FAILURE;
 	}
 
 	cryptKeyFree( &pubKey );
@@ -261,7 +251,7 @@ int32_t opt_key_path(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
 STATIC_FUNC
 struct opt_type sec_options[]=
 {
-	{ODI,0,ARG_KEY_PATH,		0,  4,1,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,		0,		0,		0,DEF_KEY_PATH,	opt_key_path,
+	{ODI,0,ARG_KEY_PATH,		0,  9,1,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,		0,		0,		0,DEF_KEY_PATH,	opt_key_path,
 			ARG_DIR_FORM,	"set path to rsa der-encoded private key file (used as permanent public ID"},
 
 };
@@ -270,7 +260,7 @@ struct opt_type sec_options[]=
 STATIC_FUNC
 int32_t init_sec( void )
 {
-
+	my_PrivKey = CYRYPTKEY_ZERO;
 	register_options_array( sec_options, sizeof( sec_options ), CODE_CATEGORY_NAME );
 
         struct frame_handl handl;
