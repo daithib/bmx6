@@ -15,7 +15,6 @@
  * 02110-1301, USA
  */
 
-#include "sec.h"
 
 #define ARG_UHNA "unicastHna"
 
@@ -317,7 +316,7 @@ struct tunXin6_net_adv_node {
 	char *tunInDev;
 };
 
-
+/*
 // requirements:
 // - lightweight possibilty for gw to check client ID and request authenticity (no other client send it)
 //   -> include: ClientPubSHA, reqSignature
@@ -345,7 +344,7 @@ struct dedicated_hdr_tun6_req {
     RSA1024_T  encTunKey;
     RSA1024_T  clientSign;
 } __attribute__((packed));
-
+*/
 
 
 
