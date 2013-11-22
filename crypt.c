@@ -25,6 +25,7 @@
 #include <stdint.h>
 
 #include "bmx.h"
+#include "crypt.h"
 #include "tools.h"
 //#include "crypt.h"
 

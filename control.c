@@ -32,6 +32,7 @@
 #include <paths.h>
 
 #include "bmx.h"
+#include "crypt.h"
 #include "node.h"
 #include "ip.h"
 #include "plugin.h"
@@ -785,136 +786,6 @@ void free_init_string(void)
 }
 
 
-
-
-#ifdef ADJ_PATCHED_NETW
-int32_t get_tracked_network( struct opt_type *opt, struct opt_parent *patch, char *out, uint32_t *ip, int32_t *mask, struct ctrl_node *cn ) {
-	
-	struct opt_child *nc, *mc;
-	struct opt_parent *p = get_opt_parent_val( opt, patch->p_val );
-	
-	if ( !p  ||  !(nc = get_opt_child(get_option(opt,0,ARG_UHNA_NETWORK), p) )  ||  !nc->c_val )
-		return FAILURE;
-	
-	if ( !p  ||  !(mc = get_opt_child(get_option(opt,0,ARG_UHNA_PREFIXLEN), p) )  ||  !mc->c_val )
-		return FAILURE;
-	
-	sprintf( out, "%s/%s", nc->c_val, mc->c_val );
-	
-	if ( str2netw( out, ip, '/', cn, mask, 32 ) == FAILURE )
-		return FAILURE;
-	
-	return SUCCESS;
-}
-#endif
-
-#ifdef ADJ_PATCHED_NETW
-int32_t adj_patched_network( struct opt_type *opt, struct opt_parent *patch, char *out, uint32_t *ip, int32_t *mask, struct ctrl_node *cn ) {
-	
-	struct opt_child *nc, *mc;
-	struct opt_parent *p;
-	
-	if ( strpbrk( patch->p_val, "*'\"#\\/~?^°,;|<>()[]{}$%&=`´" ) ) {
-		
-		dbg_cn( cn, DBGL_SYS, DBGT_ERR, 
-		        "%s %s with %s%s and %s%s MUST NOT be named with special characters or a leading number",
-                        opt->long_name, patch->p_val, LONG_OPT_ARG_DELIMITER_STR, ARG_UHNA_PREFIXLEN, LONG_OPT_ARG_DELIMITER_STR, ARG_UHNA_NETWORK);
-		return FAILURE;
-	}
-
-        // obtain netmask:
-
-	p = get_opt_parent_val( opt, patch->p_val );
-	
-	if ( (mc = get_opt_child( get_option(opt,0,ARG_UHNA_PREFIXLEN), patch ) )  &&  mc->c_val ) {
-
-                // obtain the just-given netmask:
-
-		if ( str2netw( mc->c_val, ip, '/', cn, 0,0 ) == SUCCESS ) {
-
-                        // the 255.255.255.0 notation:
-
-			if ( *ip == htonl( 0xFFFFFFFF<<( 32 - (*mask=bits_count( *ip )) ) ) ) {
-				sprintf( out, "%d", *mask );
-				set_opt_child_val( mc, out );
-			} else {
-				dbg_cn( cn, DBGL_SYS, DBGT_ERR, "invalid %s %s %s%s %s",
-                                        opt->long_name, patch->p_val, LONG_OPT_ARG_DELIMITER_STR, ARG_UHNA_PREFIXLEN, mc->c_val);
-				return FAILURE;
-			}
-			
-		} else if ( (*mask=strtol(mc->c_val, NULL, 10)) ) {
-                        
-                        // the prefix_len /24 notation:
-			
-			if ( *mask < MIN_MASK  ||  *mask > MAX_MASK ) {
-				dbg_cn( cn, DBGL_SYS, DBGT_ERR, "invalid prefix-length %s %s %s%s %s",
-				        opt->long_name, patch->p_val, LONG_OPT_ARG_DELIMITER_STR, ARG_UHNA_PREFIXLEN, mc->c_val );
-				return FAILURE;
-			}
-			
-		} else {
-			
-			dbg_cn( cn, DBGL_SYS, DBGT_ERR, "missing prefix-length %s %s %s%s %s",
-			        opt->long_name, patch->p_val, LONG_OPT_ARG_DELIMITER_STR, ARG_UHNA_PREFIXLEN, mc->c_val );
-			return FAILURE;
-		}
-		
-	} else if ( p  &&  (mc = get_opt_child(get_option(opt,0,ARG_UHNA_PREFIXLEN), p) )  &&  mc->c_val ) {
-		
-                // obtain the already-configured netmask:
-		*mask = strtol( mc->c_val , NULL , 10 );
-		
-	} else {
-
-		dbg_cn( cn, DBGL_SYS, DBGT_ERR, "missing %s %s %s%s",
-		        opt->long_name, patch->p_val, LONG_OPT_ARG_DELIMITER_STR, ARG_UHNA_PREFIXLEN );
-		return FAILURE;
-        }
-
-
-        // obtain the network:
-
-        if ((nc = get_opt_child(get_option(opt, 0, ARG_UHNA_NETWORK), patch)) && nc->c_val) {
-
-                // obtain the just-given network:
-
-		sprintf( out, "%s/%d", nc->c_val, *mask );
-		if ( str2netw( out, ip, '/', cn, mask, 32 ) == FAILURE ) {
-			dbg_cn( cn, DBGL_SYS, DBGT_ERR, "invalid patch %s %s %s%s %s",
-			        opt->long_name, patch->p_val, LONG_OPT_ARG_DELIMITER_STR, ARG_UHNA_NETWORK, mc->c_val  );
-			return FAILURE;
-                }
-
-                if (ip_netmask_validate(ipX, mask, family) == FAILURE) {
-                        dbg_cn(cn, DBGL_SYS, DBGT_ERR, "invalid prefix");
-                        return FAILURE;
-                }
-
-                set_opt_child_val(nc, ipXAsStr(family, ipX));
-		
-	} else if ( p && (nc=get_opt_child( get_option(opt,0,ARG_UHNA_NETWORK), p ))  &&  nc->c_val ) {
-
-                // obtain the already-configured network:
-
-		sprintf( out, "%s/%d", nc->c_val, *mask );
-		if ( str2netw( out, ip, '/', cn, mask, 32 ) == FAILURE ) {
-			dbg_cn( cn, DBGL_SYS, DBGT_ERR, "invalid trac %s %s %s%s %s",
-			        opt->long_name, patch->p_val, LONG_OPT_ARG_DELIMITER_STR, ARG_UHNA_NETWORK, mc->c_val  );
-			return FAILURE;
-		}
-		
-	} else {
-		dbg_cn( cn, DBGL_SYS, DBGT_ERR, "missing %s %s %s%s",
-		        opt->long_name, patch->p_val, LONG_OPT_ARG_DELIMITER_STR, ARG_UHNA_NETWORK  );
-		
-		return FAILURE;
-	}
-	
-	sprintf( out, "%s/%d", nc->c_val, *mask );
-	return SUCCESS;
-}
-#endif
 
 STATIC_FUNC
 char* nextword(char *s)

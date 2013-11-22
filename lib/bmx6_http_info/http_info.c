@@ -31,6 +31,7 @@
 
 
 #include "bmx.h"
+#include "crypt.h"
 #include "node.h"
 //#include "os.h"
 //#include "originator.h"

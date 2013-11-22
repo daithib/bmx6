@@ -463,11 +463,6 @@ void register_options_array ( struct opt_type *fixed_options, int size, const ch
 extern int32_t Load_config;
 
 
-#ifdef ADJ_PATCHED_NETW
-int32_t get_tracked_network( struct opt_type *opt, struct opt_parent *patch, char *out, uint32_t *ip, int32_t *mask, struct ctrl_node *cn );
-int32_t adj_patched_network( struct opt_type *opt, struct opt_parent *patch, char *out, uint32_t *ip, int32_t *mask, struct ctrl_node *cn );
-#endif
-
 void apply_init_args ( int argc, char *argv[] );
 
 extern struct opt_type Patch_opt;

@@ -27,7 +27,9 @@
 
 
 #include "bmx.h"
+#include "crypt.h"
 #include "node.h"
+#include "metrics.h"
 #include "msg.h"
 #include "ip.h"
 #include "plugin.h"

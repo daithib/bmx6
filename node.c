@@ -34,14 +34,15 @@
 
 
 #include "bmx.h"
+#include "crypt.h"
 #include "node.h"
+#include "metrics.h"
 #include "msg.h"
 #include "ip.h"
 #include "hna.h"
 #include "schedule.h"
 #include "tools.h"
 #include "iptools.h"
-#include "metrics.h"
 #include "plugin.h"
 
 #define CODE_CATEGORY_NAME "node"
@@ -70,7 +71,7 @@ AVL_TREE(dhash_invalid_tree, struct dhash_node, dhash);
 
 AVL_TREE(orig_tree, struct orig_node, global_id);
 
-AVL_TREE(blacklisted_tree, struct black_node, dhash);
+//static AVL_TREE(blacklisted_tree, struct black_node, dhash);
 
 AVL_TREE(status_tree, struct status_handl, status_name);
 
@@ -1054,6 +1055,46 @@ void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired)
                         }
                 }
         }
+}
+
+
+char *globalIdAsString( struct GLOBAL_ID *id ) {
+
+
+        if ( id ) {
+                uint8_t i;
+#define MAX_IDS_PER_PRINTF 4
+                static char id_str[MAX_IDS_PER_PRINTF][GLOBAL_ID_NAME_LEN + (sizeof(".")-1) + (GLOBAL_ID_PKID_LEN * 2) + 1];
+                static uint8_t a = 0;
+
+                a = (a + 1) % MAX_IDS_PER_PRINTF;
+
+                for (i = 0; !id->pkid.u8[i] && i < GLOBAL_ID_PKID_LEN; i++);
+
+                sprintf(id_str[a], "%s.%s",
+                        validate_name_string(id->name, GLOBAL_ID_NAME_LEN, NULL) == SUCCESS ? id->name : "ILLEGAL_HOSTNAME",
+                        memAsHexString(&(id->pkid.u8[i]), GLOBAL_ID_PKID_LEN - i));
+
+                return id_str[a];
+        }
+
+        return NULL;
+}
+
+
+struct orig_node *init_orig_node(GLOBAL_ID_T *id)
+{
+        TRACE_FUNCTION_CALL;
+        struct orig_node *on = debugMallocReset(sizeof ( struct orig_node) + (sizeof (void*) * plugin_data_registries[PLUGIN_DATA_ORIG]), -300128);
+        on->global_id = *id;
+
+        AVL_INIT_TREE(on->rt_tree, struct router_node, local_key);
+
+        avl_insert(&orig_tree, on, -300148);
+
+        cb_plugin_hooks(PLUGIN_CB_STATUS, NULL);
+
+        return on;
 }
 
 

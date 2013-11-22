@@ -273,13 +273,39 @@
 
 
 
+#if MIN_COMPATIBILITY <= CV16
+
+struct packet_header // 17 bytes
+{
+	uint8_t    comp_version;     //  8
+	uint8_t    capabilities;     //  8  reserved
+	uint16_t   pkt_length; 	     // 16 the relevant data size in bytes (including the bmx_header)
+
+	IID_T      transmitterIID;   // 16 IID of transmitter node
+
+	LINKADV_SQN_T link_adv_sqn;  // 16 used for processing: link_adv, lq_adv, rp_adv, ogm_adv, ogm_ack
+
+	//TODOCV17: merge pkt_sqn and local_id into single uint64_t local_id
+	PKT_SQN_T  pkt_sqn;          // 32
+	LOCAL_ID_T local_id;         // 32
+
+	DEVADV_IDX_T   dev_idx;      //  8
+
+//	uint8_t    reserved_for_2byte_alignement;  //  8
+
+} __attribute__((packed));
+#else
+// use generic tlv_header instead...
+#endif
+
+
 
 struct frame_header_short { // 2 bytes
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 	unsigned int type : FRAME_TYPE_BIT_SIZE;
 	unsigned int reserved : 2;
-	unsigned int is_short : FRAME_ISSHORT_BIT_SIZE;
+	unsigned int is_short : 1;
 
 #elif __BYTE_ORDER == __BIG_ENDIAN
 	unsigned int is_short : FRAME_ISSHORT_BIT_SIZE;
@@ -297,7 +323,7 @@ struct frame_header_long { // 4 bytes
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 	unsigned int type : FRAME_TYPE_BIT_SIZE;
 	unsigned int reserved : 2;
-	unsigned int is_short : FRAME_ISSHORT_BIT_SIZE;
+	unsigned int is_short : 1;
 #elif __BYTE_ORDER == __BIG_ENDIAN
 	unsigned int is_short : FRAME_ISSHORT_BIT_SIZE;
 	unsigned int reserved : FRAME_RELEVANCE_BIT_SIZE;
@@ -316,7 +342,7 @@ struct frame_header_long { // 4 bytes
 struct frame_header_virtual { // 6 bytes
 	unsigned int type : FRAME_TYPE_BIT_SIZE;
 	unsigned int reserved1 : 2;
-	unsigned int is_short : FRAME_ISSHORT_BIT_SIZE;
+	unsigned int is_short  : 1;
 
 	unsigned int is_virtual  : 1;
 	unsigned int reserved    : 7;
@@ -608,6 +634,28 @@ struct msg_ref_req {
 
 
 
+#define BMX_DSC_TLV_METRIC      0x00
+
+#define BMX_DSC_TLV_UHNA6       0x02
+
+#define BMX_DSC_TLV_TUN6_MIN            0x04
+#define BMX_DSC_TLV_TUN6_ADV            0x04
+#define BMX_DSC_TLV_TUN4IN6_INGRESS_ADV 0x05
+#define BMX_DSC_TLV_TUN6IN6_INGRESS_ADV 0x06
+#define BMX_DSC_TLV_TUN4IN6_SRC_ADV     0x07
+#define BMX_DSC_TLV_TUN6IN6_SRC_ADV     0x08
+#define BMX_DSC_TLV_TUN4IN6_NET_ADV     0x09
+#define BMX_DSC_TLV_TUN6IN6_NET_ADV     0x0A
+#define BMX_DSC_TLV_TUN6_MAX            0x0A
+
+#define BMX_DSC_TLV_SMS                 0x10
+
+#define BMX_DSC_TLV_PUBKEY      (FRAME_TYPE_ARRSZ-3)
+#define BMX_DSC_TLV_SIGNATURE   (FRAME_TYPE_ARRSZ-2)
+
+#define BMX_DSC_TLV_RHASH_ADV   (FRAME_TYPE_ARRSZ-1)
+
+
 
 #define msg_description_request msg_dhash_request
 #define hdr_description_request hdr_dhash_request
@@ -727,6 +775,21 @@ struct msg_ogm_ack {
 
 
 
+struct ogm_aggreg_node {
+
+	struct list_node list;
+
+	struct msg_ogm_adv *ogm_advs;
+
+	uint8_t ogm_dest_field[(OGM_DEST_ARRAY_BIT_SIZE / 8)];
+//	int16_t ogm_dest_bit_max;
+	int16_t ogm_dest_bytes;
+
+	uint16_t aggregated_msgs;
+
+	AGGREG_SQN_T    sqn;
+	uint8_t  tx_attempt;
+};
 
 struct description_cache_node {
 	DHASH_T dhash;

@@ -30,14 +30,15 @@
 
 
 #include "bmx.h"
+#include "crypt.h"
 #include "node.h"
+#include "metrics.h"
 #include "msg.h"
 #include "ip.h"
 #include "plugin.h"
 #include "schedule.h"
 #include "tools.h"
 #include "iptools.h"
-#include "metrics.h"
 
 #define CODE_CATEGORY_NAME "metric"
 
@@ -1517,6 +1518,9 @@ struct opt_type metrics_options[]=
 STATIC_FUNC
 int32_t init_metrics( void )
 {
+	assertion(-500996, (sizeof (FMETRIC_U16_T) == 2));
+        assertion(-500997, (sizeof (FMETRIC_U8_T) == 1));
+
         UMETRIC_MAX_SQRT = umetric_fast_sqrt(UMETRIC_MAX);
         U64_MAX_HALF_SQRT = umetric_fast_sqrt(U64_MAX_HALF);
 

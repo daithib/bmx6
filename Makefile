@@ -54,8 +54,11 @@
 # CFLAGS += -DWITH_UNUSED	  # (includes yet unused stuff and buggy stuff)
 # CFLAGS += -DPROFILING           # (no static functions -> better profiling and cores)
 
-#EXTRA_CFLAGS += 
+#EXTRA_CFLAGS +=
 #EXTRA_LDFLAGS +=
+
+# add as much features and test cases as possible:
+#EXTRA_CFLAGS += -DMOST
 
 #for profiling:
 #EXTRA_CFLAGS="-DPROFILING -pg"
@@ -67,6 +70,8 @@
 
 #for normal machines (adding features and facilitating debugging):
 #EXTRA_CFLAGS="-DDEBUG_ALL -DTRAFFIC_DUMP -DDEBUG_DUMP -DEBUG_MALLOC -DMEMORY_USAGE"
+
+CFLAGS += $(shell echo "$(EXTRA_CFLAGS)" | grep -q "DMOST" && echo "-pg -DEXTREME_PARANOIA -DEXIT_ON_ERROR -DPROFILING -DDEBUG_ALL -DTRAFFIC_DUMP -DDEBUG_DUMP -DDEBUG_MALLOC -DMEMORY_USAGE " )
 
 LDFLAGS += -g3
 

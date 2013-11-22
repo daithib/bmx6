@@ -24,7 +24,6 @@
 #include <linux/if.h>
 #include <linux/rtnetlink.h>
 
-#include "crypt.h"
 
 /*
  * from other headers:
@@ -141,93 +140,7 @@ typedef int8_t IDM_T; // smallest int which size does NOT matter
 
 
 
-// to be used:
-typedef uint64_t UMETRIC_T;
 
-#define OGM_MANTISSA_BIT_SIZE  5
-#define OGM_EXPONENT_BIT_SIZE  5
-#define OGM_EXPONENT_OFFSET    OGM_MANTISSA_BIT_SIZE
-
-#define OGM_EXPONENT_MAX       ((1<<OGM_EXPONENT_BIT_SIZE)-1)
-#define OGM_MANTISSA_MASK      ((1<<OGM_MANTISSA_BIT_SIZE)-1)
-#define OGM_EXPONENT_MASK      ((1<<OGM_EXPONENT_BIT_SIZE)-1)
-
-
-#define OGM_MANTISSA_INVALID            0
-#define OGM_MANTISSA_MIN__NOT_ROUTABLE  1
-#define OGM_MANTISSA_ROUTABLE           2
-
-#define FM8_EXPONENT_BIT_SIZE  OGM_EXPONENT_BIT_SIZE
-#define FM8_MANTISSA_BIT_SIZE  (8-FM8_EXPONENT_BIT_SIZE)
-#define FM8_MANTISSA_MASK      ((1<<FM8_MANTISSA_BIT_SIZE)-1)
-#define FM8_MANTISSA_MIN       (1)
-
-#define OGM_MANTISSA_MAX       (FM8_MANTISSA_MASK << (OGM_MANTISSA_BIT_SIZE - FM8_MANTISSA_BIT_SIZE))
-
-#define UMETRIC_SHIFT_MAX          ((sizeof(UMETRIC_T)*8) - (OGM_EXPONENT_OFFSET+OGM_EXPONENT_MAX+1))
-#define UMETRIC_MULTIPLY_MAX       (((UMETRIC_T)-1)>>(OGM_EXPONENT_OFFSET+OGM_EXPONENT_MAX+1))
-#define UMETRIC_MASK               ((((UMETRIC_T) 1) << (OGM_EXPONENT_OFFSET+OGM_EXPONENT_MAX+1)) -1)
-
-#define UMETRIC_INVALID            ((((UMETRIC_T) 1) << OGM_EXPONENT_OFFSET) + OGM_MANTISSA_INVALID)
-#define UMETRIC_MIN__NOT_ROUTABLE  ((((UMETRIC_T) 1) << OGM_EXPONENT_OFFSET) + OGM_MANTISSA_MIN__NOT_ROUTABLE)
-#define UMETRIC_ROUTABLE           ((((UMETRIC_T) 1) << OGM_EXPONENT_OFFSET) + OGM_MANTISSA_ROUTABLE)
-#define UMETRIC_FM8_MAX            ((((UMETRIC_T) 1) << (OGM_EXPONENT_OFFSET+OGM_EXPONENT_MAX)) + (((UMETRIC_T) FM8_MANTISSA_MASK) << ((OGM_EXPONENT_OFFSET+OGM_EXPONENT_MAX)-FM8_MANTISSA_BIT_SIZE)))
-#define UMETRIC_FM8_MIN            ((((UMETRIC_T) 1) << OGM_EXPONENT_OFFSET) + (((UMETRIC_T) FM8_MANTISSA_MIN) << (OGM_EXPONENT_OFFSET-FM8_MANTISSA_BIT_SIZE)))
-#define UMETRIC_MAX                UMETRIC_FM8_MAX
-//#define UMETRIC_MAX       ((((UMETRIC_T) 1) << (OGM_EXPONENT_OFFSET+OGM_EXPONENT_MAX)) + (((UMETRIC_T) OGM_MANTISSA_MAX) << ((OGM_EXPONENT_OFFSET+OGM_EXPONENT_MAX)-OGM_MANTISSA_BIT_SIZE)))
-
-// these fixes are used to improove (average) rounding errors in umetric_to_fmetric()
-#define UMETRIC_TO_FMETRIC_INPUT_FIX (79)
-
-//#define UMETRIC_MAX_SQRT           ((UMETRIC_T)358956)      // sqrt(UMETRIC_MAX)
-//#define UMETRIC_MAX_HALF_SQRT      ((UMETRIC_T)253821)      // sqrt(UMETRIC_MAX/2)
-//#define U64_MAX_QUARTER_SQRT       ((UMETRIC_T)2147493120)  // sqrt(U64_MAX/4)
-
-struct float_u16 {
-
-	union {
-		struct {
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-			uint8_t mantissa_fm16;
-			uint8_t exp_fm16;
-#elif __BYTE_ORDER == __BIG_ENDIAN
-			uint8_t exp_fm16;
-			uint8_t mantissa_fm16;
-#else
-#error "Please fix <bits/endian.h>"
-#endif
-		} __attribute__((packed)) f;
-
-		uint8_t u8[2];
-
-		uint16_t u16;
-	}val;
-};
-
-
-typedef struct float_u16 FMETRIC_U16_T;
-
-
-
-struct float_u8 {
-	union {
-
-		struct {
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-			unsigned int mantissa_fmu8 : FM8_MANTISSA_BIT_SIZE;
-			unsigned int exp_fmu8 : FM8_EXPONENT_BIT_SIZE;
-#elif __BYTE_ORDER == __BIG_ENDIAN
-			unsigned int exp_fmu8 : FM8_EXPONENT_BIT_SIZE;
-			unsigned int mantissa_fmu8 : FM8_MANTISSA_BIT_SIZE;
-#else
-#error "Please fix <bits/endian.h>"
-#endif
-		} __attribute__((packed)) f;
-		uint8_t u8;
-	} val;
-};
-
-typedef struct float_u8 FMETRIC_U8_T;
 
 
 #define MY_DESC_CAPABILITIES_CV16 0x0200 //capability flag for compatibility with CV16 txInterval field
@@ -373,39 +286,19 @@ typedef uint32_t DESC_SQN_T;
 #define DEF_DESCRIPTION_DAD_RANGE 8192
 
 
-typedef uint8_t  FRAME_TYPE_T;
 
-#define FRAME_ISSHORT_BIT_SIZE   (1)
 #define FRAME_TYPE_BIT_SIZE    (5)
 #define FRAME_TYPE_MASK        ((1<<FRAME_TYPE_BIT_SIZE)-1)
 #define FRAME_TYPE_ARRSZ       (FRAME_TYPE_MASK+1)
 
 #define BMX_DSC_TLV_MIN         0x00
-#define BMX_DSC_TLV_METRIC      0x00
-
-#define BMX_DSC_TLV_UHNA6       0x02
-
-#define BMX_DSC_TLV_TUN6_MIN            0x04
-#define BMX_DSC_TLV_TUN6_ADV            0x04
-#define BMX_DSC_TLV_TUN4IN6_INGRESS_ADV 0x05
-#define BMX_DSC_TLV_TUN6IN6_INGRESS_ADV 0x06
-#define BMX_DSC_TLV_TUN4IN6_SRC_ADV     0x07
-#define BMX_DSC_TLV_TUN6IN6_SRC_ADV     0x08
-#define BMX_DSC_TLV_TUN4IN6_NET_ADV     0x09
-#define BMX_DSC_TLV_TUN6IN6_NET_ADV     0x0A
-#define BMX_DSC_TLV_TUN6_MAX            0x0A
-
-#define BMX_DSC_TLV_SMS                 0x10
-
-#define BMX_DSC_TLV_PUBKEY      (FRAME_TYPE_ARRSZ-3)
-#define BMX_DSC_TLV_SIGNATURE   (FRAME_TYPE_ARRSZ-2)
-
-#define BMX_DSC_TLV_RHASH_ADV   (FRAME_TYPE_ARRSZ-1)
-
 #define BMX_DSC_TLV_MAX_KNOWN   (FRAME_TYPE_ARRSZ-1)
 #define BMX_DSC_TLV_MAX         (FRAME_TYPE_ARRSZ-1)
 #define BMX_DSC_TLV_ARRSZ       (FRAME_TYPE_ARRSZ)
 #define BMX_DSC_TLV_INVALID     (FRAME_TYPE_ARRSZ)
+
+
+
 
 
 
@@ -417,62 +310,6 @@ typedef uint8_t  FRAME_TYPE_T;
 
 
 
-/*
- * from metrics.h
- */
-
-typedef uint16_t ALGO_T;
-
-
-struct host_metricalgo {
-
-	FMETRIC_U16_T fmetric_u16_min;
-
-	UMETRIC_T umetric_min;
-	ALGO_T algo_type;
-	uint16_t flags;
-	uint8_t algo_rp_exp_numerator;
-	uint8_t algo_rp_exp_divisor;
-	uint8_t algo_tp_exp_numerator;
-	uint8_t algo_tp_exp_divisor;
-
-
-	uint8_t window_size;                // MUST be given as multiple of sqn_steps
-        uint8_t lounge_size;                // MUST be given as multiple of sqn_steps e.g. 6
-        uint8_t regression;             // e.g. 16
-//        uint8_t fast_regression;             // e.g. 2
-//        uint8_t fast_regression_impact;             // e.g. 8
-	uint8_t hystere;
-	uint8_t hop_penalty;
-	uint8_t late_penalty;
-};
-
-struct lndev_probe_record {
-	HELLO_SQN_T hello_sqn_max; // SQN which has been applied (if equals wa_pos) then wa_unscaled MUST NOT be set again!
-
-	uint8_t hello_array[MAX_HELLO_SQN_WINDOW/8];
-	uint32_t hello_sum;
-	UMETRIC_T hello_umetric;
-	TIME_T hello_time_max;
-};
-
-
-struct metric_record {
-	SQN_T sqn_bit_mask;
-
-        SQN_T clr; // SQN upto which waightedAverageVal has been purged
-	SQN_T set; // SQN which has been applied (if equals wa_pos) then wa_unscaled MUST NOT be set again!
-
-//	UMETRIC_T umetric;
-//	UMETRIC_T umetric_fast;
-	UMETRIC_T umetric;
-//	UMETRIC_T umetric_prev;
-};
-
-#define ZERO_METRIC_RECORD {0, 0, 0, 0,0,0}
-
-
-
 
 #include "avl.h"
 #include "list.h"
@@ -480,21 +317,6 @@ struct metric_record {
 #include "allocate.h"
 
 
-
-#define GLOBAL_ID_NAME_LEN 32
-#define GLOBAL_ID_PKID_LEN HASH_SHA1_LEN
-
-
-struct GLOBAL_ID {
-	char    name[GLOBAL_ID_NAME_LEN];
-	union {
-		uint8_t u8[GLOBAL_ID_PKID_LEN];
-		uint16_t u16[GLOBAL_ID_PKID_LEN / sizeof(uint16_t)];
-		uint32_t u32[GLOBAL_ID_PKID_LEN / sizeof(uint32_t)];
-	} pkid;
-} __attribute__((packed));
-
-typedef struct GLOBAL_ID GLOBAL_ID_T;
 
 
 
@@ -508,11 +330,6 @@ typedef struct GLOBAL_ID GLOBAL_ID_T;
 #define BMX_ENV_DEBUG "BMX6_DEBUG"
 
 
-#define DEF_TTL 50                /* Time To Live of OGM broadcast messages */
-#define MAX_TTL 63
-#define MIN_TTL 1
-#define ARG_TTL "ttl"
-extern int32_t my_ttl;
 
 
 
@@ -531,9 +348,6 @@ extern int32_t my_ttl;
 #define ARG_STATUS "status"
 #define ARG_LINKS "links"
 
-#define ARG_THROW "throw"
-
-
 
 
 #define MAX_DBG_STR_SIZE 1500
@@ -547,9 +361,6 @@ enum NoYes {
 extern const IDM_T CONST_YES;
 extern const IDM_T CONST_NO;
 
-extern const void *IGNORED_PTR;
-extern const void *UNRESOLVED_PTR;
-extern const void *FAILURE_PTR;
 
 
 enum ADGSN {
@@ -738,35 +549,6 @@ void register_status_handl(uint16_t min_msg_size, IDM_T multiline, const struct 
 
 
 
-
-
-
-
-
-/* list element to store all the disabled tunnel rule netmasks */
-struct throw_node
-{
-	struct list_node list;
-	uint32_t addr;
-	uint8_t  netmask;
-};
-
-
-struct ogm_aggreg_node {
-
-	struct list_node list;
-
-	struct msg_ogm_adv *ogm_advs;
-
-	uint8_t ogm_dest_field[(OGM_DEST_ARRAY_BIT_SIZE / 8)];
-//	int16_t ogm_dest_bit_max;
-	int16_t ogm_dest_bytes;
-
-	uint16_t aggregated_msgs;
-
-	AGGREG_SQN_T    sqn;
-	uint8_t  tx_attempt;
-};
 
 
 

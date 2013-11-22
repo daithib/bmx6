@@ -16,6 +16,14 @@
  */
 
 
+
+/*
+ * from metrics.h
+ */
+
+
+
+
 #define MIN_DESC_METRICALGO           0
 #define MAX_DESC_METRICALGO           1
 #define DEF_DESC_METRICALGO           1
@@ -250,6 +258,7 @@ IDM_T fmetric_cmp(FMETRIC_U16_T a, unsigned char cmp, FMETRIC_U16_T b);
 //void apply_metric_algo(UMETRIC_T *out, struct link_dev_node *link, const UMETRIC_T *path, struct host_metricalgo *algo);
 
 UMETRIC_T apply_metric_algo(UMETRIC_T *tr, UMETRIC_T *umetric_max, const UMETRIC_T *path, struct host_metricalgo *algo);
+
 void lndev_assign_best(struct local_node *local, struct link_dev_node *lndev );
 void update_link_probe_record(struct link_dev_node *lndev, HELLO_SQN_T sqn, uint8_t probe);
 

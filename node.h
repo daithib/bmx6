@@ -63,6 +63,163 @@ struct iid_repos {
 
 
 
+/*
+ * from metrics.h:
+ */
+
+// to be used:
+typedef uint64_t UMETRIC_T;
+
+
+#define OGM_MANTISSA_BIT_SIZE  5
+#define OGM_EXPONENT_BIT_SIZE  5
+#define OGM_EXPONENT_OFFSET    OGM_MANTISSA_BIT_SIZE
+
+#define OGM_EXPONENT_MAX       ((1<<OGM_EXPONENT_BIT_SIZE)-1)
+#define OGM_MANTISSA_MASK      ((1<<OGM_MANTISSA_BIT_SIZE)-1)
+#define OGM_EXPONENT_MASK      ((1<<OGM_EXPONENT_BIT_SIZE)-1)
+
+
+#define OGM_MANTISSA_INVALID            0
+#define OGM_MANTISSA_MIN__NOT_ROUTABLE  1
+#define OGM_MANTISSA_ROUTABLE           2
+
+#define FM8_EXPONENT_BIT_SIZE  OGM_EXPONENT_BIT_SIZE
+#define FM8_MANTISSA_BIT_SIZE  (8-FM8_EXPONENT_BIT_SIZE)
+#define FM8_MANTISSA_MASK      ((1<<FM8_MANTISSA_BIT_SIZE)-1)
+#define FM8_MANTISSA_MIN       (1)
+
+#define OGM_MANTISSA_MAX       (FM8_MANTISSA_MASK << (OGM_MANTISSA_BIT_SIZE - FM8_MANTISSA_BIT_SIZE))
+
+#define UMETRIC_SHIFT_MAX          ((sizeof(UMETRIC_T)*8) - (OGM_EXPONENT_OFFSET+OGM_EXPONENT_MAX+1))
+#define UMETRIC_MULTIPLY_MAX       (((UMETRIC_T)-1)>>(OGM_EXPONENT_OFFSET+OGM_EXPONENT_MAX+1))
+#define UMETRIC_MASK               ((((UMETRIC_T) 1) << (OGM_EXPONENT_OFFSET+OGM_EXPONENT_MAX+1)) -1)
+
+#define UMETRIC_INVALID            ((((UMETRIC_T) 1) << OGM_EXPONENT_OFFSET) + OGM_MANTISSA_INVALID)
+#define UMETRIC_MIN__NOT_ROUTABLE  ((((UMETRIC_T) 1) << OGM_EXPONENT_OFFSET) + OGM_MANTISSA_MIN__NOT_ROUTABLE)
+#define UMETRIC_ROUTABLE           ((((UMETRIC_T) 1) << OGM_EXPONENT_OFFSET) + OGM_MANTISSA_ROUTABLE)
+#define UMETRIC_FM8_MAX            ((((UMETRIC_T) 1) << (OGM_EXPONENT_OFFSET+OGM_EXPONENT_MAX)) + (((UMETRIC_T) FM8_MANTISSA_MASK) << ((OGM_EXPONENT_OFFSET+OGM_EXPONENT_MAX)-FM8_MANTISSA_BIT_SIZE)))
+#define UMETRIC_FM8_MIN            ((((UMETRIC_T) 1) << OGM_EXPONENT_OFFSET) + (((UMETRIC_T) FM8_MANTISSA_MIN) << (OGM_EXPONENT_OFFSET-FM8_MANTISSA_BIT_SIZE)))
+#define UMETRIC_MAX                UMETRIC_FM8_MAX
+//#define UMETRIC_MAX       ((((UMETRIC_T) 1) << (OGM_EXPONENT_OFFSET+OGM_EXPONENT_MAX)) + (((UMETRIC_T) OGM_MANTISSA_MAX) << ((OGM_EXPONENT_OFFSET+OGM_EXPONENT_MAX)-OGM_MANTISSA_BIT_SIZE)))
+
+// these fixes are used to improove (average) rounding errors in umetric_to_fmetric()
+#define UMETRIC_TO_FMETRIC_INPUT_FIX (79)
+
+//#define UMETRIC_MAX_SQRT           ((UMETRIC_T)358956)      // sqrt(UMETRIC_MAX)
+//#define UMETRIC_MAX_HALF_SQRT      ((UMETRIC_T)253821)      // sqrt(UMETRIC_MAX/2)
+//#define U64_MAX_QUARTER_SQRT       ((UMETRIC_T)2147493120)  // sqrt(U64_MAX/4)
+
+struct float_u16 {
+
+	union {
+		struct {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+			uint8_t mantissa_fm16;
+			uint8_t exp_fm16;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+			uint8_t exp_fm16;
+			uint8_t mantissa_fm16;
+#else
+#error "Please fix <bits/endian.h>"
+#endif
+		} __attribute__((packed)) f;
+
+		uint8_t u8[2];
+
+		uint16_t u16;
+	}val;
+};
+
+
+typedef struct float_u16 FMETRIC_U16_T;
+
+
+
+struct float_u8 {
+	union {
+
+		struct {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+			unsigned int mantissa_fmu8 : FM8_MANTISSA_BIT_SIZE;
+			unsigned int exp_fmu8 : FM8_EXPONENT_BIT_SIZE;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+			unsigned int exp_fmu8 : FM8_EXPONENT_BIT_SIZE;
+			unsigned int mantissa_fmu8 : FM8_MANTISSA_BIT_SIZE;
+#else
+#error "Please fix <bits/endian.h>"
+#endif
+		} __attribute__((packed)) f;
+		uint8_t u8;
+	} val;
+};
+
+typedef struct float_u8 FMETRIC_U8_T;
+
+typedef uint16_t ALGO_T;
+
+
+struct host_metricalgo {
+
+	FMETRIC_U16_T fmetric_u16_min;
+
+	UMETRIC_T umetric_min;
+	ALGO_T algo_type;
+	uint16_t flags;
+	uint8_t algo_rp_exp_numerator;
+	uint8_t algo_rp_exp_divisor;
+	uint8_t algo_tp_exp_numerator;
+	uint8_t algo_tp_exp_divisor;
+
+
+	uint8_t window_size;                // MUST be given as multiple of sqn_steps
+        uint8_t lounge_size;                // MUST be given as multiple of sqn_steps e.g. 6
+        uint8_t regression;             // e.g. 16
+//        uint8_t fast_regression;             // e.g. 2
+//        uint8_t fast_regression_impact;             // e.g. 8
+	uint8_t hystere;
+	uint8_t hop_penalty;
+	uint8_t late_penalty;
+};
+
+struct lndev_probe_record {
+	HELLO_SQN_T hello_sqn_max; // SQN which has been applied (if equals wa_pos) then wa_unscaled MUST NOT be set again!
+
+	uint8_t hello_array[MAX_HELLO_SQN_WINDOW/8];
+	uint32_t hello_sum;
+	UMETRIC_T hello_umetric;
+	TIME_T hello_time_max;
+};
+
+
+struct metric_record {
+	SQN_T sqn_bit_mask;
+
+        SQN_T clr; // SQN upto which waightedAverageVal has been purged
+	SQN_T set; // SQN which has been applied (if equals wa_pos) then wa_unscaled MUST NOT be set again!
+
+//	UMETRIC_T umetric;
+//	UMETRIC_T umetric_fast;
+	UMETRIC_T umetric;
+//	UMETRIC_T umetric_prev;
+};
+
+#define ZERO_METRIC_RECORD {0, 0, 0, 0,0,0}
+
+
+
+
+
+
+/*
+ * from node.h:
+ */
+
+typedef CRYPTSHA1_T SHA1_T;
+typedef CRYPTSHA1_T DHASH_T;
+typedef CRYPTSHA1_T RHASH_T;
+
+
 #define DEF_LINK_PURGE_TO  100000
 #define MIN_LINK_PURGE_TO  (MAX_TX_INTERVAL*2)
 #define MAX_LINK_PURGE_TO  864000000 /*10 days*/
@@ -74,14 +231,20 @@ struct iid_repos {
 #define ARG_OGM_PURGE_TO  "purgeTimeout"
 
 
-#if MIN_COMPATIBILITY <= CV16
+#define GLOBAL_ID_NAME_LEN 32
+#define GLOBAL_ID_PKID_LEN HASH_SHA1_LEN
 
 
+struct GLOBAL_ID {
+	char    name[GLOBAL_ID_NAME_LEN];
+	union {
+		uint8_t u8[GLOBAL_ID_PKID_LEN];
+		uint16_t u16[GLOBAL_ID_PKID_LEN / sizeof(uint16_t)];
+		uint32_t u32[GLOBAL_ID_PKID_LEN / sizeof(uint32_t)];
+	} pkid;
+} __attribute__((packed));
 
-
-typedef CRYPTSHA1_T SHA1_T;
-typedef CRYPTSHA1_T DHASH_T;
-typedef CRYPTSHA1_T RHASH_T;
+typedef struct GLOBAL_ID GLOBAL_ID_T;
 
 
 struct local_node {
@@ -315,30 +478,6 @@ struct black_node {
 
 
 
-
-struct packet_header // 17 bytes
-{
-	uint8_t    comp_version;     //  8
-	uint8_t    capabilities;     //  8  reserved
-	uint16_t   pkt_length; 	     // 16 the relevant data size in bytes (including the bmx_header)
-
-	IID_T      transmitterIID;   // 16 IID of transmitter node
-
-	LINKADV_SQN_T link_adv_sqn;  // 16 used for processing: link_adv, lq_adv, rp_adv, ogm_adv, ogm_ack
-
-	//TODOCV17: merge pkt_sqn and local_id into single uint64_t local_id
-	PKT_SQN_T  pkt_sqn;          // 32
-	LOCAL_ID_T local_id;         // 32
-
-	DEVADV_IDX_T   dev_idx;      //  8
-
-//	uint8_t    reserved_for_2byte_alignement;  //  8
-
-} __attribute__((packed));
-#else
-// use generic tlv_header instead...
-#endif
-
 struct packet_buff {
 
 	struct packet_buff_info {
@@ -366,7 +505,7 @@ struct packet_buff {
 	} i;
 
 	union {
-		struct packet_header header;
+//		struct packet_header header;
 		unsigned char data[MAX_UDPD_SIZE + 1];
 	} packet;
 
@@ -386,7 +525,6 @@ extern struct avl_tree link_tree;
 extern struct avl_tree link_dev_tree;
 extern struct avl_tree neigh_tree;
 extern struct avl_tree orig_tree;
-extern struct avl_tree blacklisted_tree;
 
 
 /***********************************************************
@@ -415,12 +553,15 @@ void block_orig_node(IDM_T block, struct orig_node *on);
 void free_orig_node(struct orig_node *on);
 struct orig_node * init_orig_node(GLOBAL_ID_T *id);
 
+char *globalIdAsString( struct GLOBAL_ID *id );
+
 void purge_local_node(struct local_node *local);
 
 IDM_T update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn);
 void update_neigh_dhash(struct orig_node *on, DHASH_T *dhash);
 
 LOCAL_ID_T new_local_id(struct dev_node *dev);
+
 
 void node_tasks(void);
 

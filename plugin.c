@@ -21,8 +21,8 @@
 #include <dlfcn.h>
 
 #include "bmx.h"
+#include "crypt.h"
 #include "node.h"
-#include "msg.h"
 #include "ip.h"
 #include "plugin.h"
 #include "schedule.h"

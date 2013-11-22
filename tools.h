@@ -58,7 +58,6 @@ IDM_T check_string(char*s, char *okChars, char replaceChar);
 IDM_T validate_char_string (const char* data, uint32_t len);
 IDM_T validate_name_string(char* name, uint32_t field_len, char* exceptions);
 
-char *globalIdAsString( struct GLOBAL_ID *id );
 
 
 int32_t max_i32( int32_t a, int32_t b );

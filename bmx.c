@@ -34,14 +34,15 @@
 
 
 #include "bmx.h"
+#include "crypt.h"
 #include "node.h"
+#include "metrics.h"
 #include "msg.h"
 #include "ip.h"
 #include "hna.h"
 #include "schedule.h"
 #include "tools.h"
 #include "iptools.h"
-#include "metrics.h"
 #include "plugin.h"
 
 #define CODE_CATEGORY_NAME "general"
@@ -74,9 +75,6 @@ const IDM_T CONST_YES = YES;
 const IDM_T CONST_NO = NO;
 
 
-const void* IGNORED_PTR = (void*) & IGNORED_PTR;
-const void* UNRESOLVED_PTR = (void*) & UNRESOLVED_PTR;
-const void* FAILURE_PTR = (void*) & FAILURE_PTR;
 
 uint32_t test_magic_number = 1234543210;
 
@@ -1127,46 +1125,6 @@ static struct opt_type bmx_options[]=
 };
 
 
-char *globalIdAsString( struct GLOBAL_ID *id ) {
-
-
-        if ( id ) {
-                uint8_t i;
-#define MAX_IDS_PER_PRINTF 4
-                static char id_str[MAX_IDS_PER_PRINTF][GLOBAL_ID_NAME_LEN + (sizeof(".")-1) + (GLOBAL_ID_PKID_LEN * 2) + 1];
-                static uint8_t a = 0;
-
-                a = (a + 1) % MAX_IDS_PER_PRINTF;
-
-                for (i = 0; !id->pkid.u8[i] && i < GLOBAL_ID_PKID_LEN; i++);
-
-                sprintf(id_str[a], "%s.%s",
-                        validate_name_string(id->name, GLOBAL_ID_NAME_LEN, NULL) == SUCCESS ? id->name : "ILLEGAL_HOSTNAME",
-                        memAsHexString(&(id->pkid.u8[i]), GLOBAL_ID_PKID_LEN - i));
-
-                return id_str[a];
-        }
-
-        return NULL;
-}
-
-
-struct orig_node *init_orig_node(GLOBAL_ID_T *id)
-{
-        TRACE_FUNCTION_CALL;
-        struct orig_node *on = debugMallocReset(sizeof ( struct orig_node) + (sizeof (void*) * plugin_data_registries[PLUGIN_DATA_ORIG]), -300128);
-        on->global_id = *id;
-
-        AVL_INIT_TREE(on->rt_tree, struct router_node, local_key);
-
-        avl_insert(&orig_tree, on, -300148);
-
-        cb_plugin_hooks(PLUGIN_CB_STATUS, NULL);
-
-        return on;
-}
-
-
 STATIC_FUNC
 void init_bmx(void)
 {
@@ -1300,8 +1258,6 @@ int main(int argc, char *argv[])
 {
         // make sure we are using compatible description0 sizes:
         assertion(-500201, (MSG_DESCRIPTION0_ADV_SIZE == sizeof ( struct msg_description_adv)));
-        assertion(-500996, (sizeof (FMETRIC_U16_T) == 2));
-        assertion(-500997, (sizeof (FMETRIC_U8_T) == 1));
         assertion(-500998, (sizeof(struct frame_header_short) == 2));
         assertion(-500999, (sizeof(struct frame_header_long) == 4));
 
@@ -1352,23 +1308,6 @@ int main(int argc, char *argv[])
 #ifdef TRAFFIC_DUMP
                 struct plugin * dump_get_plugin(void);
                 activate_plugin((dump_get_plugin()), NULL, NULL);
-#endif
-
-
-#ifdef BMX6_TODO
-
-#ifndef	NO_VIS
-                activate_plugin((vis_get_plugin_v1()), NULL, NULL);
-#endif
-
-#ifndef	NO_TUNNEL
-                activate_plugin((tun_get_plugin_v1()), NULL, NULL);
-#endif
-
-#ifndef	NO_SRV
-                activate_plugin((srv_get_plugin_v1()), NULL, NULL);
-#endif
-
 #endif
 
         } else {

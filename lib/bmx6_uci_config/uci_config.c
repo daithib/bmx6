@@ -29,6 +29,7 @@
 #include <uci.h>
 
 #include "bmx.h"
+#include "crypt.h"
 #include "node.h"
 #include "plugin.h"
 #include "tools.h"

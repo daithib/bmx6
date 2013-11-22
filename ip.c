@@ -41,14 +41,15 @@
 
 
 #include "bmx.h"
+#include "crypt.h"
 #include "node.h"
+#include "metrics.h"
 #include "msg.h"
 #include "ip.h"
 #include "schedule.h"
 #include "plugin.h"
 #include "tools.h"
 #include "iptools.h"
-#include "metrics.h"
 
 #define CODE_CATEGORY_NAME "ip"
 
@@ -119,8 +120,6 @@ AVL_TREE(tun_name_tree, struct ifname, str);
 
 AVL_TREE(iptrack_tree, struct track_node, k);
 
-
-static LIST_SIMPEL( throw4_list, struct throw_node, list, list );
 
 static int ifevent_sk = -1;
 
@@ -2314,23 +2313,6 @@ int update_interface_rules(void)
 
                 }
         }
-
-#ifdef ADJ_PATCHED_NETW
-        struct list_node *throw_pos;
-	struct throw_node *throw_node;
-
-        list_for_each(throw_pos, &throw4_list) {
-
-                throw_node = list_entry(throw_pos, struct throw_node, list);
-
-                IPX_T throw6 = ip4ToX(throw_node->addr);
-
-                configure_route(&throw6, AF_INET, throw_node->netmask, 0, 0, 0, 0, RT_TABLE_HOSTS, RTN_THROW, ADD, IP_THROW_MY_NET);
-                configure_route(&throw6, AF_INET, throw_node->netmask, 0, 0, 0, 0, RT_TABLE_HNA, RTN_THROW, ADD, IP_THROW_MY_NET);
-                configure_route(&throw6, AF_INET, throw_node->netmask, 0, 0, 0, 0, RT_TABLE_TUN, RTN_THROW, ADD, IP_THROW_MY_NET);
-
-        }
-#endif
 	return SUCCESS;
 }
 

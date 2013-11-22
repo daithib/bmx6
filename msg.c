@@ -27,11 +27,12 @@
 #include <netinet/ip6.h>
 
 #include "bmx.h"
+#include "crypt.h"
 #include "node.h"
+#include "metrics.h"
 #include "msg.h"
 #include "z.h"
 #include "ip.h"
-#include "metrics.h"
 #include "schedule.h"
 #include "tools.h"
 #include "iptools.h"
@@ -117,7 +118,7 @@ static int32_t my_link_adv_msgs = 0;
 
 
 
-LIST_SIMPEL( ogm_aggreg_list, struct ogm_aggreg_node, list, sqn );
+static LIST_SIMPEL( ogm_aggreg_list, struct ogm_aggreg_node, list, sqn );
 uint32_t ogm_aggreg_pending = 0;
 static AGGREG_SQN_T ogm_aggreg_sqn_max;
 
@@ -2585,6 +2586,9 @@ int32_t rx_frame_ogm_acks(struct rx_frame_iterator *it)
 
 
 
+static const void* IGNORED_PTR = (void*) & IGNORED_PTR;
+static const void* UNRESOLVED_PTR = (void*) & UNRESOLVED_PTR;
+static const void* FAILURE_PTR = (void*) & FAILURE_PTR;
 
 
 STATIC_FUNC
@@ -3235,12 +3239,12 @@ IDM_T rx_frames(struct packet_buff *pb)
 {
         TRACE_FUNCTION_CALL;
         int32_t it_result;
-
+	struct packet_header *phdr = (struct packet_header *)pb->packet.data;
         struct rx_frame_iterator it = {
                 .caller = __FUNCTION__, .on = NULL, .cn = NULL, .op = 0, .pb = pb,
                 .handls = packet_frame_handler, .handl_max = FRAME_TYPE_MAX, .process_filter = FRAME_TYPE_PROCESS_ALL,
-                .frame_type = -1, .frames_in = (((uint8_t*) & pb->packet.header) + sizeof (struct packet_header)),
-                .frames_length = (ntohs(pb->packet.header.pkt_length) - sizeof (struct packet_header)), .frames_pos = 0
+                .frame_type = -1, .frames_in = (pb->packet.data + sizeof (struct packet_header)),
+                .frames_length = (ntohs(phdr->pkt_length) - sizeof (struct packet_header)), .frames_pos = 0
         };
 
         while ((it_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE || it_result == TLV_RX_DATA_BLOCKED);
@@ -3712,8 +3716,6 @@ void tx_packet(void *devp)
         dbgf_all(DBGT_INFO, "dev=%s", dev->label_cfg.str);
 
         assertion(-500205, (dev->active));
-        ASSERTION(-500788, ((pb.packet.data) == ((uint8_t*) (&pb.packet.header))));
-        ASSERTION(-500789, ((pb.packet.data + sizeof (struct packet_header)) == ((uint8_t*) &((&pb.packet.header)[1]))));
 
 
         schedule_tx_task(&dev->dummy_lndev, FRAME_TYPE_HELLO_ADV, SCHEDULE_MIN_MSG_SIZE, 0, 0, 0, 0);
@@ -3858,7 +3860,7 @@ void tx_packet(void *devp)
 
                 if (tlv_result == TLV_TX_DATA_FULL || (it.frame_type == FRAME_TYPE_NOP && it.frames_out_pos)) {
 
-                        struct packet_header *packet_hdr = &pb.packet.header;
+			struct packet_header *phdr = (struct packet_header *)pb.packet.data;
 
                         assertion(-501338, (it.frames_out_pos && it.frames_out_num));
                         assertion(-501339, IMPLIES(it.frames_out_num > 1, it.frames_out_pos <= it.frames_out_pref));
@@ -3867,15 +3869,15 @@ void tx_packet(void *devp)
                         pb.i.oif = dev;
                         pb.i.total_length = (it.frames_out_pos + sizeof ( struct packet_header));
 
-                        memset(packet_hdr, 0, sizeof (struct packet_header));
+                        memset(phdr, 0, sizeof (struct packet_header));
 
-                        packet_hdr->comp_version = my_compatibility;
-                        packet_hdr->pkt_length = htons(pb.i.total_length);
-                        packet_hdr->transmitterIID = htons(myIID4me);
-                        packet_hdr->link_adv_sqn = htons(my_link_adv_sqn);
-                        packet_hdr->pkt_sqn = htonl(++my_packet_sqn); //TODOCV18: remove
-                        packet_hdr->local_id = my_local_id;
-                        packet_hdr->dev_idx = dev->llip_key.idx;
+                        phdr->comp_version = my_compatibility;
+                        phdr->pkt_length = htons(pb.i.total_length);
+                        phdr->transmitterIID = htons(myIID4me);
+                        phdr->link_adv_sqn = htons(my_link_adv_sqn);
+                        phdr->pkt_sqn = htonl(++my_packet_sqn); //TODOCV18: remove
+                        phdr->local_id = my_local_id;
+                        phdr->dev_idx = dev->llip_key.idx;
 
                         cb_packet_hooks(&pb);
 
@@ -4698,13 +4700,13 @@ void rx_packet( struct packet_buff *pb )
 
         assertion(-500841, ((iif->active && iif->if_llocal_addr)));
 
-        struct packet_header *hdr = &pb->packet.header;
-        uint16_t pkt_length = ntohs(hdr->pkt_length);
-        pb->i.transmittersIID = ntohs(hdr->transmitterIID);
-        pb->i.link_sqn = ntohs(hdr->link_adv_sqn);
+	struct packet_header *phdr = (struct packet_header *)pb->packet.data;
+        uint16_t pkt_length = ntohs(phdr->pkt_length);
+        pb->i.transmittersIID = ntohs(phdr->transmitterIID);
+        pb->i.link_sqn = ntohs(phdr->link_adv_sqn);
 
-        pb->i.link_key.local_id = hdr->local_id;
-        pb->i.link_key.dev_idx = hdr->dev_idx;
+        pb->i.link_key.local_id = phdr->local_id;
+        pb->i.link_key.dev_idx = phdr->dev_idx;
 
 	pb->i.llip = (*((struct sockaddr_in6*) &(pb->i.addr))).sin6_addr;
 
@@ -4725,7 +4727,7 @@ void rx_packet( struct packet_buff *pb )
 	// we acceppt longer packets than specified by pos->size to allow padding for equal packet sizes
         if (    pb->i.total_length < (int) (sizeof (struct packet_header) + sizeof (struct frame_header_long)) ||
                 pkt_length < (int) (sizeof (struct packet_header) + sizeof (struct frame_header_long)) ||
-                ((hdr->comp_version < (my_compatibility - 1)) || (hdr->comp_version > (my_compatibility + 1))) ||
+                ((phdr->comp_version < (my_compatibility - 1)) || (phdr->comp_version > (my_compatibility + 1))) ||
                 pkt_length > pb->i.total_length || pkt_length > (PKT_FRAMES_SIZE_MAX + sizeof(struct packet_header)) ||
                 pb->i.link_key.dev_idx < DEVADV_IDX_MIN || pb->i.link_key.local_id == LOCAL_ID_INVALID ) {
 
@@ -4789,7 +4791,7 @@ void rx_packet( struct packet_buff *pb )
 
 
         dbgf_all(DBGT_INFO, "version=%i, reserved=%X, size=%i IID=%d rcvd udp_len=%d via NB %s %s %s",
-                hdr->comp_version, hdr->capabilities, pkt_length, pb->i.transmittersIID,
+                phdr->comp_version, phdr->capabilities, pkt_length, pb->i.transmittersIID,
                 pb->i.total_length, pb->i.llip_str, iif->label_cfg.str, pb->i.unicast ? "UNICAST" : "BRC");
 
 
@@ -4810,8 +4812,8 @@ process_packet_error:
         dbgf_sys(DBGT_WARN,
                 "Drop (remaining) packet: rcvd problematic packet via NB=%s dev=%s "
                 "(version=%i, local_id=%X dev_idx=0x%X, reserved=0x%X, pkt_size=%i), udp_len=%d my_version=%d, max_udpd_size=%d",
-                pb->i.llip_str, iif->label_cfg.str, hdr->comp_version,
-                ntohl(pb->i.link_key.local_id), pb->i.link_key.dev_idx, hdr->capabilities, pkt_length, pb->i.total_length,
+                pb->i.llip_str, iif->label_cfg.str, phdr->comp_version,
+                ntohl(pb->i.link_key.local_id), pb->i.link_key.dev_idx, phdr->capabilities, pkt_length, pb->i.total_length,
                 my_compatibility, MAX_UDPD_SIZE);
 
         blacklist_neighbor(pb);
