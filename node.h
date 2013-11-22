@@ -507,7 +507,7 @@ struct packet_buff {
 	union {
 //		struct packet_header header;
 		unsigned char data[MAX_UDPD_SIZE + 1];
-	} __attribute__((__may_alias__)) packet;
+	} packet;
 
 };
 

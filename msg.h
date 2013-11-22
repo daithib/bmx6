@@ -293,7 +293,7 @@ struct packet_header // 17 bytes
 
 //	uint8_t    reserved_for_2byte_alignement;  //  8
 
-} __attribute__((packed));
+} __attribute__((packed,__may_alias__));
 #else
 // use generic tlv_header instead...
 #endif
