@@ -30,8 +30,9 @@
 #include <unistd.h>
 
 
+#include "list.h"
+#include "control.h"
 #include "bmx.h"
-//#include "ip.h"
 #include "tools.h"
 
 char* memAsHexStringSep( const void* mem, uint32_t len, uint16_t seperationLen, char *seperator)

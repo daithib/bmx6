@@ -39,8 +39,11 @@
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
 
+#include "list.h"
+#include "control.h"
 #include "bmx.h"
 #include "crypt.h"
+#include "avl.h"
 #include "node.h"
 #include "metrics.h"
 #include "msg.h"
@@ -50,6 +53,7 @@
 #include "tools.h"
 #include "iptools.h"
 #include "schedule.h"
+#include "allocate.h"
 
 #define CODE_CATEGORY_NAME "hna"
 

@@ -29,8 +29,9 @@
 #include <unistd.h>
 
 
+#include "list.h"
+#include "control.h"
 #include "bmx.h"
-//#include "ip.h"
 #include "tools.h"
 #include "iptools.h"
 

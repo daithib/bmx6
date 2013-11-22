@@ -16,7 +16,7 @@
  */
 
 
-#define REGISTER_TASK_TIMEOUT_MAX XMIN( 100000, TIME_MAX>>2)
+#define REGISTER_TASK_TIMEOUT_MAX 100000
 
 struct task_node {
 	struct list_node list;

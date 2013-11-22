@@ -21,6 +21,9 @@
 #include <assert.h>
 #include <errno.h>
 #include <zlib.h>
+
+#include "list.h"
+#include "control.h"
 #include "bmx.h"
 #include "allocate.h"
 #include "z.h"

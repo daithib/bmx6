@@ -15,6 +15,8 @@
  * 02110-1301, USA
  */
 
+typedef uint32_t TIME_T;
+typedef uint32_t TIME_SEC_T;
 
 #define MIN_UPTIME 0
 #define MAX_UPTIME 2147383 /*(((TP32/1000)/2)-100) /1000 to talk about seconds and not ms, /2 to not render scheduled events outdated, -100 to be save */

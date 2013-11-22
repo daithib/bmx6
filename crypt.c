@@ -19,15 +19,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-
 #include <unistd.h>
 #include <errno.h>
 #include <stdint.h>
 
+#include "list.h"
+#include "control.h"
 #include "bmx.h"
 #include "crypt.h"
 #include "tools.h"
-//#include "crypt.h"
+#include "allocate.h"
 
 
 const CRYPTKEY_T CYRYPTKEY_ZERO = { .nativeBackendKey=0, .backendKey=NULL, .rawKeyLen=0, .rawKey=NULL };

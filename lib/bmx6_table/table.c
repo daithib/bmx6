@@ -34,8 +34,11 @@
 #include <netinet/in.h>
 
 
+#include "list.h"
+#include "control.h"
 #include "bmx.h"
 #include "crypt.h"
+#include "avl.h"
 #include "node.h"
 #include "metrics.h"
 #include "msg.h"
@@ -45,8 +48,9 @@
 #include "iptools.h"
 #include "ip.h"
 #include "hna.h"
-#include "redist.c"
+#include "allocate.h"
 #include "table.h"
+#include "redist.c"
 
 
 #define CODE_CATEGORY_NAME "table"

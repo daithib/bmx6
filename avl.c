@@ -25,8 +25,11 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "list.h"
+#include "control.h"
 #include "bmx.h"
 #include "avl.h"
+#include "allocate.h"
 
 #define CODE_CATEGORY_NAME "avl"
 

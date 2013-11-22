@@ -26,14 +26,18 @@
 #include <linux/rtnetlink.h>
 
 
+#include "list.h"
+#include "control.h"
 #include "bmx.h"
 #include "crypt.h"
+#include "avl.h"
 #include "node.h"
 #include "metrics.h"
 #include "msg.h"
 #include "ip.h"
 #include "plugin.h"
 #include "schedule.h"
+#include "allocate.h"
 
 
 

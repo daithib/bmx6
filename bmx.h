@@ -25,6 +25,8 @@
 #include <linux/rtnetlink.h>
 
 
+typedef int8_t IDM_T; // smallest int which size does NOT matter
+
 /*
  * from other headers:
  * TODO: partly move this to system.h
@@ -128,12 +130,9 @@ extern const struct net_key ZERO_NET6_KEY;
 /*
  * from bmx.h:
  */
-typedef uint32_t TIME_T;
-#define TIME_MAX ((TIME_T)-1)
 
-typedef uint32_t TIME_SEC_T;
 
-typedef int8_t IDM_T; // smallest int which size does NOT matter
+
 
 
 
@@ -309,12 +308,6 @@ typedef uint32_t DESC_SQN_T;
 
 
 
-
-
-#include "avl.h"
-#include "list.h"
-#include "control.h"
-#include "allocate.h"
 
 
 
@@ -678,3 +671,4 @@ IDM_T validate_param(int32_t probe, int32_t min, int32_t max, char *name);
 
 int32_t opt_status(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn);
 int32_t opt_update_description(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn);
+

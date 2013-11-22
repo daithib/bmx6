@@ -30,15 +30,18 @@
 #include <dirent.h>
 #include <sys/inotify.h>
 
+#include "list.h"
+#include "control.h"
 #include "bmx.h"
 #include "crypt.h"
+#include "avl.h"
 #include "node.h"
 #include "msg.h"
 #include "plugin.h"
 #include "schedule.h"
 #include "tools.h"
 #include "sms.h"
-
+#include "allocate.h"
 
 #define CODE_CATEGORY_NAME "sms"
 

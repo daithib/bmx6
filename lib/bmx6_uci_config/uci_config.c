@@ -28,8 +28,11 @@
 #include <errno.h>
 #include <uci.h>
 
+#include "list.h"
+#include "control.h"
 #include "bmx.h"
 #include "crypt.h"
+#include "avl.h"
 #include "node.h"
 #include "plugin.h"
 #include "tools.h"
