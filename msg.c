@@ -2270,8 +2270,8 @@ int32_t rx_frame_problem_adv(struct rx_frame_iterator *it)
 
         if (adv->code == FRAME_TYPE_PROBLEM_CODE_DUP_LINK_ID) {
 
-#if MIN_COMPATIBILITY <= CV16
-		if ( my_compatibility <= CV16 ) {
+#if MIN_COMPATIBILITY <= CV17
+		if ( my_compatibility <= CV17 ) {
 
 			if (it->frame_data_length != sizeof (struct msg_problem_adv)) {
 				dbgf_sys(DBGT_ERR,"frame_data_length=%d !!", it->frame_data_length);

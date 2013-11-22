@@ -273,7 +273,7 @@
 
 
 
-#if MIN_COMPATIBILITY <= CV16
+#if MIN_COMPATIBILITY <= CV17
 
 struct packet_header // 17 bytes
 {
@@ -294,12 +294,14 @@ struct packet_header // 17 bytes
 //	uint8_t    reserved_for_2byte_alignement;  //  8
 
 } __attribute__((packed,__may_alias__));
-#else
-// use generic tlv_header instead...
+#endif
+
+#if MAX_COMPATIBILITY >= CV16
+// understand tlv_header as well
 #endif
 
 
-
+#if MIN_COMPATIBILITY <= CV17
 struct frame_header_short { // 2 bytes
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
@@ -337,7 +339,7 @@ struct frame_header_long { // 4 bytes
 	uint16_t length;  // lenght of (compressed) frame in 1-Byte steps, including frame_header and variable data field
 //	uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
 } __attribute__((packed));
-
+#endif
 
 struct frame_header_virtual { // 6 bytes
 	unsigned int type : FRAME_TYPE_BIT_SIZE;
