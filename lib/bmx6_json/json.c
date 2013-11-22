@@ -543,7 +543,8 @@ void json_description_event_hook(int32_t cb_id, struct orig_node *on)
                                         .caller = __FUNCTION__, .on = on, .cn = NULL, .op = TLV_OP_PLUGIN_MIN,
                                         .handls = description_tlv_handl, .handl_max = BMX_DSC_TLV_MAX,
                                         .process_filter = FRAME_TYPE_PROCESS_ALL,
-                                        .frame_type = -1, .frames_in = on->dext->data, .frames_length = on->dext->dlen
+                                        .frame_type = -1, .frames_in = on->dext->data, .frames_length = on->dext->dlen,
+					.is_virtual_header = 1
                                 };
 				
 

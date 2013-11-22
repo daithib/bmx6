@@ -324,17 +324,18 @@ struct frame_header_short { // 2 bytes
 struct frame_header_long { // 4 bytes
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 	unsigned int type : FRAME_TYPE_BIT_SIZE;
-	unsigned int reserved : 2;
-	unsigned int is_short : 1;
+	unsigned int reserved1 : 2;
+	unsigned int is_short  : 1;
 #elif __BYTE_ORDER == __BIG_ENDIAN
-	unsigned int is_short : FRAME_ISSHORT_BIT_SIZE;
-	unsigned int reserved : FRAME_RELEVANCE_BIT_SIZE;
+	unsigned int is_short  : FRAME_ISSHORT_BIT_SIZE;
+	unsigned int reserved1 : FRAME_RELEVANCE_BIT_SIZE;
 	unsigned int type : FRAME_TYPE_BIT_SIZE;
 #else
 # error "Please fix <bits/endian.h>"
 #endif
 
-	uint8_t  is_virtual;
+//	uint8_t  is_virtual;
+	uint8_t  reserved;
 
 	uint16_t length;  // lenght of (compressed) frame in 1-Byte steps, including frame_header and variable data field
 //	uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
@@ -346,8 +347,8 @@ struct frame_header_virtual { // 6 bytes
 	unsigned int reserved1 : 2;
 	unsigned int is_short  : 1;
 
-	unsigned int is_virtual  : 1;
-	unsigned int reserved    : 7;
+//	unsigned int is_virtual  : 1;
+	unsigned int reserved    : 8;
 
 	uint32_t length;  // lenght of (always uncompressed and resolved) frame in 1-Byte steps, including frame_header and variable data field
 //	uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
@@ -817,6 +818,7 @@ struct rx_frame_iterator {
         uint8_t op;
         uint8_t process_filter;
         uint8_t handl_max;
+        uint8_t is_virtual_header;
         int32_t frames_length;
 
         // MUST be initialized, updated by rx..iterate(), and consumed by handl[].rx_tlv_handler
@@ -826,7 +828,6 @@ struct rx_frame_iterator {
 
         // set by rx..iterate(), and consumed by handl[].rx_tlv_handler
         uint8_t is_short_header;
-        uint8_t is_virtual_header;
         int32_t frame_data_length;
         int32_t frame_length;
         int32_t frame_msgs_length;

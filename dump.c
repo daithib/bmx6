@@ -155,7 +155,7 @@ void dump(struct packet_buff *pb)
                 .caller = __FUNCTION__, .on = NULL, .cn = NULL, .op = 0, .pb = NULL,
                 .handls = packet_frame_handler, .handl_max = FRAME_TYPE_MAX, .process_filter = FRAME_TYPE_PROCESS_NONE,
                 .frame_type = -1, .frames_in = (((uint8_t*) phdr) + sizeof (struct packet_header)),
-                .frames_length = (plength - sizeof (struct packet_header)), .frames_pos = 0
+                .frames_length = (plength - sizeof (struct packet_header)), .frames_pos = 0, .is_virtual_header = 0
         };
 
         int32_t iterator_result;
