@@ -145,7 +145,7 @@ int32_t rsa_test( char *tmp_path, CRYPTKEY_T *cryptKey ) {
 
 	cryptKeyFromDer(cryptKey, der, derSz);
 
-	CRYPTKEY_T pubKey;
+	CRYPTKEY_T pubKey = CYRYPTKEY_ZERO;
 	cryptKeyFromRaw( &pubKey, cryptKey->rawKey, cryptKey->rawKeyLen);
 
 
