@@ -271,6 +271,95 @@
 #define ARG_REFERENCES          "references"
 #define HLP_REFERENCES          "show cached reference frames\n"
 
+#ifdef COMMENT
+
+
+FSV : fixed-sized array of fixed-sized values (implicit types)
+
+ILV : single implicit-length value (implicit type)
+
+TLV : type length value (variable type and length, implicit dataHdrRelevance and dataBdyRelevance)
+- dataHdrFormat := { nil | FSV | TLV }
+- dataBdyFormat := { nil | ILV | {+|*}{ FSV | TLV } }
+
+data[ context=packet[ dataHdrFormat=nil dataBdyFormat=+TLV ], length= ]={
+    dataBdy={
+	TLV={
+	    type=cv16, length=,
+	    data[ context=packet.cv16[ dataHdrFormat=FSV dataBdyFormat=+TLV ], length= ]={
+		dataHdr={ FSV={transmitterIID, linkID, devID, ...} }
+		dataBdy={
+		    TLV={
+			type=hello, length=,
+			data[ context=packet.cv16.hello[ dataHdrFormat=FSV ], length= ]={
+			    dataHdr={ FSV={helloSqn} }
+			}
+		    }
+		    TLV={
+			type=descriptions, length=,
+			data[ context=packet.cv16.description[ dataBdyFormat=+TLV ], length= ]={
+			    dataBdy={
+				TLV={
+				    type=0, length=,
+				    data[ context=packet.cv16.description.1[ dataHdrFormat=FSV, dataBdyFormat=*TLV ], length= ]={
+					dataHdr={ FSV={name, descSqn, ...} }
+					dataBdy={
+					    TLV={
+						type=metric, length=,
+						data[ context=packet.cv16.description.1.metric[ dataHdrFormat=FSV ], length= ]={
+						    dataHdr={ FSV={algo, ...} }
+						}
+					    }
+					    TLV={
+						type=hna, length=,
+						data[ context=packet.cv16.description.1.hna[ dataBdyFormat=+FSV ], length= ]={
+						    dataBdy={
+							FSV={net,prefix}
+							FSV={net,prefix}
+							...
+						    }
+						}
+					    }
+					    TLV={
+						type=sms, length=,
+						data[ context=packet.cv16.description.1.sms[ dataBdyFormat=+TLV ], length= ]={
+						    dataBdy={
+							TLV={
+							    type=0, length=,
+							    data[ context=packet.cv16.description.1.sms.1[ dataHdrFormat=FSV, dataBdyFormat=ILV ], length= ]={
+								dataHdr={ FSV={name} }
+								dataBdy={ ILV={data} }
+							    }
+							}
+							TLV={
+							    type=0, length=,
+							    data[ context=packet.cv16.description.1.sms.2[ dataHdrFormat=FSV, dataBdyFormat=ILV ], length= ]={
+								dataHdr={ FSV={name} }
+								dataBdy={ ILV={data} }
+							    }
+							}
+						    }
+						}
+					    }
+					}
+				    }
+				}
+				TLV={
+				    type=0, length=,
+				    data[ context=packet.cv16.description.2[ dataHdrFormat=FSV, dataMsgsFormat=*TLV ], length= ]={}
+				}
+				TLV
+			    }
+			}			
+		    }
+		}
+	    }
+	}
+    }
+}
+
+#endif
+
 
 
 #if MIN_COMPATIBILITY <= CV17
@@ -371,9 +460,12 @@ struct tlv_hdr { // 2 bytes
 //	uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
 } __attribute__((packed));
 
+
+
 // for BMX_DSC_TLV_RHASH_ADV:
 struct msg_rhash_adv {
-
+    SHA1_T rframe_hash;       // hash over full frame (including frame-header and data) as transmitted
+//TODO: remove:
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 	unsigned int compression : 2; // 0:= NO compresson, 1:= gzip compression, 2-7:=reserved; only data field is compressed
 	unsigned int nested : 1;
@@ -385,23 +477,24 @@ struct msg_rhash_adv {
 #else
 # error "Please fix <bits/endian.h>"
 #endif
-//? uint32_t rframe_position; // position of to-be-resolved frame in hdr_rhash_adv->expanded_len area
-    SHA1_T rframe_hash;       // hash over full frame (including frame-header and data) as transmitted
 } __attribute__((packed));
 
 struct hdr_rhash_adv {
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int compression : 2; // 0:= NO compresson, 1:= gzip compression, 2-7:=reserved; only data field is compressed
-	                              // all resolved and aggregated data fields are compressed (NOT the hashes)
-	unsigned int expanded_type : 6;
+	unsigned int nested :        1;
+	unsigned int compression :   2; // 0:= NO compresson, 1:= gzip compression, 2-7:=reserved; only data field is compressed
+	                                // all resolved and aggregated data fields are compressed (NOT the hashes)
+	unsigned int expanded_type : 5;
 #elif __BYTE_ORDER == __BIG_ENDIAN
-	unsigned int expanded_type : 6;
-	unsigned int compression : 2;
+	unsigned int expanded_type : 5;
+	unsigned int compression :   2;
+	unsigned int nested :        1;
+
 #else
 # error "Please fix <bits/endian.h>"
 #endif
-
+//TODO: remove:
     uint32_t expanded_rframes_data_len; // length of fully expanded (uncompressed, resolved rhash->rdata), without frame header!
     SHA1_T   expanded_rframes_data_hash;  // hash over expanded_rframes_data_len data
     struct   msg_rhash_adv msg[];
