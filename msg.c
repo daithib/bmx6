@@ -132,7 +132,7 @@ STATIC_FUNC
 struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t *data, uint32_t dlen);
 
 STATIC_FUNC
-int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, struct desc_extension *dext, uint8_t rf_type, uint8_t nest_level );
+int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, struct desc_extension *dext, uint8_t rf_type, uint8_t compression, uint8_t nest_level );
 
 STATIC_FUNC
 int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it);
@@ -199,7 +199,7 @@ void register_frame_handler(struct frame_handl *array, int pos, struct frame_han
 	// messages to point and allow unambiguous concatenation of
 	assertion(-501613, TEST_VALUE(FRAME_TYPE_REF_ADV));
 	// into
-	assertion(-501614, TEST_STRUCT(struct frame_header_virtual));
+	assertion(-501614, TEST_STRUCT(struct tlv_hdr_virtual));
 	// and
 	assertion(-501615, TEST_STRUCT(struct desc_extension));
 	// without potentially conflicting message headers (frame data headers)
@@ -1205,7 +1205,7 @@ void ref_node_del (struct ref_node *refn)
 	assertion(-501667, !refn->dext_tree.items);
 	assertion(-501668, ref_tree.items);
 	avl_remove(&ref_tree, &refn->rhash, -300560);
-	debugFree(refn->f_data, -300561);
+	debugFree(refn->frame, -300561);
 	debugFree(refn, -300562);
 }
 
@@ -1241,32 +1241,21 @@ void ref_node_purge (IDM_T all_unused)
 
 
 STATIC_FUNC
-struct ref_node * ref_node_add(uint8_t *frame_data, uint32_t f_data_len, int8_t long_hdr)
+struct ref_node * ref_node_add(uint8_t *f_body, uint32_t f_body_len, uint8_t compression, uint8_t nested, uint8_t reserved)
 {
 
-	assertion(-501616, (f_data_len <= REF_FRAME_DATA_SIZE_MAX));
+	assertion(-501616, (f_body_len > sizeof(struct frame_hdr_rhash_adv)));
+	assertion(-501616, (f_body_len - sizeof(struct frame_hdr_rhash_adv) <= REF_FRAME_BODY_SIZE_MAX));
 
-	uint32_t f_hdr_len;
-	uint8_t f_hdr[sizeof(struct frame_header_long)];
-	memset(&f_hdr, 0, sizeof(f_hdr));
+	struct frame_header_long fhl = {.type=FRAME_TYPE_REF_ADV, .is_short=0};
+	fhl.length = htons(sizeof(struct frame_header_long) + f_body_len);
 
-	if ((long_hdr = (long_hdr || f_data_len > MAX_SHORT_FRAME_DATA_LEN))) {
-		f_hdr_len = sizeof(struct frame_header_long);
-		struct frame_header_long *fhl = (struct frame_header_long *)&f_hdr;
-		fhl->type = FRAME_TYPE_REF_ADV;
-		fhl->is_short = 0;
-		fhl->length = htons(f_hdr_len + f_data_len);
-	} else {
-		f_hdr_len = sizeof(struct frame_header_short);
-		struct frame_header_short *fhs = (struct frame_header_short *)&f_hdr;
-		fhs->type = FRAME_TYPE_REF_ADV;
-		fhs->is_short = 1;
-		fhs->length = f_hdr_len + f_data_len;
-	}
+	struct frame_hdr_rhash_adv rhash_hdr = {.compression=compression, .nested=nested, .reserved=reserved};
 
 	SHA1_T rhash;
-	cryptShaNew(&f_hdr, f_hdr_len);
-	cryptShaUpdate(frame_data, f_data_len);
+	cryptShaNew(&fhl, sizeof(fhl));
+	cryptShaNew(&rhash_hdr, sizeof(rhash_hdr));
+	cryptShaUpdate(f_body, f_body_len);
 	cryptShaFinal(&rhash);
 
 	struct ref_node *refn = ref_node_get(NULL, &rhash);
@@ -1278,17 +1267,26 @@ struct ref_node * ref_node_add(uint8_t *frame_data, uint32_t f_data_len, int8_t 
 
 		refn = debugMallocReset(sizeof(struct ref_node), -300563);
 		AVL_INIT_TREE(refn->dext_tree, struct dext_tree_node, dext_key);
-		refn->f_long = long_hdr;
+		refn->frame_len = sizeof(fhl) + sizeof(rhash_hdr) + f_body_len;
+		refn->frame = debugMalloc(refn->frame_len, -300564);
+		memcpy(refn->frame, &fhl, sizeof(fhl));
+		memcpy(refn->frame + sizeof(fhl), &rhash_hdr, sizeof(rhash_hdr));
+		memcpy(refn->frame + refn->frame_len, f_body, f_body_len);
+		refn->f_body_len = f_body_len;
+		refn->f_body = refn->frame  + sizeof(fhl) + sizeof(rhash_hdr);
 		refn->last_usage = bmx_time;
 		refn->rhash = rhash;
-		refn->f_data_len = f_data_len;
-		refn->f_data = debugMalloc(f_data_len, -300564);
-		memcpy(refn->f_data, frame_data, f_data_len);
-
+		refn->compression = compression;
+		refn->nested = nested;
+		refn->reserved = reserved;
+#ifndef NO_ASSERTIONS
+		cryptShaAtomic(refn->frame, refn->frame_len, &rhash);
+		assertion(-500000, (!memcmp(&refn->rhash, &rhash, sizeof(rhash))));
+#endif
 		avl_insert(&ref_tree, refn, -300565);
 
 		dbgf_track(DBGT_INFO, "new rhash=%s data_len=%d",
-			memAsHexString(&rhash, sizeof(rhash)), f_data_len);
+			memAsHexString(&rhash, sizeof(rhash)), f_body_len);
 	}
 
 	return refn;
@@ -1323,7 +1321,7 @@ void ref_node_use(struct desc_extension *dext, struct ref_node *refn, uint8_t f_
 			int d;
 
 			for (d = 0; (lndev_arr[d]); d++)
-				schedule_tx_task(lndev_arr[d], FRAME_TYPE_REF_ADV, refn->f_data_len, &refn->rhash, sizeof(SHA1_T), 0, 0);
+				schedule_tx_task(lndev_arr[d], FRAME_TYPE_REF_ADV, refn->f_body_len, &refn->rhash, sizeof(SHA1_T), 0, 0);
 		}
 	}
 
@@ -1382,7 +1380,7 @@ int32_t rx_msg_ref_request(struct rx_frame_iterator *it)
 	struct ref_node *refn = ref_node_get(NULL, rhash);
 
 	if (refn && refn->dext_tree.items)
-		schedule_tx_task(it->pb->i.link->local->best_tp_lndev, FRAME_TYPE_REF_ADV, refn->f_data_len, &refn->rhash, sizeof(SHA1_T), 0, 0);
+		schedule_tx_task(it->pb->i.link->local->best_tp_lndev, FRAME_TYPE_REF_ADV, refn->f_body_len, &refn->rhash, sizeof(SHA1_T), 0, 0);
 
 	return sizeof(struct msg_ref_req);
 }
@@ -1400,12 +1398,14 @@ int32_t tx_frame_ref_adv(struct tx_frame_iterator *it)
 
 	if(refn && refn->dext_tree.items) {
 
-		assertion(-501582, (int)refn->f_data_len <= tx_iterator_cache_data_space_max(it));
+		struct frame_hdr_rhash_adv rhash_hdr = {.compression = refn->compression, .nested=refn->nested, .reserved=refn->reserved};
 
-		memcpy(tx_iterator_cache_msg_ptr(it), refn->f_data, refn->f_data_len);
-		it->use_long_header = refn->f_long;
+		assertion(-501582, ((int)(sizeof(rhash_hdr) + refn->f_body_len) <= tx_iterator_cache_data_space_max(it)));
+
+		memcpy(tx_iterator_cache_msg_ptr(it), &rhash_hdr, sizeof(rhash_hdr));
+		memcpy(tx_iterator_cache_msg_ptr(it) + sizeof(rhash_hdr), refn->f_body, refn->f_body_len);
 	
-		return refn->f_data_len;
+		return (sizeof(rhash_hdr) + refn->f_body_len);
 	}
 	
 	return TLV_TX_DATA_IGNORED;
@@ -1419,10 +1419,17 @@ int32_t rx_frame_ref_adv(struct rx_frame_iterator *it)
 
 	assertion(-501583, !it->is_virtual_header && it->frame_type == FRAME_TYPE_REF_ADV);
 
-	if ( it->frame_data_length > (int32_t)REF_FRAME_DATA_SIZE_MAX )
+	if ( it->is_short_header ||
+		it->frame_data_length <= (int32_t)(sizeof(struct frame_hdr_rhash_adv)) ||
+		it->frame_data_length > (int32_t)(REF_FRAME_BODY_SIZE_MAX + sizeof(struct frame_hdr_rhash_adv))	)
 		return TLV_RX_DATA_FAILURE;
 
-	ref_node_add(it->frame_data, it->frame_data_length, !it->is_short_header);
+	ref_node_add(it->frame_data+sizeof(struct frame_hdr_rhash_adv),
+	             it->frame_data_length-sizeof(struct frame_hdr_rhash_adv),
+		     ((struct frame_hdr_rhash_adv*)it->frame_data)->compression,
+		     ((struct frame_hdr_rhash_adv*)it->frame_data)->nested,
+		     ((struct frame_hdr_rhash_adv*)it->frame_data)->reserved
+		);
 
 
 	//TODO: check if demanded, add referencee_tree and required_tree,...
@@ -2943,7 +2950,7 @@ int32_t get_desc_frame_data(uint8_t **frame_data, uint8_t *desc_ext_data, int32_
         while ((tlv_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
 
 		if ( it.frame_type == frame_type
-			|| (it.frame_type == BMX_DSC_TLV_RHASH_ADV && ((struct hdr_rhash_adv*)(it.frame_data))->expanded_type == frame_type)
+			|| (it.frame_type == BMX_DSC_TLV_RHASH_ADV && ((struct desc_hdr_rhash_adv*)(it.frame_data))->expanded_type == frame_type)
 			) {
 
 			if( frame_data_len )
@@ -3049,9 +3056,9 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 assertion(-501590, IMPLIES(it->on, f_type != BMX_DSC_TLV_RHASH_ADV));
 
 		if (f_virtual) {
-			f_len = ((struct frame_header_virtual*) fhs)->length;
-			f_data_len = f_len - sizeof (struct frame_header_virtual);
-			f_data = it->frames_in + it->frames_pos + sizeof (struct frame_header_virtual);
+			f_len = ((struct tlv_hdr_virtual*) fhs)->length;
+			f_data_len = f_len - sizeof (struct tlv_hdr_virtual);
+			f_data = it->frames_in + it->frames_pos + sizeof (struct tlv_hdr_virtual);
 			f_pos_next = it->frames_pos + f_len;
 		} else if (f_short) {
                         f_len = fhs->length;
@@ -3376,21 +3383,21 @@ int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 
 		int32_t used_cache_space = handl->data_header_size + it->frame_cache_msgs_size;
 
-		int32_t used_ref_msgs = used_cache_space/REF_FRAME_DATA_SIZE_OUT + (used_cache_space%REF_FRAME_DATA_SIZE_OUT?1:0);
+		int32_t used_ref_msgs = used_cache_space/REF_FRAME_BODY_SIZE_OUT + (used_cache_space%REF_FRAME_BODY_SIZE_OUT?1:0);
 
 		int32_t used_frames_space =
 			it->frames_out_pos +
 			(int) sizeof(struct frame_header_long) +
-			(int) sizeof(struct hdr_rhash_adv) +
-			((int) sizeof(struct msg_rhash_adv) * used_ref_msgs);
+			(int) sizeof(struct desc_hdr_rhash_adv) +
+			((int) sizeof(struct desc_msg_rhash_adv) * used_ref_msgs);
 
 		int32_t avail_frames_space = (max ? it->frames_out_max : it->frames_out_pref) - used_frames_space;
 
-		int32_t avail_cache_space_theoretical = (avail_frames_space/sizeof(struct msg_rhash_adv)) * REF_FRAME_DATA_SIZE_OUT;
+		int32_t avail_cache_space_theoretical = (avail_frames_space/sizeof(struct desc_msg_rhash_adv)) * REF_FRAME_BODY_SIZE_OUT;
 
 		int32_t avail_cache_space_practical = XMIN( it->frame_cache_size - used_cache_space, avail_cache_space_theoretical );
 
-		int32_t avail_vrt_desc_space = VRT_DESC_SIZE_OUT - handl->data_header_size - sizeof(struct frame_header_virtual) - it->dext->dlen;
+		int32_t avail_vrt_desc_space = VRT_DESC_SIZE_OUT - handl->data_header_size - sizeof(struct tlv_hdr_virtual) - it->dext->dlen;
 
 		return XMIN(avail_cache_space_practical, avail_vrt_desc_space);
 
@@ -3414,8 +3421,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 	uint8_t do_fzip = use_compression(handl);
 	uint8_t do_fref = use_referencing(handl);
 
-	struct frame_header_short *fhs = (struct frame_header_short *) (it->frames_out_ptr + it->frames_out_pos);
-	struct frame_header_long *fhl = (struct frame_header_long *) fhs;
+	struct frame_header_long *fhl = (struct frame_header_long *) (it->frames_out_ptr + it->frames_out_pos);
 
 
         assertion(-500881, (it->frame_cache_msgs_size >= TLV_TX_DATA_PROCESSED));
@@ -3431,62 +3437,51 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		assertion(-501640, (it->frame_cache_msgs_size <= VRT_FRAME_DATA_SIZE_OUT));
 		if (it->dext->data)
 			debugFree( it->dext->data, -300568);
-		it->dext->data = debugMallocReset(it->dext->dlen + sizeof(struct frame_header_virtual) + fdata_in, -300568);
-		struct frame_header_virtual *fhv = (struct frame_header_virtual *)(it->dext->data + it->dext->dlen);
+		it->dext->data = debugMallocReset(it->dext->dlen + sizeof(struct tlv_hdr_virtual) + fdata_in, -300568);
+		struct tlv_hdr_virtual *fhv = (struct tlv_hdr_virtual *)(it->dext->data + it->dext->dlen);
 //		fhv->is_virtual = 1;
 		fhv->type = it->frame_type;
-		fhv->length = sizeof(struct frame_header_virtual) + fdata_in;
-		memcpy(it->dext->data + it->dext->dlen + sizeof(struct frame_header_virtual), it->frame_cache_array, fdata_in);
-		it->dext->dlen += (sizeof(struct frame_header_virtual) + fdata_in);
+		fhv->length = sizeof(struct tlv_hdr_virtual) + fdata_in;
+		memcpy(it->dext->data + it->dext->dlen + sizeof(struct tlv_hdr_virtual), it->frame_cache_array, fdata_in);
+		it->dext->dlen += (sizeof(struct tlv_hdr_virtual) + fdata_in);
 
 		assertion(-501641, (it->dext->dlen <= (uint32_t)VRT_DESC_SIZE_OUT));
 	}
 
 	if (it->dext && do_fref) {
 		assertion(-501642, (it->handls==description_tlv_handl));
-		assertion(-501593, (!it->use_long_header));     //yet only used by tx_frame_ref_adv. NOT for creation of my desc frames.
 
 		// calculate description extension frames
 		assertion(-501643, TEST_STRUCT(struct frame_header_short)); // or
 		assertion(-501644, TEST_STRUCT(struct frame_header_long));  // of type
 		assertion(-501645, TEST_VALUE(BMX_DSC_TLV_RHASH_ADV));
 		// with frame-data hdr and msgs:
-		assertion(-501646, TEST_STRUCT(struct hdr_rhash_adv));
-		assertion(-501647, TEST_STRUCT(struct msg_rhash_adv));
+		assertion(-501646, TEST_STRUCT(struct desc_hdr_rhash_adv));
+		assertion(-501647, TEST_STRUCT(struct desc_msg_rhash_adv));
 
 		uint8_t *rfd_agg_data = do_fzip ? NULL : it->frame_cache_array;
 		int32_t rfd_zagg_len = do_fzip ? z_compress(it->frame_cache_array, fdata_in, &rfd_agg_data, 0, 0, 0) : 0;
 		assertion(-501606, IMPLIES(do_fzip, rfd_zagg_len >= 0 && rfd_zagg_len < fdata_in));
 		int32_t rfd_agg_len = rfd_zagg_len > 0 ? rfd_zagg_len : fdata_in;
 		assertion(-501594, IMPLIES(do_fzip, rfd_agg_len > 0));
-		int32_t rfd_msgs = rfd_agg_len/REF_FRAME_DATA_SIZE_OUT + (rfd_agg_len%REF_FRAME_DATA_SIZE_OUT?1:0);
-		int32_t rfd_size = sizeof(struct hdr_rhash_adv) + (rfd_msgs*sizeof(struct msg_rhash_adv));
+		int32_t rfd_msgs = rfd_agg_len/REF_FRAME_BODY_SIZE_OUT + (rfd_agg_len%REF_FRAME_BODY_SIZE_OUT?1:0);
+		int32_t rfd_size = sizeof(struct desc_hdr_rhash_adv) + (rfd_msgs*sizeof(struct desc_msg_rhash_adv));
 
-		uint8_t rf_short = rfd_size <= (int)MAX_SHORT_FRAME_DATA_LEN;
-		int32_t rf_hdr_size = rf_short?sizeof (struct frame_header_short):sizeof (struct frame_header_long);
-
-		dbgf_track(DBGT_INFO, "added %s fdata_in=%d -> %s msgs=%d rfd_size=%d flen=%d referenced=%d  do_fref=%d (%d %d %d) do_fzip=%d (%d %d %d)",
-			handl->name, fdata_in, rf_short ? "SHORT" : "LONG", rfd_msgs, rfd_size, rf_hdr_size + rfd_size, !!it->dext,
+		dbgf_track(DBGT_INFO, "added %s fdata_in=%d -> msgs=%d rfd_size=%d flen=%d referenced=%d  do_fref=%d (%d %d %d) do_fzip=%d (%d %d %d)",
+			handl->name, fdata_in, rfd_msgs, rfd_size, sizeof (struct frame_header_long) + rfd_size, !!it->dext,
 			do_fref, use_referencing(handl), dextReferencing, DEF_FREF,
 			do_fzip, use_compression(handl), dextCompression, DEF_FZIP );
 
 		// set frame header size and values:
-		memset(fhs, 0, rf_hdr_size);
-		fhs->type = BMX_DSC_TLV_RHASH_ADV;
-		fhs->is_short = rf_short;
-		if (rf_short) {
-			fhs->length = rf_hdr_size + rfd_size;
-		} else {
-			fhl->length = htons(rf_hdr_size + rfd_size);
-		}
+		memset(fhl, 0, sizeof (struct frame_header_long));
+		fhl->type = BMX_DSC_TLV_RHASH_ADV;
+		fhl->length = htons(sizeof (struct frame_header_long) + rfd_size);
 
 		// set: frame-data hdr:
-		struct hdr_rhash_adv *rfd_hdr = (struct hdr_rhash_adv *) ((uint8_t*)fhs + rf_hdr_size);
+		struct desc_hdr_rhash_adv *rfd_hdr = (struct desc_hdr_rhash_adv *) ((uint8_t*)fhl + sizeof(struct frame_header_long));
 		rfd_hdr->compression = do_fzip;
+		rfd_hdr->nested = NO; // Not supported yet!
 		rfd_hdr->expanded_type = it->frame_type;
-		rfd_hdr->expanded_rframes_data_len = fdata_in;
-
-		cryptShaAtomic(it->frame_cache_array, fdata_in, &rfd_hdr->expanded_rframes_data_hash);
 
 		// set: frame-data msgs:
 		// by splitting potentially huge
@@ -3494,19 +3489,16 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		// of size
 		assertion(-501649, TEST_VARIABLE(rfd_agg_len));
 		// into pieces of max size
-		assertion(-501650, TEST_VALUE(REF_FRAME_DATA_SIZE_OUT));
+		assertion(-501650, TEST_VALUE(REF_FRAME_BODY_SIZE_OUT));
 		// and add each's hash as msg
 		int32_t pos, m=0;
-		for (pos=0; pos < rfd_agg_len; pos += REF_FRAME_DATA_SIZE_OUT) {
+		for (pos=0; pos < rfd_agg_len; pos += REF_FRAME_BODY_SIZE_OUT) {
 
-			int32_t rsize = XMIN(rfd_agg_len - pos, (int)REF_FRAME_DATA_SIZE_OUT);
+			int32_t rsize = XMIN(rfd_agg_len - pos, (int)REF_FRAME_BODY_SIZE_OUT);
 
-			struct ref_node *refn = ref_node_add(rfd_agg_data + pos, rsize, 0);
+			struct ref_node *refn = ref_node_add(rfd_agg_data + pos, rsize, 0, 0, 0);
 
-			rfd_hdr->msg[m].rframe_hash = refn->rhash;
-			rfd_hdr->msg[m].compression = NO; //Not supported yet!
-			rfd_hdr->msg[m].nested = NO; //only level-1 references supported yet!
-			m++;
+			rfd_hdr->msg[m++].rframe_hash = refn->rhash;
 			ref_node_use(it->dext, refn, it->frame_type);
 		}
 
@@ -3515,39 +3507,24 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 		assertion_dbg(-501596, (m == rfd_msgs), "m=%d rfd_msgs=%d", m, rfd_msgs);
 
-		it->frames_out_pos += rf_hdr_size + sizeof(struct hdr_rhash_adv) + (rfd_msgs * sizeof(struct msg_rhash_adv)); ///TODO
+		it->frames_out_pos += sizeof(struct frame_header_long) + sizeof(struct desc_hdr_rhash_adv) + (rfd_msgs * sizeof(struct desc_msg_rhash_adv)); ///TODO
 
 		assertion(-501651, ( it->frames_out_pos <= (int32_t)DESC_FRAMES_SIZE_OUT));
 
 	} else {
 		
-		IDM_T is_long_header = it->use_long_header || (fdata_in > (int)MAX_SHORT_FRAME_DATA_LEN);
+		memset(fhl, 0, sizeof (struct frame_header_long));
+		fhl->type = it->frame_type;
 
-		uint32_t hdr_size = is_long_header ? sizeof (struct frame_header_long) : sizeof (struct frame_header_short);
+		int32_t z_size = 0;
 
-		memset(fhl, 0, hdr_size);
+		it->frames_out_pos += sizeof ( struct frame_header_long);
 
-		fhs->is_short = !is_long_header;
-		fhs->type = it->frame_type;
+		assertion(-501607, z_size == 0);
+		memcpy(it->frames_out_ptr + it->frames_out_pos, it->frame_cache_array, fdata_in);
+		it->frames_out_pos += fdata_in;
+		fhl->length = htons(fdata_in + sizeof ( struct frame_header_long));
 
-		if (is_long_header) {
-
-			int32_t z_size = 0;
-
-			it->frames_out_pos += sizeof ( struct frame_header_long);
-
-			assertion(-501607, z_size == 0);
-			memcpy(it->frames_out_ptr + it->frames_out_pos, it->frame_cache_array, fdata_in);
-			it->frames_out_pos += fdata_in;
-			fhl->length = htons(fdata_in + sizeof ( struct frame_header_long));
-
-		} else {
-
-			it->frames_out_pos += sizeof ( struct frame_header_short);
-			memcpy(it->frames_out_ptr + it->frames_out_pos, it->frame_cache_array, fdata_in);
-			it->frames_out_pos += fdata_in;
-			fhs->length = (fdata_in + sizeof ( struct frame_header_short));
-		}
 
 		assertion(-501652, ( it->frames_out_pos <= (int32_t)PKT_FRAMES_SIZE_MAX));
 	}
@@ -3557,8 +3534,6 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
         memset(it->frame_cache_array, 0, fdata_in);
         it->frame_cache_msgs_size = 0;
-
-	it->use_long_header = 0;
 
 	return TLV_TX_DATA_PROCESSED;
         //return tlv_result;
@@ -3983,19 +3958,20 @@ void schedule_my_originator_message( void* unused )
  *          < 0 if error (nest_level exceeded, ...)
  */
 STATIC_FUNC
-int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, struct desc_extension *dext, uint8_t rf_type, uint8_t nest_level )
+int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *f_body, uint32_t f_body_len, struct desc_extension *dext, uint8_t rf_type, uint8_t compression, uint8_t nest_level )
 {
 	assertion(-501598, (FAILURE==-1 && SUCCESS==0));
+	assertion(-500000, (sizeof(struct desc_msg_rhash_adv) == sizeof(struct frame_msg_rhash_adv)));
 
-	struct hdr_rhash_adv *hdr = (struct hdr_rhash_adv *)data;
-        struct msg_rhash_adv *msg = hdr->msg;
-	int32_t m = 0, msgs = (dlen - sizeof(struct hdr_rhash_adv)) / sizeof(struct msg_rhash_adv);
+        struct desc_msg_rhash_adv *msg = (struct desc_msg_rhash_adv *)f_body;
+
+
+	int32_t m = 0, msgs = f_body_len / sizeof(struct desc_msg_rhash_adv);
 	int32_t ref_len = 0;
 	struct desc_extension *solvable = dext ? dext : debugMallocReset(sizeof(struct desc_extension), -300584);
 	struct desc_extension *solvable_free = dext ? NULL : solvable;
 	uint32_t solvable_begin = solvable->dlen;
 	char *goto_error_code = " ";
-	SHA1_T rhash = {.h.u32 = {0}};
 
 	if (solvable != dext)
 		LIST_INIT_HEAD(solvable->refnl_list, struct refnl_node, list, list);
@@ -4003,25 +3979,17 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 	if ((++nest_level) > MAX_REF_NESTING)
 		goto_error( resolve_ref_frame_error, "exceeded nest level");
 
-	if (hdr->expanded_rframes_data_len == 0 || hdr->expanded_rframes_data_len > MAX_DESC_LEN)
-		goto_error( resolve_ref_frame_error, "invalid claimed expanded lenght");
-
-	if (hdr->expanded_type != rf_type)
-		goto_error( resolve_ref_frame_error, "invalid referenced type");
-
 	solvable->max_nesting = nest_level;
-
-        for (; m < msgs && ref_len < (int32_t)hdr->expanded_rframes_data_len; m++) {
-
+	for (; m < msgs && ref_len < MAX_DESC_LEN; m++) {
                 struct ref_node *refn = ref_node_get(pb, &(msg[m].rframe_hash));
 
 		if (!refn) {
 
 			solvable = NULL;
 
-		} else if (msg[m].nested) {
+		} else if (refn->nested) {
 
-			int32_t tmp_len = resolve_ref_frame(pb, refn->f_data, refn->f_data_len, solvable, rf_type, nest_level);
+			int32_t tmp_len = resolve_ref_frame(pb, refn->f_body, refn->f_body_len, solvable, rf_type, refn->compression, nest_level);
 
 			if (tmp_len < 0)
 				goto_error( resolve_ref_frame_error, "failed next recursion");
@@ -4030,21 +3998,21 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 			if (tmp_len > 0)
 				ref_len += tmp_len;
 
-		} else if (msg[m].compression == FRAME_COMPRESSION_NONE  && solvable) {
+		} else if (refn->compression == FRAME_COMPRESSION_NONE  && solvable) {
 
-			solvable->data = debugRealloc(solvable->data, solvable->dlen + refn->f_data_len, -300569);
-			memcpy(solvable->data + solvable->dlen, refn->f_data, refn->f_data_len);
-			solvable->dlen += refn->f_data_len;
+			solvable->data = debugRealloc(solvable->data, solvable->dlen + refn->f_body_len, -300569);
+			memcpy(solvable->data + solvable->dlen, refn->f_body, refn->f_body_len);
+			solvable->dlen += refn->f_body_len;
 
 			if (solvable == dext)
 				ref_node_use(dext, refn, rf_type);
 
-			ref_len += refn->f_data_len;
+			ref_len += refn->f_body_len;
 
-		} else if (msg[m].compression == FRAME_COMPRESSION_GZIP  && solvable) {
+		} else if (refn->compression == FRAME_COMPRESSION_GZIP  && solvable) {
 
 			int32_t tmp_len;
-			if((tmp_len = z_decompress(refn->f_data, refn->f_data_len, &solvable->data, solvable->dlen)) <= 0)
+			if((tmp_len = z_decompress(refn->f_body, refn->f_body_len, &solvable->data, solvable->dlen)) <= 0)
 				goto_error( resolve_ref_frame_error, "failed inner decompression");
 
 			solvable->dlen += tmp_len;
@@ -4068,9 +4036,9 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 	if (!solvable)
 		goto resolve_ref_frame_unresolved;
 
-	if (hdr->compression == FRAME_COMPRESSION_NONE) {
+	if (compression == FRAME_COMPRESSION_NONE) {
 
-	} else if (hdr->compression == FRAME_COMPRESSION_GZIP) {
+	} else if (compression == FRAME_COMPRESSION_GZIP) {
 
 		if ((ref_len = z_decompress(solvable->data + solvable_begin, ref_len, &solvable->data, solvable_begin)) <= 0)
 			goto_error( resolve_ref_frame_error, "failed outer decompression");
@@ -4081,15 +4049,6 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, 
 		goto_error( resolve_ref_frame_error, "invalid outer decompression");
 	}
 
-	if (ref_len != (int32_t)hdr->expanded_rframes_data_len)
-		goto_error( resolve_ref_frame_error, "invalid expanded length");
-
-	cryptShaAtomic(solvable->data + solvable_begin, ref_len, &rhash);
-
-	if (memcmp(&rhash, &hdr->expanded_rframes_data_hash, sizeof(SHA1_T)))
-		goto_error( resolve_ref_frame_error, "invalid expanded hash");
-
-
 	free_desc_extensions(&solvable_free);
 	return ref_len;
 
@@ -4099,13 +4058,9 @@ resolve_ref_frame_unresolved:
 
 resolve_ref_frame_error:
 {
-	dbgf_sys(DBGT_ERR, "dlen=%d compression=%d dext=%d  msgs=%d exp_rfdlen=%d exp_rfdhash=%s -> ",
-		dlen, hdr->compression, dext?1:0, msgs,
-		hdr->expanded_rframes_data_len, memAsHexString(&hdr->expanded_rframes_data_hash, sizeof(SHA1_T)));
+	dbgf_sys(DBGT_ERR, "dlen=%d compression=%d dext=%d  msgs=%d nest_level=%d solvable=%d rf_type=%d m=%d ref_len=%d error=%s",
+		f_body_len, compression, dext?1:0, msgs, nest_level, solvable?1:0, rf_type, m, ref_len, goto_error_code);
 
-	dbgf_sys(DBGT_ERR, " nest_level=%d solvable=%d rf_type=%d m=%d ref_len=%d rhash=%s error=%s",
-		nest_level, solvable?1:0, rf_type, m, ref_len, memAsHexString(&rhash, sizeof(SHA1_T)),
-		goto_error_code);
 
 	free_desc_extensions(&solvable_free);
 	assertion(-501654, !dext); // this function should only be called if a prior call with dext=NULL succeeded
@@ -4173,20 +4128,18 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 				goto_error( resolve_desc_extension_error, "1");
 
 
-                } else if (it.frame_type == BMX_DSC_TLV_RHASH_ADV &&
-			(((struct hdr_rhash_adv*)(it.frame_data))->expanded_rframes_data_len) > 0) {
+                } else if (it.frame_type == BMX_DSC_TLV_RHASH_ADV) {
 
-			vf_type = ((struct hdr_rhash_adv*)(it.frame_data))->expanded_type;
-			vf_compression = ((struct hdr_rhash_adv*)(it.frame_data))->compression;
-			vf_data_len = resolve_ref_frame(pb, it.frame_data, it.frame_data_length, NULL, vf_type, 1);
+			vf_type = ((struct desc_hdr_rhash_adv*)(it.frame_data))->expanded_type;
+			vf_compression = ((struct desc_hdr_rhash_adv*)(it.frame_data))->compression;
+			vf_data_len = resolve_ref_frame(pb, it.frame_data+sizeof(struct desc_hdr_rhash_adv), it.frame_data_length-sizeof(struct desc_hdr_rhash_adv), NULL, vf_type, vf_compression, 1);
 
 			if (vf_data_len == 0) {
 
 				unresolved = 1;
-				
-			} else if ( vf_data_len == (int32_t)(((struct hdr_rhash_adv*)(it.frame_data))->expanded_rframes_data_len)) {
 
-			} else {
+			} else if ( vf_data_len < 0) {
+
 				goto_error( resolve_desc_extension_error, "2");
 			}
 
@@ -4232,7 +4185,7 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 		vf_compression = 0;
 		uint32_t dext_dlen_old = dext->dlen;
 
-		dext->dlen += sizeof(struct frame_header_virtual);
+		dext->dlen += sizeof(struct tlv_hdr_virtual);
 		// reallocation is done before writing new data
 
                 if (it.frame_type != BMX_DSC_TLV_RHASH_ADV) {
@@ -4246,11 +4199,9 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 
                 } else if (it.frame_type == BMX_DSC_TLV_RHASH_ADV) {
 
-			vf_type = ((struct hdr_rhash_adv*)(it.frame_data))->expanded_type;
-			vf_compression = ((struct hdr_rhash_adv*)(it.frame_data))->compression;
-			vf_data_len = resolve_ref_frame(pb, it.frame_data, it.frame_data_length, dext, vf_type, 1);
-
-			assertion(-501657,  (vf_data_len == (int32_t)(((struct hdr_rhash_adv*)(it.frame_data))->expanded_rframes_data_len)));
+			vf_type = ((struct desc_hdr_rhash_adv*)(it.frame_data))->expanded_type;
+			vf_compression = ((struct desc_hdr_rhash_adv*)(it.frame_data))->compression;
+			vf_data_len = resolve_ref_frame(pb, it.frame_data+sizeof(struct desc_hdr_rhash_adv), it.frame_data_length-sizeof(struct desc_hdr_rhash_adv), dext, vf_type, vf_compression, 1);
 
                 } else {
 			assertion(-501658, 0);
@@ -4261,11 +4212,11 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 			   vf_type, vf_type <= it.handl_max ? it.handls[vf_type].name : "???",
 			   vf_data_len, dext->dlen );
 
-		struct frame_header_virtual *vf_hdr = (struct frame_header_virtual *)(dext->data + dext_dlen_old);
-		memset(vf_hdr, 0, sizeof(struct frame_header_virtual));
+		struct tlv_hdr_virtual *vf_hdr = (struct tlv_hdr_virtual *)(dext->data + dext_dlen_old);
+		memset(vf_hdr, 0, sizeof(struct tlv_hdr_virtual));
 //		vf_hdr->is_virtual = 1;
 		vf_hdr->type = vf_type;
-		vf_hdr->length = sizeof(struct frame_header_virtual) + vf_data_len;
+		vf_hdr->length = sizeof(struct tlv_hdr_virtual) + vf_data_len;
 
 		assertion(-501659, (vf_data_len <= VRT_FRAME_DATA_SIZE_MAX));
 		assertion(-501660, (vf_data_len > 0 && vf_type <= BMX_DSC_TLV_MAX));
@@ -4607,8 +4558,7 @@ int32_t opt_show_descriptions(uint8_t cmd, uint8_t _save, struct opt_type *opt,
 struct ref_status {
         SHA1_T   f_hash;
 	uint8_t  f_compression;
-	uint8_t  f_long;
-        uint32_t f_data_len; // NOT including frame header!!
+        uint32_t f_body_len; // NOT including frame header!!
         uint32_t last_usage;
         uint32_t usage_counter;
 	char ref_types[100];
@@ -4617,8 +4567,7 @@ struct ref_status {
 
 static const struct field_format ref_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_BINARY, ref_status, f_hash,        1, FIELD_RELEVANCE_HIGH),
-        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, f_long,        1, FIELD_RELEVANCE_HIGH),
-        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, f_data_len,    1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, f_body_len,    1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, last_usage,    1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,          ref_status, usage_counter, 1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,   ref_status, ref_types,     1, FIELD_RELEVANCE_HIGH),
@@ -4639,8 +4588,7 @@ static int32_t ref_status_creator(struct status_handl *handl, void *data)
         for (it = NULL; (rfn = avl_iterate_item(&ref_tree, &it));) {
 
 		memcpy( &(status[i].f_hash), &rfn->rhash, sizeof(SHA1_T));
-		status[i].f_long = rfn->f_long;
-		status[i].f_data_len = rfn->f_data_len;
+		status[i].f_body_len = rfn->f_body_len;
 		status[i].last_usage = rfn->last_usage;
 		status[i].usage_counter = rfn->dext_tree.items;
 
@@ -4960,7 +4908,8 @@ int32_t init_msg( void )
         handl.name = "REF_ADV";
         handl.is_advertisement = 1;
         handl.tx_iterations = &desc_adv_tx_iters;
-        handl.min_msg_size = 1;  // this frame does not know what the referenced data is about!
+	handl.data_header_size = sizeof(struct frame_hdr_rhash_adv);
+        handl.min_msg_size = XMIN(1, sizeof(struct frame_msg_rhash_adv));  // this frame does not know what the referenced data is about!
         handl.fixed_msg_size = 0;
         handl.tx_task_interval_min = DEF_TX_DREF_ADV_TO;
         handl.tx_frame_handler = tx_frame_ref_adv;
@@ -4969,8 +4918,8 @@ int32_t init_msg( void )
 
         static const struct field_format ref_format[] = MSG_RHASH_ADV_FORMAT;
         handl.name = "RHASH_EXTENSION";
-        handl.data_header_size = sizeof( struct hdr_rhash_adv);
-        handl.min_msg_size = sizeof (struct msg_rhash_adv);
+        handl.data_header_size = sizeof( struct desc_hdr_rhash_adv);
+        handl.min_msg_size = sizeof (struct desc_msg_rhash_adv);
         handl.fixed_msg_size = 1;
         handl.tx_frame_handler = create_description_tlv_ref;
         handl.rx_msg_handler = process_description_tlv_ref;

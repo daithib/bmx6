@@ -48,8 +48,8 @@
 #define MIN_DESC_FRAME_SIZE         (MIN_UDPD_SIZE - sizeof(struct packet_header))
 #define MAX_DESC_FRAME_SIZE         (MAX_UDPD_SIZE - sizeof(struct packet_header))
 #define DEF_DESC_FRAME_SIZE         (BIG_UDPD_SIZE - sizeof(struct packet_header))
-#define     REF_FRAME_DATA_SIZE_OUT (desc_frame_size_out - sizeof(struct frame_header_long))
-#define     REF_FRAME_DATA_SIZE_MAX (MAX_DESC_FRAME_SIZE - sizeof(struct frame_header_long))
+#define     REF_FRAME_BODY_SIZE_OUT (desc_frame_size_out - sizeof(struct frame_header_long) - sizeof(struct frame_hdr_rhash_adv))
+#define     REF_FRAME_BODY_SIZE_MAX (MAX_DESC_FRAME_SIZE - sizeof(struct frame_header_long) - sizeof(struct frame_hdr_rhash_adv))
 #define     DESC_FRAMES_SIZE_OUT    (desc_frame_size_out - sizeof(struct frame_header_long) - sizeof (struct msg_description_adv))
 #define     DESC_FRAMES_SIZE_MAX    (MAX_DESC_FRAME_SIZE - sizeof(struct frame_header_long) - sizeof (struct msg_description_adv))
 
@@ -61,9 +61,10 @@
 #define DEF_VRT_DESC_SIZE      (16384) //any value less-equal then MAX_VRT_DESC_SIZE
 //#define MAX_VRT_DESC_SIZE      (INT32_MAX)
 // this should be the max possible with a reference depth of 1 :
-#define MAX_VRT_DESC_SIZE      (((DEF_DESC_FRAME_SIZE - sizeof(struct frame_header_long) - sizeof (struct msg_description_adv)) - \
-                               (5 * (sizeof(struct frame_header_long) + sizeof(struct hdr_rhash_adv)) )) / \
-			       sizeof(struct msg_rhash_adv)) * (DEF_DESC_FRAME_SIZE - sizeof(struct frame_header_long))
+#define MAX_VRT_DESC_SIZE      ((DESC_FRAMES_SIZE_MAX - (5 * (sizeof(struct frame_header_long) + sizeof(struct desc_hdr_rhash_adv)) )) / \
+			       sizeof(struct desc_msg_rhash_adv)) \
+			       * \
+			       (DEF_DESC_FRAME_SIZE - sizeof(struct frame_header_long) - sizeof(struct frame_hdr_rhash_adv))
 #define     VRT_DESC_SIZE_OUT  (vrt_desc_size_out)
 #define     VRT_DESC_SIZE_IN   (vrt_desc_size_in)
 
@@ -74,7 +75,7 @@
 #define HLP_VRT_FRAME_DATA_SIZE_IN   "set maximum virtual size for other description frames"
 #define MIN_VRT_FRAME_DATA_SIZE      (MIN_DESC_FRAME_SIZE - sizeof (struct frame_header_long))
 #define DEF_VRT_FRAME_DATA_SIZE      (8192) //any value less then MAX_VRT_FRAME_DATA_SIZE
-#define MAX_VRT_FRAME_DATA_SIZE      (MAX_VRT_DESC_SIZE - sizeof(struct frame_header_virtual))
+#define MAX_VRT_FRAME_DATA_SIZE      (MAX_VRT_DESC_SIZE - sizeof(struct tlv_hdr_virtual))
 #define     VRT_FRAME_DATA_SIZE_OUT  (vrt_frame_data_size_out)
 #define     VRT_FRAME_DATA_SIZE_MAX  XMAX(vrt_frame_data_size_in, vrt_frame_data_size_out)
 
@@ -431,15 +432,10 @@ struct frame_header_long { // 4 bytes
 } __attribute__((packed));
 #endif
 
-struct frame_header_virtual { // 6 bytes
-	unsigned int type : FRAME_TYPE_BIT_SIZE;
-	unsigned int reserved1 : 2;
-	unsigned int is_short  : 1;
-
-//	unsigned int is_virtual  : 1;
-	unsigned int reserved    : 8;
-
-	uint32_t length;  // lenght of (always uncompressed and resolved) frame in 1-Byte steps, including frame_header and variable data field
+struct tlv_hdr_virtual { // 6 bytes
+    uint8_t type;
+    uint8_t reserved;
+    uint32_t length;  // lenght of (always uncompressed and resolved) frame in 1-Byte steps, including frame_header and variable data field
 //	uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
 } __attribute__((packed));
 
@@ -463,7 +459,7 @@ struct tlv_hdr { // 2 bytes
 
 
 // for BMX_DSC_TLV_RHASH_ADV:
-struct msg_rhash_adv {
+struct desc_msg_rhash_adv {
     SHA1_T rframe_hash;       // hash over full frame (including frame-header and data) as transmitted
 //TODO: remove:
 #if __BYTE_ORDER == __LITTLE_ENDIAN
@@ -479,8 +475,8 @@ struct msg_rhash_adv {
 #endif
 } __attribute__((packed));
 
-struct hdr_rhash_adv {
 
+struct desc_hdr_rhash_adv {
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 	unsigned int nested :        1;
 	unsigned int compression :   2; // 0:= NO compresson, 1:= gzip compression, 2-7:=reserved; only data field is compressed
@@ -490,15 +486,35 @@ struct hdr_rhash_adv {
 	unsigned int expanded_type : 5;
 	unsigned int compression :   2;
 	unsigned int nested :        1;
-
 #else
 # error "Please fix <bits/endian.h>"
 #endif
-//TODO: remove:
-    uint32_t expanded_rframes_data_len; // length of fully expanded (uncompressed, resolved rhash->rdata), without frame header!
-    SHA1_T   expanded_rframes_data_hash;  // hash over expanded_rframes_data_len data
-    struct   msg_rhash_adv msg[];
+    struct   desc_msg_rhash_adv msg[];
 } __attribute__((packed));
+
+
+// for FRAME_TYPE_REF_ADV:
+struct frame_msg_rhash_adv {
+    SHA1_T rframe_hash;       // hash over full frame (including frame-header and data) as transmitted
+} __attribute__((packed));
+
+struct frame_hdr_rhash_adv {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+	unsigned int nested :      1;
+	unsigned int compression : 2; // 0:= NO compresson, 1:= gzip compression, 2-7:=reserved; only data field is compressed
+	                              // all resolved and aggregated data fields are compressed (NOT the hashes)
+	unsigned int reserved    : 5;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+	unsigned int reserved    : 5;
+	unsigned int compression : 2;
+	unsigned int nested :      1;
+#else
+# error "Please fix <bits/endian.h>"
+#endif
+    struct   frame_msg_rhash_adv msg[];
+} __attribute__((packed));
+
+
 
 #define MSG_RHASH_ADV_FORMAT { \
 {FIELD_TYPE_UINT,          -1, 5,   1, FIELD_RELEVANCE_LOW,  "reserved" }, \
@@ -767,23 +783,33 @@ struct description { // 68 bytes
 	OGM_SQN_T ogmSqnMin;   // 2 bytes
 	OGM_SQN_T ogmSqnRange; // 2 bytes
 
-	uint16_t capabilities; // 2 bytes // TODOCV18: dont use before!
+	uint16_t capabilities; // 2 bytes //was tx_interval, TODOCV18: dont use before!
 
 	uint8_t comp_version;  // 1 bytes
-
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int reserved    : 6;
-	unsigned int ref_nesting : 2;
-#elif __BYTE_ORDER == __BIG_ENDIAN
-	unsigned int ref_nesting : 2;
-	unsigned int reserved    : 6;
-#else
-# error "Please fix <bits/endian.h>"
-#endif
+	uint8_t reserved;
 
         uint16_t extensionLen;// 2 bytes
 //	uint8_t extensionData[];
 } __attribute__((packed));
+
+
+
+struct description2 {
+
+	SHA1_T globalId;       // 20 bytes, hash of pubKey
+
+        DESC_SQN_T descSqn;    // 4 bytes
+	OGM_SQN_T ogmSqnMin;   // 2 bytes
+	OGM_SQN_T ogmSqnRange; // 2 bytes
+
+//	uint8_t extensionData[];
+	
+// Additional TLV types needed for:
+// - hostname, email, revision, capabilities,
+// - expanded uint32_t rframes_data_len and SHA1_T rframes_data_hash
+
+} __attribute__((packed));
+
 
 
 #define MSG_DESCRIPTION0_ADV_UNHASHED_SIZE  2
@@ -963,8 +989,6 @@ struct tx_frame_iterator {
 	int32_t              frames_out_num;
 	int32_t              frame_cache_msgs_size;
 
-	// optionally set by tx_frame_handler():
-	uint8_t              use_long_header;
 
 //#define tx_iterator_cache_data_space( it ) (((it)->frames_out_max) - ((it)->frames_out_pos + (it)->cache_msg_pos + ((int)(sizeof (struct frame_header_long)))))
 //#define tx_iterator_cache_hdr_ptr( it ) ((it)->cache_data_array)

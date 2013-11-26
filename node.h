@@ -379,9 +379,13 @@ struct dext_tree_node {
 struct ref_node {
         SHA1_T rhash;
         //struct frame_header_long *frame_hdr;
-	uint8_t f_long;
-	uint8_t *f_data;
-        uint32_t f_data_len; // NOT including frame header!!
+	uint8_t *frame;
+	uint8_t *f_body;
+	uint32_t f_body_len;
+	uint8_t nested;
+	uint8_t compression;
+	uint8_t reserved;
+        uint32_t frame_len;
         uint32_t last_usage;
         uint32_t usage_counter;
 	struct avl_tree dext_tree;
