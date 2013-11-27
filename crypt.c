@@ -399,23 +399,27 @@ void cryptShaFree( void ) {
 }
 
 void cryptShaAtomic( void *in, int32_t len, CRYPTSHA1_T *sha) {
+	dbgf_sys(DBGT_INFO," ");
 	assertion(-500000, (shaClean==YES));
 	ShaUpdate(&cryptSha, (byte*) in, len);
 	ShaFinal(&cryptSha, (byte*) sha);
 }
 
 void cryptShaNew( void *in, int32_t len) {
+	dbgf_sys(DBGT_INFO," ");
 	assertion(-500000, (shaClean==YES));
 	shaClean = NO;
 	ShaUpdate(&cryptSha, (byte*) in, len);
 }
 
 void cryptShaUpdate( void *in, int32_t len) {
+	dbgf_sys(DBGT_INFO," ");
 	assertion(-500000, (shaClean==NO));
 	ShaUpdate(&cryptSha, (byte*)in, len);
 }
 
 void cryptShaFinal( CRYPTSHA1_T *sha) {
+	dbgf_sys(DBGT_INFO," ");
 	assertion(-500000, (shaClean==NO));
 	ShaFinal(&cryptSha, (byte*) sha);
 	shaClean = YES;
