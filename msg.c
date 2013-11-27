@@ -1261,7 +1261,7 @@ struct ref_node * ref_node_add(uint8_t *f_body, uint32_t f_body_len, uint8_t com
 
 	dbgf_sys(DBGT_INFO, "fhl=%s", memAsHexString(&fhl, sizeof(fhl)));
 	dbgf_sys(DBGT_INFO, "hdr=%s", memAsHexString(&rhash_hdr, sizeof(rhash_hdr)));
-	dbgf_sys(DBGT_INFO, "bdy=%s", memAsHexString(&f_body, f_body_len));
+	dbgf_sys(DBGT_INFO, "bdy=%s", memAsHexString(f_body, f_body_len));
 	dbgf_sys(DBGT_INFO, "sha=%s", memAsHexString(&rhash, sizeof(rhash)));
 
 	struct ref_node *refn = ref_node_get(NULL, &rhash);
