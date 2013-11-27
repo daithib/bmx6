@@ -461,31 +461,19 @@ struct tlv_hdr { // 2 bytes
 // for BMX_DSC_TLV_RHASH_ADV:
 struct desc_msg_rhash_adv {
     SHA1_T rframe_hash;       // hash over full frame (including frame-header and data) as transmitted
-//TODO: remove:
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int compression : 2; // 0:= NO compresson, 1:= gzip compression, 2-7:=reserved; only data field is compressed
-	unsigned int nested : 1;
-	unsigned int reserved : 5;
-#elif __BYTE_ORDER == __BIG_ENDIAN
-	unsigned int reserved : 5;
-	unsigned int nested : 1;
-	unsigned int compression : 2;
-#else
-# error "Please fix <bits/endian.h>"
-#endif
 } __attribute__((packed));
 
 
 struct desc_hdr_rhash_adv {
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int nested :        1;
+	unsigned int reserved :      1;
 	unsigned int compression :   2; // 0:= NO compresson, 1:= gzip compression, 2-7:=reserved; only data field is compressed
 	                                // all resolved and aggregated data fields are compressed (NOT the hashes)
 	unsigned int expanded_type : 5;
 #elif __BYTE_ORDER == __BIG_ENDIAN
 	unsigned int expanded_type : 5;
 	unsigned int compression :   2;
-	unsigned int nested :        1;
+	unsigned int reserved :      1;
 #else
 # error "Please fix <bits/endian.h>"
 #endif
@@ -511,7 +499,6 @@ struct frame_hdr_rhash_adv {
 #else
 # error "Please fix <bits/endian.h>"
 #endif
-    struct   frame_msg_rhash_adv msg[];
 } __attribute__((packed));
 
 

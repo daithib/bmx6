@@ -3497,7 +3497,6 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		// set: frame-data hdr:
 		struct desc_hdr_rhash_adv *rfd_hdr = (struct desc_hdr_rhash_adv *) ((uint8_t*)fhl + sizeof(struct frame_header_long));
 		rfd_hdr->compression = do_fzip;
-		rfd_hdr->nested = NO; // Not supported yet!
 		rfd_hdr->expanded_type = it->frame_type;
 
 		// set: frame-data msgs:
@@ -3978,7 +3977,6 @@ STATIC_FUNC
 int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *f_body, uint32_t f_body_len, struct desc_extension *dext, uint8_t rf_type, uint8_t compression, uint8_t nest_level )
 {
 	assertion(-501598, (FAILURE==-1 && SUCCESS==0));
-	assertion(-500000, (sizeof(struct desc_msg_rhash_adv) == sizeof(struct frame_msg_rhash_adv)));
 
         struct desc_msg_rhash_adv *msg = (struct desc_msg_rhash_adv *)f_body;
 
@@ -4873,6 +4871,9 @@ int32_t init_msg( void )
 
         assertion(-500347, (sizeof (DHASH_T) == HASH_SHA1_LEN));
         assertion(-501146, (OGM_DEST_ARRAY_BIT_SIZE == ((OGM_DEST_ARRAY_BIT_SIZE / 8)*8)));
+
+	assertion(-500000, (sizeof(struct desc_msg_rhash_adv) == sizeof(struct frame_msg_rhash_adv)));
+	assertion(-500000, (sizeof(struct desc_hdr_rhash_adv) == sizeof(struct frame_hdr_rhash_adv)));
 
         memset(description_tlv_handl, 0, sizeof(description_tlv_handl));
 
