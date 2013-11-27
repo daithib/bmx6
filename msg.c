@@ -4912,6 +4912,18 @@ int32_t init_msg( void )
         register_frame_handler(packet_frame_handler, FRAME_TYPE_TEST_ADV, &handl);
 */
 
+        static const struct field_format ref_format[] = MSG_RHASH_ADV_FORMAT;
+
+        handl.name = "RHASH_EXTENSION";
+        handl.data_header_size = sizeof( struct desc_hdr_rhash_adv);
+        handl.min_msg_size = sizeof (struct desc_msg_rhash_adv);
+        handl.fixed_msg_size = 1;
+        handl.tx_frame_handler = create_description_tlv_ref;
+        handl.rx_msg_handler = process_description_tlv_ref;
+        handl.msg_format = ref_format;
+        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_RHASH_ADV, &handl);
+
+
         handl.name = "REF_REQ";
         handl.is_destination_specific_frame = 1;
         handl.tx_iterations = &desc_req_tx_iters;
@@ -4932,17 +4944,8 @@ int32_t init_msg( void )
         handl.tx_task_interval_min = DEF_TX_DREF_ADV_TO;
         handl.tx_frame_handler = tx_frame_ref_adv;
         handl.rx_frame_handler = rx_frame_ref_adv;
-        register_frame_handler(packet_frame_handler, FRAME_TYPE_REF_ADV, &handl);
-
-        static const struct field_format ref_format[] = MSG_RHASH_ADV_FORMAT;
-        handl.name = "RHASH_EXTENSION";
-        handl.data_header_size = sizeof( struct desc_hdr_rhash_adv);
-        handl.min_msg_size = sizeof (struct desc_msg_rhash_adv);
-        handl.fixed_msg_size = 1;
-        handl.tx_frame_handler = create_description_tlv_ref;
-        handl.rx_msg_handler = process_description_tlv_ref;
         handl.msg_format = ref_format;
-        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_RHASH_ADV, &handl);
+        register_frame_handler(packet_frame_handler, FRAME_TYPE_REF_ADV, &handl);
 
 
         handl.name = "DESC_REQ";

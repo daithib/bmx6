@@ -504,9 +504,6 @@ struct frame_hdr_rhash_adv {
 
 
 #define MSG_RHASH_ADV_FORMAT { \
-{FIELD_TYPE_UINT,          -1, 5,   1, FIELD_RELEVANCE_LOW,  "reserved" }, \
-{FIELD_TYPE_UINT,          -1, 1,   1, FIELD_RELEVANCE_LOW,  "nested" }, \
-{FIELD_TYPE_UINT,          -1, 2,   1, FIELD_RELEVANCE_LOW,  "compression" }, \
 {FIELD_TYPE_STRING_BINARY, -1, 160, 1, FIELD_RELEVANCE_LOW,  "rframe_hash"},  \
 	FIELD_FORMAT_END }
 
