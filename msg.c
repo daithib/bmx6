@@ -1254,7 +1254,7 @@ struct ref_node * ref_node_add(uint8_t *f_body, uint32_t f_body_len, uint8_t com
 
 	SHA1_T rhash;
 	cryptShaNew(&fhl, sizeof(fhl));
-	cryptShaNew(&rhash_hdr, sizeof(rhash_hdr));
+	cryptShaUpdate(&rhash_hdr, sizeof(rhash_hdr));
 	cryptShaUpdate(f_body, f_body_len);
 	cryptShaFinal(&rhash);
 
