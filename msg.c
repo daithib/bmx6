@@ -3467,11 +3467,20 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		assertion(-501646, TEST_STRUCT(struct desc_hdr_rhash_adv));
 		assertion(-501647, TEST_STRUCT(struct desc_msg_rhash_adv));
 
-		uint8_t *rfd_agg_data = do_fzip ? NULL : it->frame_cache_array;
-		int32_t rfd_zagg_len = do_fzip ? z_compress(it->frame_cache_array, fdata_in, &rfd_agg_data, 0, 0, 0) : 0;
-		assertion(-501606, IMPLIES(do_fzip, rfd_zagg_len >= 0 && rfd_zagg_len < fdata_in));
-		int32_t rfd_agg_len = rfd_zagg_len > 0 ? rfd_zagg_len : fdata_in;
-		assertion(-501594, IMPLIES(do_fzip, rfd_agg_len > 0));
+		uint8_t *rfd_agg_data = it->frame_cache_array;
+		int32_t rfd_agg_len = fdata_in;
+
+		if (do_fzip) {
+			uint8_t *rfd_zagg_data = NULL;
+			int32_t rfd_zagg_len = z_compress(it->frame_cache_array, fdata_in, &rfd_zagg_data, 0, 0, 0);
+			assertion(-501606, IMPLIES(do_fzip, rfd_zagg_len >= 0 && rfd_zagg_len < fdata_in));
+			if (rfd_zagg_len > 0) {
+				assertion(-501594, (rfd_zagg_len > 0 && rfd_zagg_data));
+				rfd_agg_len = rfd_zagg_len;
+				rfd_agg_data = rfd_zagg_data;
+			}
+		}
+
 		int32_t rfd_msgs = rfd_agg_len/REF_FRAME_BODY_SIZE_OUT + (rfd_agg_len%REF_FRAME_BODY_SIZE_OUT?1:0);
 		int32_t rfd_size = sizeof(struct desc_hdr_rhash_adv) + (rfd_msgs*sizeof(struct desc_msg_rhash_adv));
 
