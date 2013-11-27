@@ -1247,16 +1247,22 @@ struct ref_node * ref_node_add(uint8_t *f_body, uint32_t f_body_len, uint8_t com
 	assertion(-501616, (f_body_len > sizeof(struct frame_hdr_rhash_adv)));
 	assertion(-501616, (f_body_len - sizeof(struct frame_hdr_rhash_adv) <= REF_FRAME_BODY_SIZE_MAX));
 
-	struct frame_header_long fhl = {.type=FRAME_TYPE_REF_ADV, .is_short=0};
-	fhl.length = htons(sizeof(struct frame_header_long) + f_body_len);
-
 	struct frame_hdr_rhash_adv rhash_hdr = {.compression=compression, .nested=nested, .reserved=reserved};
+
+	struct frame_header_long fhl = {.type=FRAME_TYPE_REF_ADV, .is_short=0};
+	fhl.length = htons(sizeof(fhl) + sizeof(rhash_hdr) + f_body_len);
+
 
 	SHA1_T rhash;
 	cryptShaNew(&fhl, sizeof(fhl));
 	cryptShaUpdate(&rhash_hdr, sizeof(rhash_hdr));
 	cryptShaUpdate(f_body, f_body_len);
 	cryptShaFinal(&rhash);
+
+	dbgf_sys(DBGT_INFO, "fhl=%s", memAsHexString(&fhl, sizeof(fhl)));
+	dbgf_sys(DBGT_INFO, "hdr=%s", memAsHexString(&rhash_hdr, sizeof(rhash_hdr)));
+	dbgf_sys(DBGT_INFO, "bdy=%s", memAsHexString(&f_body, f_body_len));
+	dbgf_sys(DBGT_INFO, "sha=%s", memAsHexString(&rhash, sizeof(rhash)));
 
 	struct ref_node *refn = ref_node_get(NULL, &rhash);
 
@@ -1271,7 +1277,7 @@ struct ref_node * ref_node_add(uint8_t *f_body, uint32_t f_body_len, uint8_t com
 		refn->frame = debugMalloc(refn->frame_len, -300564);
 		memcpy(refn->frame, &fhl, sizeof(fhl));
 		memcpy(refn->frame + sizeof(fhl), &rhash_hdr, sizeof(rhash_hdr));
-		memcpy(refn->frame + refn->frame_len, f_body, f_body_len);
+		memcpy(refn->frame + sizeof(fhl) + sizeof(rhash_hdr), f_body, f_body_len);
 		refn->f_body_len = f_body_len;
 		refn->f_body = refn->frame  + sizeof(fhl) + sizeof(rhash_hdr);
 		refn->last_usage = bmx_time;
@@ -1281,6 +1287,8 @@ struct ref_node * ref_node_add(uint8_t *f_body, uint32_t f_body_len, uint8_t com
 		refn->reserved = reserved;
 #ifndef NO_ASSERTIONS
 		cryptShaAtomic(refn->frame, refn->frame_len, &rhash);
+		dbgf_sys(DBGT_INFO, "all=%s", memAsHexString(refn->frame, refn->frame_len));
+		dbgf_sys(DBGT_INFO, "sha=%s", memAsHexString(&rhash, sizeof(rhash)));
 		assertion(-500000, (!memcmp(&refn->rhash, &rhash, sizeof(rhash))));
 #endif
 		avl_insert(&ref_tree, refn, -300565);
