@@ -1442,7 +1442,7 @@ int32_t rx_frame_ref_adv(struct rx_frame_iterator *it)
 
 	//TODO: check if demanded, add referencee_tree and required_tree,...
 
-	return it->frame_data_length;
+	return it->frame_msgs_length;
 }
 
 
