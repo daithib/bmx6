@@ -4913,7 +4913,6 @@ int32_t init_msg( void )
 */
 
         static const struct field_format ref_format[] = MSG_RHASH_ADV_FORMAT;
-
         handl.name = "RHASH_EXTENSION";
         handl.data_header_size = sizeof( struct desc_hdr_rhash_adv);
         handl.min_msg_size = sizeof (struct desc_msg_rhash_adv);
@@ -4944,7 +4943,6 @@ int32_t init_msg( void )
         handl.tx_task_interval_min = DEF_TX_DREF_ADV_TO;
         handl.tx_frame_handler = tx_frame_ref_adv;
         handl.rx_frame_handler = rx_frame_ref_adv;
-        handl.msg_format = ref_format;
         register_frame_handler(packet_frame_handler, FRAME_TYPE_REF_ADV, &handl);
 
 
