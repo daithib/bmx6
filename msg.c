@@ -1399,21 +1399,24 @@ int32_t tx_frame_ref_adv(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	SHA1_T *rhash = (SHA1_T *)it->ttn->task.data;
-	struct ref_node *refn = ref_node_get(NULL, rhash);
+	struct ref_node *refn = ref_node_get(NULL, (SHA1_T *)it->ttn->task.data);
 
 	assertion(-501581, refn);
 
 	if(refn && refn->dext_tree.items) {
 
-		struct frame_hdr_rhash_adv rhash_hdr = {.compression = refn->compression, .nested=refn->nested, .reserved=refn->reserved};
+		assertion(-500000, ((int) it->ttn->frame_msgs_length <= tx_iterator_cache_data_space_pref(it)));
+		assertion(-500000, ((int) it->ttn->frame_msgs_length == refn->f_body_len));
 
-		assertion(-501582, ((int)(sizeof(rhash_hdr) + refn->f_body_len) <= tx_iterator_cache_data_space_max(it)));
+		struct frame_hdr_rhash_adv *hdr = ((struct frame_hdr_rhash_adv*) tx_iterator_cache_hdr_ptr(it));
 
-		memcpy(tx_iterator_cache_msg_ptr(it), &rhash_hdr, sizeof(rhash_hdr));
-		memcpy(tx_iterator_cache_msg_ptr(it) + sizeof(rhash_hdr), refn->f_body, refn->f_body_len);
+		hdr->compression = refn->compression;
+		hdr->nested = refn->nested;
+		hdr->reserved = refn->reserved;
+
+		memcpy(hdr->msg, refn->f_body, refn->f_body_len);
 	
-		return (sizeof(rhash_hdr) + refn->f_body_len);
+		return refn->f_body_len;
 	}
 	
 	return TLV_TX_DATA_IGNORED;

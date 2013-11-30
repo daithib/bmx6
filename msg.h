@@ -499,6 +499,7 @@ struct frame_hdr_rhash_adv {
 #else
 # error "Please fix <bits/endian.h>"
 #endif
+    struct   desc_msg_rhash_adv msg[];
 } __attribute__((packed));
 
 
