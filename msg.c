@@ -192,7 +192,7 @@ void register_frame_handler(struct frame_handl *array, int pos, struct frame_han
 
         assertion(-501213, IMPLIES(handl->msg_format, handl->min_msg_size ==
                 fields_dbg_lines(NULL, FIELD_RELEVANCE_LOW, 0, NULL, handl->min_msg_size, handl->msg_format)));
-
+/*
 	assertion(-501611, IMPLIES(array==description_tlv_handl && pos!=BMX_DSC_TLV_RHASH_ADV, !handl->data_header_size));
 	// this is mandatory to let
 	assertion(-501612, TEST_VALUE(BMX_DSC_TLV_RHASH_ADV));
@@ -203,7 +203,7 @@ void register_frame_handler(struct frame_handl *array, int pos, struct frame_han
 	// and
 	assertion(-501615, TEST_STRUCT(struct desc_extension));
 	// without potentially conflicting message headers (frame data headers)
-
+*/
 
         array[pos] = *handl;
 
