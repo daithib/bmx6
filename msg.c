@@ -3487,8 +3487,8 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		int32_t rfd_msgs = rfd_agg_len/REF_FRAME_BODY_SIZE_OUT + (rfd_agg_len%REF_FRAME_BODY_SIZE_OUT?1:0);
 		int32_t rfd_size = sizeof(struct desc_hdr_rhash_adv) + (rfd_msgs*sizeof(struct desc_msg_rhash_adv));
 
-		dbgf_track(DBGT_INFO, "added %s fdata_in=%d -> msgs=%d rfd_size=%d flen=%d referenced=%d  do_fref=%d (%d %d %d) do_fzip=%d (%d %d %d)",
-			handl->name, fdata_in, rfd_msgs, rfd_size, sizeof (struct frame_header_long) + rfd_size, !!it->dext,
+		dbgf_track(DBGT_INFO, "added %s fDataInLen=%d fDataOutLen=%d -> msgs=%d rfd_size=%d flen=%d do_fref=%d (%d %d %d) do_fzip=%d (%d %d %d)",
+			handl->name, fdata_in, rfd_agg_len, rfd_msgs, rfd_size, sizeof (struct frame_header_long) + rfd_size,
 			do_fref, use_referencing(handl), dextReferencing, DEF_FREF,
 			do_fzip, use_compression(handl), dextCompression, DEF_FZIP );
 
@@ -3499,7 +3499,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 		// set: frame-data hdr:
 		struct desc_hdr_rhash_adv *rfd_hdr = (struct desc_hdr_rhash_adv *) ((uint8_t*)fhl + sizeof(struct frame_header_long));
-		rfd_hdr->compression = do_fzip;
+		rfd_hdr->compression = (rfd_agg_len < fdata_in);
 		rfd_hdr->expanded_type = it->frame_type;
 
 		// set: frame-data msgs:
