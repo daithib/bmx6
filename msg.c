@@ -4454,7 +4454,7 @@ void update_my_description_adv(void)
 
 			int32_t iterator_result = tx_frame_iterate(NO/*iterate_msg*/, &it);
 
-			if (iterator_result < TLV_TX_DATA_DONE && iterator_result != TLV_TX_DATA_FULL) {
+			if (iterator_result < TLV_TX_DATA_DONE) {
 				free_desc_extensions(&next_dext);
 				assertion_dbg(-500798, 0, "frame_type=%d iterator_result=%d", it.frame_type, iterator_result);
 			}
