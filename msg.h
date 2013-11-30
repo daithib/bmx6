@@ -820,8 +820,7 @@ struct msg_description_adv { // IPv6: >= 92 bytes
 {FIELD_TYPE_UINT,             -1, (8*sizeof(OGM_SQN_T)),   0, FIELD_RELEVANCE_MEDI, ARG_OGM_SQN_RANGE }, \
 {FIELD_TYPE_HEX,              -1, 16,                      0, FIELD_RELEVANCE_MEDI, "capabilities" }, \
 {FIELD_TYPE_UINT,             -1, 8,                       1, FIELD_RELEVANCE_LOW,  "comp_version" }, \
-{FIELD_TYPE_UINT,             -1, 6,                       1, FIELD_RELEVANCE_LOW,  "reserved" }, \
-{FIELD_TYPE_UINT,             -1, 2,                       1, FIELD_RELEVANCE_LOW,  "ref_nesting" }, \
+{FIELD_TYPE_UINT,             -1, 8,                       1, FIELD_RELEVANCE_LOW,  "reserved" }, \
 {FIELD_TYPE_STRING_SIZE,      -1, 16,                      0, FIELD_RELEVANCE_LOW,  "extensionLen" }, \
 {FIELD_TYPE_STRING_BINARY,    -1, 0,                       1, FIELD_RELEVANCE_LOW,  "extensionData" }, \
 FIELD_FORMAT_END}
