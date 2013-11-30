@@ -214,12 +214,12 @@ int create_description_sms(struct tx_frame_iterator *it)
         struct sms_node *sms;
 
         uint8_t *data = tx_iterator_cache_msg_ptr(it);
-        uint16_t max_size = tx_iterator_cache_data_space_pref(it);
+        int32_t max_size = tx_iterator_cache_data_space_pref(it);
         int pos = 0;
 
         while ((sms = avl_iterate_item(&sms_tree, &an))) {
 
-                if (pos + sizeof (struct description_msg_sms) + sms->text_len > max_size) {
+                if (pos + (int)sizeof (struct description_msg_sms) + (int)sms->text_len > max_size) {
                         dbgf_sys(DBGT_ERR, "Failed adding descriptionSms=%s/%s", smsTx_dir, sms->name);
                         continue;
                 }
