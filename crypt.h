@@ -23,11 +23,10 @@
 #define BMX6_CRYPTLIB CYASSL
 //#define BMX6_CRYPTLIB POLARSSL
 
-#define XKEY_N_MOD 256
-#define XKEY_E_VAL 65537
+#define CRYPT_KEY_N_MIN 512
+#define CRYPT_KEY_E_VAL 65537
 
 #define HASH_SHA1_LEN 20
-#define RSA1024_SIGN_LEN (1024/8) //128 bytes
 
 typedef struct CRYPTSHA1_T {
 	union {

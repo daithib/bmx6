@@ -39,7 +39,6 @@ static uint8_t shaClean = NO;
 #if BMX6_CRYPTLIB == CYASSL
 
 #define XKEY_DP_SZ sizeof( mp_digit)
-#define XDER_BUF_SZ 4096
 
 
 #define CYASSL_KEY_GEN
@@ -78,7 +77,7 @@ uint8_t * mp_int_get_raw( mp_int *in, uint32_t *rawLen) {
 
 	int s = XKEY_DP_SZ;
 	int u = in->used;
-	*rawLen = ( ( ((s*u*8)-((u)*4)) / XKEY_N_MOD ) * XKEY_N_MOD) / 8;
+	*rawLen = ( ( ((s*u*8)-((u)*4)) / CRYPT_KEY_N_MIN ) * CRYPT_KEY_N_MIN) / 8;
 	int w = ((*rawLen*8) / ((s*8)-4)) + (((*rawLen*8) % ((s*8)-4)) ? 1 : 0);
 	int zeros = (s*u)-(*rawLen);
 
@@ -119,7 +118,7 @@ uint8_t * mp_int_get_raw( mp_int *in, uint32_t *rawLen) {
 	
 	dbgf_sys(DBGT_INFO, "raw:\n%s", memAsHexStringSep( raw, *rawLen, 16, "\n"));
 
-	assertion(-500000, (*rawLen >= (XKEY_N_MOD/8))); // too small key!?
+	assertion(-500000, (*rawLen >= (CRYPT_KEY_N_MIN/8))); // too small key!?
 	assertion(-500000, (!is_zero( begin, 4))); // strange key with 4 leading octets!
 	assertion(-500000, (is_zero(tmp, zeros)));
 
@@ -217,7 +216,7 @@ void cryptKeyFromRaw( CRYPTKEY_T *cryptKey, uint8_t *rawKey, uint32_t rawKeyLen 
 	key->type = RSA_PUBLIC;
 
 	key->e.dp = debugMallocReset(sizeof (mp_digit) * 4, -300000);
-	key->e.dp[0] = XKEY_E_VAL;
+	key->e.dp[0] = CRYPT_KEY_E_VAL;
 	key->e.alloc = 4;
 	key->e.used  = 1;
 	key->e.sign  = MP_ZPOS;
@@ -252,7 +251,7 @@ void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
 	dbgf_sys(DBGT_INFO, "E=%d", (uint32_t)key->e.dp[0]);
 
 	assertion(-500000, (key->type == RSA_PUBLIC || key->type == RSA_PRIVATE));
-	assertion(-500000, (key->e.dp[0] == XKEY_E_VAL));
+	assertion(-500000, (key->e.dp[0] == CRYPT_KEY_E_VAL));
 
 	cryptKey->rawKeyLen = 0;
 	cryptKey->rawKey = mp_int_get_raw(&key->n, &cryptKey->rawKeyLen);
@@ -277,7 +276,7 @@ void cryptKeyMake( CRYPTKEY_T *cryptKey, int32_t keyBitSize ) {
 
 	InitRsaKey(key, 0);
 
-	if ((ret = MakeRsaKey(key, keyBitSize, XKEY_E_VAL, &cryptRng)) != 0) {
+	if ((ret = MakeRsaKey(key, keyBitSize, CRYPT_KEY_E_VAL, &cryptRng)) != 0) {
 		dbgf_sys(DBGT_ERR, "Failed making rsa key! ret=%d", ret);
 		cleanup_all(-500000);
 	}

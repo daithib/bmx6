@@ -53,11 +53,15 @@ int create_description_tlv_pubkey(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	uint32_t pubkey_len;
+	assertion(-500000, (my_PrivKey.rawKeyLen >= (CRYPT_KEY_N_MIN/8)));
+        if ((int)my_PrivKey.rawKeyLen > tx_iterator_cache_data_space_pref(it))
+		return TLV_TX_DATA_FULL;
 
-	dbgf_track(DBGT_INFO, "added description rsa pubkey len=%d", pubkey_len);
+	struct tlv_hdr *hdr = ((struct tlv_hdr*) tx_iterator_cache_hdr_ptr(it));
+	memcpy(&hdr[1], my_PrivKey.rawKey, my_PrivKey.rawKeyLen);
+	dbgf_track(DBGT_INFO, "added description rsa pubkey len=%d", my_PrivKey.rawKeyLen);
 
-	return (sizeof (struct description_msg_pubkey) + pubkey_len);
+	return my_PrivKey.rawKeyLen;
 }
 
 STATIC_FUNC
@@ -77,7 +81,7 @@ int create_description_tlv_signature(struct tx_frame_iterator *it)
 
 	dbgf_track(DBGT_INFO, "added description rsa pubkey len=%d", signature_len);
 
-	return (sizeof (struct description_msg_pubkey) + signature_len);
+	return signature_len;
 }
 
 STATIC_FUNC
@@ -95,8 +99,8 @@ int32_t rsa_create( char *tmp_path, uint16_t keyBitSize ) {
 	if (!(keyFile = fopen(tmp_path, "rb"))) {
 
 		CRYPTKEY_T key = CYRYPTKEY_ZERO;
-		uint8_t der[XDER_BUF_SZ];
-		int derSz = XDER_BUF_SZ;
+		uint8_t der[SEC_DER_BUF_SZ];
+		int derSz = SEC_DER_BUF_SZ;
 		int ret;
 
 		dbgf_sys(DBGT_INFO, "Creating new %d bit key to %s!", keyBitSize, tmp_path);
@@ -123,7 +127,7 @@ int32_t rsa_test( char *tmp_path, CRYPTKEY_T *cryptKey ) {
 
 	// test with: ./bmx6 f=0 d=0 --keyDir=$(pwdd)/rsa-test/key.der
 
-	uint8_t der[XDER_BUF_SZ];
+	uint8_t der[SEC_DER_BUF_SZ];
 	int derSz = 0;
 	FILE* keyFile;
 
@@ -270,7 +274,8 @@ int32_t init_sec( void )
 
 //      static const struct field_format ref_format[] = DESCRIPTION_MSG_REF_FORMAT;
         handl.name = "PUBKEY";
-        handl.min_msg_size = sizeof (struct description_msg_pubkey);
+        handl.min_msg_size = CRYPT_KEY_N_MIN;
+	handl.data_header_size = sizeof (struct tlv_hdr);
         handl.fixed_msg_size = 0;
 	handl.dextReferencing = (int32_t*)&always_fref;
         handl.tx_frame_handler = create_description_tlv_pubkey;
@@ -279,7 +284,8 @@ int32_t init_sec( void )
         register_frame_handler(description_tlv_handl, BMX_DSC_TLV_PUBKEY, &handl);
 
         handl.name = "SIGNATURE";
-        handl.min_msg_size = sizeof (struct description_msg_signature);
+        handl.min_msg_size = CRYPT_KEY_N_MIN;
+	handl.data_header_size = sizeof (struct tlv_hdr);
         handl.fixed_msg_size = 0;
         handl.tx_frame_handler = create_description_tlv_signature;
         handl.rx_frame_handler = process_description_tlv_signature;

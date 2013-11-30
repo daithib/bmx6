@@ -28,35 +28,19 @@
 #define ARG_KEY_PATH "keyPath"
 #define DEF_KEY_PATH "/etc/bmx6/rsa.der"
 
-#define XKEY_N_MOD 256
-#define XKEY_E_VAL 65537
-#define XKEY_DP_SZ sizeof( mp_digit)
-#define XDER_BUF_SZ 4096
+#define SEC_DER_BUF_SZ 4096
 
 
 
-struct rsa1024 {
-	union {
-		uint8_t u8[RSA1024_SIGN_LEN];
-		uint32_t u32[RSA1024_SIGN_LEN/sizeof(uint32_t)];
-	} h;
-};
-
-typedef struct rsa1024 RSA1024_T;
-
-struct description_msg_signature {
-	uint8_t   type;
-	uint8_t   reserved;
-	RSA1024_T signature;        // 128 bytes
-} __attribute__((packed));
-
-
-struct description_msg_pubkey {
-	uint8_t   type;
-	uint8_t   reserved;
-	RSA1024_T pubkey;
-} __attribute__((packed));
-
+#define SEC_RSA512_MIN   CRYPT_KEY_N_MIN/8
+#define SEC_RSA512_TYPE  1
+#define SEC_RSA512_LEN   64
+#define SEC_RSA1024_TYPE 2
+#define SEC_RSA1024_LEN  128
+#define SEC_RSA2048_TYPE 2
+#define SEC_RSA2048_LEN  256
+#define SEC_RSA4096_TYPE 3
+#define SEC_RSA4096_LEN  512
 
 struct plugin *sec_get_plugin( void );
 
