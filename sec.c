@@ -94,7 +94,7 @@ int32_t rsa_create( char *tmp_path, uint16_t keyBitSize ) {
 
 	if (!(keyFile = fopen(tmp_path, "rb"))) {
 
-		CRYPTKEY_T key;
+		CRYPTKEY_T key = CYRYPTKEY_ZERO;
 		uint8_t der[XDER_BUF_SZ];
 		int derSz = XDER_BUF_SZ;
 		int ret;
