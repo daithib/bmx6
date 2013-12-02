@@ -3582,10 +3582,11 @@ int32_t tx_frame_iterate(IDM_T iterate_msg, struct tx_frame_iterator *it)
         assertion(-500781, (it->frame_type <= it->handl_max));
         assertion(-500784, (IMPLIES(it->frame_cache_msgs_size, it->frame_cache_msgs_size >= TLV_TX_DATA_PROCESSED)));
 
-        dbgf_all(DBGT_INFO, "from %s iterate_msg=%s frame_type=%d cache_msgs_size=%d cache_data_space=%d frames_out_pos=%d frames_out_pref=%d ",
-                it->caller, iterate_msg ? "YES" : "NO ", it->frame_type,
-                it->frame_cache_msgs_size, tx_iterator_cache_data_space_pref(it), it->frames_out_pos, it->frames_out_pref);
-
+	if (it->dext) {
+		dbgf_track(DBGT_INFO, "from %s iterate_msg=%s frame_type=%d cache_msgs_size=%d cache_data_space=%d frames_out_pos=%d frames_out_pref=%d ",
+			it->caller, iterate_msg ? "YES" : "NO ", it->frame_type,
+			it->frame_cache_msgs_size, tx_iterator_cache_data_space_pref(it), it->frames_out_pos, it->frames_out_pref);
+	}
         if (handl->tx_frame_handler || iterate_msg) {
 
                 if (handl->min_msg_size > tx_iterator_cache_data_space_pref(it))
