@@ -272,7 +272,8 @@ int32_t init_sec( void )
         memset(&handl, 0, sizeof ( handl));
 
 
-//      static const struct field_format ref_format[] = DESCRIPTION_MSG_REF_FORMAT;
+	static const struct field_format ref_format[] = DESCRIPTION_MSG_SEC_FORMAT;
+
         handl.name = "PUBKEY";
         handl.min_msg_size = CRYPT_KEY_N_MIN/8;
 	handl.data_header_size = sizeof (struct tlv_hdr);
@@ -280,7 +281,7 @@ int32_t init_sec( void )
 	handl.dextReferencing = (int32_t*)&always_fref;
         handl.tx_frame_handler = create_description_tlv_pubkey;
         handl.rx_frame_handler = process_description_tlv_pubkey;
-//	handl.msg_format = ref_format;
+	handl.msg_format = ref_format;
         register_frame_handler(description_tlv_handl, BMX_DSC_TLV_PUBKEY, &handl);
 
         handl.name = "SIGNATURE";
@@ -289,6 +290,7 @@ int32_t init_sec( void )
         handl.fixed_msg_size = 0;
         handl.tx_frame_handler = create_description_tlv_signature;
         handl.rx_frame_handler = process_description_tlv_signature;
+	handl.msg_format = ref_format;
         register_frame_handler(description_tlv_handl, BMX_DSC_TLV_SIGNATURE, &handl);
 
         return SUCCESS;
