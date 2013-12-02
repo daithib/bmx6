@@ -31,11 +31,8 @@
 #define SEC_DER_BUF_SZ 4096
 
 #define DESCRIPTION_MSG_SEC_FORMAT { \
-{FIELD_TYPE_STRING_BINARY, -1, 0,                         1, FIELD_RELEVANCE_LOW,  "pubKey" },  \
-FIELD_FORMAT_END }
-
-#define DESCRIPTION_MSG_SEC_FORMAT { \
-{FIELD_TYPE_STRING_BINARY, -1, 0,                         1, FIELD_RELEVANCE_LOW,  "pubKey" },  \
+{FIELD_TYPE_STRING_BINARY, -1, CRYPT_KEY_N_MIN,           1, FIELD_RELEVANCE_LOW,  "sec0" },  \
+{FIELD_TYPE_STRING_BINARY, -1, 0,                         1, FIELD_RELEVANCE_LOW,  "sec..." },  \
 FIELD_FORMAT_END }
 
 #define SEC_RSA512_MIN   CRYPT_KEY_N_MIN/8
