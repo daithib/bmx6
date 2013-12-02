@@ -530,16 +530,20 @@ uint32_t field_iterate(struct field_iterator *it)
         it->field_bit_pos = (format->field_pos == -1) ?
                 it->field_bit_pos + it->field_bits : it->msg_bit_pos + format->field_pos;
 
+
+	if (!format->field_bits && !it->var_bits)
+		it->var_bits = it->data_size ? ((8*it->data_size)-it->field_bit_pos) : 0;
+
         uint8_t field_type = format->field_type;
         uint32_t field_bits = format->field_bits ? format->field_bits : it->var_bits;
         int32_t std_bits = field_standard_sizes[field_type];
 
         dbgf_all(DBGT_INFO,
                 "fmt.field_name=%s data_size_bits=%d min_msg_size_bits=%d msg_bit_pos=%d data=%p "
-                "it.field=%d it.field_bits=%d it.field_bit_pos=%d it.var_bits=%d "
+                "it.field=%d it.field_bits=%d it.field_bit_pos=%d it.var_bits=%d field_bits=%d "
                 "fmt.field_type=%d fmt.field_bits=%d std_bits=%d\n",
                 format->field_name, (8 * it->data_size), (8 * it->min_msg_size), it->msg_bit_pos, it->data,
-                it->field, it->field_bits, it->field_bit_pos, it->var_bits,
+                it->field, it->field_bits, it->field_bit_pos, it->var_bits, field_bits,
                 field_type, format->field_bits, std_bits);
 
 
