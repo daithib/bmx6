@@ -81,7 +81,7 @@ int create_description_tlv_signature(struct tx_frame_iterator *it)
 
 	dbgf_track(DBGT_INFO, "added description rsa pubkey len=%d", signature_len);
 
-	return signature_len;
+	return TLV_TX_DATA_IGNORED;
 }
 
 STATIC_FUNC
@@ -274,7 +274,7 @@ int32_t init_sec( void )
 
 //      static const struct field_format ref_format[] = DESCRIPTION_MSG_REF_FORMAT;
         handl.name = "PUBKEY";
-        handl.min_msg_size = CRYPT_KEY_N_MIN;
+        handl.min_msg_size = CRYPT_KEY_N_MIN/8;
 	handl.data_header_size = sizeof (struct tlv_hdr);
         handl.fixed_msg_size = 0;
 	handl.dextReferencing = (int32_t*)&always_fref;
@@ -284,7 +284,7 @@ int32_t init_sec( void )
         register_frame_handler(description_tlv_handl, BMX_DSC_TLV_PUBKEY, &handl);
 
         handl.name = "SIGNATURE";
-        handl.min_msg_size = CRYPT_KEY_N_MIN;
+        handl.min_msg_size = CRYPT_KEY_N_MIN/8;
 	handl.data_header_size = sizeof (struct tlv_hdr);
         handl.fixed_msg_size = 0;
         handl.tx_frame_handler = create_description_tlv_signature;

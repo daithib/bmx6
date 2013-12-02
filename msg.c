@@ -3146,7 +3146,8 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                         (it->frame_msgs_length < f_handl->min_msg_size && it->frame_msgs_length != 0)
                         ) {
 
-                        dbgf_sys(DBGT_WARN, "%s - too small length=%d for type=%s", it->caller, f_len, f_handl->name);
+                        dbgf_sys(DBGT_WARN, "%s - too small f_len=%d f_data_len=%d f_msgs_len=%d for type=%s",
+				it->caller, f_len, f_data_len, it->frame_msgs_length, f_handl->name);
                         return TLV_RX_DATA_FAILURE;
 
                 } else if (f_handl->fixed_msg_size && it->frame_msgs_length % f_handl->min_msg_size) {
