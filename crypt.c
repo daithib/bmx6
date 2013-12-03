@@ -278,51 +278,6 @@ void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
 }
 
 
-int cryptKeyMakeDer( int32_t keyBitSize, char *tmp_path ) {
-
-	RsaKey *key = debugMalloc(sizeof(RsaKey), -300000);
-	FILE* keyFile;
-	uint8_t der[CRYPT_DER_BUF_SZ];
-	int derSz = CRYPT_DER_BUF_SZ;
-	int ret;
-
-	InitRsaKey(key, 0);
-
-	if ((ret = MakeRsaKey(key, keyBitSize, CRYPT_KEY_E_VAL, &cryptRng)) != 0) {
-		dbgf_sys(DBGT_ERR, "Failed making rsa key! ret=%d", ret);
-		return FAILURE;
-	}
-
-	dbgf_sys(DBGT_INFO, "NEW Key: alloc=%d sign=%d used=%d sizeof=%ld len=%ld bits=%ld N:\n%s",
-		key->n.alloc, key->n.sign, key->n.used, XKEY_DP_SZ, (key->n.used * XKEY_DP_SZ), (key->n.used * XKEY_DP_SZ)*8,
-		memAsHexStringSep( key->n.dp, (key->n.used * XKEY_DP_SZ), 16, "\n")
-		);
-
-	if ((derSz = RsaKeyToDer(key, der, derSz)) < 0) {
-		dbgf_sys(DBGT_ERR, "Failed translating rsa key to der! derSz=%d", derSz)
-		return FAILURE;
-	}
-
-	// read this with:
-	//    dumpasn1 key.der
-	//    note that all first INTEGER bytes are not zero (unlike with openssl certificates), but after conversion they are.
-	// convert to pem with openssl:
-	//    openssl rsa -in rsa-test/key.der -inform DER -out rsa-test/openssl.pem -outform PEM
-	// extract public key with openssl:
-	//    openssl rsa -in rsa-test/key.der -inform DER -pubout -out rsa-test/openssl.der.pub -outform DER
-
-	FreeRsaKey(key);
-
-
-	if (!(keyFile = fopen(tmp_path, "wb")) || ((int)fwrite(der, 1, derSz, keyFile)) != derSz ) {
-		dbgf_sys(DBGT_ERR, "Failed writing %s!", tmp_path);
-		return FAILURE;
-	}
-
-
-	fclose(keyFile);
-	return SUCCESS;
-}
 
 
 CRYPTKEY_T *cryptKeyFromDer( char *tmp_path ) {
@@ -368,6 +323,51 @@ CRYPTKEY_T *cryptKeyFromDer( char *tmp_path ) {
 
 }
 
+int cryptKeyMakeDer( int32_t keyBitSize, char *tmp_path ) {
+
+	RsaKey *key = debugMalloc(sizeof(RsaKey), -300000);
+	FILE* keyFile;
+	uint8_t der[CRYPT_DER_BUF_SZ];
+	int derSz = CRYPT_DER_BUF_SZ;
+	int ret;
+
+	InitRsaKey(key, 0);
+
+	if ((ret = MakeRsaKey(key, keyBitSize, CRYPT_KEY_E_VAL, &cryptRng)) != 0) {
+		dbgf_sys(DBGT_ERR, "Failed making rsa key! ret=%d", ret);
+		return FAILURE;
+	}
+
+	dbgf_sys(DBGT_INFO, "NEW Key: alloc=%d sign=%d used=%d sizeof=%ld len=%ld bits=%ld N:\n%s",
+		key->n.alloc, key->n.sign, key->n.used, XKEY_DP_SZ, (key->n.used * XKEY_DP_SZ), (key->n.used * XKEY_DP_SZ)*8,
+		memAsHexStringSep( key->n.dp, (key->n.used * XKEY_DP_SZ), 16, "\n")
+		);
+
+	if ((derSz = RsaKeyToDer(key, der, derSz)) < 0) {
+		dbgf_sys(DBGT_ERR, "Failed translating rsa key to der! derSz=%d", derSz)
+		return FAILURE;
+	}
+
+	// read this with:
+	//    dumpasn1 key.der
+	//    note that all first INTEGER bytes are not zero (unlike with openssl certificates), but after conversion they are.
+	// convert to pem with openssl:
+	//    openssl rsa -in rsa-test/key.der -inform DER -out rsa-test/openssl.pem -outform PEM
+	// extract public key with openssl:
+	//    openssl rsa -in rsa-test/key.der -inform DER -pubout -out rsa-test/openssl.der.pub -outform DER
+
+	FreeRsaKey(key);
+
+
+	if (!(keyFile = fopen(tmp_path, "wb")) || ((int)fwrite(der, 1, derSz, keyFile)) != derSz ) {
+		dbgf_sys(DBGT_ERR, "Failed writing %s!", tmp_path);
+		return FAILURE;
+	}
+
+
+	fclose(keyFile);
+	return SUCCESS;
+}
 
 
 int cryptEncrypt( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *pubKey) {
