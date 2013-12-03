@@ -1242,11 +1242,9 @@ void ref_node_purge (IDM_T all_unused)
 
 SHA1_T *ref_node_key(uint8_t *f_body, uint32_t f_body_len, uint8_t compression, uint8_t nested, uint8_t reserved)
 {
-
 	static SHA1_T rhash;
 
-	assertion(-501616, (f_body_len > sizeof(struct frame_hdr_rhash_adv)));
-	assertion(-501616, (f_body_len - sizeof(struct frame_hdr_rhash_adv) <= REF_FRAME_BODY_SIZE_MAX));
+	assertion(-501616, (f_body && f_body_len));
 
 	struct frame_hdr_rhash_adv rhash_hdr = {.compression=compression, .nested=nested, .reserved=reserved};
 
@@ -4369,6 +4367,7 @@ process_desc0_error:
 
         return (struct dhash_node *) FAILURE_PTR;
 }
+
 
 
 void update_my_description_adv(void)
