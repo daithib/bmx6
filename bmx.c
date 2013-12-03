@@ -52,6 +52,8 @@
 
 int32_t my_compatibility = DEF_COMPATIBILITY;
 
+char my_Hostname[GLOBAL_ID_NAME_LEN];
+
 
 int32_t dad_to = DEF_DAD_TO;
 
@@ -1090,6 +1092,29 @@ int32_t opt_update_description(uint8_t cmd, uint8_t _save, struct opt_type *opt,
 }
 
 
+STATIC_FUNC
+int32_t opt_hostname(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
+{
+	static uint8_t checked = NO;
+
+	if ( (cmd == OPT_SET_POST) && initializing && !checked ) {
+
+		checked = YES;
+
+		if (gethostname(my_Hostname, GLOBAL_ID_NAME_LEN))
+			return FAILURE;
+
+		my_Hostname[GLOBAL_ID_NAME_LEN - 1] = 0;
+
+		if (validate_name_string(my_Hostname, GLOBAL_ID_NAME_LEN, NULL) == FAILURE) {
+			dbg_sys(DBGT_ERR, "illegal hostname %s", my_Hostname);
+			return FAILURE;
+		}
+	}
+
+	return SUCCESS;
+}
+
 
 static struct opt_type bmx_options[]=
 {
@@ -1101,6 +1126,8 @@ static struct opt_type bmx_options[]=
         {ODI,0,ARG_COMPATIBILITY,       0,  3,1,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,   &my_compatibility,MIN_COMPATIBILITY,MAX_COMPATIBILITY,DEF_COMPATIBILITY,0, 0,
 			ARG_VALUE_FORM,	"set (elastic) compatibility version"},
 
+	{ODI,0,ARG_HOSTNAME,		0,  9,0,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,		0,		        0,		        0,0,	opt_hostname,
+			ARG_VALUE_FORM,	"set advertised hostname of node"},
 
 	{ODI,0,ARG_SHOW,		's', 9,2,A_PS1N,A_USR,A_DYN,A_ARG,A_ANY,	0,		0, 		0,		0,0, 		opt_status,
 			ARG_VALUE_FORM,		"show status information about given context. E.g.:" ARG_STATUS ", " ARG_INTERFACES ", " ARG_LINKS ", " ARG_ORIGINATORS ", ..." "\n"},
@@ -1135,32 +1162,6 @@ static struct opt_type bmx_options[]=
 STATIC_FUNC
 void init_bmx(void)
 {
-
-        static uint8_t my_desc0[PKT_FRAMES_SIZE_MAX - sizeof(struct frame_header_long)];
-        static GLOBAL_ID_T id;
-        memset(&id, 0, sizeof (id));
-
-        if (gethostname(id.name, GLOBAL_ID_NAME_LEN))
-                cleanup_all(-500240);
-
-        id.name[GLOBAL_ID_NAME_LEN - 1] = 0;
-
-        if (validate_name_string(id.name, GLOBAL_ID_NAME_LEN, NULL) == FAILURE) {
-                dbg_sys(DBGT_ERR, "illegal hostname %s", id.name);
-                cleanup_all(-500272);
-        }
-
-	cryptRand( &(id.pkid.u8[0]), sizeof(id.pkid) );
-
-        self = init_orig_node(&id);
-
-        self->desc = (struct description *) my_desc0;
-
-
-        self->ogmSqn_rangeMin = ((OGM_SQN_MASK) & rand_num(OGM_SQN_MAX));
-
-        self->descSqn = ((DESC_SQN_MASK) & rand_num(DESC_SQN_MAX));
-
         register_options_array(bmx_options, sizeof ( bmx_options), CODE_CATEGORY_NAME);
 
         register_status_handl(sizeof (struct bmx_status), 0, bmx_status_format, ARG_STATUS, bmx_status_creator);
@@ -1170,6 +1171,26 @@ void init_bmx(void)
 }
 
 
+STATIC_FUNC
+void init_self(void)
+{
+        static uint8_t my_desc0[PKT_FRAMES_SIZE_MAX - sizeof(struct frame_header_long)];
+        GLOBAL_ID_T id;
+	memset(&id, 0, sizeof(id));
+
+	strcpy(id.name, my_Hostname);
+
+	assertion(-500000, (sizeof(SHA1_T)==sizeof(id.pkid)));
+	id.pkid.sha1 = *ref_node_key(my_PubKey.rawKey, my_PubKey.rawKeyLen, 0, 0, 0);
+
+        self = init_orig_node(&id);
+
+        self->desc = (struct description *) my_desc0;
+
+        self->ogmSqn_rangeMin = ((OGM_SQN_MASK) & rand_num(OGM_SQN_MAX));
+
+        self->descSqn = ((DESC_SQN_MASK) & rand_num(DESC_SQN_MAX));
+}
 
 
 STATIC_FUNC
@@ -1183,7 +1204,8 @@ void bmx(void)
 	TIME_T s_last_cpu_time = 0, s_curr_cpu_time = 0;
 
 	frequent_timeout = seldom_timeout = bmx_time;
-
+	
+	init_self();
         update_my_description_adv();
 
         for (an = NULL; (dev = avl_iterate_item(&dev_ip_tree, &an));) {

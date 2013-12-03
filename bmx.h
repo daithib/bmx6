@@ -146,7 +146,7 @@ extern const struct net_key ZERO_NET6_KEY;
 
 
 
-
+#define ARG_HOSTNAME "hostname"
 
 
 
