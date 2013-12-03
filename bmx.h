@@ -434,7 +434,6 @@ extern uint32_t s_curr_avg_cpu_load;
 
 extern IDM_T my_description_changed;
 
-extern struct orig_node *self;
 
 
 /**
