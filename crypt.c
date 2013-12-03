@@ -35,7 +35,7 @@ const CRYPTKEY_T CYRYPTKEY_ZERO = { .nativeBackendKey=0, .backendKey=NULL, .rawK
 
 static uint8_t shaClean = NO;
 
-CRYPTKEY_T my_PrivKey;
+CRYPTKEY_T *my_PrivKey = NULL;
 
 /******************* accessing cyassl: ***************************************/
 #if BMX6_CRYPTLIB == CYASSL
@@ -75,7 +75,7 @@ void * clone_to_nbo(void *in, uint32_t len) {
 
 
 STATIC_FUNC
-uint8_t * mp_int_get_raw( mp_int *in, uint32_t *rawLen) {
+uint8_t * mp_int_get_raw( mp_int *in, uint16_t *rawLen) {
 
 	int s = XKEY_DP_SZ;
 	int u = in->used;
@@ -204,10 +204,13 @@ void cryptKeyFree( CRYPTKEY_T *cryptKey ) {
 		debugFree(cryptKey->rawKey, -300000);
 	}
 	
-	*cryptKey = CYRYPTKEY_ZERO;
+	debugFree( cryptKey, -300000);
 }
 
-void cryptKeyFromRaw( CRYPTKEY_T *cryptKey, uint8_t *rawKey, uint32_t rawKeyLen ) {
+
+CRYPTKEY_T *cryptPubKeyFromRaw( CRYPTKEY_T *in ) {
+
+	CRYPTKEY_T *cryptKey = debugMallocReset(sizeof(CRYPTKEY_T), -300000);
 
 	assertion(-500000, (!cryptKey->backendKey && !cryptKey->rawKey));
 
@@ -223,14 +226,17 @@ void cryptKeyFromRaw( CRYPTKEY_T *cryptKey, uint8_t *rawKey, uint32_t rawKeyLen 
 	key->e.used  = 1;
 	key->e.sign  = MP_ZPOS;
 
-	int used = mp_int_put_raw( &key->n, rawKey, rawKeyLen );
+	int used = mp_int_put_raw( &key->n, in->rawKey, in->rawKeyLen );
 	key->n.alloc = used;
 	key->n.used  = used;
 	key->n.sign  = MP_ZPOS;
 
-	cryptKey->rawKeyLen = rawKeyLen;
-	cryptKey->rawKey = debugMalloc(rawKeyLen,-300000);
-	memcpy(cryptKey->rawKey, rawKey, rawKeyLen);
+	cryptKey->rawKeyLen = in->rawKeyLen;
+	cryptKey->rawKeyType = in->rawKeyType;
+	cryptKey->rawKey = debugMalloc(in->rawKeyLen,-300000);
+	memcpy(cryptKey->rawKey, in->rawKey, in->rawKeyLen);
+
+	return cryptKey;
 }
 
 STATIC_FUNC
@@ -257,30 +263,34 @@ void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
 
 	cryptKey->rawKeyLen = 0;
 	cryptKey->rawKey = mp_int_get_raw(&key->n, &cryptKey->rawKeyLen);
+	cryptKey->rawKeyType =
+		cryptKey->rawKeyLen == CRYPT_RSA1024_LEN ? CRYPT_RSA1024_TYPE : (
+		cryptKey->rawKeyLen == CRYPT_RSA2048_LEN ? CRYPT_RSA2048_TYPE : (
+		cryptKey->rawKeyLen == CRYPT_RSA4096_LEN ? CRYPT_RSA4096_TYPE : (
+		0 )));
 
-	CRYPTKEY_T test = CYRYPTKEY_ZERO;
-	cryptKeyFromRaw(&test, cryptKey->rawKey, cryptKey->rawKeyLen);
-	assertion(-500000, !memcmp(((RsaKey*)(cryptKey->backendKey))->n.dp, ((RsaKey*)(test.backendKey))->n.dp, (((RsaKey*)(cryptKey->backendKey))->n.used * XKEY_DP_SZ)));
-	cryptKeyFree(&test);
+
+#ifndef NO_ASSERTIONS
+	CRYPTKEY_T *test = cryptPubKeyFromRaw(cryptKey);
+	assertion(-500000, !memcmp(((RsaKey*)(cryptKey->backendKey))->n.dp, ((RsaKey*)(test->backendKey))->n.dp, (((RsaKey*)(cryptKey->backendKey))->n.used * XKEY_DP_SZ)));
+	cryptKeyFree(test);
+#endif
 }
 
 
-void cryptKeyMake( CRYPTKEY_T *cryptKey, int32_t keyBitSize ) {
+int cryptKeyMakeDer( int32_t keyBitSize, char *tmp_path ) {
 
-	assertion(-500000, (!cryptKey->backendKey && !cryptKey->rawKey));
-
-	cryptKey->backendKey = debugMalloc(sizeof(RsaKey), -300000);
-
-	RsaKey *key = cryptKey->backendKey;
+	RsaKey *key = debugMalloc(sizeof(RsaKey), -300000);
+	FILE* keyFile;
+	uint8_t der[CRYPT_DER_BUF_SZ];
+	int derSz = CRYPT_DER_BUF_SZ;
 	int ret;
-
-	cryptKey->nativeBackendKey = 1;
 
 	InitRsaKey(key, 0);
 
 	if ((ret = MakeRsaKey(key, keyBitSize, CRYPT_KEY_E_VAL, &cryptRng)) != 0) {
 		dbgf_sys(DBGT_ERR, "Failed making rsa key! ret=%d", ret);
-		cleanup_all(-500000);
+		return FAILURE;
 	}
 
 	dbgf_sys(DBGT_INFO, "NEW Key: alloc=%d sign=%d used=%d sizeof=%ld len=%ld bits=%ld N:\n%s",
@@ -288,16 +298,9 @@ void cryptKeyMake( CRYPTKEY_T *cryptKey, int32_t keyBitSize ) {
 		memAsHexStringSep( key->n.dp, (key->n.used * XKEY_DP_SZ), 16, "\n")
 		);
 
-	cryptKeyAddRaw(cryptKey);
-}
-
-void cryptKeyToDer( CRYPTKEY_T *cryptKey, uint8_t *der, int32_t *derSz ) {
-
-	RsaKey *key = cryptKey->backendKey;
-
-	if ((*derSz = RsaKeyToDer(key, der, *derSz)) < 0) {
+	if ((derSz = RsaKeyToDer(key, der, derSz)) < 0) {
 		dbgf_sys(DBGT_ERR, "Failed translating rsa key to der! derSz=%d", derSz)
-		cleanup_all(-500000);
+		return FAILURE;
 	}
 
 	// read this with:
@@ -307,29 +310,61 @@ void cryptKeyToDer( CRYPTKEY_T *cryptKey, uint8_t *der, int32_t *derSz ) {
 	//    openssl rsa -in rsa-test/key.der -inform DER -out rsa-test/openssl.pem -outform PEM
 	// extract public key with openssl:
 	//    openssl rsa -in rsa-test/key.der -inform DER -pubout -out rsa-test/openssl.der.pub -outform DER
-}
 
-void cryptKeyFromDer( CRYPTKEY_T *pubKey, uint8_t *der, int32_t derSz ) {
+	FreeRsaKey(key);
 
-	assertion(-500000, (!my_PrivKey.backendKey && !my_PrivKey.rawKey));
 
-	my_PrivKey.backendKey = debugMalloc(sizeof(RsaKey), -300000);
-
-	int    ret;
-	word32 idx = 0;
-
-	my_PrivKey.nativeBackendKey = 1;
-
-	InitRsaKey((RsaKey*)my_PrivKey.backendKey, 0);
-
-	if ((ret = RsaPrivateKeyDecode(der, &idx, (RsaKey*)my_PrivKey.backendKey, derSz)) != 0) {
-		dbgf_sys(DBGT_ERR, "can not decode ret=%d", ret);
-		cleanup_all(-500000);
+	if (!(keyFile = fopen(tmp_path, "wb")) || ((int)fwrite(der, 1, derSz, keyFile)) != derSz ) {
+		dbgf_sys(DBGT_ERR, "Failed writing %s!", tmp_path);
+		return FAILURE;
 	}
 
-	cryptKeyAddRaw(&my_PrivKey);
 
-	cryptKeyFromRaw( pubKey, my_PrivKey.rawKey, my_PrivKey.rawKeyLen);
+	fclose(keyFile);
+	return SUCCESS;
+}
+
+
+CRYPTKEY_T *cryptKeyFromDer( char *tmp_path ) {
+
+	uint8_t der[CRYPT_DER_BUF_SZ];
+	int derSz = 0;
+	FILE* keyFile;
+	int    ret;
+	word32 idx = 0;
+	
+	assertion(-500000, (!my_PrivKey));
+
+	if (!(keyFile = fopen(tmp_path, "rb"))) {
+		dbgf_sys(DBGT_ERR, "can not open %s: %s", tmp_path, strerror(errno));
+		return NULL;
+	}
+
+	if(((derSz = (int)fread(der, 1, sizeof(der), keyFile)) <= 0) || derSz == sizeof(der)) {
+		dbgf_sys(DBGT_ERR, "can not read %s: %s", tmp_path, strerror(errno));
+		return NULL;
+	} else {
+		dbgf_sys(DBGT_INFO, "read %d bytes from %s", derSz, tmp_path);
+	}
+
+	fclose(keyFile);
+
+	CRYPTKEY_T *ckey = debugMallocReset(sizeof(CRYPTKEY_T), -300000);
+
+	ckey->backendKey = debugMalloc(sizeof(RsaKey), -300000);
+	ckey->nativeBackendKey = 1;
+	InitRsaKey((RsaKey*)ckey->backendKey, 0);
+
+	if ((ret = RsaPrivateKeyDecode(der, &idx, (RsaKey*)ckey->backendKey, derSz)) != 0) {
+		dbgf_sys(DBGT_ERR, "can not decode ret=%d", ret);
+		return NULL;
+	}
+
+	cryptKeyAddRaw(ckey);
+
+	my_PrivKey = ckey;
+
+	return cryptPubKeyFromRaw( my_PrivKey );
 
 }
 
@@ -347,7 +382,7 @@ int cryptEncrypt( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRY
 
 int cryptDecrypt(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen) {
 
-	if ((*outLen = RsaPrivateDecrypt(in, inLen, out, *outLen, (RsaKey *)my_PrivKey.backendKey)) < 0)
+	if ((*outLen = RsaPrivateDecrypt(in, inLen, out, *outLen, (RsaKey *)my_PrivKey->backendKey)) < 0)
 		return FAILURE;
 	else
 		return SUCCESS;
@@ -355,7 +390,7 @@ int cryptDecrypt(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen) {
 
 int cryptSign( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen) {
 
-	if ((*outLen = RsaSSL_Sign(in, inLen, out, *outLen, (RsaKey *)my_PrivKey.backendKey, &cryptRng)) < 0)
+	if ((*outLen = RsaSSL_Sign(in, inLen, out, *outLen, (RsaKey *)my_PrivKey->backendKey, &cryptRng)) < 0)
 		return FAILURE;
 	else
 		return SUCCESS;
@@ -437,8 +472,6 @@ void cryptShaFinal( CRYPTSHA1_T *sha) {
 
 
 void init_crypt(void) {
-
-	my_PrivKey = CYRYPTKEY_ZERO;
 	
 	cryptRngInit();
 	cryptShaInit();
@@ -446,7 +479,7 @@ void init_crypt(void) {
 
 void cleanup_crypt(void) {
 
-        cryptKeyFree(&my_PrivKey);
+        cryptKeyFree(my_PrivKey);
 
 	cryptRngFree();
 	cryptShaFree();

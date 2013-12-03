@@ -52,15 +52,19 @@ int create_description_tlv_pubkey(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	assertion(-500000, (my_PubKey.rawKeyLen >= (CRYPT_KEY_N_MIN/8)));
-        if ((int)my_PubKey.rawKeyLen > tx_iterator_cache_data_space_pref(it))
+	assertion(-500000, (my_PubKey));
+
+        if ((int)(sizeof(struct ilv_hdr) + my_PubKey->rawKeyLen) > tx_iterator_cache_data_space_pref(it))
 		return TLV_TX_DATA_FULL;
 
-	struct tlv_hdr *hdr = ((struct tlv_hdr*) tx_iterator_cache_hdr_ptr(it));
-	memcpy(&hdr[1], my_PubKey.rawKey, my_PubKey.rawKeyLen);
-	dbgf_track(DBGT_INFO, "added description rsa pubkey len=%d", my_PubKey.rawKeyLen);
+	struct ilv_hdr *hdr = ((struct ilv_hdr*) tx_iterator_cache_msg_ptr(it));
 
-	return my_PubKey.rawKeyLen;
+	hdr[0].type = my_PubKey->rawKeyType;
+
+	memcpy(&hdr[1], my_PubKey->rawKey, my_PubKey->rawKeyLen);
+	dbgf_track(DBGT_INFO, "added description rsa pubkey len=%d", my_PubKey->rawKeyLen);
+
+	return (sizeof(struct ilv_hdr) + my_PubKey->rawKeyLen);
 }
 
 STATIC_FUNC
@@ -97,58 +101,28 @@ int32_t rsa_create( char *tmp_path, uint16_t keyBitSize ) {
 
 	if (!(keyFile = fopen(tmp_path, "rb"))) {
 
-		CRYPTKEY_T key = CYRYPTKEY_ZERO;
-		uint8_t der[SEC_DER_BUF_SZ];
-		int derSz = SEC_DER_BUF_SZ;
-		int ret;
-
-		dbgf_sys(DBGT_INFO, "Creating new %d bit key to %s!", keyBitSize, tmp_path);
-		cryptKeyMake(&key, keyBitSize);
-		cryptKeyToDer(&key, der, &derSz);
-
-		if (!(keyFile = fopen(tmp_path, "wb"))) {
-			dbgf_sys(DBGT_ERR, "Failed writing %s!", tmp_path)
+		if (cryptKeyMakeDer(keyBitSize, tmp_path) != SUCCESS) {
+			dbgf_sys(DBGT_ERR, "Failed creating new %d bit key to %s!", keyBitSize, tmp_path);
 			return FAILURE;
 		}
 
-		if ((ret = (int)fwrite(der, 1, derSz, keyFile)) != derSz)
-			return FAILURE;
-
-		cryptKeyFree(&key);
+	} else {
+		fclose(keyFile);
 	}
-	
-	fclose(keyFile);
 
 	return SUCCESS;
 }
 
-int32_t rsa_load( char *tmp_path, CRYPTKEY_T *pubKey ) {
+int32_t rsa_load( char *tmp_path ) {
 
 	// test with: ./bmx6 f=0 d=0 --keyDir=$(pwdd)/rsa-test/key.der
 
-	uint8_t der[SEC_DER_BUF_SZ];
-	int derSz = 0;
-	FILE* keyFile;
 
 	dbgf_sys(DBGT_INFO, "testing %s=%s", ARG_KEY_PATH, tmp_path);
 
-	if (!(keyFile = fopen(tmp_path, "rb"))) {
-		dbgf_sys(DBGT_ERR, "can not open %s: %s", tmp_path, strerror(errno));
+	if (!(my_PubKey = cryptKeyFromDer( tmp_path ))) {
 		return FAILURE;
 	}
-
-	if(((derSz = (int)fread(der, 1, sizeof(der), keyFile)) <= 0) || derSz == sizeof(der)) {
-		dbgf_sys(DBGT_ERR, "can not read %s: %s", tmp_path, strerror(errno));
-		return FAILURE;
-	} else {
-		dbgf_sys(DBGT_INFO, "read %d bytes from %s", derSz, tmp_path);
-	}
-
-	fclose(keyFile);
-
-	cryptKeyFromDer( pubKey, der, derSz);
-
-
 
 	uint8_t in[] = "Everyone gets Friday off.";
 	int32_t inLen = strlen((char*)in);
@@ -161,7 +135,7 @@ int32_t rsa_load( char *tmp_path, CRYPTKEY_T *pubKey ) {
 	plainLen = sizeof(plain);
 	memset(plain, 0, sizeof(plain));
 
-	if (cryptEncrypt(in, inLen, enc, &encLen, pubKey) != SUCCESS) {
+	if (cryptEncrypt(in, inLen, enc, &encLen, my_PubKey) != SUCCESS) {
 		dbgf_sys(DBGT_ERR, "Failed Encrypt inLen=%d outLen=%d inData=%s outData=%s",
 			inLen, encLen, memAsHexString((char*)in, inLen), memAsHexString((char*)enc, encLen));
 		return FAILURE;
@@ -186,12 +160,13 @@ int32_t rsa_load( char *tmp_path, CRYPTKEY_T *pubKey ) {
 		return FAILURE;
 	}
 
-	if (cryptVerify(enc, encLen, plain, &plainLen, pubKey) != SUCCESS ||
+	if (cryptVerify(enc, encLen, plain, &plainLen, my_PubKey) != SUCCESS ||
 		inLen != plainLen || memcmp(plain, in, inLen)) {
 		dbgf_sys(DBGT_ERR, "Failed Verify inLen=%d outLen=%d inData=%s outData=%s",
 			encLen, plainLen, memAsHexString((char*)enc, encLen), memAsHexString((char*)plain, plainLen));
 		return FAILURE;
 	}
+
 	
 	return SUCCESS;
 }
@@ -231,8 +206,8 @@ int32_t opt_key_path(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
 			}
 		}
 
-		if (rsa_load( tmp_path, &my_PubKey ) == SUCCESS ) {
-			dbgf_sys(DBGT_INFO, "Successfully initialized %d bit RSA key=%s !", (my_PubKey.rawKeyLen * 8), tmp_path);
+		if (rsa_load( tmp_path ) == SUCCESS ) {
+			dbgf_sys(DBGT_INFO, "Successfully initialized %d bit RSA key=%s !", (my_PubKey->rawKeyLen * 8), tmp_path);
 		} else {
 			dbgf_sys(DBGT_ERR, "key=%s invalid!", tmp_path);
 			return FAILURE;
@@ -263,7 +238,6 @@ struct opt_type sec_options[]=
 STATIC_FUNC
 int32_t init_sec( void )
 {
-	my_PubKey = CYRYPTKEY_ZERO;
 	register_options_array( sec_options, sizeof( sec_options ), CODE_CATEGORY_NAME );
 
         struct frame_handl handl;
@@ -273,8 +247,7 @@ int32_t init_sec( void )
 	static const struct field_format ref_format[] = DESCRIPTION_MSG_SEC_FORMAT;
 
         handl.name = "PUBKEY";
-        handl.min_msg_size = CRYPT_KEY_N_MIN/8;
-	handl.data_header_size = sizeof (struct tlv_hdr);
+        handl.min_msg_size = sizeof(struct ilv_hdr) + (CRYPT_KEY_N_MIN/8);
         handl.fixed_msg_size = 0;
 	handl.dextReferencing = (int32_t*)&always_fref;
         handl.tx_frame_handler = create_description_tlv_pubkey;
@@ -283,8 +256,7 @@ int32_t init_sec( void )
         register_frame_handler(description_tlv_handl, BMX_DSC_TLV_PUBKEY, &handl);
 
         handl.name = "SIGNATURE";
-        handl.min_msg_size = CRYPT_KEY_N_MIN/8;
-	handl.data_header_size = sizeof (struct tlv_hdr);
+        handl.min_msg_size = sizeof(struct ilv_hdr) + (CRYPT_KEY_N_MIN/8);
         handl.fixed_msg_size = 0;
         handl.tx_frame_handler = create_description_tlv_signature;
         handl.rx_frame_handler = process_description_tlv_signature;
@@ -297,7 +269,7 @@ int32_t init_sec( void )
 STATIC_FUNC
 void cleanup_sec( void )
 {
-        cryptKeyFree(&my_PubKey);
+        cryptKeyFree(my_PubKey);
 
 }
 

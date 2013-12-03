@@ -23,10 +23,22 @@
 #define BMX6_CRYPTLIB CYASSL
 //#define BMX6_CRYPTLIB POLARSSL
 
+#define CRYPT_DER_BUF_SZ 4096
+
 #define CRYPT_KEY_N_MIN 512
 #define CRYPT_KEY_E_VAL 65537
 
 #define CRYPT_SHA1_LEN 20
+
+#define CRYPT_RSA512_TYPE  1
+#define CRYPT_RSA512_LEN   64
+#define CRYPT_RSA1024_TYPE 2
+#define CRYPT_RSA1024_LEN  128
+#define CRYPT_RSA2048_TYPE 2
+#define CRYPT_RSA2048_LEN  256
+#define CRYPT_RSA4096_TYPE 3
+#define CRYPT_RSA4096_LEN  512
+
 
 typedef struct CRYPTSHA1_T {
 	union {
@@ -37,19 +49,18 @@ typedef struct CRYPTSHA1_T {
 
 
 typedef struct CRYPTKEY_T {
-    uint8_t nativeBackendKey;
     void *backendKey;
-    uint32_t rawKeyLen;
+    uint16_t rawKeyLen;
+    uint8_t nativeBackendKey;
+    uint8_t rawKeyType;
     uint8_t *rawKey;
 } CRYPTKEY_T;
 
 extern const CRYPTKEY_T CYRYPTKEY_ZERO;
 
-void cryptKeyMake( CRYPTKEY_T *key, int32_t keyBitSize );
-void cryptKeyFromDer( CRYPTKEY_T *key, uint8_t *der, int32_t derSz);
-void cryptKeyFromRaw( CRYPTKEY_T *cryptKey, uint8_t *rawKey, uint32_t rawKeyLen );
-void cryptKeyToDer( CRYPTKEY_T *cryptKey, uint8_t *der, int32_t *derSz );
-
+int cryptKeyMakeDer( int32_t keyBitSize, char *tmp_path );
+CRYPTKEY_T *cryptKeyFromDer( char *tmp_path );
+CRYPTKEY_T *cryptPubKeyFromRaw( CRYPTKEY_T *cryptKey );
 void cryptKeyFree( CRYPTKEY_T *key );
 
 int cryptEncrypt( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *pubKey);
