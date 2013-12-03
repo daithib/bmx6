@@ -442,7 +442,9 @@ struct tlv_hdr_virtual { // 6 bytes
 //#define SHORT_FRAME_DATA_MAX (XMIN( 500, ((int)((((sizeof( ((struct frame_header_short*)NULL)->length_TLV_DATA_STEPS ))<<8)-1)*TLV_DATA_STEPS))))
 
 
-// Future generic tlv header:
+
+
+// Future generic TLV header:
 struct tlv_hdr { // 2 bytes
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 	unsigned int length :    11;
@@ -456,6 +458,20 @@ struct tlv_hdr { // 2 bytes
 //	uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
 } __attribute__((packed));
 
+
+// Future generic ILV header:
+struct ilv_hdr { // 1 bytes
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+	unsigned int reserved :   3;
+	unsigned int type :       5;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+	unsigned int type :       5;
+	unsigned int reserved :   3;
+#else
+# error "Please fix <bits/endian.h>"
+#endif
+//	uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
+} __attribute__((packed));
 
 
 // for BMX_DSC_TLV_RHASH_ADV:

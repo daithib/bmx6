@@ -1100,13 +1100,12 @@ void init_self(void)
 	memset(&id, 0, sizeof(id));
 
 	assertion(-500000, (strlen(my_Hostname)));
-	assertion(-500000, (my_PubKey.rawKeyLen>=(CRYPT_KEY_N_MIN/8)));
-	assertion(-500000, (!(my_PubKey.rawKeyLen%(CRYPT_KEY_N_MIN/8))));
+	assertion(-500000, (my_PubKey));
 
 	strcpy(id.name, my_Hostname);
 
 	assertion(-500000, (sizeof(SHA1_T)==sizeof(id.pkid)));
-	id.pkid.sha1 = *ref_node_key(my_PubKey.rawKey, my_PubKey.rawKeyLen, 0, 0, 0);
+	id.pkid.sha1 = *ref_node_key(my_PubKey->rawKey, my_PubKey->rawKeyLen, 0, 0, 0);
 
         self = init_orig_node(&id);
 

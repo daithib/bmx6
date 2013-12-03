@@ -55,7 +55,7 @@ IDM_T my_description_changed = YES;
 
 struct orig_node *self = NULL;
 
-CRYPTKEY_T my_PubKey;
+CRYPTKEY_T *my_PubKey = NULL;
 
 
 LOCAL_ID_T my_local_id = LOCAL_ID_INVALID;

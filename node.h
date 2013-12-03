@@ -517,7 +517,7 @@ struct packet_buff {
 
 extern struct orig_node *self;
 
-extern CRYPTKEY_T my_PubKey;
+extern CRYPTKEY_T *my_PubKey;
 
 
 extern struct iid_repos my_iid_repos;
