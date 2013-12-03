@@ -2963,6 +2963,18 @@ int32_t opt_auto_prefix(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct
                 if (cmd == OPT_APPLY)
 			autoconf_prefix_cfg = prefix;
 
+        } else if (cmd == OPT_SET_POST && initializing ) {
+
+		assertion(-500000, (self));
+		assertion(-500000, (!is_zero(&self->global_id.pkid, sizeof(self->global_id.pkid))));
+		self->primary_ip = autoconf_prefix_cfg.ip;
+		memcpy(&self->primary_ip.s6_addr[(autoconf_prefix_cfg.mask/8)], &self->global_id.pkid, ((128-autoconf_prefix_cfg.mask)/8));
+
+/*		if (is_zero(&self->global_id.pkid, sizeof(self->global_id.pkid)/2))
+			memcpy(&self->primary_ip.s6_addr[(autoconf_prefix_cfg.mask/8)], &self->global_id.pkid.u8[sizeof(self->global_id.pkid)/2],
+				XMIN((128-autoconf_prefix_cfg.mask)/8, sizeof(self->global_id.pkid)/2));
+*/
+		ip6ToStr(&self->primary_ip, self->primary_ip_str);
 	}
 
 	return SUCCESS;

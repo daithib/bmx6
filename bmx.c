@@ -1190,12 +1190,6 @@ void init_self(void)
         self->ogmSqn_rangeMin = ((OGM_SQN_MASK) & rand_num(OGM_SQN_MAX));
 
         self->descSqn = ((DESC_SQN_MASK) & rand_num(DESC_SQN_MAX));
-
-	self->primary_ip = autoconf_prefix_cfg.ip;
-	memcpy(&self->primary_ip.s6_addr[(autoconf_prefix_cfg.mask/8)], &self->global_id.pkid, ((128-autoconf_prefix_cfg.mask)/8));
-
-	ip6ToStr(&self->primary_ip, self->primary_ip_str);
-
 }
 
 
