@@ -52,7 +52,7 @@
 
 int32_t my_compatibility = DEF_COMPATIBILITY;
 
-char my_Hostname[GLOBAL_ID_NAME_LEN];
+char my_Hostname[GLOBAL_ID_NAME_LEN] = "";
 
 
 int32_t dad_to = DEF_DAD_TO;
@@ -1093,6 +1093,31 @@ int32_t opt_update_description(uint8_t cmd, uint8_t _save, struct opt_type *opt,
 
 
 STATIC_FUNC
+void init_self(void)
+{
+        static uint8_t my_desc0[PKT_FRAMES_SIZE_MAX - sizeof(struct frame_header_long)];
+        GLOBAL_ID_T id;
+	memset(&id, 0, sizeof(id));
+
+	assertion(-500000, (strlen(my_Hostname)));
+	assertion(-500000, (my_PubKey.rawKeyLen>=CRYPT_KEY_N_MIN && !my_PubKey.rawKeyLen%CRYPT_KEY_N_MIN));
+
+	strcpy(id.name, my_Hostname);
+
+	assertion(-500000, (sizeof(SHA1_T)==sizeof(id.pkid)));
+	id.pkid.sha1 = *ref_node_key(my_PubKey.rawKey, my_PubKey.rawKeyLen, 0, 0, 0);
+
+        self = init_orig_node(&id);
+
+        self->desc = (struct description *) my_desc0;
+
+        self->ogmSqn_rangeMin = ((OGM_SQN_MASK) & rand_num(OGM_SQN_MAX));
+
+        self->descSqn = ((DESC_SQN_MASK) & rand_num(DESC_SQN_MAX));
+}
+
+
+STATIC_FUNC
 int32_t opt_hostname(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
 {
 	static uint8_t checked = NO;
@@ -1110,6 +1135,8 @@ int32_t opt_hostname(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
 			dbg_sys(DBGT_ERR, "illegal hostname %s", my_Hostname);
 			return FAILURE;
 		}
+
+		init_self();
 	}
 
 	return SUCCESS;
@@ -1125,8 +1152,8 @@ static struct opt_type bmx_options[]=
 
         {ODI,0,ARG_COMPATIBILITY,       0,  3,1,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,   &my_compatibility,MIN_COMPATIBILITY,MAX_COMPATIBILITY,DEF_COMPATIBILITY,0, 0,
 			ARG_VALUE_FORM,	"set (elastic) compatibility version"},
-
-	{ODI,0,ARG_HOSTNAME,		0,  9,0,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,		0,		        0,		        0,0,	opt_hostname,
+//order must be after ARG_KEY_PATH and before ARG_AUTO_IP6_PREFIX and ARG_TUN_IN_DEV (which use self, initialized from init_self, called from opt_hostname):
+	{ODI,0,ARG_HOSTNAME,		0,  5,0,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,		0,		        0,		        0,0,	opt_hostname,
 			ARG_VALUE_FORM,	"set advertised hostname of node"},
 
 	{ODI,0,ARG_SHOW,		's', 9,2,A_PS1N,A_USR,A_DYN,A_ARG,A_ANY,	0,		0, 		0,		0,0, 		opt_status,
@@ -1171,27 +1198,6 @@ void init_bmx(void)
 }
 
 
-STATIC_FUNC
-void init_self(void)
-{
-        static uint8_t my_desc0[PKT_FRAMES_SIZE_MAX - sizeof(struct frame_header_long)];
-        GLOBAL_ID_T id;
-	memset(&id, 0, sizeof(id));
-
-	strcpy(id.name, my_Hostname);
-
-	assertion(-500000, (sizeof(SHA1_T)==sizeof(id.pkid)));
-	id.pkid.sha1 = *ref_node_key(my_PubKey.rawKey, my_PubKey.rawKeyLen, 0, 0, 0);
-
-        self = init_orig_node(&id);
-
-        self->desc = (struct description *) my_desc0;
-
-        self->ogmSqn_rangeMin = ((OGM_SQN_MASK) & rand_num(OGM_SQN_MAX));
-
-        self->descSqn = ((DESC_SQN_MASK) & rand_num(DESC_SQN_MAX));
-}
-
 
 STATIC_FUNC
 void bmx(void)
@@ -1205,7 +1211,6 @@ void bmx(void)
 
 	frequent_timeout = seldom_timeout = bmx_time;
 	
-	init_self();
         update_my_description_adv();
 
         for (an = NULL; (dev = avl_iterate_item(&dev_ip_tree, &an));) {

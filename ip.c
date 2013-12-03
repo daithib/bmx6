@@ -3244,8 +3244,8 @@ static struct opt_type ip_options[]=
 
 	{ODI,0,ARG_LLOCAL_PREFIX,	0,  9,1,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,0,		opt_dev_prefix,
 			ARG_NETW_FORM,HLP_LLOCAL_PREFIX},
-
-	{ODI,0,ARG_AUTO_IP6_PREFIX,     0,  4,1,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,      	0,      	0,              0,DEF_AUTO_IP6_PREFIX,opt_auto_prefix,
+//order must be after ARG_HOSTNAME (which initializes self via init_self(), called from opt_hostname):
+	{ODI,0,ARG_AUTO_IP6_PREFIX,     0,  6,1,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,      	0,      	0,              0,DEF_AUTO_IP6_PREFIX,opt_auto_prefix,
 			ARG_VALUE_FORM,	HLP_AUTO_IP6_PREFIX},
 
 	{ODI,0,ARG_DEV,		        'i',9,2,A_PM1N,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0, 		0,		0,0, 		opt_dev,

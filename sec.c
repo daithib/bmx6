@@ -253,7 +253,8 @@ int32_t opt_key_path(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
 STATIC_FUNC
 struct opt_type sec_options[]=
 {
-	{ODI,0,ARG_KEY_PATH,		0,  9,1,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,		0,		0,		0,DEF_KEY_PATH,	opt_key_path,
+//order must be before ARG_HOSTNAME (which initializes self via init_self):
+	{ODI,0,ARG_KEY_PATH,		0,  4,1,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,		0,		0,		0,DEF_KEY_PATH,	opt_key_path,
 			ARG_DIR_FORM,	"set path to rsa der-encoded private key file (used as permanent public ID"},
 
 };
