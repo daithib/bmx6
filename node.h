@@ -232,7 +232,7 @@ typedef CRYPTSHA1_T RHASH_T;
 
 
 #define GLOBAL_ID_NAME_LEN 32
-#define GLOBAL_ID_PKID_LEN HASH_SHA1_LEN
+#define GLOBAL_ID_PKID_LEN CRYPT_SHA1_LEN
 
 
 struct GLOBAL_ID {
@@ -241,6 +241,7 @@ struct GLOBAL_ID {
 		uint8_t u8[GLOBAL_ID_PKID_LEN];
 		uint16_t u16[GLOBAL_ID_PKID_LEN / sizeof(uint16_t)];
 		uint32_t u32[GLOBAL_ID_PKID_LEN / sizeof(uint32_t)];
+		SHA1_T  sha1;
 	} pkid;
 } __attribute__((packed));
 
@@ -379,13 +380,11 @@ struct dext_tree_node {
 struct ref_node {
         SHA1_T rhash;
         //struct frame_header_long *frame_hdr;
-	uint8_t *frame;
 	uint8_t *f_body;
 	uint32_t f_body_len;
 	uint8_t nested;
 	uint8_t compression;
 	uint8_t reserved;
-        uint32_t frame_len;
         uint32_t last_usage;
         uint32_t usage_counter;
 	struct avl_tree dext_tree;
@@ -516,6 +515,9 @@ struct packet_buff {
 };
 
 
+extern struct orig_node *self;
+
+extern CRYPTKEY_T my_PubKey;
 
 
 extern struct iid_repos my_iid_repos;

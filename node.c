@@ -55,6 +55,9 @@ IDM_T my_description_changed = YES;
 
 struct orig_node *self = NULL;
 
+CRYPTKEY_T my_PubKey;
+
+
 LOCAL_ID_T my_local_id = LOCAL_ID_INVALID;
 
 TIME_T my_local_id_timestamp = 0;
@@ -500,7 +503,7 @@ struct dhash_node* create_dhash_node(DHASH_T *dhash, struct orig_node *on)
         TRACE_FUNCTION_CALL;
 
         struct dhash_node * dhn = debugMallocReset(sizeof ( struct dhash_node), -300001);
-        memcpy(&dhn->dhash, dhash, HASH_SHA1_LEN);
+        dhn->dhash = *dhash;
         avl_insert(&dhash_tree, dhn, -300142);
 
         dhn->myIID4orig = iid_new_myIID4x(dhn);
