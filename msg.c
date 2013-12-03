@@ -308,7 +308,8 @@ struct description_cache_node *purge_cached_descriptions(IDM_T purge_all)
 
         while ((dcn = avl_next_item(&description_cache_tree, &tmp_dhash))) {
 
-                memcpy(&tmp_dhash, &dcn->dhash, HASH_SHA1_LEN);
+
+		tmp_dhash = dcn->dhash;
 
                 if (purge_all || ((TIME_T) (bmx_time - dcn->timestamp)) > DEF_DESC0_CACHE_TO) {
 
@@ -366,7 +367,7 @@ void cache_description(struct description *desc, DHASH_T *dhash)
         dcn = debugMalloc(sizeof ( struct description_cache_node), -300104);
         dcn->description = debugMalloc(desc_len, -300105);
         memcpy(dcn->description, desc, desc_len);
-        memcpy( &dcn->dhash, dhash, HASH_SHA1_LEN );
+        dcn->dhash = *dhash;
         dcn->timestamp = bmx_time;
         avl_insert(&description_cache_tree, dcn, -300145);
 }
@@ -1205,7 +1206,7 @@ void ref_node_del (struct ref_node *refn)
 	assertion(-501667, !refn->dext_tree.items);
 	assertion(-501668, ref_tree.items);
 	avl_remove(&ref_tree, &refn->rhash, -300560);
-	debugFree(refn->frame, -300561);
+	debugFree(refn->f_body, -300000);
 	debugFree(refn, -300562);
 }
 
@@ -1239,10 +1240,10 @@ void ref_node_purge (IDM_T all_unused)
 	}
 }
 
-
-STATIC_FUNC
-struct ref_node * ref_node_add(uint8_t *f_body, uint32_t f_body_len, uint8_t compression, uint8_t nested, uint8_t reserved)
+SHA1_T *ref_node_key(uint8_t *f_body, uint32_t f_body_len, uint8_t compression, uint8_t nested, uint8_t reserved)
 {
+
+	static SHA1_T rhash;
 
 	assertion(-501616, (f_body_len > sizeof(struct frame_hdr_rhash_adv)));
 	assertion(-501616, (f_body_len - sizeof(struct frame_hdr_rhash_adv) <= REF_FRAME_BODY_SIZE_MAX));
@@ -1252,8 +1253,6 @@ struct ref_node * ref_node_add(uint8_t *f_body, uint32_t f_body_len, uint8_t com
 	struct frame_header_long fhl = {.type=FRAME_TYPE_REF_ADV, .is_short=0};
 	fhl.length = htons(sizeof(fhl) + sizeof(rhash_hdr) + f_body_len);
 
-
-	SHA1_T rhash;
 	cryptShaNew(&fhl, sizeof(fhl));
 	cryptShaUpdate(&rhash_hdr, sizeof(rhash_hdr));
 	cryptShaUpdate(f_body, f_body_len);
@@ -1264,7 +1263,15 @@ struct ref_node * ref_node_add(uint8_t *f_body, uint32_t f_body_len, uint8_t com
 	dbgf_sys(DBGT_INFO, "bdy=%s", memAsHexString(f_body, f_body_len));
 	dbgf_sys(DBGT_INFO, "sha=%s", memAsHexString(&rhash, sizeof(rhash)));
 
-	struct ref_node *refn = ref_node_get(NULL, &rhash);
+	return &rhash;
+}
+
+STATIC_FUNC
+struct ref_node * ref_node_add(uint8_t *f_body, uint32_t f_body_len, uint8_t compression, uint8_t nested, uint8_t reserved)
+{
+
+	SHA1_T *rhash = ref_node_key(f_body, f_body_len, compression, nested, reserved);
+	struct ref_node *refn = ref_node_get(NULL, rhash);
 
 	if (!refn) {
 
@@ -1273,28 +1280,19 @@ struct ref_node * ref_node_add(uint8_t *f_body, uint32_t f_body_len, uint8_t com
 
 		refn = debugMallocReset(sizeof(struct ref_node), -300563);
 		AVL_INIT_TREE(refn->dext_tree, struct dext_tree_node, dext_key);
-		refn->frame_len = sizeof(fhl) + sizeof(rhash_hdr) + f_body_len;
-		refn->frame = debugMalloc(refn->frame_len, -300564);
-		memcpy(refn->frame, &fhl, sizeof(fhl));
-		memcpy(refn->frame + sizeof(fhl), &rhash_hdr, sizeof(rhash_hdr));
-		memcpy(refn->frame + sizeof(fhl) + sizeof(rhash_hdr), f_body, f_body_len);
+
 		refn->f_body_len = f_body_len;
-		refn->f_body = refn->frame  + sizeof(fhl) + sizeof(rhash_hdr);
+		refn->f_body = debugMalloc(f_body_len, -300000);
+		memcpy(refn->f_body, f_body, f_body_len);
 		refn->last_usage = bmx_time;
-		refn->rhash = rhash;
+		refn->rhash = *rhash;
 		refn->compression = compression;
 		refn->nested = nested;
 		refn->reserved = reserved;
-#ifndef NO_ASSERTIONS
-		cryptShaAtomic(refn->frame, refn->frame_len, &rhash);
-		dbgf_sys(DBGT_INFO, "all=%s", memAsHexString(refn->frame, refn->frame_len));
-		dbgf_sys(DBGT_INFO, "sha=%s", memAsHexString(&rhash, sizeof(rhash)));
-		assertion(-500000, (!memcmp(&refn->rhash, &rhash, sizeof(rhash))));
-#endif
 		avl_insert(&ref_tree, refn, -300565);
 
 		dbgf_track(DBGT_INFO, "new rhash=%s data_len=%d",
-			memAsHexString(&rhash, sizeof(rhash)), f_body_len);
+			memAsHexString(rhash, sizeof(SHA1_T)), f_body_len);
 	}
 
 	return refn;
@@ -4874,7 +4872,7 @@ int32_t init_msg( void )
 	assertion(-501567, (FRAME_TYPE_MASK >= FRAME_TYPE_MAX_KNOWN));
 	assertion(-501568, (FRAME_TYPE_MASK >= BMX_DSC_TLV_MAX_KNOWN));
 
-        assertion(-500347, (sizeof (DHASH_T) == HASH_SHA1_LEN));
+        assertion(-500347, (sizeof (DHASH_T) == CRYPT_SHA1_LEN));
         assertion(-501146, (OGM_DEST_ARRAY_BIT_SIZE == ((OGM_DEST_ARRAY_BIT_SIZE / 8)*8)));
 
 	assertion(-500000, (sizeof(struct desc_msg_rhash_adv) == sizeof(struct frame_msg_rhash_adv)));
