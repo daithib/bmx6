@@ -232,7 +232,7 @@ int32_t opt_key_path(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
 		}
 
 		if (rsa_load( tmp_path, &my_PubKey ) == SUCCESS ) {
-			dbgf_sys(DBGT_INFO, "Successfully initialized %d bit RSA key=%s !", my_PubKey.rawKeyLen, tmp_path);
+			dbgf_sys(DBGT_INFO, "Successfully initialized %d bit RSA key=%s !", (my_PubKey.rawKeyLen * 8), tmp_path);
 		} else {
 			dbgf_sys(DBGT_ERR, "key=%s invalid!", tmp_path);
 			return FAILURE;

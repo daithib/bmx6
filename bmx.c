@@ -1100,7 +1100,8 @@ void init_self(void)
 	memset(&id, 0, sizeof(id));
 
 	assertion(-500000, (strlen(my_Hostname)));
-	assertion(-500000, (my_PubKey.rawKeyLen>=(CRYPT_KEY_N_MIN/8) && !my_PubKey.rawKeyLen%(CRYPT_KEY_N_MIN/8)));
+	assertion(-500000, (my_PubKey.rawKeyLen>=(CRYPT_KEY_N_MIN/8)));
+	assertion(-500000, (!(my_PubKey.rawKeyLen%(CRYPT_KEY_N_MIN/8))));
 
 	strcpy(id.name, my_Hostname);
 
