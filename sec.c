@@ -44,7 +44,6 @@
 char key_path[MAX_PATH_SIZE] = DEF_KEY_PATH;
 
 
-CRYPTKEY_T my_PrivKey;
 
 
 
@@ -53,15 +52,15 @@ int create_description_tlv_pubkey(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	assertion(-500000, (my_PrivKey.rawKeyLen >= (CRYPT_KEY_N_MIN/8)));
-        if ((int)my_PrivKey.rawKeyLen > tx_iterator_cache_data_space_pref(it))
+	assertion(-500000, (my_PubKey.rawKeyLen >= (CRYPT_KEY_N_MIN/8)));
+        if ((int)my_PubKey.rawKeyLen > tx_iterator_cache_data_space_pref(it))
 		return TLV_TX_DATA_FULL;
 
 	struct tlv_hdr *hdr = ((struct tlv_hdr*) tx_iterator_cache_hdr_ptr(it));
-	memcpy(&hdr[1], my_PrivKey.rawKey, my_PrivKey.rawKeyLen);
-	dbgf_track(DBGT_INFO, "added description rsa pubkey len=%d", my_PrivKey.rawKeyLen);
+	memcpy(&hdr[1], my_PubKey.rawKey, my_PubKey.rawKeyLen);
+	dbgf_track(DBGT_INFO, "added description rsa pubkey len=%d", my_PubKey.rawKeyLen);
 
-	return my_PrivKey.rawKeyLen;
+	return my_PubKey.rawKeyLen;
 }
 
 STATIC_FUNC
@@ -123,7 +122,7 @@ int32_t rsa_create( char *tmp_path, uint16_t keyBitSize ) {
 	return SUCCESS;
 }
 
-int32_t rsa_test( char *tmp_path, CRYPTKEY_T *cryptKey ) {
+int32_t rsa_load( char *tmp_path, CRYPTKEY_T *pubKey ) {
 
 	// test with: ./bmx6 f=0 d=0 --keyDir=$(pwdd)/rsa-test/key.der
 
@@ -147,10 +146,8 @@ int32_t rsa_test( char *tmp_path, CRYPTKEY_T *cryptKey ) {
 
 	fclose(keyFile);
 
-	cryptKeyFromDer(cryptKey, der, derSz);
+	cryptKeyFromDer( pubKey, der, derSz);
 
-	CRYPTKEY_T pubKey = CYRYPTKEY_ZERO;
-	cryptKeyFromRaw( &pubKey, cryptKey->rawKey, cryptKey->rawKeyLen);
 
 
 	uint8_t in[] = "Everyone gets Friday off.";
@@ -164,13 +161,13 @@ int32_t rsa_test( char *tmp_path, CRYPTKEY_T *cryptKey ) {
 	plainLen = sizeof(plain);
 	memset(plain, 0, sizeof(plain));
 
-	if (cryptEncrypt(in, inLen, enc, &encLen, &pubKey) != SUCCESS) {
+	if (cryptEncrypt(in, inLen, enc, &encLen, pubKey) != SUCCESS) {
 		dbgf_sys(DBGT_ERR, "Failed Encrypt inLen=%d outLen=%d inData=%s outData=%s",
 			inLen, encLen, memAsHexString((char*)in, inLen), memAsHexString((char*)enc, encLen));
 		return FAILURE;
 	}
 
-	if (cryptDecrypt(enc, encLen, plain, &plainLen, cryptKey) != SUCCESS ||
+	if (cryptDecrypt(enc, encLen, plain, &plainLen) != SUCCESS ||
 		inLen != plainLen || memcmp(plain, in, inLen)) {
 		dbgf_sys(DBGT_ERR, "Failed Decrypt inLen=%d outLen=%d inData=%s outData=%s",
 			encLen, plainLen, memAsHexString((char*)enc, encLen), memAsHexString((char*)plain, plainLen));
@@ -183,20 +180,18 @@ int32_t rsa_test( char *tmp_path, CRYPTKEY_T *cryptKey ) {
 	plainLen = sizeof(plain);
 	memset(plain, 0, sizeof(plain));
 
-	if (cryptSign(in, inLen, enc, &encLen, cryptKey) != SUCCESS) {
+	if (cryptSign(in, inLen, enc, &encLen) != SUCCESS) {
 		dbgf_sys(DBGT_ERR, "Failed Sign inLen=%d outLen=%d inData=%s outData=%s",
 			inLen, encLen, memAsHexString((char*)in, inLen), memAsHexString((char*)enc, encLen));
 		return FAILURE;
 	}
 
-	if (cryptVerify(enc, encLen, plain, &plainLen, &pubKey) != SUCCESS ||
+	if (cryptVerify(enc, encLen, plain, &plainLen, pubKey) != SUCCESS ||
 		inLen != plainLen || memcmp(plain, in, inLen)) {
 		dbgf_sys(DBGT_ERR, "Failed Verify inLen=%d outLen=%d inData=%s outData=%s",
 			encLen, plainLen, memAsHexString((char*)enc, encLen), memAsHexString((char*)plain, plainLen));
 		return FAILURE;
 	}
-
-	cryptKeyFree( &pubKey );
 	
 	return SUCCESS;
 }
@@ -236,12 +231,14 @@ int32_t opt_key_path(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
 			}
 		}
 
-		if (rsa_test( tmp_path, &my_PrivKey ) == SUCCESS ) {
-			dbgf_sys(DBGT_INFO, "Successfully initialized %d bit RSA key=%s !", my_PrivKey.rawKeyLen, tmp_path);
+		if (rsa_load( tmp_path, &my_PubKey ) == SUCCESS ) {
+			dbgf_sys(DBGT_INFO, "Successfully initialized %d bit RSA key=%s !", my_PubKey.rawKeyLen, tmp_path);
 		} else {
 			dbgf_sys(DBGT_ERR, "key=%s invalid!", tmp_path);
 			return FAILURE;
 		}
+
+
 
 		strcpy(key_path, tmp_path);
 
@@ -265,7 +262,7 @@ struct opt_type sec_options[]=
 STATIC_FUNC
 int32_t init_sec( void )
 {
-	my_PrivKey = CYRYPTKEY_ZERO;
+	my_PubKey = CYRYPTKEY_ZERO;
 	register_options_array( sec_options, sizeof( sec_options ), CODE_CATEGORY_NAME );
 
         struct frame_handl handl;
@@ -299,7 +296,8 @@ int32_t init_sec( void )
 STATIC_FUNC
 void cleanup_sec( void )
 {
-        cryptKeyFree(&my_PrivKey);
+        cryptKeyFree(&my_PubKey);
+
 }
 
 

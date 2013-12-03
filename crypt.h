@@ -26,12 +26,12 @@
 #define CRYPT_KEY_N_MIN 512
 #define CRYPT_KEY_E_VAL 65537
 
-#define HASH_SHA1_LEN 20
+#define CRYPT_SHA1_LEN 20
 
 typedef struct CRYPTSHA1_T {
 	union {
-		uint8_t u8[HASH_SHA1_LEN];
-		uint32_t u32[HASH_SHA1_LEN/sizeof(uint32_t)];
+		uint8_t u8[CRYPT_SHA1_LEN];
+		uint32_t u32[CRYPT_SHA1_LEN/sizeof(uint32_t)];
 	} h;
 } CRYPTSHA1_T;
 
@@ -53,8 +53,8 @@ void cryptKeyToDer( CRYPTKEY_T *cryptKey, uint8_t *der, int32_t *derSz );
 void cryptKeyFree( CRYPTKEY_T *key );
 
 int cryptEncrypt( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *pubKey);
-int cryptDecrypt(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *privKey);
-int cryptSign( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *privKey);
+int cryptDecrypt(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen);
+int cryptSign( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen);
 int cryptVerify(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *pubKey);
 
 void cryptRand( void *out, int32_t outLen);

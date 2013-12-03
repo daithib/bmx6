@@ -35,6 +35,8 @@ const CRYPTKEY_T CYRYPTKEY_ZERO = { .nativeBackendKey=0, .backendKey=NULL, .rawK
 
 static uint8_t shaClean = NO;
 
+CRYPTKEY_T my_PrivKey;
+
 /******************* accessing cyassl: ***************************************/
 #if BMX6_CRYPTLIB == CYASSL
 
@@ -307,26 +309,28 @@ void cryptKeyToDer( CRYPTKEY_T *cryptKey, uint8_t *der, int32_t *derSz ) {
 	//    openssl rsa -in rsa-test/key.der -inform DER -pubout -out rsa-test/openssl.der.pub -outform DER
 }
 
-void cryptKeyFromDer( CRYPTKEY_T *cryptKey, uint8_t *der, int32_t derSz ) {
+void cryptKeyFromDer( CRYPTKEY_T *pubKey, uint8_t *der, int32_t derSz ) {
 
-	assertion(-500000, (!cryptKey->backendKey && !cryptKey->rawKey));
+	assertion(-500000, (!my_PrivKey.backendKey && !my_PrivKey.rawKey));
 
-	cryptKey->backendKey = debugMalloc(sizeof(RsaKey), -300000);
+	my_PrivKey.backendKey = debugMalloc(sizeof(RsaKey), -300000);
 
-	RsaKey *key = cryptKey->backendKey;
 	int    ret;
 	word32 idx = 0;
 
-	cryptKey->nativeBackendKey = 1;
+	my_PrivKey.nativeBackendKey = 1;
 
-	InitRsaKey(key, 0);
+	InitRsaKey((RsaKey*)my_PrivKey.backendKey, 0);
 
-	if ((ret = RsaPrivateKeyDecode(der, &idx, key, derSz)) != 0) {
+	if ((ret = RsaPrivateKeyDecode(der, &idx, (RsaKey*)my_PrivKey.backendKey, derSz)) != 0) {
 		dbgf_sys(DBGT_ERR, "can not decode ret=%d", ret);
 		cleanup_all(-500000);
 	}
 
-	cryptKeyAddRaw(cryptKey);
+	cryptKeyAddRaw(&my_PrivKey);
+
+	cryptKeyFromRaw( pubKey, my_PrivKey.rawKey, my_PrivKey.rawKeyLen);
+
 }
 
 
@@ -341,21 +345,17 @@ int cryptEncrypt( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRY
 		return SUCCESS;
 }
 
-int cryptDecrypt(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *privKey) {
+int cryptDecrypt(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen) {
 
-	RsaKey *key = privKey->backendKey;
-
-	if ((*outLen = RsaPrivateDecrypt(in, inLen, out, *outLen, key)) < 0)
+	if ((*outLen = RsaPrivateDecrypt(in, inLen, out, *outLen, (RsaKey *)my_PrivKey.backendKey)) < 0)
 		return FAILURE;
 	else
 		return SUCCESS;
 }
 
-int cryptSign( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *privKey) {
+int cryptSign( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen) {
 
-	RsaKey *key = privKey->backendKey;
-
-	if ((*outLen = RsaSSL_Sign(in, inLen, out, *outLen, key, &cryptRng)) < 0)
+	if ((*outLen = RsaSSL_Sign(in, inLen, out, *outLen, (RsaKey *)my_PrivKey.backendKey, &cryptRng)) < 0)
 		return FAILURE;
 	else
 		return SUCCESS;
@@ -437,12 +437,16 @@ void cryptShaFinal( CRYPTSHA1_T *sha) {
 
 
 void init_crypt(void) {
+
+	my_PrivKey = CYRYPTKEY_ZERO;
 	
 	cryptRngInit();
 	cryptShaInit();
 }
 
 void cleanup_crypt(void) {
+
+        cryptKeyFree(&my_PrivKey);
 
 	cryptRngFree();
 	cryptShaFree();

@@ -45,5 +45,7 @@ FIELD_FORMAT_END }
 #define SEC_RSA4096_TYPE 3
 #define SEC_RSA4096_LEN  512
 
+extern CRYPTKEY_T my_PubKey;
+
 struct plugin *sec_get_plugin( void );
 
