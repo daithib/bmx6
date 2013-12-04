@@ -1105,7 +1105,11 @@ void init_self(void)
 	strcpy(id.name, my_Hostname);
 
 	assertion(-500000, (sizeof(SHA1_T)==sizeof(id.pkid)));
-	id.pkid.sha1 = *ref_node_key(my_PubKey->rawKey, my_PubKey->rawKeyLen, 0, 0, 0);
+	struct ilv_hdr *hdr = debugMallocReset(sizeof(struct ilv_hdr) + my_PubKey->rawKeyLen, -300000);
+	hdr->type = my_PubKey->rawKeyType;
+	memcpy(&(hdr[1]), my_PubKey->rawKey, my_PubKey->rawKeyLen);
+	id.pkid.sha1 = *ref_node_key((uint8_t*)hdr, sizeof(struct ilv_hdr) + my_PubKey->rawKeyLen, 0, 0, 0);
+	debugFree(hdr, -300000);
 
         self = init_orig_node(&id);
 
