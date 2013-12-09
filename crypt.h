@@ -30,14 +30,18 @@
 
 #define CRYPT_SHA1_LEN 20
 
-#define CRYPT_RSA512_TYPE  1
+#define CRYPT_RSA512_TYPE  0
 #define CRYPT_RSA512_LEN   64
-#define CRYPT_RSA1024_TYPE 2
+#define CRYPT_RSA512_NAME  "RSA512"
+#define CRYPT_RSA1024_TYPE 1
 #define CRYPT_RSA1024_LEN  128
+#define CRYPT_RSA1024_NAME "RSA1024"
 #define CRYPT_RSA2048_TYPE 2
 #define CRYPT_RSA2048_LEN  256
+#define CRYPT_RSA2048_NAME "RSA2048"
 #define CRYPT_RSA4096_TYPE 3
 #define CRYPT_RSA4096_LEN  512
+#define CRYPT_RSA4096_NAME "RSA4096"
 
 
 typedef struct CRYPTSHA1_T {
@@ -75,6 +79,9 @@ void cryptShaNew( void *in, int32_t len);
 void cryptShaUpdate( void *in, int32_t len);
 void cryptShaFinal( CRYPTSHA1_T *sha);
 
+int cryptKeyTypeByLen(int len);
+int cryptKeyLenByType(int type);
+char *cryptKeyTypeAsString(int type);
 
 void init_crypt(void);
 void cleanup_crypt(void);

@@ -30,9 +30,9 @@
 
 
 #define DESCRIPTION_MSG_SEC_FORMAT { \
-{FIELD_TYPE_UINT,          -1, 8*sizeof(struct ilv_hdr),  1, FIELD_RELEVANCE_LOW,  "ilv_hdr"},  \
-{FIELD_TYPE_STRING_BINARY, -1, CRYPT_KEY_N_MIN,           1, FIELD_RELEVANCE_LOW,  "sec0" },  \
-{FIELD_TYPE_STRING_BINARY, -1, 0,                         1, FIELD_RELEVANCE_LOW,  "sec..." },  \
+{FIELD_TYPE_UINT,          -1, 8*sizeof(struct ilv_hdr),  1, FIELD_RELEVANCE_LOW,  "type"},  \
+/*{FIELD_TYPE_STRING_BINARY, -1, CRYPT_KEY_N_MIN,           1, FIELD_RELEVANCE_LOW,  "key[0]" },*/  \
+{FIELD_TYPE_STRING_BINARY, -1, 0,                         1, FIELD_RELEVANCE_LOW,  "key" },  \
 FIELD_FORMAT_END }
 
 

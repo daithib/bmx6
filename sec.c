@@ -71,7 +71,14 @@ STATIC_FUNC
 int process_description_tlv_pubkey(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-        return it->frame_msgs_length;
+
+	int32_t key_len = it->frame_data_length - sizeof(struct ilv_hdr);
+	struct ilv_hdr *hdr = (struct ilv_hdr*)(it->frame_data);
+
+	if ( !cryptKeyTypeAsString(hdr->type) || cryptKeyLenByType(hdr->type) != key_len )
+		return TLV_RX_DATA_FAILURE;
+
+        return it->frame_data_length;
 }
 
 
@@ -80,22 +87,21 @@ int create_description_tlv_signature(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-
 	int32_t keySpace = tx_iterator_cache_data_space_pref(it) - sizeof(struct ilv_hdr);
 
 	if (keySpace < my_PubKey->rawKeyLen)
 		return TLV_TX_DATA_FULL;
-	
+
 	uint8_t *desc_start = it->frames_out_ptr - sizeof (struct description);
 	uint32_t desc_len = sizeof (struct description) + it->frames_out_pos;
-	
+
 	struct ilv_hdr *hdr = (struct ilv_hdr*) tx_iterator_cache_msg_ptr(it);
 
 	hdr[0].type = my_PubKey->rawKeyType;
-	
+
 	CRYPTSHA1_T sha;
 	cryptShaAtomic(desc_start, desc_len, &sha);
-	
+
 	cryptSign((uint8_t*)&sha, sizeof(sha), (uint8_t*)&hdr[1], &keySpace);
 
 	dbgf_sys(DBGT_INFO, "added len=%d description rsa-%d signature over hash=%s over len=%d bytes desc.name=%s", 
@@ -111,17 +117,21 @@ STATIC_FUNC
 int process_description_tlv_signature(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-	
+
+	int32_t key_len = it->frame_data_length - sizeof(struct ilv_hdr);
 	struct ilv_hdr *hdr = (struct ilv_hdr*)(it->frame_data);
-	
+
+	if ( !cryptKeyTypeAsString(hdr->type) || cryptKeyLenByType(hdr->type) != key_len )
+		return TLV_RX_DATA_FAILURE;
+
 	struct description *dsc = (struct description*)it->frames_in;
 
 	dbgf_sys(DBGT_INFO, "verifying type=%d frame_data_len=%d frame_msgs_length=%d frames_length=%d",
 		hdr->type, it->frame_data_length, it->frame_msgs_length, it->frames_length);
-	
+
 	assertion(-500000, (it->frame_data_length == it->frame_msgs_length && it->frame_data == it->msg));
-	
-        return it->frame_msgs_length;
+
+        return it->frame_data_length;
 }
 
 
@@ -277,7 +287,7 @@ int32_t init_sec( void )
 	static const struct field_format ref_format[] = DESCRIPTION_MSG_SEC_FORMAT;
 
         handl.name = "PUBKEY";
-        handl.min_msg_size = sizeof(struct ilv_hdr) + (CRYPT_KEY_N_MIN/8);
+        handl.min_msg_size = sizeof(struct ilv_hdr);
         handl.fixed_msg_size = 0;
 	handl.dextReferencing = (int32_t*)&always_fref;
         handl.tx_frame_handler = create_description_tlv_pubkey;
@@ -286,7 +296,7 @@ int32_t init_sec( void )
         register_frame_handler(description_tlv_handl, BMX_DSC_TLV_PUBKEY, &handl);
 
         handl.name = "SIGNATURE";
-        handl.min_msg_size = sizeof(struct ilv_hdr) + (CRYPT_KEY_N_MIN/8);
+        handl.min_msg_size = sizeof(struct ilv_hdr);
         handl.fixed_msg_size = 0;
         handl.tx_frame_handler = create_description_tlv_signature;
         handl.rx_frame_handler = process_description_tlv_signature;

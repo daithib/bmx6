@@ -268,11 +268,7 @@ void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
 
 	cryptKey->rawKeyLen = 0;
 	cryptKey->rawKey = mp_int_get_raw(&key->n, &cryptKey->rawKeyLen);
-	cryptKey->rawKeyType =
-		cryptKey->rawKeyLen == CRYPT_RSA1024_LEN ? CRYPT_RSA1024_TYPE : (
-		cryptKey->rawKeyLen == CRYPT_RSA2048_LEN ? CRYPT_RSA2048_TYPE : (
-		cryptKey->rawKeyLen == CRYPT_RSA4096_LEN ? CRYPT_RSA4096_TYPE : (
-		0 )));
+	cryptKey->rawKeyType = cryptKeyTypeByLen(cryptKey->rawKeyLen);
 
 
 #ifndef NO_ASSERTIONS
@@ -474,7 +470,29 @@ void cryptShaFinal( CRYPTSHA1_T *sha) {
 # error "Please fix crypto lib"
 #endif
 
+int cryptKeyTypeByLen(int len) {
+	return 	len == CRYPT_RSA512_LEN ? CRYPT_RSA512_TYPE : (
+		len == CRYPT_RSA1024_LEN ? CRYPT_RSA1024_TYPE : (
+		len == CRYPT_RSA2048_LEN ? CRYPT_RSA2048_TYPE : (
+		len == CRYPT_RSA4096_LEN ? CRYPT_RSA4096_TYPE : (
+		FAILURE ))));
+}
 
+int cryptKeyLenByType(int type) {
+	return 	type == CRYPT_RSA512_TYPE ? CRYPT_RSA512_LEN : (
+		type == CRYPT_RSA1024_TYPE ? CRYPT_RSA1024_LEN : (
+		type == CRYPT_RSA2048_TYPE ? CRYPT_RSA2048_LEN : (
+		type == CRYPT_RSA4096_TYPE ? CRYPT_RSA4096_LEN : (
+		FAILURE ))));
+}
+
+char *cryptKeyTypeAsString(int type) {
+	return 	type == CRYPT_RSA512_TYPE ? CRYPT_RSA512_NAME : (
+		type == CRYPT_RSA1024_TYPE ? CRYPT_RSA1024_NAME : (
+		type == CRYPT_RSA2048_TYPE ? CRYPT_RSA2048_NAME : (
+		type == CRYPT_RSA4096_TYPE ? CRYPT_RSA4096_NAME : (
+		NULL ))));
+}
 
 void init_crypt(void) {
 	
