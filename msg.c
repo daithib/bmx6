@@ -3443,11 +3443,14 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		// this is the dext creation of my description...
 		assertion(-501639, (it->handls==description_tlv_handl));
 		assertion(-501640, (it->frame_cache_msgs_size <= VRT_FRAME_DATA_SIZE_OUT));
-		if (it->dext->data)
+		uint8_t *data = debugMallocReset(it->dext->dlen + sizeof(struct tlv_hdr_virtual) + fdata_in, -300568);
+		if (it->dext->data) {
+			memcpy(data, it->dext->data, it->dext->dlen);
 			debugFree( it->dext->data, -300568);
-		it->dext->data = debugMallocReset(it->dext->dlen + sizeof(struct tlv_hdr_virtual) + fdata_in, -300568);
+		}
+		it->dext->data = data;
 		struct tlv_hdr_virtual *fhv = (struct tlv_hdr_virtual *)(it->dext->data + it->dext->dlen);
-//		fhv->is_virtual = 1;
+
 		fhv->type = it->frame_type;
 		fhv->length = sizeof(struct tlv_hdr_virtual) + fdata_in;
 		memcpy(it->dext->data + it->dext->dlen + sizeof(struct tlv_hdr_virtual), it->frame_cache_array, fdata_in);
