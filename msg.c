@@ -129,7 +129,7 @@ static AGGREG_SQN_T ogm_aggreg_sqn_max;
 //static struct dhash_node* DHASH_NODE_FAILURE = (struct dhash_node*) & DHASH_NODE_FAILURE;
 
 STATIC_FUNC
-struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t *data, uint32_t dlen);
+struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, struct description *desc, struct desc_extension *dext);
 
 STATIC_FUNC
 int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *data, uint32_t dlen, struct desc_extension *dext, uint8_t rf_type, uint8_t compression, uint8_t nest_level );
@@ -4105,17 +4105,18 @@ void free_desc_extensions(struct desc_extension **dext)
 }
 
 STATIC_FUNC
-struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t *data, uint32_t dlen)
+struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, struct description *desc, struct desc_extension *dext)
 {
         TRACE_FUNCTION_CALL;
 	assertion(-501655, (BMX_DSC_TLV_INVALID > BMX_DSC_TLV_MAX && BMX_DSC_TLV_INVALID <= UINT8_MAX));
 
+	uint8_t *data = (((uint8_t*) desc) + sizeof (struct description));
+	uint32_t dlen = ntohs(desc->extensionLen);
 	IDM_T unresolved = 0;
-        struct desc_extension *dext = NULL;
 	uint8_t dsc_frame_types[BMX_DSC_TLV_ARRSZ] = {0};
 	int32_t tlv_result;
 
-        struct rx_frame_iterator it, it_init = {
+        struct rx_frame_iterator it = {
                 .caller = __FUNCTION__, .on = NULL, .cn = NULL, .op = TLV_OP_PLUGIN_MIN,
                 .handls = description_tlv_handl, .handl_max = BMX_DSC_TLV_MAX,
                 .process_filter = FRAME_TYPE_PROCESS_NONE, .custom_data = NULL,
@@ -4124,45 +4125,55 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 	uint8_t vf_type = BMX_DSC_TLV_INVALID;
 	int32_t vf_data_len = 0;
 	uint8_t vf_compression = 0;
-//	char *vf_error = "???";
 	char *goto_error_code = "???";
 	int32_t vd_len = 0;
 
-	// First check if dext is fully resolvable::
-	it = it_init;
-        while ((tlv_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
+	
+        while ((tlv_result=rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
 
+		uint32_t dext_dlen_old = 0;
 		vf_type = BMX_DSC_TLV_INVALID;
 		vf_data_len = 0;
+		vf_compression = 0;
+		
+		if (dext) {
+			dext_dlen_old = dext->dlen;
+			dext->dlen += sizeof(struct tlv_hdr_virtual);
+		}
+		// reallocation is done before writing new data
 
-                if (it.frame_type != BMX_DSC_TLV_RHASH_ADV ) {
+                if (it.frame_type != BMX_DSC_TLV_RHASH_ADV) {
 
 			vf_type = it.frame_type;
 			vf_data_len = it.frame_data_length;
-
-			if ( vf_data_len <= 0 || vf_data_len < it.frame_data_length || vf_data_len > VRT_FRAME_DATA_SIZE_MAX)
+			
+			if ( vf_data_len <= 0 || vf_data_len > VRT_FRAME_DATA_SIZE_MAX)
 				goto_error( resolve_desc_extension_error, "1");
+			
+			if (dext) {
+				dext->data = debugRealloc(dext->data, dext->dlen + vf_data_len, -300429 );
+				memcpy(dext->data + dext->dlen, it.frame_data, vf_data_len);
+				dext->dlen += vf_data_len;
+			}
 
 
                 } else if (it.frame_type == BMX_DSC_TLV_RHASH_ADV) {
 
 			vf_type = ((struct desc_hdr_rhash_adv*)(it.frame_data))->expanded_type;
 			vf_compression = ((struct desc_hdr_rhash_adv*)(it.frame_data))->compression;
-			vf_data_len = resolve_ref_frame(pb, it.frame_data+sizeof(struct desc_hdr_rhash_adv), it.frame_data_length-sizeof(struct desc_hdr_rhash_adv), NULL, vf_type, vf_compression, 1);
+			vf_data_len = resolve_ref_frame(pb, it.frame_data+sizeof(struct desc_hdr_rhash_adv), it.frame_data_length-sizeof(struct desc_hdr_rhash_adv), dext, vf_type, vf_compression, 1);
 
 			if (vf_data_len == 0) {
-
 				unresolved = 1;
-
 			} else if ( vf_data_len < 0) {
-
 				goto_error( resolve_desc_extension_error, "2");
 			}
+
 
                 } else {
 			goto_error( resolve_desc_extension_error, "3");
 		}
-
+		
 		if (!unresolved) {
 			if (vf_type > BMX_DSC_TLV_MAX || dsc_frame_types[vf_type])
 				goto_error( resolve_desc_extension_error, "4");
@@ -4173,10 +4184,26 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 		if ((vd_len = vd_len + vf_data_len) > VRT_DESC_SIZE_IN)
 			goto_error( resolve_desc_extension_error, "5");
 
-	}
+		dbgf_track(DBGT_INFO, "converted type=%d %s f_data_length=%d compression=%d -> type=%d %s vf_data_len=%d, dext.len=%d",
+		           it.frame_type, it.handl->name, it.frame_data_length, vf_compression,
+			   vf_type, vf_type <= it.handl_max ? it.handls[vf_type].name : "???",
+			   vf_data_len, dext ? dext->dlen : 0 );
+		
+		if (dext) {
+			struct tlv_hdr_virtual *vf_hdr = (struct tlv_hdr_virtual *)(dext->data + dext_dlen_old);
+			memset(vf_hdr, 0, sizeof(struct tlv_hdr_virtual));
+			vf_hdr->type = vf_type;
+			vf_hdr->length = sizeof(struct tlv_hdr_virtual) + vf_data_len;
+
+			assertion(-501659, (vf_data_len <= VRT_FRAME_DATA_SIZE_MAX));
+			assertion(-501660, (vf_data_len > 0 && vf_type <= BMX_DSC_TLV_MAX));
+			assertion(-501661, (dext->dlen == dext_dlen_old + vf_hdr->length));
+			assertion(-501662, (dext->dlen <= (uint32_t)VRT_DESC_SIZE_IN));
+		}
+        }
+
 
 	if (tlv_result != TLV_RX_DATA_DONE) {
-
                 dbgf_sys(DBGT_WARN, "problematic description_ltv from %s, near type=%s frame_data_length=%d  pos=%d tlv_result=%d",
                         pb ? pb->i.llip_str : DBG_NIL, description_tlv_handl[it.frame_type].name,
                         it.frame_data_length, it.frames_pos, tlv_result);
@@ -4184,61 +4211,8 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, uint8_t 
 		goto_error( resolve_desc_extension_error, "6");
         }
 
-
 	if (unresolved)
 		return (struct desc_extension *) UNRESOLVED_PTR;
-
-
-
-	// only if dext is fully resolvable then allocate it, so this should always succeed!!!
-	dext = debugMallocReset(sizeof(struct desc_extension), -300571);
-	LIST_INIT_HEAD(dext->refnl_list, struct refnl_node, list, list);
-	it = it_init;
-        while (rx_frame_iterate(&it) > TLV_RX_DATA_DONE) {
-
-		vf_type = BMX_DSC_TLV_INVALID;
-		vf_data_len = 0;
-		vf_compression = 0;
-		uint32_t dext_dlen_old = dext->dlen;
-
-		dext->dlen += sizeof(struct tlv_hdr_virtual);
-		// reallocation is done before writing new data
-
-                if (it.frame_type != BMX_DSC_TLV_RHASH_ADV) {
-
-			vf_type = it.frame_type;
-			vf_data_len = it.frame_data_length;
-			dext->data = debugRealloc(dext->data, dext->dlen + vf_data_len, -300429 );
-                        memcpy(dext->data + dext->dlen, it.frame_data, vf_data_len);
-			dext->dlen += vf_data_len;
-
-
-                } else if (it.frame_type == BMX_DSC_TLV_RHASH_ADV) {
-
-			vf_type = ((struct desc_hdr_rhash_adv*)(it.frame_data))->expanded_type;
-			vf_compression = ((struct desc_hdr_rhash_adv*)(it.frame_data))->compression;
-			vf_data_len = resolve_ref_frame(pb, it.frame_data+sizeof(struct desc_hdr_rhash_adv), it.frame_data_length-sizeof(struct desc_hdr_rhash_adv), dext, vf_type, vf_compression, 1);
-
-                } else {
-			assertion(-501658, 0);
-		}
-
-		dbgf_track(DBGT_INFO, "converted type=%d %s f_data_length=%d compression=%d -> type=%d %s vf_data_len=%d, dext.len=%d",
-		           it.frame_type, it.handl->name, it.frame_data_length, vf_compression,
-			   vf_type, vf_type <= it.handl_max ? it.handls[vf_type].name : "???",
-			   vf_data_len, dext->dlen );
-
-		struct tlv_hdr_virtual *vf_hdr = (struct tlv_hdr_virtual *)(dext->data + dext_dlen_old);
-		memset(vf_hdr, 0, sizeof(struct tlv_hdr_virtual));
-//		vf_hdr->is_virtual = 1;
-		vf_hdr->type = vf_type;
-		vf_hdr->length = sizeof(struct tlv_hdr_virtual) + vf_data_len;
-
-		assertion(-501659, (vf_data_len <= VRT_FRAME_DATA_SIZE_MAX));
-		assertion(-501660, (vf_data_len > 0 && vf_type <= BMX_DSC_TLV_MAX));
-		assertion(-501661, (dext->dlen == dext_dlen_old + vf_hdr->length));
-		assertion(-501662, (dext->dlen <= (uint32_t)VRT_DESC_SIZE_IN));
-        }
 
         return dext;
 
@@ -4269,21 +4243,33 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 		return (struct dhash_node *) IGNORED_PTR;
 	}
 
-        struct desc_extension *dext = resolve_desc_extensions(pb, (((uint8_t*) desc) + sizeof (struct description)), ntohs(desc->extensionLen));
+	
+	// First check if dext is fully resolvable::
+        struct desc_extension *dext = resolve_desc_extensions(pb, desc, NULL);
 
-	assertion(-501602, (dext && dext!=IGNORED_PTR));
-
-	if (dext == FAILURE_PTR)
+	if (dext == FAILURE_PTR) {
+		
 		goto process_desc0_error;
-
-        if (dext == UNRESOLVED_PTR) {
+		
+        } else if (dext == UNRESOLVED_PTR) {
+		
 		dbgf_sys(DBGT_WARN, "UNRESOLVED global_id=%s rcvd via_dev=%s via_ip=%s",
 			desc ? globalIdAsString(&desc->globalId) : "???", pb->i.iif->label_cfg.str, pb->i.llip_str);
 
 		return (struct dhash_node *) UNRESOLVED_PTR;
+	} else if (dext==NULL) {
+		
+		dext = debugMallocReset(sizeof(struct desc_extension), -300571);
+		LIST_INIT_HEAD(dext->refnl_list, struct refnl_node, list, list);
+		
+		if ( dext != resolve_desc_extensions(pb, desc, dext) )
+			cleanup_all(-500000);
+		
+	} else {
+		cleanup_all(-500000);
 	}
-
-
+	
+	// only if dext is fully resolvable then allocate it, so this should always succeed!!!
 
         if (!on) // create new orig:
                 on = init_orig_node(&desc->globalId);
