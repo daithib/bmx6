@@ -4375,7 +4375,6 @@ void update_my_description_adv(void)
         TRACE_FUNCTION_CALL;
 //        static uint8_t cache_data_array[PREF_VRT_FRAME_DATA_SIZE_OUT] = {0};
         DHASH_T dhash;
-        struct description *dsc = self->desc;
 
 	static uint8_t *frame_cache_array = NULL;
 	static int32_t frame_cache_size = 0;
@@ -4394,6 +4393,7 @@ void update_my_description_adv(void)
 		frame_cache_array = debugMallocReset(frame_cache_size, -300586);
 	}
 
+        struct description *dsc = self->desc;
 
         if (!initializing)
                 cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, self);
