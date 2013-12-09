@@ -93,11 +93,16 @@ int create_description_tlv_signature(struct tx_frame_iterator *it)
 
 	hdr[0].type = my_PubKey->rawKeyType;
 	
-	cryptSign(desc_start, desc_len, (uint8_t*)&hdr[1], &keySpace);
-	assertion(-500000, (keySpace == my_PubKey->rawKeyLen));
+	CRYPTSHA1_T sha;
+	cryptShaAtomic(desc_start, desc_len, &sha);
+	
+	cryptSign((uint8_t*)&sha, sizeof(sha), (uint8_t*)&hdr[1], &keySpace);
 
-	dbgf_sys(DBGT_INFO, "added len=%d description rsa-%d signature over len=%d bytes desc.name=%s", 
-		(sizeof(struct ilv_hdr) + keySpace), (keySpace*8), desc_len, ((struct description*)desc_start)->globalId.name );
+	dbgf_sys(DBGT_INFO, "added len=%d description rsa-%d signature over hash=%s over len=%d bytes desc.name=%s", 
+		(sizeof(struct ilv_hdr) + keySpace), (keySpace*8), memAsHexString(&sha, sizeof(sha)),
+		desc_len, ((struct description*)desc_start)->globalId.name );
+
+	assertion(-500000, (keySpace == my_PubKey->rawKeyLen));
 
 	return (sizeof(struct ilv_hdr) + keySpace);
 }

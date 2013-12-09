@@ -4467,7 +4467,8 @@ void update_my_description_adv(void)
 
         dsc->extensionLen = htons(it.frames_out_pos);
 
-        dbgf_sys(DBGT_INFO, "added my description_tlv_size=%d ", it.frames_out_pos);
+	dbgf_sys(DBGT_INFO, "added my (description_size=%d description_tlv_size=%d)=%d", 
+		sizeof(struct description), it.frames_out_pos, (sizeof(struct description) + it.frames_out_pos));
 
 	cryptShaAtomic(dsc, (sizeof (struct description) + it.frames_out_pos), &dhash);
 
