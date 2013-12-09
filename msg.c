@@ -5091,7 +5091,8 @@ void cleanup_msg( void )
 	
         schedule_or_purge_ogm_aggregations(YES /*purge_all*/);
 	
-	free_desc_extensions(&self->dext);
+        if (self)
+                free_desc_extensions(&self->dext);
 
         if (lndev_arr)
                 debugFree(lndev_arr, -300218);
