@@ -3963,128 +3963,14 @@ void schedule_my_originator_message( void* unused )
 }
 
 
-
-
-
-
-
-/*
- * tries to resolve data,len and requests unknown ref-hashes, updates dext if available and successfull
- * returns: > 0 if successfully resolved
- *          ==0 if unresolved
- *          < 0 if error (nest_level exceeded, ...)
- */
 STATIC_FUNC
-int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *f_body, uint32_t f_body_len, struct desc_extension *dext, uint8_t rf_type, uint8_t compression, uint8_t nest_level )
+struct desc_extension * init_desc_extension(void)
 {
-	assertion(-501598, (FAILURE==-1 && SUCCESS==0));
+	struct desc_extension *dext = debugMallocReset(sizeof(struct desc_extension), -300572);
+	LIST_INIT_HEAD(dext->refnl_list, struct refnl_node, list, list);
+	return dext;
 
-        struct desc_msg_rhash_adv *msg = (struct desc_msg_rhash_adv *)f_body;
-
-
-	int32_t m = 0, msgs = f_body_len / sizeof(struct desc_msg_rhash_adv);
-	int32_t ref_len = 0;
-	struct desc_extension *solvable = dext ? dext : debugMallocReset(sizeof(struct desc_extension), -300584);
-	struct desc_extension *solvable_free = dext ? NULL : solvable;
-	uint32_t solvable_begin = solvable->dlen;
-	char *goto_error_code = " ";
-
-	if (solvable != dext)
-		LIST_INIT_HEAD(solvable->refnl_list, struct refnl_node, list, list);
-
-	if ((++nest_level) > MAX_REF_NESTING)
-		goto_error( resolve_ref_frame_error, "exceeded nest level");
-
-	solvable->max_nesting = nest_level;
-	for (; m < msgs && ref_len < MAX_DESC_LEN; m++) {
-                struct ref_node *refn = ref_node_get(pb, &(msg[m].rframe_hash));
-
-		if (!refn) {
-
-			solvable = NULL;
-
-		} else if (refn->nested) {
-
-			int32_t tmp_len = resolve_ref_frame(pb, refn->f_body, refn->f_body_len, solvable, rf_type, refn->compression, nest_level);
-
-			if (tmp_len < 0)
-				goto_error( resolve_ref_frame_error, "failed next recursion");
-			if (tmp_len == 0)
-				solvable = NULL;
-			if (tmp_len > 0)
-				ref_len += tmp_len;
-
-		} else if (refn->compression == FRAME_COMPRESSION_NONE  && solvable) {
-
-			solvable->data = debugRealloc(solvable->data, solvable->dlen + refn->f_body_len, -300569);
-			memcpy(solvable->data + solvable->dlen, refn->f_body, refn->f_body_len);
-			solvable->dlen += refn->f_body_len;
-
-			if (solvable == dext)
-				ref_node_use(dext, refn, rf_type);
-
-			ref_len += refn->f_body_len;
-
-		} else if (refn->compression == FRAME_COMPRESSION_GZIP  && solvable) {
-
-			int32_t tmp_len;
-			if((tmp_len = z_decompress(refn->f_body, refn->f_body_len, &solvable->data, solvable->dlen)) <= 0)
-				goto_error( resolve_ref_frame_error, "failed inner decompression");
-
-			solvable->dlen += tmp_len;
-
-			if (solvable == dext)
-				ref_node_use(dext, refn, rf_type);
-
-			ref_len += tmp_len;
-
-		} else {
-			goto_error( resolve_ref_frame_error, "invalid case");
-		}
-
-		assertion(-501599, IMPLIES(solvable, solvable_begin + ref_len == solvable->dlen));
-		assertion(-501653, IMPLIES(solvable, rf_type <= BMX_DSC_TLV_MAX));
-        }
-
-	if (m != msgs)
-		goto_error( resolve_ref_frame_error, "invalid msgs");
-
-	if (!solvable)
-		goto resolve_ref_frame_unresolved;
-
-	if (compression == FRAME_COMPRESSION_NONE) {
-
-	} else if (compression == FRAME_COMPRESSION_GZIP) {
-
-		if ((ref_len = z_decompress(solvable->data + solvable_begin, ref_len, &solvable->data, solvable_begin)) <= 0)
-			goto_error( resolve_ref_frame_error, "failed outer decompression");
-
-		solvable->dlen = solvable_begin + ref_len;
-
-	} else {
-		goto_error( resolve_ref_frame_error, "invalid outer decompression");
-	}
-
-	free_desc_extensions(&solvable_free);
-	return ref_len;
-
-resolve_ref_frame_unresolved:
-	free_desc_extensions(&solvable_free);
-	return SUCCESS; // 0 == unresolved
-
-resolve_ref_frame_error:
-{
-	dbgf_sys(DBGT_ERR, "dlen=%d compression=%d dext=%d  msgs=%d nest_level=%d solvable=%d rf_type=%d m=%d ref_len=%d error=%s",
-		f_body_len, compression, dext?1:0, msgs, nest_level, solvable?1:0, rf_type, m, ref_len, goto_error_code);
-
-
-	free_desc_extensions(&solvable_free);
-	assertion(-501654, !dext); // this function should only be called if a prior call with dext=NULL succeeded
-	return FAILURE;
 }
-}
-
-
 
 void free_desc_extensions(struct desc_extension **dext)
 {
@@ -4227,6 +4113,125 @@ resolve_desc_extension_error:
 	return (struct desc_extension *) FAILURE_PTR;
 }
 
+
+
+
+
+/*
+ * tries to resolve data,len and requests unknown ref-hashes, updates dext if available and successfull
+ * returns: > 0 if successfully resolved
+ *          ==0 if unresolved
+ *          < 0 if error (nest_level exceeded, ...)
+ */
+STATIC_FUNC
+int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *f_body, uint32_t f_body_len, struct desc_extension *dext, uint8_t rf_type, uint8_t compression, uint8_t nest_level )
+{
+	assertion(-501598, (FAILURE==-1 && SUCCESS==0));
+
+        struct desc_msg_rhash_adv *msg = (struct desc_msg_rhash_adv *)f_body;
+
+
+	int32_t m = 0, msgs = f_body_len / sizeof(struct desc_msg_rhash_adv);
+	int32_t ref_len = 0;
+	struct desc_extension *solvable = dext ? dext : init_desc_extension();
+	struct desc_extension *solvable_free = dext ? NULL : solvable;
+	uint32_t solvable_begin = solvable->dlen;
+	char *goto_error_code = " ";
+
+	if ((++nest_level) > MAX_REF_NESTING)
+		goto_error( resolve_ref_frame_error, "exceeded nest level");
+
+	solvable->max_nesting = nest_level;
+	for (; m < msgs && ref_len < MAX_DESC_LEN; m++) {
+                struct ref_node *refn = ref_node_get(pb, &(msg[m].rframe_hash));
+
+		if (!refn) {
+
+			solvable = NULL;
+
+		} else if (refn->nested) {
+
+			int32_t tmp_len = resolve_ref_frame(pb, refn->f_body, refn->f_body_len, solvable, rf_type, refn->compression, nest_level);
+
+			if (tmp_len < 0)
+				goto_error( resolve_ref_frame_error, "failed next recursion");
+			if (tmp_len == 0)
+				solvable = NULL;
+			if (tmp_len > 0)
+				ref_len += tmp_len;
+
+		} else if (refn->compression == FRAME_COMPRESSION_NONE  && solvable) {
+
+			solvable->data = debugRealloc(solvable->data, solvable->dlen + refn->f_body_len, -300569);
+			memcpy(solvable->data + solvable->dlen, refn->f_body, refn->f_body_len);
+			solvable->dlen += refn->f_body_len;
+
+			if (solvable == dext)
+				ref_node_use(dext, refn, rf_type);
+
+			ref_len += refn->f_body_len;
+
+		} else if (refn->compression == FRAME_COMPRESSION_GZIP  && solvable) {
+
+			int32_t tmp_len;
+			if((tmp_len = z_decompress(refn->f_body, refn->f_body_len, &solvable->data, solvable->dlen)) <= 0)
+				goto_error( resolve_ref_frame_error, "failed inner decompression");
+
+			solvable->dlen += tmp_len;
+
+			if (solvable == dext)
+				ref_node_use(dext, refn, rf_type);
+
+			ref_len += tmp_len;
+
+		} else {
+			goto_error( resolve_ref_frame_error, "invalid case");
+		}
+
+		assertion(-501599, IMPLIES(solvable, solvable_begin + ref_len == solvable->dlen));
+		assertion(-501653, IMPLIES(solvable, rf_type <= BMX_DSC_TLV_MAX));
+        }
+
+	if (m != msgs)
+		goto_error( resolve_ref_frame_error, "invalid msgs");
+
+	if (!solvable)
+		goto resolve_ref_frame_unresolved;
+
+	if (compression == FRAME_COMPRESSION_NONE) {
+
+	} else if (compression == FRAME_COMPRESSION_GZIP) {
+
+		if ((ref_len = z_decompress(solvable->data + solvable_begin, ref_len, &solvable->data, solvable_begin)) <= 0)
+			goto_error( resolve_ref_frame_error, "failed outer decompression");
+
+		solvable->dlen = solvable_begin + ref_len;
+
+	} else {
+		goto_error( resolve_ref_frame_error, "invalid outer decompression");
+	}
+
+	free_desc_extensions(&solvable_free);
+	return ref_len;
+
+resolve_ref_frame_unresolved:
+	free_desc_extensions(&solvable_free);
+	return SUCCESS; // 0 == unresolved
+
+resolve_ref_frame_error:
+{
+	dbgf_sys(DBGT_ERR, "dlen=%d compression=%d dext=%d  msgs=%d nest_level=%d solvable=%d rf_type=%d m=%d ref_len=%d error=%s",
+		f_body_len, compression, dext?1:0, msgs, nest_level, solvable?1:0, rf_type, m, ref_len, goto_error_code);
+
+
+	free_desc_extensions(&solvable_free);
+	assertion(-501654, !dext); // this function should only be called if a prior call with dext=NULL succeeded
+	return FAILURE;
+}
+}
+
+
+
 struct dhash_node * process_description(struct packet_buff *pb, struct description *desc, DHASH_T *dhash)
 {
         TRACE_FUNCTION_CALL;
@@ -4257,11 +4262,9 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 			desc ? globalIdAsString(&desc->globalId) : "???", pb->i.iif->label_cfg.str, pb->i.llip_str);
 
 		return (struct dhash_node *) UNRESOLVED_PTR;
+		
 	} else if (dext==NULL) {
-		
-		dext = debugMallocReset(sizeof(struct desc_extension), -300571);
-		LIST_INIT_HEAD(dext->refnl_list, struct refnl_node, list, list);
-		
+		dext=init_desc_extension();
 		if ( dext != resolve_desc_extensions(pb, desc, dext) )
 			cleanup_all(-500000);
 		
@@ -4414,8 +4417,7 @@ void update_my_description_adv(void)
         dsc->comp_version = my_compatibility;
         dsc->descSqn = htonl(++(self->descSqn));
 
-	struct desc_extension *next_dext = debugMallocReset(sizeof(struct desc_extension), -300572);
-	LIST_INIT_HEAD(next_dext->refnl_list, struct refnl_node, list, list);
+	struct desc_extension *next_dext = init_desc_extension();
 
         // add all tlv options:
         
