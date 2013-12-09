@@ -1185,16 +1185,18 @@ int32_t rx_frame_test_adv( struct rx_frame_iterator *it)
 
 
 STATIC_FUNC
-struct ref_node* ref_node_get(struct packet_buff *pb, SHA1_T *rhash ) {
+struct ref_node* ref_node_get(SHA1_T *rhash ) {
 
         struct ref_node *refn = avl_find_item( &ref_tree, rhash);
 
         if (refn) {
+
                 refn->last_usage = bmx_time;
+
 		return refn;
+
         } else {
-		if(pb)
-			schedule_tx_task(pb->i.link->local->best_tp_lndev, FRAME_TYPE_REF_REQ, SCHEDULE_MIN_MSG_SIZE, rhash, sizeof(SHA1_T), 0, 0);
+
 		return NULL;
         }
 }
@@ -1269,7 +1271,7 @@ struct ref_node * ref_node_add(uint8_t *f_body, uint32_t f_body_len, uint8_t com
 {
 
 	SHA1_T *rhash = ref_node_key(f_body, f_body_len, compression, nested, reserved);
-	struct ref_node *refn = ref_node_get(NULL, rhash);
+	struct ref_node *refn = ref_node_get(rhash);
 
 	if (!refn) {
 
@@ -1366,7 +1368,7 @@ int32_t tx_msg_ref_request(struct tx_frame_iterator *it)
 
 	SHA1_T *rhash = (SHA1_T *)it->ttn->task.data;
 
-        if (ref_node_get( NULL, rhash)) {
+        if (ref_node_get(rhash)) {
                 it->ttn->tx_iterations = 0;
                 return TLV_TX_DATA_DONE;
         } else {
@@ -1381,7 +1383,7 @@ int32_t rx_msg_ref_request(struct rx_frame_iterator *it)
         TRACE_FUNCTION_CALL;
 
 	SHA1_T *rhash = &(((struct msg_ref_req*)it->msg)->rframe_hash);
-	struct ref_node *refn = ref_node_get(NULL, rhash);
+	struct ref_node *refn = ref_node_get(rhash);
 
 	if (refn && refn->dext_tree.items)
 		schedule_tx_task(it->pb->i.link->local->best_tp_lndev, FRAME_TYPE_REF_ADV, refn->f_body_len, &refn->rhash, sizeof(SHA1_T), 0, 0);
@@ -1395,7 +1397,7 @@ int32_t tx_frame_ref_adv(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	struct ref_node *refn = ref_node_get(NULL, (SHA1_T *)it->ttn->task.data);
+	struct ref_node *refn = ref_node_get((SHA1_T *)it->ttn->task.data);
 
 	assertion(-501581, refn);
 
@@ -4052,7 +4054,9 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, struct d
 
 			vf_type = ((struct desc_hdr_rhash_adv*)(it.frame_data))->expanded_type;
 			vf_compression = ((struct desc_hdr_rhash_adv*)(it.frame_data))->compression;
-			vf_data_len = resolve_ref_frame(pb, it.frame_data+sizeof(struct desc_hdr_rhash_adv), it.frame_data_length-sizeof(struct desc_hdr_rhash_adv), dext, vf_type, vf_compression, 1);
+			vf_data_len = resolve_ref_frame(pb, 
+				it.frame_data+sizeof(struct desc_hdr_rhash_adv), it.frame_data_length-sizeof(struct desc_hdr_rhash_adv),
+				dext, vf_type, vf_compression, 1);
 
 			if (vf_data_len == 0) {
 				unresolved = 1;
@@ -4134,8 +4138,6 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *f_body, uint32_t f_bo
 	assertion(-501598, (FAILURE==-1 && SUCCESS==0));
 
         struct desc_msg_rhash_adv *msg = (struct desc_msg_rhash_adv *)f_body;
-
-
 	int32_t m = 0, msgs = f_body_len / sizeof(struct desc_msg_rhash_adv);
 	int32_t ref_len = 0;
 	struct desc_extension *solvable = dext ? dext : init_desc_extension();
@@ -4147,10 +4149,16 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *f_body, uint32_t f_bo
 		goto_error( resolve_ref_frame_error, "exceeded nest level");
 
 	solvable->max_nesting = nest_level;
+
 	for (; m < msgs && ref_len < MAX_DESC_LEN; m++) {
-                struct ref_node *refn = ref_node_get(pb, &(msg[m].rframe_hash));
+
+                struct ref_node *refn = ref_node_get(&(msg[m].rframe_hash));
 
 		if (!refn) {
+
+			if(pb)
+				schedule_tx_task(pb->i.link->local->best_tp_lndev, FRAME_TYPE_REF_REQ, SCHEDULE_MIN_MSG_SIZE, 
+					&(msg[m].rframe_hash), sizeof(SHA1_T), 0, 0);
 
 			solvable = NULL;
 
@@ -4172,20 +4180,21 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *f_body, uint32_t f_bo
 			solvable->dlen += refn->f_body_len;
 
 			if (solvable == dext)
-				ref_node_use(dext, refn, rf_type);
+				ref_node_use(solvable, refn, rf_type);
 
 			ref_len += refn->f_body_len;
 
 		} else if (refn->compression == FRAME_COMPRESSION_GZIP  && solvable) {
 
-			int32_t tmp_len;
-			if((tmp_len = z_decompress(refn->f_body, refn->f_body_len, &solvable->data, solvable->dlen)) <= 0)
+			int32_t tmp_len = z_decompress(refn->f_body, refn->f_body_len, &solvable->data, solvable->dlen);
+
+			if (tmp_len <= 0)
 				goto_error( resolve_ref_frame_error, "failed inner decompression");
 
 			solvable->dlen += tmp_len;
 
 			if (solvable == dext)
-				ref_node_use(dext, refn, rf_type);
+				ref_node_use(solvable, refn, rf_type);
 
 			ref_len += tmp_len;
 
@@ -4230,7 +4239,7 @@ resolve_ref_frame_error:
 
 
 	free_desc_extensions(&solvable_free);
-	assertion(-501654, !dext); // this function should only be called if a prior call with dext=NULL succeeded
+	assertion(-501654, !dext); // this function should only be called with dext if a prior call with dext=NULL succeeded
 	return FAILURE;
 }
 }
@@ -4268,8 +4277,10 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 
 		return (struct dhash_node *) UNRESOLVED_PTR;
 		
-	} else if (dext==NULL) {
-		dext=init_desc_extension();
+	} else if (dext == NULL) {
+
+		dext = init_desc_extension();
+
 		if ( dext != resolve_desc_extensions(pb, desc, dext) )
 			cleanup_all(-500000);
 		
