@@ -461,16 +461,7 @@ struct tlv_hdr { // 2 bytes
 
 // Future generic ILV header:
 struct ilv_hdr { // 1 bytes
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int reserved :   3;
-	unsigned int type :       5;
-#elif __BYTE_ORDER == __BIG_ENDIAN
-	unsigned int type :       5;
-	unsigned int reserved :   3;
-#else
-# error "Please fix <bits/endian.h>"
-#endif
-//	uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
+    uint8_t type;
 } __attribute__((packed));
 
 
