@@ -269,7 +269,7 @@ int32_t init_sec( void )
 STATIC_FUNC
 void cleanup_sec( void )
 {
-        cryptKeyFree(my_PubKey);
+        cryptKeyFree(&my_PubKey);
 
 }
 

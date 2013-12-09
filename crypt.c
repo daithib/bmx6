@@ -184,27 +184,32 @@ int mp_int_put_raw( mp_int *out, uint8_t *raw, uint32_t rawLen) {
 
 
 
-void cryptKeyFree( CRYPTKEY_T *cryptKey ) {
+void cryptKeyFree( CRYPTKEY_T **cryptKey ) {
 
-	if (cryptKey->backendKey) {
+	if (!*cryptKey)
+		return;
 
-		RsaKey *key = cryptKey->backendKey;
+	if ((*cryptKey)->backendKey) {
 
-		if (cryptKey->nativeBackendKey) {
+		RsaKey *key = (*cryptKey)->backendKey;
+
+		if ((*cryptKey)->nativeBackendKey) {
 			FreeRsaKey(key);
 		} else {
 			debugFree(key->n.dp, -300000);
 			debugFree(key->e.dp, -300000);
 		}
 
-		debugFree(cryptKey->backendKey, -300000);
+		debugFree((*cryptKey)->backendKey, -300000);
 	}
 
-	if (cryptKey->rawKey) {
-		debugFree(cryptKey->rawKey, -300000);
+	if ((*cryptKey)->rawKey) {
+		debugFree((*cryptKey)->rawKey, -300000);
 	}
-	
-	debugFree( cryptKey, -300000);
+
+	debugFree( (*cryptKey), -300000);
+
+	cryptKey = NULL;
 }
 
 
@@ -273,7 +278,7 @@ void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
 #ifndef NO_ASSERTIONS
 	CRYPTKEY_T *test = cryptPubKeyFromRaw(cryptKey);
 	assertion(-500000, !memcmp(((RsaKey*)(cryptKey->backendKey))->n.dp, ((RsaKey*)(test->backendKey))->n.dp, (((RsaKey*)(cryptKey->backendKey))->n.used * XKEY_DP_SZ)));
-	cryptKeyFree(test);
+	cryptKeyFree(&test);
 #endif
 }
 
@@ -479,7 +484,7 @@ void init_crypt(void) {
 
 void cleanup_crypt(void) {
 
-        cryptKeyFree(my_PrivKey);
+        cryptKeyFree(&my_PrivKey);
 
 	cryptRngFree();
 	cryptShaFree();
