@@ -4408,9 +4408,9 @@ void update_my_description_adv(void)
         dsc->ogmSqnRange = htons(self->ogmSqn_rangeSize);
         dsc->capabilities = htons(my_desc_capabilities);
 
-        uint32_t rev_u16;
-        sscanf(GIT_REV, "%4X", &rev_u16);
-        dsc->revision = htons(rev_u16);
+        uint32_t rev_u32;
+        sscanf(GIT_REV, "%4X", &rev_u32);
+        dsc->revision = htons(rev_u32);
         dsc->comp_version = my_compatibility;
         dsc->descSqn = htonl(++(self->descSqn));
 
