@@ -80,17 +80,42 @@ int create_description_tlv_signature(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	uint32_t signature_len;
 
-	dbgf_track(DBGT_INFO, "added description rsa pubkey len=%d", signature_len);
+	int32_t keySpace = tx_iterator_cache_data_space_pref(it) - sizeof(struct ilv_hdr);
 
-	return TLV_TX_DATA_IGNORED;
+	if (keySpace < my_PubKey->rawKeyLen)
+		return TLV_TX_DATA_FULL;
+	
+	uint8_t *desc_start = it->frames_out_ptr - sizeof (struct description);
+	uint32_t desc_len = sizeof (struct description) + it->frames_out_pos;
+	
+	struct ilv_hdr *hdr = (struct ilv_hdr*) tx_iterator_cache_msg_ptr(it);
+
+	hdr[0].type = my_PubKey->rawKeyType;
+	
+	cryptSign(desc_start, desc_len, (uint8_t*)&hdr[1], &keySpace);
+	assertion(-500000, (keySpace == my_PubKey->rawKeyLen));
+
+	dbgf_sys(DBGT_INFO, "added len=%d description rsa-%d signature over len=%d bytes desc.name=%s", 
+		(sizeof(struct ilv_hdr) + keySpace), (keySpace*8), desc_len, ((struct description*)desc_start)->globalId.name );
+
+	return (sizeof(struct ilv_hdr) + keySpace);
 }
 
 STATIC_FUNC
 int process_description_tlv_signature(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
+	
+	struct ilv_hdr *hdr = (struct ilv_hdr*)(it->frame_data);
+	
+	struct description *dsc = (struct description*)it->frames_in;
+
+	dbgf_sys(DBGT_INFO, "verifying type=%d frame_data_len=%d frame_msgs_length=%d frames_length=%d",
+		hdr->type, it->frame_data_length, it->frame_msgs_length, it->frames_length);
+	
+	assertion(-500000, (it->frame_data_length == it->frame_msgs_length && it->frame_data == it->msg));
+	
         return it->frame_msgs_length;
 }
 
