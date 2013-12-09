@@ -4537,7 +4537,7 @@ int32_t opt_show_descriptions(uint8_t cmd, uint8_t _save, struct opt_type *opt,
                         struct rx_frame_iterator it = {
                                 .caller = __FUNCTION__, .on = on, .cn = cn, .op = TLV_OP_PLUGIN_MIN,
                                 .handls = description_tlv_handl, .handl_max = BMX_DSC_TLV_MAX, .process_filter = type_filter,
-                                .frame_type = -1, .frames_in = on->dext->data, .frames_length = on->dext->dlen, .is_virtual_header = 0
+                                .frame_type = -1, .frames_in = on->dext->data, .frames_length = on->dext->dlen, .is_virtual_header = 1
                         };
 
                         int32_t it_result;
