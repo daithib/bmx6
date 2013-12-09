@@ -801,7 +801,7 @@ static int32_t bmx_status_creator(struct status_handl *handl, void *data)
         struct bmx_status *status = (struct bmx_status *) (handl->data = debugRealloc(handl->data, sizeof (struct bmx_status), -300365));
         sprintf(status->version, "%s-%s", BMX_BRANCH, BRANCH_VERSION);
         status->compat = my_compatibility;
-	snprintf(status->revision, 8, GIT_REV);
+	snprintf(status->revision, 8, "%s", GIT_REV);
         status->name = self->global_id.name;
         status->globalId = &self->global_id;
         status->primaryIp = self->primary_ip;
