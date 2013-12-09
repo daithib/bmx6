@@ -1424,6 +1424,8 @@ int32_t rx_frame_ref_adv(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
+	dbgf_track(DBGT_INFO, "")
+	
 	assertion(-501583, !it->is_virtual_header && it->frame_type == FRAME_TYPE_REF_ADV);
 
 	if ( it->is_short_header ||
