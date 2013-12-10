@@ -64,7 +64,7 @@ extern const CRYPTKEY_T CYRYPTKEY_ZERO;
 
 int cryptKeyMakeDer( int32_t keyBitSize, char *tmp_path );
 CRYPTKEY_T *cryptKeyFromDer( char *tmp_path );
-CRYPTKEY_T *cryptPubKeyFromRaw( CRYPTKEY_T *cryptKey );
+CRYPTKEY_T *cryptPubKeyFromRaw( uint8_t *rawKey, uint16_t rawKeyLen );
 void cryptKeyFree( CRYPTKEY_T **key );
 
 int cryptEncrypt( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *pubKey);

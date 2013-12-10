@@ -213,11 +213,11 @@ void cryptKeyFree( CRYPTKEY_T **cryptKey ) {
 }
 
 
-CRYPTKEY_T *cryptPubKeyFromRaw( CRYPTKEY_T *in ) {
+CRYPTKEY_T *cryptPubKeyFromRaw( uint8_t *rawKey, uint16_t rawKeyLen ) {
 
 	CRYPTKEY_T *cryptKey = debugMallocReset(sizeof(CRYPTKEY_T), -300000);
 
-	assertion(-500000, (!cryptKey->backendKey && !cryptKey->rawKey));
+	assertion(-500000, (rawKey && cryptKeyTypeByLen(rawKeyLen) != FAILURE));
 
 	cryptKey->nativeBackendKey = 0;
 	cryptKey->backendKey = debugMalloc(sizeof(RsaKey), -300000);
@@ -231,15 +231,15 @@ CRYPTKEY_T *cryptPubKeyFromRaw( CRYPTKEY_T *in ) {
 	key->e.used  = 1;
 	key->e.sign  = MP_ZPOS;
 
-	int used = mp_int_put_raw( &key->n, in->rawKey, in->rawKeyLen );
+	int used = mp_int_put_raw( &key->n, rawKey, rawKeyLen );
 	key->n.alloc = used;
 	key->n.used  = used;
 	key->n.sign  = MP_ZPOS;
 
-	cryptKey->rawKeyLen = in->rawKeyLen;
-	cryptKey->rawKeyType = in->rawKeyType;
-	cryptKey->rawKey = debugMalloc(in->rawKeyLen,-300000);
-	memcpy(cryptKey->rawKey, in->rawKey, in->rawKeyLen);
+	cryptKey->rawKeyLen = rawKeyLen;
+	cryptKey->rawKeyType = cryptKeyTypeByLen(rawKeyLen);
+	cryptKey->rawKey = debugMalloc(rawKeyLen,-300000);
+	memcpy(cryptKey->rawKey, rawKey, rawKeyLen);
 
 	return cryptKey;
 }
@@ -266,13 +266,12 @@ void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
 	assertion(-500000, (key->type == RSA_PUBLIC || key->type == RSA_PRIVATE));
 	assertion(-500000, (key->e.dp[0] == CRYPT_KEY_E_VAL));
 
-	cryptKey->rawKeyLen = 0;
 	cryptKey->rawKey = mp_int_get_raw(&key->n, &cryptKey->rawKeyLen);
 	cryptKey->rawKeyType = cryptKeyTypeByLen(cryptKey->rawKeyLen);
 
 
 #ifndef NO_ASSERTIONS
-	CRYPTKEY_T *test = cryptPubKeyFromRaw(cryptKey);
+	CRYPTKEY_T *test = cryptPubKeyFromRaw(cryptKey->rawKey, cryptKey->rawKeyLen);
 	assertion(-500000, !memcmp(((RsaKey*)(cryptKey->backendKey))->n.dp, ((RsaKey*)(test->backendKey))->n.dp, (((RsaKey*)(cryptKey->backendKey))->n.used * XKEY_DP_SZ)));
 	cryptKeyFree(&test);
 #endif
@@ -320,7 +319,7 @@ CRYPTKEY_T *cryptKeyFromDer( char *tmp_path ) {
 
 	my_PrivKey = ckey;
 
-	return cryptPubKeyFromRaw( my_PrivKey );
+	return cryptPubKeyFromRaw( my_PrivKey->rawKey, my_PrivKey->rawKeyLen );
 
 }
 
