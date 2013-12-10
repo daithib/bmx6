@@ -3447,17 +3447,13 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		// this is the dext creation of my description...
 		assertion(-501639, (it->handls==description_tlv_handl));
 		assertion(-501640, (it->frame_cache_msgs_size <= VRT_FRAME_DATA_SIZE_OUT));
-		uint8_t *data = debugMallocReset(it->dext->dlen + sizeof(struct tlv_hdr_virtual) + fdata_in, -300568);
-		if (it->dext->data) {
-			memcpy(data, it->dext->data, it->dext->dlen);
-			debugFree( it->dext->data, -300568);
-		}
-		it->dext->data = data;
+		it->dext->data = debugRealloc( it->dext->data, it->dext->dlen + sizeof(struct tlv_hdr_virtual) + fdata_in, -300568);
+
 		struct tlv_hdr_virtual *fhv = (struct tlv_hdr_virtual *)(it->dext->data + it->dext->dlen);
 
 		fhv->type = it->frame_type;
 		fhv->length = sizeof(struct tlv_hdr_virtual) + fdata_in;
-		memcpy(it->dext->data + it->dext->dlen + sizeof(struct tlv_hdr_virtual), it->frame_cache_array, fdata_in);
+		memcpy(&(fhv[1]), it->frame_cache_array, fdata_in);
 		it->dext->dlen += (sizeof(struct tlv_hdr_virtual) + fdata_in);
 
 		assertion(-501641, (it->dext->dlen <= (uint32_t)VRT_DESC_SIZE_OUT));
@@ -3500,9 +3496,11 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		memset(fhl, 0, sizeof (struct frame_header_long));
 		fhl->type = BMX_DSC_TLV_RHASH_ADV;
 		fhl->length = htons(sizeof (struct frame_header_long) + rfd_size);
+		it->frames_out_pos += sizeof(struct frame_header_long) + rfd_size; ///TODO
+		assertion(-501651, ( it->frames_out_pos <= (int32_t)DESC_FRAMES_SIZE_OUT));
 
 		// set: frame-data hdr:
-		struct desc_hdr_rhash_adv *rfd_hdr = (struct desc_hdr_rhash_adv *) ((uint8_t*)fhl + sizeof(struct frame_header_long));
+		struct desc_hdr_rhash_adv *rfd_hdr = (struct desc_hdr_rhash_adv *) ((uint8_t*)&(fhl[1]));
 		rfd_hdr->compression = (rfd_agg_len < fdata_in);
 		rfd_hdr->expanded_type = it->frame_type;
 
@@ -3530,26 +3528,16 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 		assertion_dbg(-501596, (m == rfd_msgs), "m=%d rfd_msgs=%d", m, rfd_msgs);
 
-		it->frames_out_pos += sizeof(struct frame_header_long) + sizeof(struct desc_hdr_rhash_adv) + (rfd_msgs * sizeof(struct desc_msg_rhash_adv)); ///TODO
-
-		assertion(-501651, ( it->frames_out_pos <= (int32_t)DESC_FRAMES_SIZE_OUT));
 
 	} else {
 		
 		memset(fhl, 0, sizeof (struct frame_header_long));
 		fhl->type = it->frame_type;
-
-		int32_t z_size = 0;
-
-		it->frames_out_pos += sizeof ( struct frame_header_long);
-
-		assertion(-501607, z_size == 0);
-		memcpy(it->frames_out_ptr + it->frames_out_pos, it->frame_cache_array, fdata_in);
-		it->frames_out_pos += fdata_in;
 		fhl->length = htons(fdata_in + sizeof ( struct frame_header_long));
-
-
+		it->frames_out_pos += sizeof ( struct frame_header_long) + fdata_in;
 		assertion(-501652, ( it->frames_out_pos <= (int32_t)PKT_FRAMES_SIZE_MAX));
+
+		memcpy(&(fhl[1]), it->frame_cache_array, fdata_in);
 	}
 
 
@@ -4032,8 +4020,9 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, struct d
 		if (dext) {
 			dext_dlen_old = dext->dlen;
 			dext->dlen += sizeof(struct tlv_hdr_virtual);
+			// hdr setting is done when succeeded
+			// data reallocation is done before writing new data
 		}
-		// reallocation is done before writing new data
 
                 if (it.frame_type != BMX_DSC_TLV_RHASH_ADV) {
 
