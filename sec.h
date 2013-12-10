@@ -29,10 +29,36 @@
 #define DEF_KEY_PATH "/etc/bmx6/rsa.der"
 
 
-#define DESCRIPTION_MSG_SEC_FORMAT { \
-{FIELD_TYPE_UINT,          -1, 8*sizeof(struct ilv_hdr),  1, FIELD_RELEVANCE_LOW,  "type"},  \
-/*{FIELD_TYPE_STRING_BINARY, -1, CRYPT_KEY_N_MIN,           1, FIELD_RELEVANCE_LOW,  "key[0]" },*/  \
-{FIELD_TYPE_STRING_BINARY, -1, 0,                         1, FIELD_RELEVANCE_LOW,  "key" },  \
+#define DESCRIPTION_MSG_PUBKEY_FORMAT { \
+{FIELD_TYPE_UINT,          -1, 8*sizeof(struct dsc_msg_pubkey),     1, FIELD_RELEVANCE_HIGH,  "type"}, \
+{FIELD_TYPE_STRING_BINARY, -1, 0,                                   1, FIELD_RELEVANCE_HIGH,  "key" }, \
+FIELD_FORMAT_END }
+
+
+#define DESCRIPTION_MSG_SIGNATURE_FORMAT { \
+{FIELD_TYPE_UINT,          -1, 8*sizeof(struct dsc_msg_signature),  1, FIELD_RELEVANCE_HIGH,  "type"}, \
+{FIELD_TYPE_STRING_BINARY, -1, 0,                                   1, FIELD_RELEVANCE_HIGH,  "signature" }, \
+FIELD_FORMAT_END }
+
+struct dsc_msg_sha {
+        uint32_t desc_len;
+        CRYPTSHA1_T desc_sha;
+} __attribute__((packed));
+
+struct dsc_msg_pubkey {
+        uint8_t type;
+        uint8_t key[];
+} __attribute__((packed));
+
+struct dsc_msg_signature {
+        uint8_t type;
+        uint8_t signature[];
+} __attribute__((packed));
+
+
+#define DESCRIPTION_MSG_SHA_FORMAT { \
+{FIELD_TYPE_UINT,          -1, 32,                        1, FIELD_RELEVANCE_HIGH,  "len"}, \
+{FIELD_TYPE_STRING_BINARY, -1, 8*sizeof(SHA1_T),          1, FIELD_RELEVANCE_HIGH,  "sha"}, \
 FIELD_FORMAT_END }
 
 

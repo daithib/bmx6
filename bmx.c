@@ -36,6 +36,7 @@
 #include "control.h"
 #include "bmx.h"
 #include "crypt.h"
+#include "sec.h"
 #include "avl.h"
 #include "node.h"
 #include "metrics.h"
@@ -1105,11 +1106,11 @@ void init_self(void)
 	strcpy(id.name, my_Hostname);
 
 	assertion(-500000, (sizeof(SHA1_T)==sizeof(id.pkid)));
-	struct ilv_hdr *hdr = debugMallocReset(sizeof(struct ilv_hdr) + my_PubKey->rawKeyLen, -300000);
-	hdr->type = my_PubKey->rawKeyType;
-	memcpy(&(hdr[1]), my_PubKey->rawKey, my_PubKey->rawKeyLen);
-	id.pkid.sha1 = *ref_node_key((uint8_t*)hdr, sizeof(struct ilv_hdr) + my_PubKey->rawKeyLen, 0, 0, 0);
-	debugFree(hdr, -300000);
+	struct dsc_msg_pubkey *msg = debugMallocReset(sizeof(struct dsc_msg_pubkey) + my_PubKey->rawKeyLen, -300000);
+	msg->type = my_PubKey->rawKeyType;
+	memcpy(msg->key, my_PubKey->rawKey, my_PubKey->rawKeyLen);
+	id.pkid.sha1 = *ref_node_key((uint8_t*)msg, sizeof(struct dsc_msg_pubkey) + my_PubKey->rawKeyLen, 0, 0, 0);
+	debugFree(msg, -300000);
 
         self = init_orig_node(&id);
 

@@ -754,7 +754,8 @@ struct msg_ref_req {
 
 #define BMX_DSC_TLV_SMS                 0x10
 
-#define BMX_DSC_TLV_PUBKEY      (FRAME_TYPE_ARRSZ-3)
+#define BMX_DSC_TLV_PUBKEY      (FRAME_TYPE_ARRSZ-4) //TODO: move to struct description
+#define BMX_DSC_TLV_SHA         (FRAME_TYPE_ARRSZ-3)
 #define BMX_DSC_TLV_SIGNATURE   (FRAME_TYPE_ARRSZ-2)
 
 #define BMX_DSC_TLV_RHASH_ADV   (FRAME_TYPE_ARRSZ-1)
@@ -921,7 +922,7 @@ struct rx_frame_iterator {
         struct packet_buff *pb;
         struct orig_node *on;
         struct ctrl_node *cn;
-//        uint8_t *data;
+        struct description *desc; //as received on wire
         uint8_t *frames_in;
         struct frame_handl *handls;
         struct frame_handl *handl;
@@ -934,7 +935,7 @@ struct rx_frame_iterator {
         // MUST be initialized, updated by rx..iterate(), and consumed by handl[].rx_tlv_handler
         int32_t frames_pos;
         int8_t frame_type; //init to -1 !!
-        int8_t frame_type_no_ref; //init to -1 !!
+        int8_t frame_type_expanded; //init to -1 !!
 
         // set by rx..iterate(), and consumed by handl[].rx_tlv_handler
         uint8_t is_short_header;

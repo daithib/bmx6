@@ -389,7 +389,7 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, str
         int32_t tlv_result;
 
         struct rx_frame_iterator it = {
-                .caller = __FUNCTION__, .on = on, .cn = cn, .op = op, .pb = pb,
+                .caller = __FUNCTION__, .on = on, .cn = cn, .op = op, .pb = pb, .desc = desc,
                 .handls = description_tlv_handl, .handl_max = (BMX_DSC_TLV_MAX), .process_filter = filter,
                 .frame_type = -1, .frames_in = dext->data, .frames_pos = 0,
                 .frames_length = dext->dlen, .custom_data = custom, .is_virtual_header = 1
@@ -2977,10 +2977,12 @@ int32_t get_desc_frame_data(uint8_t **frame_data, uint8_t *desc_ext_data, int32_
 	return frame_data_len;
 }
 
-IDM_T desc_frame_changed(  struct rx_frame_iterator *it, uint8_t f_type ) {
-
-	uint8_t *fs_in_new = it->frames_in;
-	int32_t fs_len_new = it->frames_length;
+IDM_T desc_frame_changed(  struct rx_frame_iterator *it, uint8_t f_type )
+{
+	assertion(-500000, (it->desc));
+	
+	uint8_t *fs_in_new = (((uint8_t*) it->desc) + sizeof (struct description));
+	int32_t fs_len_new = ntohs(it->desc->extensionLen);
 	uint8_t *fs_in_old = (((uint8_t*) it->on->desc) + sizeof (struct description));
 	int32_t fs_len_old = ntohs(it->on->desc->extensionLen);
 
@@ -3014,12 +3016,12 @@ STATIC_FUNC
 void process_description_tlvs_del( struct orig_node *on, uint8_t ft_start, uint8_t ft_end ) {
 
 	int8_t t;
-
+	
 	for (t = ft_start; t <= ft_end; t++) {
 
-		if (t == BMX_DSC_TLV_RHASH_ADV)
+		if ( t== BMX_DSC_TLV_RHASH_ADV )
 			continue;
-
+		
 		int32_t df_len = get_desc_frame_data(NULL, ((uint8_t*)(on->desc)) + sizeof(struct description), ntohs(on->desc->extensionLen), t);
 
 		assertion(-500000, (df_len >= 0));
@@ -3037,16 +3039,18 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
         TRACE_FUNCTION_CALL;
         struct frame_handl *f_handl;
         struct packet_buff *pb = it->pb;
-        it->frame_type_no_ref = ((it->frame_type == -1) ? -1 : it->frame_type_no_ref);
+        it->frame_type_expanded = ((it->frame_type == -1) ? -1 : it->frame_type_expanded); //avoids init to -1
 
         dbgf_all(DBGT_INFO, "%s - f_type=%d f_pos=%d f_len=%d",
 	        it->caller, it->frame_type, it->frames_pos, it->frames_length);
 
+	assertion(-500000, IMPLIES(it->on, it->is_virtual_header));
+	
         if (it->frames_pos == it->frames_length ) {
 		
-		if ( it->handls == description_tlv_handl && it->on && it->on->added && it->op == TLV_OP_NEW && it->process_filter == FRAME_TYPE_PROCESS_ALL &&
-			it->frame_type < it->handl_max ) {
-
+		if ( it->handls == description_tlv_handl && it->on && it->on->added && it->op == TLV_OP_NEW && 
+			it->process_filter == FRAME_TYPE_PROCESS_ALL && it->frame_type < it->handl_max ) {
+			
 			process_description_tlvs_del( it->on, (it->frame_type + 1), it->handl_max );
 		}
 
@@ -3086,15 +3090,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 
                 it->frames_pos = f_pos_next;
 
-                if (it->handls == description_tlv_handl && it->process_filter == FRAME_TYPE_PROCESS_ALL &&
-                        it->frame_type_no_ref >= f_type) {
-
-                        dbgf_sys(DBGT_WARN, "%s - unordered or double desc frame_type=%d prev=%d prev_no_ref=%d",
-                                it->caller, f_type, it->frame_type, it->frame_type_no_ref);
-
-                        return TLV_RX_DATA_FAILURE;
-
-                } else if (f_pos_next > it->frames_length || f_data_len <= 0 ) {
+		if (f_pos_next > it->frames_length || f_data_len <= 0 ) {
                         // not yet processed anything, so return failure:
 
                         dbgf_sys(DBGT_ERR, "%s - type=%d f_virtual=%d f_pos_next=%d f_len=%d f_data_len=%d",
@@ -3104,11 +3100,25 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 }
 
 
-                if (it->handls == description_tlv_handl && it->on && it->on->added && it->op == TLV_OP_NEW && it->process_filter == FRAME_TYPE_PROCESS_ALL &&
-			it->frame_type + 1 < f_type) {
+                if ( it->handls == description_tlv_handl /*&& it->process_filter == FRAME_TYPE_PROCESS_ALL*/ ? (
+			( f_type != BMX_DSC_TLV_RHASH_ADV && it->frame_type_expanded >= f_type ) ||
+			( f_type == BMX_DSC_TLV_RHASH_ADV && (f_data_len < sizeof(struct desc_hdr_rhash_adv) || 
+			it->frame_type_expanded >= ((struct desc_hdr_rhash_adv*)(f_data))->expanded_type)) 
+			) : (
+			it->frame_type > f_type  
+			) ) {
 
+                        dbgf_sys(DBGT_WARN, "%s - unordered or double frame_type=%d prev=%d prev_expanded=%d",
+                                it->caller, f_type, it->frame_type, it->frame_type_expanded);
+
+                        return TLV_RX_DATA_FAILURE;
+                }
+
+                if (it->handls == description_tlv_handl && it->on && it->on->added && it->op == TLV_OP_NEW && 
+			it->process_filter == FRAME_TYPE_PROCESS_ALL && it->frame_type + 1 < f_type) {
+			
 			process_description_tlvs_del( it->on, (it->frame_type + 1), (f_type - 1) );
-                 }
+		}
 
 
                 if (f_type > it->handl_max || !(it->handls[f_type].rx_frame_handler || it->handls[f_type].rx_msg_handler)) {
@@ -3126,7 +3136,8 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 it->frame_length = f_len;
                 it->frame_data = f_data;
                 it->frame_type = f_type;
-                it->frame_type_no_ref = ((f_type == BMX_DSC_TLV_RHASH_ADV) ? it->frame_type_no_ref : f_type);
+                it->frame_type_expanded = ((it->handls == description_tlv_handl && f_type == BMX_DSC_TLV_RHASH_ADV) ? 
+			((struct desc_hdr_rhash_adv*)(f_data))->expanded_type : f_type);
                 it->is_short_header = f_short;
                 it->frame_hdr = fhs;
 
