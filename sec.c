@@ -125,6 +125,8 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
+	assertion(-500000, (it->frame_data_length == it->frame_msgs_length && it->frame_data == it->msg));
+
 	if (it->op != TLV_OP_TEST 
 #ifdef EXTREME_PARANOIA
 		&& it->op != TLV_OP_NEW
@@ -132,15 +134,16 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 		)
 		return it->frame_data_length;
 
-
+	char *goto_error_code = NULL;
 	int32_t sign_len = it->frame_data_length - sizeof(struct dsc_msg_signature);
 	struct dsc_msg_signature *msg = (struct dsc_msg_signature*)(it->frame_data);
 	uint8_t *desc_start = (uint8_t*)it->desc;
 	int32_t desc_len = sizeof (struct description) + ntohs(it->desc->extensionLen) - (sizeof(struct frame_header_long) + it->frame_data_length);
 	CRYPTSHA1_T desc_sha;
-
+	CRYPTKEY_T *pkey = NULL;
+	
 	if ( !cryptKeyTypeAsString(msg->type) || cryptKeyLenByType(msg->type) != sign_len || desc_len < (int)sizeof(struct description))
-		return TLV_RX_DATA_FAILURE;
+		goto_error( finish, "1");
 
 	cryptShaAtomic(desc_start, desc_len, &desc_sha);
 	
@@ -148,25 +151,40 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 	int32_t pkey_len = get_desc_frame_data(&pkey_frame_data, it->frames_in, it->frames_length, BMX_DSC_TLV_PUBKEY) - sizeof(struct dsc_msg_pubkey);
 
 	if (pkey_len != sign_len)
-		return TLV_RX_DATA_FAILURE;
+		goto_error( finish, "2");
 
-	CRYPTKEY_T *pkey = cryptPubKeyFromRaw(((struct dsc_msg_pubkey*)pkey_frame_data)->key, pkey_len);
+	pkey = cryptPubKeyFromRaw(((struct dsc_msg_pubkey*)pkey_frame_data)->key, pkey_len);
 	
 	CRYPTSHA1_T plain_sha;
 	int32_t plain_len = sizeof(plain_sha);
 
 	if (cryptVerify(msg->signature, sign_len, (uint8_t*)&plain_sha, &plain_len, pkey) != SUCCESS )
-		return TLV_RX_DATA_FAILURE;
+		goto_error( finish, "3");
 	
 	if (plain_len != sizeof(desc_sha) || memcmp(&plain_sha, &desc_sha, sizeof(desc_sha)))
-		return TLV_RX_DATA_FAILURE;
+		goto_error( finish, "4");
 	
-	dbgf_sys(DBGT_INFO, "verifying type=%d frame_data_len=%d frame_msgs_length=%d frames_length=%d",
-		msg->type, it->frame_data_length, it->frame_msgs_length, it->frames_length);
-
-	assertion(-500000, (it->frame_data_length == it->frame_msgs_length && it->frame_data == it->msg));
-
-        return it->frame_data_length;
+finish: {
+	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
+		"%s verifying  desc_len=%d desc_sha=%s \n"
+		"signature=%s\n"
+		"sign_type=%s sign_type_len=%d == sign_len=%d == pkey_len=%d pkey=%s \n"
+		"plain_len=%d==%d plain_sha=%s problem?=%s",
+		goto_error_code?"Failed":"Succeeded", desc_len, memAsHexString(&desc_sha, sizeof(desc_sha)),
+		memAsHexString(msg->signature, sign_len), cryptKeyTypeAsString(msg->type), cryptKeyLenByType(msg->type), 
+		sign_len, pkey_len, pkey ? memAsHexString(pkey->rawKey, pkey->rawKeyLen) : "---",
+		plain_len, sizeof(plain_sha), memAsHexString(&plain_sha, sizeof(plain_sha)), goto_error_code
+		)
+	
+	cryptKeyFree(&pkey);
+	
+	if (goto_error_code)
+		return TLV_RX_DATA_FAILURE;
+	else
+		return it->frame_data_length;
+		
+}
+	
 }
 
 STATIC_FUNC
