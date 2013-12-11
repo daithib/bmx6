@@ -4365,10 +4365,10 @@ process_desc0_error:
         if (on)
                 free_orig_node(on);
 
-        blacklist_neighbor(pb);
-
 	dbgf_sys(DBGT_ERR, "FAILED global_id=%s rcvd via_dev=%s via_ip=%s",
 		desc ? globalIdAsString(&desc->globalId) : "???", pb->i.iif->label_cfg.str, pb->i.llip_str);
+
+        blacklist_neighbor(pb);
 
         return (struct dhash_node *) FAILURE_PTR;
 }
