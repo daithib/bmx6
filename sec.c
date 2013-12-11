@@ -72,11 +72,15 @@ STATIC_FUNC
 int process_description_tlv_pubkey(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
+
+	return TLV_RX_DATA_IGNORED;
+
+	char *goto_error_code = NULL;
 	
 	if (it->op != TLV_OP_TEST 
 #ifdef EXTREME_PARANOIA
 		&& it->op != TLV_OP_NEW
-#endif	
+#endif
 		)
 		return it->frame_data_length;
 
@@ -84,9 +88,19 @@ int process_description_tlv_pubkey(struct rx_frame_iterator *it)
 	struct dsc_msg_pubkey *msg = (struct dsc_msg_pubkey*)(it->frame_data);
 
 	if ( !cryptKeyTypeAsString(msg->type) || cryptKeyLenByType(msg->type) != key_len )
-		return TLV_RX_DATA_FAILURE;
+		goto_error( finish, "1");
 
-        return it->frame_data_length;
+finish: {
+	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
+		"%s verifying msg_type=%s msg_key_len=%d key_len=%d problem?=%s",
+		goto_error_code?"Failed":"Succeeded", cryptKeyTypeAsString(msg->type),
+		cryptKeyLenByType(msg->type), key_len, goto_error_code);
+
+	if (goto_error_code)
+		return TLV_RX_DATA_FAILURE;
+	else
+		return it->frame_data_length;
+}
 }
 
 STATIC_FUNC
@@ -125,6 +139,8 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
+	return TLV_RX_DATA_IGNORED;
+	
 	assertion(-500000, (it->frame_data_length == it->frame_msgs_length && it->frame_data == it->msg));
 
 	if (it->op != TLV_OP_TEST 
@@ -173,18 +189,14 @@ finish: {
 		goto_error_code?"Failed":"Succeeded", desc_len, memAsHexString(&desc_sha, sizeof(desc_sha)),
 		memAsHexString(msg->signature, sign_len), cryptKeyTypeAsString(msg->type), cryptKeyLenByType(msg->type), 
 		sign_len, pkey_len, pkey ? memAsHexString(pkey->rawKey, pkey->rawKeyLen) : "---",
-		plain_len, sizeof(plain_sha), memAsHexString(&plain_sha, sizeof(plain_sha)), goto_error_code
-		)
-	
+		plain_len, sizeof(plain_sha), memAsHexString(&plain_sha, sizeof(plain_sha)), goto_error_code);
+}	
 	cryptKeyFree(&pkey);
 	
 	if (goto_error_code)
 		return TLV_RX_DATA_FAILURE;
 	else
 		return it->frame_data_length;
-		
-}
-	
 }
 
 STATIC_FUNC
@@ -211,6 +223,8 @@ int process_description_tlv_sha(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
+	return TLV_RX_DATA_IGNORED;
+	
 	if (it->op != TLV_OP_TEST 
 #ifdef EXTREME_PARANOIA
 		&& it->op != TLV_OP_NEW
@@ -218,20 +232,34 @@ int process_description_tlv_sha(struct rx_frame_iterator *it)
 		)
 		return it->frame_data_length;
 
+	char *goto_error_code = NULL;
 	struct dsc_msg_sha *msg = ((struct dsc_msg_sha*) it->frame_data);
 
 	if( ntohl(msg->desc_len) != sizeof(struct description) + it->frames_length)
-		return TLV_RX_DATA_FAILURE;
+		goto_error(finish, "1");
 	
-	SHA1_T sha;
+	SHA1_T desc_sha;
 	cryptShaNew(it->desc, sizeof(struct description));
 	cryptShaUpdate(it->frames_in, it->frames_length);
-	cryptShaFinal(&sha);
+	cryptShaFinal(&desc_sha);
 	
-	if (memcmp(&msg->desc_sha, &sha, sizeof(SHA1_T)))
-		return TLV_RX_DATA_FAILURE;
+	if (memcmp(&msg->desc_sha, &desc_sha, sizeof(SHA1_T)))
+		goto_error(finish, "2"); 
 
-        return it->frame_data_length;
+finish: {
+	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
+		"%s verifying  desc_len=%d == msg_desc_len=%d desc_sha=%s == msg_desc_sha=%s  problem?=%s",
+		goto_error_code?"Failed":"Succeeded", sizeof(struct description) + it->frames_length,
+		ntohl(msg->desc_len), 
+		memAsHexString(&desc_sha, sizeof(desc_sha)), memAsHexString(&msg->desc_sha, sizeof(desc_sha)),
+		goto_error_code
+		);
+
+	if (goto_error_code)
+		return TLV_RX_DATA_FAILURE;
+	else
+		return it->frame_data_length;
+}
 }
 
 int32_t rsa_create( char *tmp_path, uint16_t keyBitSize ) {
