@@ -38,7 +38,7 @@
 char* memAsHexStringSep( const void* mem, uint32_t len, uint16_t seperationLen, char *seperator)
 {
 #define MEMASSTR_BUFF_SIZE 2048
-#define MEMASSTR_BUFFERS 2
+#define MEMASSTR_BUFFERS 4
 #define MEMASSTR_STEP_SIZE 2
 #define TRAILER_LEN 4
         seperationLen = (seperationLen && seperationLen<len) ? seperationLen : MEMASSTR_BUFF_SIZE;
@@ -188,7 +188,7 @@ IDM_T validate_name_string(char* name, uint32_t field_len, char* exceptions)
 char* memAsCharString( const char* mem, uint32_t len)
 {
 #define MEMASSTR_BUFF_SIZE 2048
-#define MEMASSTR_BUFFERS 2
+#define MEMASSTR_BUFFERS 4
 	static uint8_t c=0;
         static char out[MEMASSTR_BUFFERS][MEMASSTR_BUFF_SIZE];
 
