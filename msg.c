@@ -3102,7 +3102,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 
                 if ( it->handls == description_tlv_handl /*&& it->process_filter == FRAME_TYPE_PROCESS_ALL*/ ? (
 			( f_type != BMX_DSC_TLV_RHASH_ADV && it->frame_type_expanded >= f_type ) ||
-			( f_type == BMX_DSC_TLV_RHASH_ADV && (f_data_len < sizeof(struct desc_hdr_rhash_adv) || 
+			( f_type == BMX_DSC_TLV_RHASH_ADV && (f_data_len < (int)sizeof(struct desc_hdr_rhash_adv) || 
 			it->frame_type_expanded >= ((struct desc_hdr_rhash_adv*)(f_data))->expanded_type)) 
 			) : (
 			it->frame_type > f_type  
@@ -3245,15 +3245,21 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 
                                 return TLV_RX_DATA_UNRESOLVED;
 
-                        } else if (receptor_result != it->frame_msgs_length) {
+			} else if (receptor_result == TLV_RX_DATA_IGNORED ) {
+
+				return TLV_RX_DATA_IGNORED;
+
+			} else if ( receptor_result == it->frame_msgs_length) {
+
+				return TLV_RX_DATA_PROCESSED;
+
+                        } else {
 
                                 dbgf_sys(DBGT_ERR, "%s - rx_frame_handler(%s)=%d frame_msgs_len=%d : FAILURE",
                                         it->caller, f_handl->name, receptor_result, it->frame_msgs_length );
 
                                 return TLV_RX_DATA_FAILURE;
                         }
-
-                        return TLV_RX_DATA_PROCESSED; //receptor_result:
                 }
 
                 assertion(-501018, (0));
