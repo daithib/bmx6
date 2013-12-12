@@ -433,7 +433,7 @@ void cryptShaFree( void ) {
 }
 
 void cryptShaAtomic( void *in, int32_t len, CRYPTSHA1_T *sha) {
-	dbgf_sys(DBGT_INFO," ");
+
 	assertion(-500000, (shaClean==YES));
 	assertion(-500000, (sha));
 	assertion(-500000, (in && len>0 && !memcmp(in, in, len)));
@@ -443,7 +443,7 @@ void cryptShaAtomic( void *in, int32_t len, CRYPTSHA1_T *sha) {
 }
 
 void cryptShaNew( void *in, int32_t len) {
-	dbgf_sys(DBGT_INFO," ");
+
 	assertion(-500000, (shaClean==YES));
 	assertion(-500000, (in && len>0 && !memcmp(in, in, len)));
 	shaClean = NO;
@@ -451,14 +451,14 @@ void cryptShaNew( void *in, int32_t len) {
 }
 
 void cryptShaUpdate( void *in, int32_t len) {
-	dbgf_sys(DBGT_INFO," ");
+
 	assertion(-500000, (shaClean==NO));
 	assertion(-500000, (in && len>0 && !memcmp(in, in, len)));
 	ShaUpdate(&cryptSha, (byte*)in, len);
 }
 
 void cryptShaFinal( CRYPTSHA1_T *sha) {
-	dbgf_sys(DBGT_INFO," ");
+
 	assertion(-500000, (shaClean==NO));
 	assertion(-500000, (sha));
 	ShaFinal(&cryptSha, (byte*) sha);
