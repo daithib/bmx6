@@ -4099,7 +4099,7 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, struct d
 
 			assertion(-501659, (vf_data_len <= VRT_FRAME_DATA_SIZE_MAX));
 			assertion(-501660, (vf_data_len > 0 && vf_type <= BMX_DSC_TLV_MAX));
-			assertion(-501661, (dext->dlen == dext_dlen_old + vf_hdr->length));
+			assertion(-501661, (dext->dlen == dext_dlen_old + ntohl(vf_hdr->length)));
 			assertion(-501662, (dext->dlen <= (uint32_t)VRT_DESC_SIZE_IN));
 		}
         }
