@@ -154,7 +154,7 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 	int32_t sign_len = it->frame_data_length - sizeof(struct dsc_msg_signature);
 	struct dsc_msg_signature *msg = (struct dsc_msg_signature*)(it->frame_data);
 	uint8_t *desc_start = (uint8_t*)it->desc;
-	int32_t desc_len = sizeof (struct description) + ntohs(it->desc->extensionLen) - (sizeof(struct tlv_hdr) + it->frame_data_length);
+	int32_t desc_len = it->desc_len - (sizeof(struct tlv_hdr) + it->frame_data_length);
 	CRYPTSHA1_T desc_sha;
 	CRYPTKEY_T *pkey = NULL;
 	

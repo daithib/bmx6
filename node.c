@@ -994,7 +994,7 @@ void free_orig_node(struct orig_node *on)
 
         if (on->added) {
 		assertion(-500000, (on->desc));
-                process_description_tlvs(NULL, on, on->desc, on->dext, TLV_OP_DEL, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
+                process_description_tlvs(NULL, on, on->desc, on->desc_len, on->dext, TLV_OP_DEL, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
         }
 
         if ( on->dhn ) {
@@ -1339,13 +1339,13 @@ void node_tasks(void) {
 
 		assertion(-501351, (on->blocked && !on->added));
 
-		IDM_T tlvs_res = process_description_tlvs(NULL, on, on->desc, on->dext, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
+		IDM_T tlvs_res = process_description_tlvs(NULL, on, on->desc, on->desc_len, on->dext, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
 
 		if (tlvs_res == TLV_RX_DATA_DONE) {
 
 			cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, on);
 
-			tlvs_res = process_description_tlvs(NULL, on, on->desc, on->dext, TLV_OP_NEW, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
+			tlvs_res = process_description_tlvs(NULL, on, on->desc, on->desc_len, on->dext, TLV_OP_NEW, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
 
 			assertion(-500364, (tlvs_res == TLV_RX_DATA_DONE)); // checked, so MUST SUCCEED!!
 

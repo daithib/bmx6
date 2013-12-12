@@ -740,8 +740,8 @@ struct description { // 68 bytes
 
 	uint8_t comp_version;  // 1 bytes
 	uint8_t reserved;
-
-        uint16_t extensionLen;// 2 bytes
+        uint16_t reserved2;
+//      uint16_t extensionLen;// 2 bytes
 //	uint8_t extensionData[];
 } __attribute__((packed));
 
@@ -781,7 +781,7 @@ struct msg_description_adv { // IPv6: >= 92 bytes
 {FIELD_TYPE_HEX,              -1, 16,                      0, FIELD_RELEVANCE_MEDI, "capabilities" }, \
 {FIELD_TYPE_UINT,             -1, 8,                       1, FIELD_RELEVANCE_LOW,  "comp_version" }, \
 {FIELD_TYPE_UINT,             -1, 8,                       1, FIELD_RELEVANCE_LOW,  "reserved" }, \
-{FIELD_TYPE_STRING_SIZE,      -1, 16,                      0, FIELD_RELEVANCE_LOW,  "extensionLen" }, \
+{FIELD_TYPE_STRING_SIZE,      -1, 16,                      0, FIELD_RELEVANCE_LOW,  "reserved2" }, \
 {FIELD_TYPE_STRING_BINARY,    -1, 0,                       1, FIELD_RELEVANCE_LOW,  "extensionData" }, \
 FIELD_FORMAT_END}
 
@@ -860,7 +860,8 @@ struct ogm_aggreg_node {
 struct description_cache_node {
 	DHASH_T dhash;
         TIME_T timestamp;
-        struct description *description;
+        uint16_t desc_len;
+        struct description *desc;
 };
 
 
@@ -875,6 +876,7 @@ struct rx_frame_iterator {
         struct orig_node *on;
         struct ctrl_node *cn;
         struct description *desc; //as received on wire
+        uint16_t desc_len;
         uint8_t *frames_in;
         struct frame_handl *handls;
         struct frame_handl *handl;
@@ -1021,9 +1023,9 @@ void update_my_dev_adv(void);
 void update_my_link_adv(uint32_t changes);
 
 void free_desc_extensions(struct desc_extension **dext);
-struct dhash_node * process_description(struct packet_buff *pb, struct description *desc, DHASH_T *dhash);
-IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, struct description *desc, struct desc_extension *dext,
-        uint8_t op, uint8_t filter, void *custom, struct ctrl_node *cn);
+struct dhash_node * process_description(struct packet_buff *pb, struct description_cache_node *desc, DHASH_T *dhash);
+IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, struct description *desc, uint16_t desc_len, 
+        struct desc_extension *dext, uint8_t op, uint8_t filter, void *custom, struct ctrl_node *cn);
 int32_t get_desc_frame_data(uint8_t **frame_data, uint8_t *desc_ext_data, int32_t desc_ext_len, uint8_t frame_type);
 IDM_T desc_frame_changed(  struct rx_frame_iterator *it, uint8_t f_type );
 void purge_tx_task_list(struct list_head *tx_tasks_list, struct link_node *only_link, struct dev_node *only_dev);

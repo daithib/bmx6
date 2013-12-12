@@ -414,6 +414,7 @@ struct orig_node {
 	struct description *desc;
 	struct desc_extension *dext;
 
+        uint16_t desc_len;
 
 	TIME_T updated_timestamp; // last time this on's desc was succesfully updated
 
