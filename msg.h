@@ -402,15 +402,13 @@ struct tlv_hdr_virtual { // 6 bytes
 
 
 struct tlv_hdr { // 2 bytes
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int length :    11;
-	unsigned int type :       5;
-#elif __BYTE_ORDER == __BIG_ENDIAN
-	unsigned int type :       5;
-	unsigned int length :    11;
-#else
-# error "Please fix <bits/endian.h>"
-#endif
+    union {
+        struct {
+            unsigned int type :       5;
+            unsigned int length :    11;
+        } tlv;
+        uint16_t u16;
+    } u;
 //	uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
 } __attribute__((packed));
 
@@ -512,6 +510,7 @@ enum {
 char *tlv_op_str(uint8_t op);
 
 
+struct tlv_hdr tlv_set_net(int16_t type, int16_t length);
 
 struct problem_type {
     LOCAL_ID_T local_id;
