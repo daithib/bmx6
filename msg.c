@@ -3469,6 +3469,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		struct tlv_hdr_virtual *fhv = (struct tlv_hdr_virtual *)(it->dext->data + it->dext->dlen);
 
 		fhv->type = it->frame_type;
+		fhv->mbz = 0;
 		fhv->length = htonl(sizeof(struct tlv_hdr_virtual) + fdata_in);
 		memcpy(&(fhv[1]), it->frame_cache_array, fdata_in);
 		it->dext->dlen += (sizeof(struct tlv_hdr_virtual) + fdata_in);
