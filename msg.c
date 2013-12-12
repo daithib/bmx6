@@ -1555,7 +1555,7 @@ int32_t tx_msg_dhash_or_description_request(struct tx_frame_iterator *it)
 
 
 STATIC_FUNC
-int32_t tx_msg_description_adv(struct tx_frame_iterator *it)
+int32_t tx_frame_description_adv(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
         struct tx_task_node * ttn = it->ttn;
@@ -2785,70 +2785,53 @@ STATIC_FUNC
 int32_t rx_frame_description_advs(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-        int32_t pos = 0;
-        uint16_t tlvs_len = 0;
-        IID_T neighIID4x = 0;
-        struct packet_buff *pb = it->pb;
 
         assertion(-500550, (it->frame_msgs_length >= ((int) sizeof (struct msg_description_adv))));
 
-        while (pos < it->frame_msgs_length && pos + ((int) sizeof (struct msg_description_adv)) <= it->frame_msgs_length) {
+	struct msg_description_adv *adv = (struct msg_description_adv*)it->frame_data;
+	struct description *desc = &adv->desc;
+	DHASH_T dhash0;
+	struct dhash_node *dhn;
+        uint16_t tlvs_len = ntohs(desc->extensionLen);
+        struct packet_buff *pb = it->pb;
 
-                struct msg_description_adv *adv = ((struct msg_description_adv*) (it->frame_data + pos));
-                struct description *desc = &adv->desc;
-                DHASH_T dhash0;
-                struct dhash_node *dhn;
+	dbgf_track( DBGT_INFO, "rcvd desc: global_id=%s via_dev=%s via_ip=%s",
+		globalIdAsString(&desc->globalId), pb->i.iif->label_cfg.str, pb->i.llip_str);
 
-                tlvs_len = ntohs(desc->extensionLen);
-                pos += (sizeof ( struct msg_description_adv) + tlvs_len);
+        if (tlvs_len > DESC_FRAMES_SIZE_MAX || (sizeof ( struct msg_description_adv) + tlvs_len) != (uint32_t)it->frame_msgs_length)
+		return FAILURE;
 
-                if (tlvs_len > DESC_FRAMES_SIZE_MAX || pos > it->frame_msgs_length)
-                        break;
+	cryptShaAtomic(desc, (sizeof(struct description) + tlvs_len), &dhash0);
 
-                dbgf_track( DBGT_INFO, "rcvd desc: global_id=%s via_dev=%s via_ip=%s",
-                        globalIdAsString(&desc->globalId), pb->i.iif->label_cfg.str, pb->i.llip_str);
+	if ((dhn = process_dhash_description_neighIID4x(pb, &dhash0, desc, IID_RSVD_UNUSED)) == FAILURE_PTR) {
 
-		cryptShaAtomic(desc, (sizeof(struct description) +tlvs_len), &dhash0);
-
-                if ((dhn = process_dhash_description_neighIID4x(pb, &dhash0, desc, IID_RSVD_UNUSED)) == FAILURE_PTR) {
-
-                        return FAILURE;
+		return FAILURE;
 			
-		} else if (dhn == UNRESOLVED_PTR || dhn == IGNORED_PTR) {
+	} else if (dhn == UNRESOLVED_PTR || dhn == IGNORED_PTR) {
 
-		} else if (dhn) {
+	} else if (dhn) {
 
-			assertion(-500691, (dhn->on));
-//			assertion(-500692, (IMPLIES(neighIID4x == pb->i.transmittersIID, is_described_neigh(pb->i.link, pb->i.transmittersIID))));
+		assertion(-500691, (dhn->on));
+//		assertion(-500692, (IMPLIES(neighIID4x == pb->i.transmittersIID, is_described_neigh(pb->i.link, pb->i.transmittersIID))));
 
-			if (desc_adv_tx_unsolicited && dhn->on->updated_timestamp == bmx_time &&
-				is_described_neigh(pb->i.link, pb->i.transmittersIID)) {
+		if (desc_adv_tx_unsolicited && dhn->on->updated_timestamp == bmx_time &&
+			is_described_neigh(pb->i.link, pb->i.transmittersIID)) {
 
-				struct link_dev_node **lndev_arr = lndevs_get_best_tp(pb->i.link->local);
-				int d;
+			struct link_dev_node **lndev_arr = lndevs_get_best_tp(pb->i.link->local);
+			int d;
 
-				uint16_t desc_len = sizeof ( struct msg_description_adv) +ntohs(dhn->on->desc->extensionLen);
+			uint16_t desc_len = sizeof ( struct msg_description_adv) +ntohs(dhn->on->desc->extensionLen);
 
-				for (d = 0; (lndev_arr[d]); d++)
-					schedule_tx_task(lndev_arr[d], FRAME_TYPE_DESC_ADV, desc_len, 0, 0, dhn->myIID4orig, 0);
-			}
-		} else if (!dhn) {
-			
-		} else {
-			assertion(-501636, 0);
+			for (d = 0; (lndev_arr[d]); d++)
+				schedule_tx_task(lndev_arr[d], FRAME_TYPE_DESC_ADV, desc_len, 0, 0, dhn->myIID4orig, 0);
 		}
+	} else if (!dhn) {
+			
+	} else {
+		assertion(-501636, 0);
 	}
-
-        
-        if (pos != it->frame_msgs_length) {
-
-                dbgf_sys(DBGT_ERR, "(pos=%d) + (desc_size=%zu) + (tlvs_len=%d) frame_data_length=%d neighIID4x=%d",
-                        pos, sizeof ( struct msg_description_adv), tlvs_len, it->frame_data_length, neighIID4x);
-
-                return FAILURE;
-        }
-
-        return pos;
+	
+        return TLV_RX_DATA_PROCESSED;
 }
 
 STATIC_FUNC
@@ -4985,7 +4968,7 @@ int32_t init_msg( void )
         handl.tx_iterations = &desc_adv_tx_iters;
         handl.min_msg_size = sizeof (struct msg_description_adv);
         handl.tx_task_interval_min = DEF_TX_DESC0_ADV_TO;
-        handl.tx_frame_handler = tx_msg_description_adv;
+        handl.tx_frame_handler = tx_frame_description_adv;
         handl.rx_frame_handler = rx_frame_description_advs;
         handl.msg_format = description_format;
         register_frame_handler(packet_frame_handler, FRAME_TYPE_DESC_ADV, &handl);
