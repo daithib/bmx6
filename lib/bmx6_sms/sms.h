@@ -23,7 +23,7 @@
 #define ARG_SMS "syncSms"
 
 #define MAX_SMS_NAME_LEN 16
-#define MAX_SMS_DATA_LEN 240
+#define MAX_SMS_DATA_LEN 300
 #define MAX_SMS_DATA_LEN_SF 2400
 
 #define SMS_POLLING_INTERVAL 5000
