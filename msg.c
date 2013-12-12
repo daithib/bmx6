@@ -3071,7 +3071,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 assertion(-501590, IMPLIES(it->on, f_type != BMX_DSC_TLV_RHASH_ADV));
 
 		if (f_virtual) {
-			f_len = ((struct tlv_hdr_virtual*) fhs)->length;
+			f_len = ntohl(((struct tlv_hdr_virtual*) fhs)->length);
 			f_data_len = f_len - sizeof (struct tlv_hdr_virtual);
 			f_data = it->frames_in + it->frames_pos + sizeof (struct tlv_hdr_virtual);
 			f_pos_next = it->frames_pos + f_len;
@@ -3469,7 +3469,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		struct tlv_hdr_virtual *fhv = (struct tlv_hdr_virtual *)(it->dext->data + it->dext->dlen);
 
 		fhv->type = it->frame_type;
-		fhv->length = sizeof(struct tlv_hdr_virtual) + fdata_in;
+		fhv->length = htonl(sizeof(struct tlv_hdr_virtual) + fdata_in);
 		memcpy(&(fhv[1]), it->frame_cache_array, fdata_in);
 		it->dext->dlen += (sizeof(struct tlv_hdr_virtual) + fdata_in);
 
@@ -4094,7 +4094,8 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, struct d
 			struct tlv_hdr_virtual *vf_hdr = (struct tlv_hdr_virtual *)(dext->data + dext_dlen_old);
 			memset(vf_hdr, 0, sizeof(struct tlv_hdr_virtual));
 			vf_hdr->type = vf_type;
-			vf_hdr->length = sizeof(struct tlv_hdr_virtual) + vf_data_len;
+			vf_hdr->mbz = 0;
+			vf_hdr->length = htonl(sizeof(struct tlv_hdr_virtual) + vf_data_len);
 
 			assertion(-501659, (vf_data_len <= VRT_FRAME_DATA_SIZE_MAX));
 			assertion(-501660, (vf_data_len > 0 && vf_type <= BMX_DSC_TLV_MAX));
