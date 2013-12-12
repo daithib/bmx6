@@ -3058,27 +3058,27 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
         } else if (it->frames_pos + ((int) sizeof (struct tlv_hdr)) < it->frames_length) {
 
                 struct tlv_hdr *tlv = (struct tlv_hdr *) (it->frames_in + it->frames_pos);
-                int8_t f_type = tlv->type;
+                int8_t f_type;
 		uint8_t f_virtual = it->is_virtual_header;
                 int32_t f_pos_next;
                 int32_t f_len, f_data_len;
                 uint8_t *f_data;
 
-                assertion(-500775, (tlv->type == ((struct tlv_hdr_virtual*) tlv)->type));
-                assertion(-501590, IMPLIES(it->on, f_type != BMX_DSC_TLV_RHASH_ADV));
-
 		if (f_virtual) {
+			f_type = ((struct tlv_hdr_virtual*) tlv)->type;
 			f_len = ntohl(((struct tlv_hdr_virtual*) tlv)->length);
 			f_data_len = f_len - sizeof (struct tlv_hdr_virtual);
 			f_data = it->frames_in + it->frames_pos + sizeof (struct tlv_hdr_virtual);
 			f_pos_next = it->frames_pos + f_len;
 		} else {
+			f_type = tlv->type;
 			f_len = ntohs(tlv->length);
 			f_data_len = f_len - sizeof (struct tlv_hdr);
 			f_data = it->frames_in + it->frames_pos + sizeof (struct tlv_hdr);
 			f_pos_next = it->frames_pos + f_len;
                 }
 
+                assertion(-501590, IMPLIES(it->on, f_type != BMX_DSC_TLV_RHASH_ADV));
 
                 it->frames_pos = f_pos_next;
 
