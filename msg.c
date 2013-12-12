@@ -1414,6 +1414,8 @@ int32_t tx_frame_ref_adv(struct tx_frame_iterator *it)
 
 	if(refn && refn->dext_tree.items) {
 
+		dbgf_sys(DBGT_INFO, "frame_msgs_length=%d f_body_len=%d space_pref=%d space_max=%d",
+			it->ttn->frame_msgs_length, refn->f_body_len, tx_iterator_cache_data_space_pref(it), tx_iterator_cache_data_space_max(it));
 		assertion(-500000, ((int) it->ttn->frame_msgs_length <= tx_iterator_cache_data_space_pref(it)));
 		assertion(-500000, ((int) it->ttn->frame_msgs_length == refn->f_body_len));
 
