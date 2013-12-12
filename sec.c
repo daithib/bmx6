@@ -206,14 +206,11 @@ int create_description_tlv_sha(struct tx_frame_iterator *it)
 
 	struct dsc_msg_sha *msg = ((struct dsc_msg_sha*) tx_iterator_cache_msg_ptr(it));
 
-	msg->desc_len = htonl(sizeof(struct description) + it->dext->dlen);
-	cryptShaNew(it->frames_out_ptr - sizeof (struct description), sizeof(struct description));
-	cryptShaUpdate(it->dext->data, it->dext->dlen);
-	cryptShaFinal(&msg->desc_sha);
-	
+	msg->expInLen = htonl(it->dext->dlen);
+	cryptShaAtomic(it->dext->data, it->dext->dlen, &msg->expInSha);
 
-	dbgf_sys(DBGT_INFO, "added description sha len=%d sha=%s", 
-		ntohl(msg->desc_len), memAsHexString(&msg->desc_sha, sizeof(SHA1_T)));
+	dbgf_sys(DBGT_INFO, "added description expInlen=%d expInsha=%s", 
+		ntohl(msg->expInLen), memAsHexString(&msg->expInSha, sizeof(SHA1_T)));
 
 	return sizeof(struct dsc_msg_sha);
 }
@@ -234,27 +231,24 @@ int process_description_tlv_sha(struct rx_frame_iterator *it)
 
 	char *goto_error_code = NULL;
 	struct dsc_msg_sha *msg = ((struct dsc_msg_sha*) it->frame_data);
-	int32_t exp_len = sizeof(struct description) + (int32_t)(((uint8_t*)it->frame_hdr) - it->frames_in);
+	int32_t expInLen = (int32_t)(((uint8_t*)it->frame_hdr) - it->frames_in);
 	
-	if( ntohl(msg->desc_len) != exp_len )
+	assertion(-500000, (expInLen>0));
+	
+	if( (int)ntohl(msg->expInLen) != expInLen )
 		goto_error(finish, "1");
 
-	assertion(-500000, (it->desc && !memcmp(it->desc, it->desc, sizeof(struct description))));
-	assertion(-500000, (it->frames_in && !memcmp(it->frames_in, it->frames_in, exp_len)));
-	SHA1_T desc_sha;
-	cryptShaNew(it->desc, sizeof(struct description));
-	cryptShaUpdate(it->frames_in, exp_len);
-	cryptShaFinal(&desc_sha);
+	SHA1_T expInSha;
+	cryptShaAtomic(it->frames_in, expInLen, &expInSha);
 	
-	if (memcmp(&msg->desc_sha, &desc_sha, sizeof(SHA1_T)))
+	if (memcmp(&msg->expInSha, &expInSha, sizeof(SHA1_T)))
 		goto_error(finish, "2"); 
 
 finish: {
 	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
-		"%s %s verifying  desc_len=%d == msg_desc_len=%d desc_sha=%s == msg_desc_sha=%s  problem?=%s",
-		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", sizeof(struct description) + it->frames_length,
-		ntohl(msg->desc_len), 
-		memAsHexString(&desc_sha, sizeof(desc_sha)), memAsHexString(&msg->desc_sha, sizeof(desc_sha)),
+		"%s %s verifying  expInLen=%d == msg.expInLen=%d expInSha=%s == msg.expInSha=%s  problem?=%s",
+		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", expInLen, ntohl(msg->expInLen), 
+		memAsHexString(&expInSha, sizeof(expInSha)), memAsHexString(&msg->expInSha, sizeof(expInSha)),
 		goto_error_code
 		);
 

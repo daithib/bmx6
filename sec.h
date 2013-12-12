@@ -41,8 +41,8 @@ FIELD_FORMAT_END }
 FIELD_FORMAT_END }
 
 struct dsc_msg_sha {
-        uint32_t desc_len;
-        CRYPTSHA1_T desc_sha;
+        uint32_t expInLen;
+        CRYPTSHA1_T expInSha;
 } __attribute__((packed));
 
 struct dsc_msg_pubkey {
