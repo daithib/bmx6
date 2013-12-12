@@ -209,8 +209,8 @@ int create_description_tlv_sha(struct tx_frame_iterator *it)
 	msg->expInLen = htonl(it->dext->dlen);
 	cryptShaAtomic(it->dext->data, it->dext->dlen, &msg->expInSha);
 
-	dbgf_sys(DBGT_INFO, "added description expInlen=%d expInsha=%s", 
-		ntohl(msg->expInLen), memAsHexString(&msg->expInSha, sizeof(SHA1_T)));
+	dbgf_sys(DBGT_INFO, "added description expInlen=%d expInsha=%s expIn=%s", 
+		ntohl(msg->expInLen), memAsHexString(&msg->expInSha, sizeof(SHA1_T)), memAsHexString(it->dext->data, it->dext->dlen));
 
 	return sizeof(struct dsc_msg_sha);
 }
@@ -246,11 +246,10 @@ int process_description_tlv_sha(struct rx_frame_iterator *it)
 
 finish: {
 	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
-		"%s %s verifying  expInLen=%d == msg.expInLen=%d expInSha=%s == msg.expInSha=%s  problem?=%s",
+		"%s %s verifying  expInLen=%d == msg.expInLen=%d expInSha=%s == msg.expInSha=%s  problem?=%s expIn=%s",
 		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", expInLen, ntohl(msg->expInLen), 
 		memAsHexString(&expInSha, sizeof(expInSha)), memAsHexString(&msg->expInSha, sizeof(expInSha)),
-		goto_error_code
-		);
+		goto_error_code, memAsHexString(it->frames_in, expInLen) );
 
 	if (goto_error_code)
 		return TLV_RX_DATA_FAILURE;
