@@ -805,10 +805,6 @@ struct description2 {
 
 
 
-#define MSG_DESCRIPTION0_ADV_UNHASHED_SIZE  2
-#define MSG_DESCRIPTION0_ADV_HASHED_SIZE   (sizeof( GLOBAL_ID_T) + (4 * sizeof(uint32_t)))
-#define MSG_DESCRIPTION0_ADV_SIZE  (MSG_DESCRIPTION0_ADV_UNHASHED_SIZE + MSG_DESCRIPTION0_ADV_HASHED_SIZE)
-
 struct msg_description_adv { // IPv6: >= 92 bytes
 	
 	// the hashed pard:

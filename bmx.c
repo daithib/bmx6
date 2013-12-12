@@ -1296,7 +1296,6 @@ void bmx(void)
 int main(int argc, char *argv[])
 {
         // make sure we are using compatible description0 sizes:
-        assertion(-500201, (MSG_DESCRIPTION0_ADV_SIZE == sizeof ( struct msg_description_adv)));
         assertion(-500998, (sizeof(struct frame_header_short) == 2));
         assertion(-500999, (sizeof(struct frame_header_long) == 4));
 
