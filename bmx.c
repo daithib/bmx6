@@ -400,7 +400,7 @@ int64_t field_get_value(const struct field_format *format, uint16_t min_msg_size
                         bit_set((uint8_t*)&result, 16, (16-bits)+bit, val);
                 }
 
-                return result;
+                return ntohs(result);
         }
 
         return FAILURE;
