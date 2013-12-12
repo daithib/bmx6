@@ -4985,7 +4985,7 @@ int32_t init_msg( void )
         handl.tx_iterations = &desc_adv_tx_iters;
         handl.min_msg_size = sizeof (struct msg_description_adv);
         handl.tx_task_interval_min = DEF_TX_DESC0_ADV_TO;
-        handl.tx_msg_handler = tx_msg_description_adv;
+        handl.tx_frame_handler = tx_msg_description_adv;
         handl.rx_frame_handler = rx_frame_description_advs;
         handl.msg_format = description_format;
         register_frame_handler(packet_frame_handler, FRAME_TYPE_DESC_ADV, &handl);
