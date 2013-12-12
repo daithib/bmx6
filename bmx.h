@@ -48,9 +48,9 @@ typedef int8_t IDM_T; // smallest int which size does NOT matter
 //and so on...
 
 
-#define MIN_COMPATIBILITY CV16
+#define MIN_COMPATIBILITY CV17
 #define MAX_COMPATIBILITY CV18
-#define DEF_COMPATIBILITY CV16
+#define DEF_COMPATIBILITY CV17
 #define ARG_COMPATIBILITY "compatibility"
 extern int32_t my_compatibility;
 
