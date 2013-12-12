@@ -181,6 +181,10 @@ struct tlv_hdr tlv_set_net(int16_t type, int16_t length)
 
 	struct tlv_hdr tlv = {.u.tlv = {.type = type, .length = length } };
 	tlv.u.u16 = htons(tlv.u.u16);
+	
+//	dbgf_sys(DBGT_INFO, "type=%d=0x%X length=%d=0x%X tlv=%s u16=0x%X",
+//	type, type, length, length, memAsHexString(&tlv, sizeof(tlv)), ntohs(tlv.u.u16));
+	
 	return tlv;
 }
 

@@ -404,9 +404,16 @@ struct tlv_hdr_virtual { // 6 bytes
 struct tlv_hdr { // 2 bytes
     union {
         struct {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+            unsigned int length :    11;
+            unsigned int type :       5;
+#elif __BYTE_ORDER == __BIG_ENDIAN
             unsigned int type :       5;
             unsigned int length :    11;
-        } tlv;
+#else
+# error "Please fix <bits/endian.h>"
+#endif
+        } __attribute__((packed)) tlv;
         uint16_t u16;
     } u;
 //	uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
