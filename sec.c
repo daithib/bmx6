@@ -237,7 +237,9 @@ int process_description_tlv_sha(struct rx_frame_iterator *it)
 
 	if( ntohl(msg->desc_len) != sizeof(struct description) + it->frames_length)
 		goto_error(finish, "1");
-	
+
+	assertion(-500000, (it->desc && !memcmp(it->desc, it->desc, sizeof(struct description))));
+	assertion(-500000, (it->frames_in && !memcmp(it->frames_in, it->frames_in, it->frames_length)));
 	SHA1_T desc_sha;
 	cryptShaNew(it->desc, sizeof(struct description));
 	cryptShaUpdate(it->frames_in, it->frames_length);
