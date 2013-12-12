@@ -179,7 +179,6 @@ struct mandatory_tlv_metricalgo { // 16 bytes
         uint16_t flags;                     // 2 bytes
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN         // 1 byte
-        unsigned int reserved2     : 8;
 	unsigned int tp_exp_divisor : 2;
 	unsigned int tp_exp_numerator : 2;
 	unsigned int rp_exp_divisor : 2;
@@ -189,12 +188,11 @@ struct mandatory_tlv_metricalgo { // 16 bytes
 	unsigned int rp_exp_divisor : 2;
 	unsigned int tp_exp_numerator : 2;
 	unsigned int tp_exp_divisor : 2;
-        unsigned int reserved2     :8;
 #else
 # error "Please fix <bits/endian.h>"
 #endif
 
-//        uint8_t reserved2;                  // 1 byte
+        uint8_t reserved2;                  // 1 byte
 	uint8_t path_window_size;           // 1 byte
 	uint8_t path_lounge_size;           // 1 byte
 	uint8_t regression;                 // 1 byte
