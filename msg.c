@@ -1266,10 +1266,10 @@ SHA1_T *ref_node_key(uint8_t *f_body, uint32_t f_body_len, uint8_t compression, 
 	cryptShaUpdate(f_body, f_body_len);
 	cryptShaFinal(&rhash);
 
-	dbgf_sys(DBGT_INFO, "fhl=%s", memAsHexString(&tlv, sizeof(tlv)));
-	dbgf_sys(DBGT_INFO, "hdr=%s", memAsHexString(&rhash_hdr, sizeof(rhash_hdr)));
-	dbgf_sys(DBGT_INFO, "bdy=%s", memAsHexString(f_body, f_body_len));
-	dbgf_sys(DBGT_INFO, "sha=%s", memAsHexString(&rhash, sizeof(rhash)));
+	dbgf_all(DBGT_INFO, "fhl=%s", memAsHexString(&tlv, sizeof(tlv)));
+	dbgf_all(DBGT_INFO, "hdr=%s", memAsHexString(&rhash_hdr, sizeof(rhash_hdr)));
+	dbgf_all(DBGT_INFO, "bdy=%s", memAsHexString(f_body, f_body_len));
+	dbgf_all(DBGT_INFO, "sha=%s", memAsHexString(&rhash, sizeof(rhash)));
 
 	return &rhash;
 }
