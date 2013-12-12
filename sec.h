@@ -57,7 +57,7 @@ struct dsc_msg_signature {
 
 
 #define DESCRIPTION_MSG_SHA_FORMAT { \
-{FIELD_TYPE_UINT,          -1, 32,                        1, FIELD_RELEVANCE_HIGH,  "len"}, \
+{FIELD_TYPE_UINT,          -1, 32,                        0, FIELD_RELEVANCE_HIGH,  "len"}, \
 {FIELD_TYPE_STRING_BINARY, -1, 8*sizeof(SHA1_T),          1, FIELD_RELEVANCE_HIGH,  "sha"}, \
 FIELD_FORMAT_END }
 

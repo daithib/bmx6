@@ -212,7 +212,7 @@ int create_description_tlv_sha(struct tx_frame_iterator *it)
 	cryptShaFinal(&msg->desc_sha);
 	
 
-	dbgf_track(DBGT_INFO, "added description sha len=%d sha=%s", 
+	dbgf_sys(DBGT_INFO, "added description sha len=%d sha=%s", 
 		ntohl(msg->desc_len), memAsHexString(&msg->desc_sha, sizeof(SHA1_T)));
 
 	return sizeof(struct dsc_msg_sha);
