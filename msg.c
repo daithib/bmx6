@@ -2809,7 +2809,7 @@ int32_t rx_frame_description_advs(struct rx_frame_iterator *it)
 		} else if (dhn) {
 
 			assertion(-500691, (dhn->on));
-			assertion(-500692, (IMPLIES(neighIID4x == pb->i.transmittersIID, is_described_neigh(pb->i.link, pb->i.transmittersIID))));
+//			assertion(-500692, (IMPLIES(neighIID4x == pb->i.transmittersIID, is_described_neigh(pb->i.link, pb->i.transmittersIID))));
 
 			if (desc_adv_tx_unsolicited && dhn->on->updated_timestamp == bmx_time &&
 				is_described_neigh(pb->i.link, pb->i.transmittersIID)) {
