@@ -2831,7 +2831,7 @@ int32_t rx_frame_description_advs(struct rx_frame_iterator *it)
 		assertion(-501636, 0);
 	}
 	
-        return TLV_RX_DATA_PROCESSED;
+        return it->frame_msgs_length;
 }
 
 STATIC_FUNC
