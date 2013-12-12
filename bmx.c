@@ -388,14 +388,16 @@ int64_t field_get_value(const struct field_format *format, uint16_t min_msg_size
                                 return ntohl(*((uint32_t*) & data[pos_bit / 8]));
                 }
 
-        } else if (bits < 8) {
+        } else if (bits <= 16) {
+
+		assertion(-500000, (bits<=8 || !host_order));
 
                 uint8_t bit = 0;
-                uint8_t result = 0;
+                uint16_t result = 0;
 
                 for (bit = 0; bit < bits; bit++) {
                         uint8_t val = bit_get(data, (8 * min_msg_size), (pos_bit + bit));
-                        bit_set(&result, 8, bit, val);
+                        bit_set((uint8_t*)&result, 16, (16-bits)+bit, val);
                 }
 
                 return result;
