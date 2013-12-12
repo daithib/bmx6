@@ -201,8 +201,8 @@ void dump(struct packet_buff *pb)
 
         if (iterator_result != TLV_RX_DATA_DONE) {
 
-                dbgf_dump(DBGT_NONE, "%s             ERROR frame_type=%d frame_length=%d frame_data_lenghth=%d short_header=%d iterator_result=%d - ignoring further frames!!",
-                        direction == DUMP_DIRECTION_IN ? "in " : "out", it.frame_type, it.frame_length, it.frame_data_length, it.is_short_header, iterator_result);
+                dbgf_dump(DBGT_NONE, "%s             ERROR frame_type=%d frame_length=%d frame_data_length=%d virtual_header=%d iterator_result=%d - ignoring further frames!!",
+                        direction == DUMP_DIRECTION_IN ? "in " : "out", it.frame_type, it.frame_length, it.frame_data_length, it.is_virtual_header, iterator_result);
 
                 dbgf_dump(DBGT_NONE, "%s         data [%3d...%3d]:%s",
                         direction == DUMP_DIRECTION_IN ? "in  hex" : "out hex",

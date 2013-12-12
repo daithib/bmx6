@@ -1250,15 +1250,15 @@ SHA1_T *ref_node_key(uint8_t *f_body, uint32_t f_body_len, uint8_t compression, 
 
 	struct frame_hdr_rhash_adv rhash_hdr = {.compression=compression, .nested=nested, .reserved=reserved};
 
-	struct frame_header_long fhl = {.type=FRAME_TYPE_REF_ADV, .is_short=0};
-	fhl.length = htons(sizeof(fhl) + sizeof(rhash_hdr) + f_body_len);
+	struct tlv_hdr tlv = {.type=FRAME_TYPE_REF_ADV};
+	tlv.length = htons(sizeof(tlv) + sizeof(rhash_hdr) + f_body_len);
 
-	cryptShaNew(&fhl, sizeof(fhl));
+	cryptShaNew(&tlv, sizeof(tlv));
 	cryptShaUpdate(&rhash_hdr, sizeof(rhash_hdr));
 	cryptShaUpdate(f_body, f_body_len);
 	cryptShaFinal(&rhash);
 
-	dbgf_sys(DBGT_INFO, "fhl=%s", memAsHexString(&fhl, sizeof(fhl)));
+	dbgf_sys(DBGT_INFO, "fhl=%s", memAsHexString(&tlv, sizeof(tlv)));
 	dbgf_sys(DBGT_INFO, "hdr=%s", memAsHexString(&rhash_hdr, sizeof(rhash_hdr)));
 	dbgf_sys(DBGT_INFO, "bdy=%s", memAsHexString(f_body, f_body_len));
 	dbgf_sys(DBGT_INFO, "sha=%s", memAsHexString(&rhash, sizeof(rhash)));
@@ -1430,8 +1430,7 @@ int32_t rx_frame_ref_adv(struct rx_frame_iterator *it)
 	
 	assertion(-501583, !it->is_virtual_header && it->frame_type == FRAME_TYPE_REF_ADV);
 
-	if ( it->is_short_header ||
-		it->frame_data_length <= (int32_t)(sizeof(struct frame_hdr_rhash_adv)) ||
+	if ( 	it->frame_data_length <= (int32_t)(sizeof(struct frame_hdr_rhash_adv)) ||
 		it->frame_data_length > (int32_t)(REF_FRAME_BODY_SIZE_MAX + sizeof(struct frame_hdr_rhash_adv))	)
 		return TLV_RX_DATA_FAILURE;
 
@@ -1486,7 +1485,6 @@ int process_description_tlv_ref(struct rx_frame_iterator *it)
 	assertion(-501634, ( TEST_VALUE( BMX_DSC_TLV_RHASH_ADV )) );
 	// must not exist anymore because it should have been resolved already!
 
-        assertion(-501584, (!it->is_short_header));
         assertion(-501585, (!it->on));
 	assertion(-501586, (0));
 	
@@ -3057,33 +3055,27 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 dbgf_all(DBGT_INFO, "%s - frames_pos=%d frames_length=%d : DONE", it->caller, it->frames_pos, it->frames_length);
                 return TLV_RX_DATA_DONE;
         
-        } else if (it->frames_pos + ((int) sizeof (struct frame_header_short)) < it->frames_length) {
+        } else if (it->frames_pos + ((int) sizeof (struct tlv_hdr)) < it->frames_length) {
 
-                struct frame_header_short *fhs = (struct frame_header_short *) (it->frames_in + it->frames_pos);
-                int8_t f_type = fhs->type;
+                struct tlv_hdr *tlv = (struct tlv_hdr *) (it->frames_in + it->frames_pos);
+                int8_t f_type = tlv->type;
 		uint8_t f_virtual = it->is_virtual_header;
-                uint8_t f_short = fhs->is_short && !f_virtual;
                 int32_t f_pos_next;
                 int32_t f_len, f_data_len;
                 uint8_t *f_data;
 
-                assertion(-500775, (fhs->type == ((struct frame_header_long*) fhs)->type));
+                assertion(-500775, (tlv->type == ((struct tlv_hdr_virtual*) tlv)->type));
                 assertion(-501590, IMPLIES(it->on, f_type != BMX_DSC_TLV_RHASH_ADV));
 
 		if (f_virtual) {
-			f_len = ntohl(((struct tlv_hdr_virtual*) fhs)->length);
+			f_len = ntohl(((struct tlv_hdr_virtual*) tlv)->length);
 			f_data_len = f_len - sizeof (struct tlv_hdr_virtual);
 			f_data = it->frames_in + it->frames_pos + sizeof (struct tlv_hdr_virtual);
 			f_pos_next = it->frames_pos + f_len;
-		} else if (f_short) {
-                        f_len = fhs->length;
-                        f_data_len = f_len - sizeof (struct frame_header_short);
-                        f_data = it->frames_in + it->frames_pos + sizeof (struct frame_header_short);
-                        f_pos_next = it->frames_pos + f_len;
-                } else {
-			f_len = ntohs(((struct frame_header_long*) fhs)->length);
-			f_data_len = f_len - sizeof (struct frame_header_long);
-			f_data = it->frames_in + it->frames_pos + sizeof (struct frame_header_long);
+		} else {
+			f_len = ntohs(tlv->length);
+			f_data_len = f_len - sizeof (struct tlv_hdr);
+			f_data = it->frames_in + it->frames_pos + sizeof (struct tlv_hdr);
 			f_pos_next = it->frames_pos + f_len;
                 }
 
@@ -3138,8 +3130,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 it->frame_type = f_type;
                 it->frame_type_expanded = ((it->handls == description_tlv_handl && f_type == BMX_DSC_TLV_RHASH_ADV) ? 
 			((struct desc_hdr_rhash_adv*)(f_data))->expanded_type : f_type);
-                it->is_short_header = f_short;
-                it->frame_hdr = fhs;
+                it->frame_hdr = tlv;
 
                 it->handl = f_handl;
                 it->frame_msgs_length = f_data_len - f_handl->data_header_size;
@@ -3416,7 +3407,7 @@ int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 
 		int32_t used_frames_space =
 			it->frames_out_pos +
-			(int) sizeof(struct frame_header_long) +
+			(int) sizeof(struct tlv_hdr) +
 			(int) sizeof(struct desc_hdr_rhash_adv) +
 			((int) sizeof(struct desc_msg_rhash_adv) * used_ref_msgs);
 
@@ -3434,7 +3425,7 @@ int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 
 		return (max ? it->frames_out_max : it->frames_out_pref) - (
 			it->frames_out_pos +
-			(int) sizeof(struct frame_header_long) +
+			(int) sizeof(struct tlv_hdr) +
 			it->handls[it->frame_type].data_header_size +
 			it->frame_cache_msgs_size );
 	}
@@ -3450,7 +3441,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 	uint8_t do_fzip = use_compression(handl);
 	uint8_t do_fref = use_referencing(handl);
 
-	struct frame_header_long *fhl = (struct frame_header_long *) (it->frames_out_ptr + it->frames_out_pos);
+	struct tlv_hdr *tlv = (struct tlv_hdr *) (it->frames_out_ptr + it->frames_out_pos);
 
 
         assertion(-500881, (it->frame_cache_msgs_size >= TLV_TX_DATA_PROCESSED));
@@ -3466,12 +3457,12 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		assertion(-501640, (it->frame_cache_msgs_size <= VRT_FRAME_DATA_SIZE_OUT));
 		it->dext->data = debugRealloc( it->dext->data, it->dext->dlen + sizeof(struct tlv_hdr_virtual) + fdata_in, -300568);
 
-		struct tlv_hdr_virtual *fhv = (struct tlv_hdr_virtual *)(it->dext->data + it->dext->dlen);
+		struct tlv_hdr_virtual *vth = (struct tlv_hdr_virtual *)(it->dext->data + it->dext->dlen);
 
-		fhv->type = it->frame_type;
-		fhv->mbz = 0;
-		fhv->length = htonl(sizeof(struct tlv_hdr_virtual) + fdata_in);
-		memcpy(&(fhv[1]), it->frame_cache_array, fdata_in);
+		vth->type = it->frame_type;
+		vth->mbz = 0;
+		vth->length = htonl(sizeof(struct tlv_hdr_virtual) + fdata_in);
+		memcpy(&(vth[1]), it->frame_cache_array, fdata_in);
 		it->dext->dlen += (sizeof(struct tlv_hdr_virtual) + fdata_in);
 
 		assertion(-501641, (it->dext->dlen <= (uint32_t)VRT_DESC_SIZE_OUT));
@@ -3481,8 +3472,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		assertion(-501642, (it->handls==description_tlv_handl));
 
 		// calculate description extension frames
-		assertion(-501643, TEST_STRUCT(struct frame_header_short)); // or
-		assertion(-501644, TEST_STRUCT(struct frame_header_long));  // of type
+		assertion(-501643, TEST_STRUCT(struct tlv_hdr)); // of type:
 		assertion(-501645, TEST_VALUE(BMX_DSC_TLV_RHASH_ADV));
 		// with frame-data hdr and msgs:
 		assertion(-501646, TEST_STRUCT(struct desc_hdr_rhash_adv));
@@ -3506,19 +3496,19 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		int32_t rfd_size = sizeof(struct desc_hdr_rhash_adv) + (rfd_msgs*sizeof(struct desc_msg_rhash_adv));
 
 		dbgf_track(DBGT_INFO, "added %s fDataInLen=%d fDataOutLen=%d -> msgs=%d rfd_size=%d flen=%d do_fref=%d (%d %d %d) do_fzip=%d (%d %d %d)",
-			handl->name, fdata_in, rfd_agg_len, rfd_msgs, rfd_size, sizeof (struct frame_header_long) + rfd_size,
+			handl->name, fdata_in, rfd_agg_len, rfd_msgs, rfd_size, sizeof (struct tlv_hdr) + rfd_size,
 			do_fref, use_referencing(handl), dextReferencing, DEF_FREF,
 			do_fzip, use_compression(handl), dextCompression, DEF_FZIP );
 
 		// set frame header size and values:
-		memset(fhl, 0, sizeof (struct frame_header_long));
-		fhl->type = BMX_DSC_TLV_RHASH_ADV;
-		fhl->length = htons(sizeof (struct frame_header_long) + rfd_size);
-		it->frames_out_pos += sizeof(struct frame_header_long) + rfd_size; ///TODO
+		memset(tlv, 0, sizeof (struct tlv_hdr));
+		tlv->type = BMX_DSC_TLV_RHASH_ADV;
+		tlv->length = htons(sizeof (struct tlv_hdr) + rfd_size);
+		it->frames_out_pos += sizeof(struct tlv_hdr) + rfd_size; ///TODO
 		assertion(-501651, ( it->frames_out_pos <= (int32_t)DESC_FRAMES_SIZE_OUT));
 
 		// set: frame-data hdr:
-		struct desc_hdr_rhash_adv *rfd_hdr = (struct desc_hdr_rhash_adv *) ((uint8_t*)&(fhl[1]));
+		struct desc_hdr_rhash_adv *rfd_hdr = (struct desc_hdr_rhash_adv *) ((uint8_t*)&(tlv[1]));
 		rfd_hdr->compression = (rfd_agg_len < fdata_in);
 		rfd_hdr->expanded_type = it->frame_type;
 
@@ -3549,13 +3539,13 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 	} else {
 		
-		memset(fhl, 0, sizeof (struct frame_header_long));
-		fhl->type = it->frame_type;
-		fhl->length = htons(fdata_in + sizeof ( struct frame_header_long));
-		it->frames_out_pos += sizeof ( struct frame_header_long) + fdata_in;
+		memset(tlv, 0, sizeof (struct tlv_hdr));
+		tlv->type = it->frame_type;
+		tlv->length = htons(fdata_in + sizeof ( struct tlv_hdr));
+		it->frames_out_pos += sizeof ( struct tlv_hdr) + fdata_in;
 		assertion(-501652, ( it->frames_out_pos <= (int32_t)PKT_FRAMES_SIZE_MAX));
 
-		memcpy(&(fhl[1]), it->frame_cache_array, fdata_in);
+		memcpy(&(tlv[1]), it->frame_cache_array, fdata_in);
 	}
 
 
@@ -3712,7 +3702,7 @@ void tx_packet(void *devp)
 {
         TRACE_FUNCTION_CALL;
 
-        static uint8_t cache_data_array[PKT_FRAMES_SIZE_MAX - sizeof(struct frame_header_long)] = {0};
+        static uint8_t cache_data_array[PKT_FRAMES_SIZE_MAX - sizeof(struct tlv_hdr)] = {0};
         static struct packet_buff pb;
         struct dev_node *dev = devp;
 
@@ -3742,7 +3732,7 @@ void tx_packet(void *devp)
                 .frames_out_ptr = (pb.packet.data + sizeof (struct packet_header)),
                 .frames_out_max =  PKT_FRAMES_SIZE_MAX,
                 .frames_out_pref = PKT_FRAMES_SIZE_OUT,
-		.frame_cache_size = PKT_FRAMES_SIZE_MAX - sizeof(struct frame_header_long),
+		.frame_cache_size = PKT_FRAMES_SIZE_MAX - sizeof(struct tlv_hdr),
                 .frame_cache_array = cache_data_array,
         };
 
@@ -4699,8 +4689,8 @@ void rx_packet( struct packet_buff *pb )
 
 	// immediately drop invalid packets...
 	// we acceppt longer packets than specified by pos->size to allow padding for equal packet sizes
-        if (    pb->i.total_length < (int) (sizeof (struct packet_header) + sizeof (struct frame_header_long)) ||
-                pkt_length < (int) (sizeof (struct packet_header) + sizeof (struct frame_header_long)) ||
+        if (    pb->i.total_length < (int) (sizeof (struct packet_header) + sizeof (struct tlv_hdr)) ||
+                pkt_length < (int) (sizeof (struct packet_header) + sizeof (struct tlv_hdr)) ||
                 ((phdr->comp_version < (my_compatibility - 1)) || (phdr->comp_version > (my_compatibility + 1))) ||
                 pkt_length > pb->i.total_length || pkt_length > (PKT_FRAMES_SIZE_MAX + sizeof(struct packet_header)) ||
                 pb->i.link_key.dev_idx < DEVADV_IDX_MIN || pb->i.link_key.local_id == LOCAL_ID_INVALID ) {

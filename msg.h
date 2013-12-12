@@ -48,10 +48,10 @@
 #define MIN_DESC_FRAME_SIZE         (MIN_UDPD_SIZE - sizeof(struct packet_header))
 #define MAX_DESC_FRAME_SIZE         (MAX_UDPD_SIZE - sizeof(struct packet_header))
 #define DEF_DESC_FRAME_SIZE         (BIG_UDPD_SIZE - sizeof(struct packet_header))
-#define     REF_FRAME_BODY_SIZE_OUT (desc_frame_size_out - sizeof(struct frame_header_long) - sizeof(struct frame_hdr_rhash_adv))
-#define     REF_FRAME_BODY_SIZE_MAX (MAX_DESC_FRAME_SIZE - sizeof(struct frame_header_long) - sizeof(struct frame_hdr_rhash_adv))
-#define     DESC_FRAMES_SIZE_OUT    (desc_frame_size_out - sizeof(struct frame_header_long) - sizeof (struct msg_description_adv))
-#define     DESC_FRAMES_SIZE_MAX    (MAX_DESC_FRAME_SIZE - sizeof(struct frame_header_long) - sizeof (struct msg_description_adv))
+#define     REF_FRAME_BODY_SIZE_OUT (desc_frame_size_out - sizeof(struct tlv_hdr) - sizeof(struct frame_hdr_rhash_adv))
+#define     REF_FRAME_BODY_SIZE_MAX (MAX_DESC_FRAME_SIZE - sizeof(struct tlv_hdr) - sizeof(struct frame_hdr_rhash_adv))
+#define     DESC_FRAMES_SIZE_OUT    (desc_frame_size_out - sizeof(struct tlv_hdr) - sizeof (struct msg_description_adv))
+#define     DESC_FRAMES_SIZE_MAX    (MAX_DESC_FRAME_SIZE - sizeof(struct tlv_hdr) - sizeof (struct msg_description_adv))
 
 #define ARG_VRT_DESC_SIZE_OUT  "descVirtSizeOut"
 #define HLP_VRT_DESC_SIZE_OUT  "set maximum virtual size for own description"
@@ -61,10 +61,10 @@
 #define DEF_VRT_DESC_SIZE      (16384) //any value less-equal then MAX_VRT_DESC_SIZE
 //#define MAX_VRT_DESC_SIZE      (INT32_MAX)
 // this should be the max possible with a reference depth of 1 :
-#define MAX_VRT_DESC_SIZE      ((DESC_FRAMES_SIZE_MAX - (5 * (sizeof(struct frame_header_long) + sizeof(struct desc_hdr_rhash_adv)) )) / \
+#define MAX_VRT_DESC_SIZE      ((DESC_FRAMES_SIZE_MAX - (5 * (sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash_adv)) )) / \
 			       sizeof(struct desc_msg_rhash_adv)) \
 			       * \
-			       (DEF_DESC_FRAME_SIZE - sizeof(struct frame_header_long) - sizeof(struct frame_hdr_rhash_adv))
+			       (DEF_DESC_FRAME_SIZE - sizeof(struct tlv_hdr) - sizeof(struct frame_hdr_rhash_adv))
 #define     VRT_DESC_SIZE_OUT  (vrt_desc_size_out)
 #define     VRT_DESC_SIZE_IN   (vrt_desc_size_in)
 
@@ -73,7 +73,7 @@
 #define HLP_VRT_FRAME_DATA_SIZE_OUT  "set maximum virtual size for own description frames"
 #define ARG_VRT_FRAME_DATA_SIZE_IN   "descVirtFrameSizeIn"
 #define HLP_VRT_FRAME_DATA_SIZE_IN   "set maximum virtual size for other description frames"
-#define MIN_VRT_FRAME_DATA_SIZE      (MIN_DESC_FRAME_SIZE - sizeof (struct frame_header_long))
+#define MIN_VRT_FRAME_DATA_SIZE      (MIN_DESC_FRAME_SIZE - sizeof (struct tlv_hdr))
 #define DEF_VRT_FRAME_DATA_SIZE      (8192) //any value less then MAX_VRT_FRAME_DATA_SIZE
 #define MAX_VRT_FRAME_DATA_SIZE      (MAX_VRT_DESC_SIZE - sizeof(struct tlv_hdr_virtual))
 #define     VRT_FRAME_DATA_SIZE_OUT  (vrt_frame_data_size_out)
@@ -391,46 +391,6 @@ struct packet_header // 17 bytes
 #endif
 
 
-#if MIN_COMPATIBILITY <= CV17
-struct frame_header_short { // 2 bytes
-
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int type : FRAME_TYPE_BIT_SIZE;
-	unsigned int reserved : 2;
-	unsigned int is_short : 1;
-
-#elif __BYTE_ORDER == __BIG_ENDIAN
-	unsigned int is_short : FRAME_ISSHORT_BIT_SIZE;
-	unsigned int reserved : FRAME_RELEVANCE_BIT_SIZE;
-	unsigned int type : FRAME_TYPE_BIT_SIZE;
-#else
-# error "Please fix <bits/endian.h>"
-#endif
-	uint8_t length; // lenght of frame in TLV_DATA_STEPS Byte steps, including frame_header and variable data field
-//	uint8_t  data[];   // frame-type specific data consisting of 0-1 data headers and 1-n data messages
-} __attribute__((packed));
-
-
-struct frame_header_long { // 4 bytes
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int type : FRAME_TYPE_BIT_SIZE;
-	unsigned int reserved1 : 2;
-	unsigned int is_short  : 1;
-#elif __BYTE_ORDER == __BIG_ENDIAN
-	unsigned int is_short  : FRAME_ISSHORT_BIT_SIZE;
-	unsigned int reserved1 : FRAME_RELEVANCE_BIT_SIZE;
-	unsigned int type : FRAME_TYPE_BIT_SIZE;
-#else
-# error "Please fix <bits/endian.h>"
-#endif
-
-//	uint8_t  is_virtual;
-	uint8_t  reserved;
-
-	uint16_t length;  // lenght of (compressed) frame in 1-Byte steps, including frame_header and variable data field
-//	uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
-} __attribute__((packed));
-#endif
 
 struct tlv_hdr_virtual { // 6 bytes
     uint8_t type;
@@ -439,12 +399,8 @@ struct tlv_hdr_virtual { // 6 bytes
 //	uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
 } __attribute__((packed));
 
-//#define SHORT_FRAME_DATA_MAX (XMIN( 500, ((int)((((sizeof( ((struct frame_header_short*)NULL)->length_TLV_DATA_STEPS ))<<8)-1)*TLV_DATA_STEPS))))
 
 
-
-
-// Future generic TLV header:
 struct tlv_hdr { // 2 bytes
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 	unsigned int length :    11;
@@ -517,8 +473,6 @@ struct frame_hdr_rhash_adv {
 
 
 
-#define MAX_SHORT_FRAME_LEN ((int)((((sizeof( ((struct frame_header_short*)NULL)->length ))<<8)-1)))
-#define MAX_SHORT_FRAME_DATA_LEN (MAX_SHORT_FRAME_LEN - sizeof(struct frame_header_short))
 
 // iterator return codes:
 #define TLV_RX_DATA_BLOCKED    (-6) // blocked due to DAD
@@ -829,7 +783,7 @@ FIELD_FORMAT_END}
 #define OGM_JUMPS_PER_AGGREGATION 10
 
 #define OGMS_PER_AGGREG_MAX  (PKT_FRAMES_SIZE_OUT - \
-                              (sizeof(struct frame_header_long) + sizeof(struct hdr_ogm_adv) + \
+                              (sizeof(struct tlv_hdr) + sizeof(struct hdr_ogm_adv) + \
                                (OGM_JUMPS_PER_AGGREGATION * sizeof(struct msg_ogm_adv)))) \
 			      / sizeof(struct msg_ogm_adv)
 
@@ -930,12 +884,11 @@ struct rx_frame_iterator {
         int8_t frame_type_expanded; //init to -1 !!
 
         // set by rx..iterate(), and consumed by handl[].rx_tlv_handler
-        uint8_t is_short_header;
         int32_t frame_data_length;
         int32_t frame_length;
         int32_t frame_msgs_length;
         int32_t frame_msgs_fixed;
-	struct frame_header_short *frame_hdr;
+	struct tlv_hdr *frame_hdr;
         uint8_t *frame_data;
         uint8_t *msg;
 

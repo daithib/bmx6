@@ -1096,7 +1096,7 @@ int32_t opt_update_description(uint8_t cmd, uint8_t _save, struct opt_type *opt,
 STATIC_FUNC
 void init_self(void)
 {
-        static uint8_t my_desc0[PKT_FRAMES_SIZE_MAX - sizeof(struct frame_header_long)];
+        static uint8_t my_desc0[PKT_FRAMES_SIZE_MAX - sizeof(struct tlv_hdr)];
         GLOBAL_ID_T id;
 	memset(&id, 0, sizeof(id));
 
@@ -1296,9 +1296,7 @@ void bmx(void)
 int main(int argc, char *argv[])
 {
         // make sure we are using compatible description0 sizes:
-        assertion(-500998, (sizeof(struct frame_header_short) == 2));
-        assertion(-500999, (sizeof(struct frame_header_long) == 4));
-
+        assertion(-500998, (sizeof(struct tlv_hdr) == 2));
 
 	gettimeofday( &start_time_tv, NULL );
         curr_tv = start_time_tv;
