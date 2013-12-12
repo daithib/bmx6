@@ -2622,7 +2622,7 @@ struct dhash_node *process_dhash_description_neighIID4x
         struct local_node *local = pb->i.link->local;
         IDM_T invalid = NO;
         struct description *cache = NULL;
-        IDM_T is_transmitters_iid = (neighIID4x == pb->i.transmittersIID);
+        IDM_T is_transmitters_iid = neighIID4x > IID_RSVD_MAX && neighIID4x == pb->i.transmittersIID;
 
         assertion(-500688, (dhash));
         assertion(-500689, (!(is_transmitters_iid && !memcmp(dhash, &(self->dhn->dhash), sizeof(*dhash))))); // cant be transmitters' and myselfs'
@@ -2645,7 +2645,7 @@ struct dhash_node *process_dhash_description_neighIID4x
 
                         assertion(-500968, (is_described_neigh(pb->i.link, pb->i.transmittersIID)));
 
-                } else if (local->neigh) {
+                } else if (neighIID4x > IID_RSVD_MAX && local->neigh) {
                         // received via a known neighbor, and is NOT about the transmitter:
 
                         if (orig_dhn == self->dhn) {
@@ -2689,7 +2689,8 @@ struct dhash_node *process_dhash_description_neighIID4x
                                 if (update_local_neigh(pb, orig_dhn) == FAILURE)
                                         return (struct dhash_node *) FAILURE_PTR;
 
-                                if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, orig_dhn->myIID4orig) == FAILURE)
+                                if (neighIID4x > IID_RSVD_MAX &&
+					iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, orig_dhn->myIID4orig) == FAILURE)
                                         return (struct dhash_node *) FAILURE_PTR;
 
                                 assertion(-500969, (is_described_neigh(pb->i.link, pb->i.transmittersIID)));
@@ -2701,7 +2702,8 @@ struct dhash_node *process_dhash_description_neighIID4x
                         if ((orig_dhn = process_description(pb, cache, dhash)) &&
 				orig_dhn != FAILURE_PTR && orig_dhn != UNRESOLVED_PTR && orig_dhn != IGNORED_PTR) {
 
-                                if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, orig_dhn->myIID4orig) == FAILURE)
+                                if (neighIID4x > IID_RSVD_MAX &&
+					iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, orig_dhn->myIID4orig) == FAILURE)
                                         return (struct dhash_node *) FAILURE_PTR;
                         }
 			assertion(-501589, orig_dhn);
@@ -2798,7 +2800,7 @@ int32_t rx_frame_description_advs(struct rx_frame_iterator *it)
 
 		cryptShaAtomic(desc, (sizeof(struct description) +tlvs_len), &dhash0);
 
-                if ((dhn = process_dhash_description_neighIID4x(pb, &dhash0, desc, neighIID4x)) == FAILURE_PTR) {
+                if ((dhn = process_dhash_description_neighIID4x(pb, &dhash0, desc, IID_RSVD_UNUSED)) == FAILURE_PTR) {
 
                         return FAILURE;
 			
