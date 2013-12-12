@@ -811,16 +811,12 @@ struct description2 {
 
 struct msg_description_adv { // IPv6: >= 92 bytes
 	
-	// the unhashed part:
-	IID_T    transmitterIID4x; // 2 bytes
-
 	// the hashed pard:
 	struct description desc;   // 68 bytes + extension frames (>= (metric-algo:2+16 bytes + hna6: 2+(x*22) bytes  ))
 
 } __attribute__((packed));
 
 #define DESCRIPTION_MSG_FORMAT { \
-{FIELD_TYPE_UINT,             -1, (8*sizeof(IID_T)),       0, FIELD_RELEVANCE_MEDI, "transmitterIid4x"}, \
 {FIELD_TYPE_GLOBAL_ID,        -1, (8*sizeof(GLOBAL_ID_T)), 1, FIELD_RELEVANCE_HIGH, "globalId"},  \
 {FIELD_TYPE_HEX,              -1, 16,                      0, FIELD_RELEVANCE_MEDI, "revision" }, \
 {FIELD_TYPE_UINT,             -1, 32,                      0, FIELD_RELEVANCE_MEDI, "descSqn" }, \

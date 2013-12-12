@@ -1585,7 +1585,6 @@ int32_t tx_msg_description_adv(struct tx_frame_iterator *it)
                 return TLV_TX_DATA_FULL;
         }
 
-        adv->transmitterIID4x = htons(ttn->task.myIID4x);
         desc0 = dhn->on->desc;
 
         memcpy((char*) & adv->desc, (char*) desc0, sizeof (struct description) + tlvs_len);
@@ -2789,10 +2788,9 @@ int32_t rx_frame_description_advs(struct rx_frame_iterator *it)
                 struct dhash_node *dhn;
 
                 tlvs_len = ntohs(desc->extensionLen);
-                neighIID4x = ntohs(adv->transmitterIID4x);
                 pos += (sizeof ( struct msg_description_adv) + tlvs_len);
 
-                if (neighIID4x <= IID_RSVD_MAX || tlvs_len > DESC_FRAMES_SIZE_MAX || pos > it->frame_msgs_length)
+                if (tlvs_len > DESC_FRAMES_SIZE_MAX || pos > it->frame_msgs_length)
                         break;
 
                 dbgf_track( DBGT_INFO, "rcvd desc: global_id=%s via_dev=%s via_ip=%s",
@@ -4541,7 +4539,6 @@ int32_t opt_show_descriptions(uint8_t cmd, uint8_t _save, struct opt_type *opt,
                                 continue;
 
                         struct msg_description_adv * desc_buff = debugMalloc(sizeof (struct msg_description_adv), -300361);
-                        desc_buff->transmitterIID4x = htons(on->dhn->myIID4orig);
                         memcpy(&desc_buff->desc, on->desc, sizeof (struct description));
 
                         dbg_printf(cn, "\ndescSha=%s blocked=%d size=%zu expanded_size=%zu:\n",

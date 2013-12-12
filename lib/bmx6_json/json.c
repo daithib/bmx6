@@ -527,7 +527,6 @@ void json_description_event_hook(int32_t cb_id, struct orig_node *on)
 
                 struct msg_description_adv * desc_buff = debugMalloc(sizeof (struct msg_description_adv), -300361);
 
-                desc_buff->transmitterIID4x = htons(on->dhn->myIID4orig);
                 memcpy(&desc_buff->desc, on->desc, sizeof (struct description));
 
                 json_object *jdesc_fields = NULL;
