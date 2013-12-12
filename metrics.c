@@ -1219,6 +1219,8 @@ int create_description_tlv_metricalgo(struct tx_frame_iterator *it)
         tlv_algo.m.hystere = my_path_hystere;
         tlv_algo.m.hop_penalty = my_hop_penalty;
         tlv_algo.m.late_penalty = my_late_penalty;
+	
+	dbgf_sys(DBGT_INFO, "tlv_algo=%s", memAsHexStringSep(&tlv_algo, sizeof(tlv_algo), 4, " "));
 
 /*
         if (self->path_metricalgo)
