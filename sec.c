@@ -92,8 +92,8 @@ int process_description_tlv_pubkey(struct rx_frame_iterator *it)
 
 finish: {
 	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
-		"%s verifying msg_type=%s msg_key_len=%d key_len=%d problem?=%s",
-		goto_error_code?"Failed":"Succeeded", cryptKeyTypeAsString(msg->type),
+		"%s %s verifying msg_type=%s msg_key_len=%d == key_len=%d problem?=%s",
+		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", cryptKeyTypeAsString(msg->type),
 		cryptKeyLenByType(msg->type), key_len, goto_error_code);
 
 	if (goto_error_code)
@@ -182,11 +182,11 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 	
 finish: {
 	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
-		"%s verifying  desc_len=%d desc_sha=%s \n"
+		"%s %s verifying  desc_len=%d desc_sha=%s \n"
 		"signature=%s\n"
 		"sign_type=%s sign_type_len=%d == sign_len=%d == pkey_len=%d pkey=%s \n"
 		"plain_len=%d==%d plain_sha=%s problem?=%s",
-		goto_error_code?"Failed":"Succeeded", desc_len, memAsHexString(&desc_sha, sizeof(desc_sha)),
+		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", desc_len, memAsHexString(&desc_sha, sizeof(desc_sha)),
 		memAsHexString(msg->signature, sign_len), cryptKeyTypeAsString(msg->type), cryptKeyLenByType(msg->type), 
 		sign_len, pkey_len, pkey ? memAsHexString(pkey->rawKey, pkey->rawKeyLen) : "---",
 		plain_len, sizeof(plain_sha), memAsHexString(&plain_sha, sizeof(plain_sha)), goto_error_code);
@@ -223,7 +223,7 @@ int process_description_tlv_sha(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	return TLV_RX_DATA_IGNORED;
+//	return TLV_RX_DATA_IGNORED;
 	
 	if (it->op != TLV_OP_TEST 
 #ifdef EXTREME_PARANOIA
@@ -248,8 +248,8 @@ int process_description_tlv_sha(struct rx_frame_iterator *it)
 
 finish: {
 	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
-		"%s verifying  desc_len=%d == msg_desc_len=%d desc_sha=%s == msg_desc_sha=%s  problem?=%s",
-		goto_error_code?"Failed":"Succeeded", sizeof(struct description) + it->frames_length,
+		"%s %s verifying  desc_len=%d == msg_desc_len=%d desc_sha=%s == msg_desc_sha=%s  problem?=%s",
+		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", sizeof(struct description) + it->frames_length,
 		ntohl(msg->desc_len), 
 		memAsHexString(&desc_sha, sizeof(desc_sha)), memAsHexString(&msg->desc_sha, sizeof(desc_sha)),
 		goto_error_code
