@@ -3507,8 +3507,8 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		it->frames_out_pos += sizeof(struct tlv_hdr) + rfd_size; ///TODO
 		assertion(-501651, ( it->frames_out_pos <= (int32_t)DESC_FRAMES_SIZE_OUT));
 
-		dbgf_sys(DBGT_INFO,"t=%X l=%X tlv=%s", 
-			BMX_DSC_TLV_RHASH_ADV, (sizeof (struct tlv_hdr) + rfd_size), memAsHexString(tlv, sizeof(struct tlv_hdr)));
+		dbgf_sys(DBGT_INFO,"fref t=%2X l=%4X tlv=%s %s", 
+			BMX_DSC_TLV_RHASH_ADV, (sizeof (struct tlv_hdr) + rfd_size), memAsHexString(tlv, sizeof(struct tlv_hdr)), handl->name);
 
 		// set: frame-data hdr:
 		struct desc_hdr_rhash_adv *rfd_hdr = (struct desc_hdr_rhash_adv *) ((uint8_t*)&(tlv[1]));
@@ -3548,8 +3548,9 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		it->frames_out_pos += sizeof ( struct tlv_hdr) + fdata_in;
 		assertion(-501652, ( it->frames_out_pos <= (int32_t)PKT_FRAMES_SIZE_MAX));
 
-		dbgf_sys(DBGT_INFO,"t=%X l=%X tlv=%s", 
-			it->frame_type, (sizeof(struct tlv_hdr)+fdata_in), memAsHexString(tlv, sizeof(struct tlv_hdr)));
+		dbgf_sys(DBGT_INFO,"dflt t=%2X l=%4X tlv=%s %s", 
+			it->frame_type, (sizeof (struct tlv_hdr) + fdata_in), memAsHexString(tlv, sizeof(struct tlv_hdr)), handl->name);
+
 		memcpy(&(tlv[1]), it->frame_cache_array, fdata_in);
 	}
 
