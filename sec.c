@@ -234,15 +234,16 @@ int process_description_tlv_sha(struct rx_frame_iterator *it)
 
 	char *goto_error_code = NULL;
 	struct dsc_msg_sha *msg = ((struct dsc_msg_sha*) it->frame_data);
-
-	if( ntohl(msg->desc_len) != sizeof(struct description) + it->frames_length)
+	int32_t exp_len = sizeof(struct description) + (int32_t)(((uint8_t*)it->frame_hdr) - it->frames_in);
+	
+	if( ntohl(msg->desc_len) != exp_len )
 		goto_error(finish, "1");
 
 	assertion(-500000, (it->desc && !memcmp(it->desc, it->desc, sizeof(struct description))));
-	assertion(-500000, (it->frames_in && !memcmp(it->frames_in, it->frames_in, it->frames_length)));
+	assertion(-500000, (it->frames_in && !memcmp(it->frames_in, it->frames_in, exp_len)));
 	SHA1_T desc_sha;
 	cryptShaNew(it->desc, sizeof(struct description));
-	cryptShaUpdate(it->frames_in, it->frames_length);
+	cryptShaUpdate(it->frames_in, exp_len);
 	cryptShaFinal(&desc_sha);
 	
 	if (memcmp(&msg->desc_sha, &desc_sha, sizeof(SHA1_T)))
