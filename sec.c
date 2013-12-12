@@ -73,7 +73,7 @@ int process_description_tlv_pubkey(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	return TLV_RX_DATA_IGNORED;
+//	return TLV_RX_DATA_IGNORED;
 
 	char *goto_error_code = NULL;
 	
@@ -421,7 +421,7 @@ int32_t init_sec( void )
         register_frame_handler(description_tlv_handl, BMX_DSC_TLV_PUBKEY, &handl);
 
 	static const struct field_format sha_format[] = DESCRIPTION_MSG_SHA_FORMAT;
-        handl.name = "SHA";
+        handl.name = "EXP_SHA";
         handl.min_msg_size = sizeof(struct dsc_msg_sha);
         handl.fixed_msg_size = 1;
         handl.tx_frame_handler = create_description_tlv_sha;
