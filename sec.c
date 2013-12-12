@@ -139,7 +139,7 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	return TLV_RX_DATA_IGNORED;
+//	return TLV_RX_DATA_IGNORED;
 	
 	assertion(-500000, (it->frame_data_length == it->frame_msgs_length && it->frame_data == it->msg));
 
