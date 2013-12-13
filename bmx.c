@@ -1072,8 +1072,7 @@ int32_t opt_status(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_
 }
 
 
-STATIC_FUNC
-int32_t opt_purge(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
+int32_t opt_purge_originators(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
 {
         TRACE_FUNCTION_CALL;
 
@@ -1177,7 +1176,7 @@ static struct opt_type bmx_options[]=
 	{ODI,0,ARG_ORIGINATORS,	        0,  9,2,A_PS0N,A_USR,A_DYN,A_ARG,A_ANY,	0,		0, 		0,		0,0, 		opt_status,
 			0,		"show originators\n"}
         ,
-	{ODI,0,"flushAll",		0,  9,2,A_PS0,A_ADM,A_DYN,A_ARG,A_ANY,	0,		0, 		0,		0,0, 		opt_purge,
+	{ODI,0,"flushAll",		0,  9,2,A_PS0,A_ADM,A_DYN,A_ARG,A_ANY,	0,		0, 		0,		0,0, 		opt_purge_originators,
 			0,		"purge all neighbors and routes on the fly"}
         ,
 #ifndef LESS_OPTIONS
