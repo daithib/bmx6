@@ -4227,7 +4227,7 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 
 		return (struct dhash_node *) IGNORED_PTR;
 	}
-	assertion(-500000, IMPLIES(cache->desc->descSqn==on->desc->descSqn, !on->added));
+	assertion(-500000, IMPLIES(on && cache->desc->descSqn==on->desc->descSqn, !on->added));
 
 	
 	// First check if dext is fully resolvable::
