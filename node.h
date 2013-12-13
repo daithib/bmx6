@@ -418,8 +418,6 @@ struct orig_node {
 
 	TIME_T updated_timestamp; // last time this on's desc was succesfully updated
 
-	DESC_SQN_T descSqn;
-
 	OGM_SQN_T ogmSqn_rangeMin;
 	OGM_SQN_T ogmSqn_rangeSize;
 
@@ -448,7 +446,7 @@ struct orig_node {
 
 	struct avl_tree rt_tree;
 
-	struct router_node * best_rt_local;  // TODO: remove
+	struct router_node *best_rt_local;  // TODO: remove
 	struct router_node *curr_rt_local;   // the currently used local neighbor for routing
 	struct link_dev_node *curr_rt_lndev; // the configured route in the kernel!
 

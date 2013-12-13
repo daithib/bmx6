@@ -53,6 +53,8 @@
 
 int32_t my_compatibility = DEF_COMPATIBILITY;
 
+uint32_t my_descSqn = 0;
+
 char my_Hostname[GLOBAL_ID_NAME_LEN] = "";
 
 
@@ -982,6 +984,9 @@ static int32_t orig_status_creator(struct status_handl *handl, void *data)
         memset(status, 0, status_size);
 
         while (data ? (on = data) : (on = avl_iterate_item(&orig_tree, &it))) {
+
+		assertion(-500000, (on->desc && on->dext));
+
                 status[i].name = on->global_id.name;
                 status[i].globalId = &on->global_id;
                 status[i].blocked = on->blocked;
@@ -991,7 +996,7 @@ static int32_t orig_status_creator(struct status_handl *handl, void *data)
                 status[i].viaDev = on->curr_rt_lndev && on->curr_rt_lndev->key.dev ? on->curr_rt_lndev->key.dev->name_phy_cfg.str : DBG_NIL;
                 status[i].metric = (on->curr_rt_local ? (on->curr_rt_local->mr.umetric) : (on == self ? UMETRIC_MAX : 0));
                 status[i].myIid4x = on->dhn->myIID4orig;
-                status[i].descSqn = on->descSqn;
+                status[i].descSqn = ntohl(on->desc->descSqn);
                 status[i].ogmSqn = on->ogmSqn_next;
                 status[i].ogmSqnDiff = (on->ogmSqn_maxRcvd - on->ogmSqn_next);
                 status[i].lastDesc = (bmx_time - on->updated_timestamp) / 1000;
@@ -1119,8 +1124,6 @@ void init_self(void)
 	self->desc_len = sizeof(struct description);
 
         self->ogmSqn_rangeMin = ((OGM_SQN_MASK) & rand_num(OGM_SQN_MAX));
-
-        self->descSqn = ((DESC_SQN_MASK) & rand_num(DESC_SQN_MAX));
 }
 
 

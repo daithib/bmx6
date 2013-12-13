@@ -60,7 +60,6 @@ extern int32_t my_compatibility;
 extern uint32_t rev_u32;
 
 
-
 /*
  * from ip.h:
  */
@@ -287,12 +286,9 @@ typedef uint16_t HELLO_SQN_T;
 
 // descriptions 
 typedef uint32_t DESC_SQN_T;
-#define DESC_SQN_BIT_SIZE   (8*sizeof(DESC_SQN_T))
-#define DESC_SQN_MASK       ((DESC_SQN_T)-1)
-#define DESC_SQN_MASK_CV16  ((uint16_t)-1)
-#define DESC_SQN_MAX        DESC_SQN_MASK
 
-#define DEF_DESCRIPTION_DAD_RANGE 8192
+
+extern uint32_t my_descSqn;
 
 
 

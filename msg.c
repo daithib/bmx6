@@ -261,31 +261,6 @@ validate_desc_structure_failure:
 
 
 
-STATIC_FUNC
-IDM_T validate_desc_sqn(struct description *desc, struct orig_node *on)
-{
-        TRACE_FUNCTION_CALL;
-
-	DESC_SQN_T descSqn = ntohl(desc->descSqn);
-
-        if (on) {
-                dbgf_track(DBGT_INFO, "descSQN=%d (old_sqn=%d) from id=%s cv=%d",
-                        descSqn, on->descSqn, globalIdAsString(&desc->globalId), desc->comp_version);
-
-                assertion(-500383, (on->dhn));
-
-                if (((TIME_T) (bmx_time - on->dhn->referred_by_me_timestamp)) < (TIME_T) dad_to) {
-
-                        if (((my_compatibility==CV16?DESC_SQN_MASK_CV16:DESC_SQN_MASK)&(descSqn - (on->descSqn + 1))) > DEF_DESCRIPTION_DAD_RANGE) {
-
-                                dbgf_sys(DBGT_ERR, "DAD-Alert: new dsc_sqn %d not > old %d + 1",descSqn, on->descSqn);
-
-                                return FAILURE;
-                        }
-                }
-        }
-        return SUCCESS;
-}
 
 
 
@@ -4237,18 +4212,22 @@ resolve_ref_frame_error:
 struct dhash_node * process_description(struct packet_buff *pb, struct description_cache_node *cache, DHASH_T *dhash)
 {
         TRACE_FUNCTION_CALL;
-        assertion(-500262, (pb && pb->i.link && cache));
+        assertion(-500262, (pb && pb->i.link && cache && cache->desc));
         assertion(-500381, (!avl_find( &dhash_tree, dhash )));
 
         struct orig_node *on = avl_find_item(&orig_tree, &cache->desc->globalId);
-        
-        if ( validate_desc_sqn( cache->desc, on ) != SUCCESS ) {
+
+	assertion(-500000, IMPLIES(on, on->desc && on->dext));
+
+        if ( on && ntohl(cache->desc->descSqn) < ntohl(on->desc->descSqn) ) {
 		
-		dbgf_sys(DBGT_WARN, "IGNORED global_id=%s rcvd via_dev=%s via_ip=%s",
-			cache ? globalIdAsString(&cache->desc->globalId) : "???", pb->i.iif->label_cfg.str, pb->i.llip_str);
+		dbgf_sys(DBGT_WARN, "IGNORED rcvd descSqn=%d (current descSqn=%d) from global_id=%s via_dev=%s via_ip=%s",
+			ntohl(cache->desc->descSqn), ntohl(on->desc->descSqn),
+			globalIdAsString(&cache->desc->globalId), pb->i.iif->label_cfg.str, pb->i.llip_str);
 
 		return (struct dhash_node *) IGNORED_PTR;
 	}
+	assertion(-500000, IMPLIES(cache->desc->descSqn==on->desc->descSqn, !on->added));
 
 	
 	// First check if dext is fully resolvable::
@@ -4282,7 +4261,6 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
                 on = init_orig_node(&cache->desc->globalId);
 
         on->updated_timestamp = bmx_time;
-        on->descSqn = ntohl(cache->desc->descSqn);
         on->ogmSqn_rangeMin = ntohs(cache->desc->ogmSqnMin);
         on->ogmSqn_rangeSize = ntohs(cache->desc->ogmSqnRange);
         on->ogmSqn_maxRcvd = (OGM_SQN_MASK & (on->ogmSqn_rangeMin - OGM_SQN_STEP));
@@ -4419,7 +4397,7 @@ void update_my_description_adv(void)
         sscanf(GIT_REV, "%4X", &rev_u32);
         dsc->revision = htons(rev_u32);
         dsc->comp_version = my_compatibility;
-        dsc->descSqn = htonl(++(self->descSqn));
+        dsc->descSqn = htonl(++my_descSqn);
 
 	struct desc_extension *next_dext = init_desc_extension();
 
