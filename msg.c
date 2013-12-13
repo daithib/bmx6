@@ -2929,7 +2929,7 @@ int32_t rx_msg_hello_adv(struct rx_frame_iterator *it)
         return sizeof (struct msg_hello_adv);
 }
 
-int32_t get_desc_frame_data(uint8_t **frame_data, uint8_t *desc_ext_data, int32_t desc_ext_len, uint8_t frame_type) {
+int32_t get_desc_frame_data(uint8_t **frame_data, uint8_t *desc_ext_data, int32_t desc_ext_len, uint8_t virtual_data, uint8_t frame_type) {
 
 	assertion(-500000, (frame_type != BMX_DSC_TLV_RHASH_ADV));
 
@@ -2939,7 +2939,7 @@ int32_t get_desc_frame_data(uint8_t **frame_data, uint8_t *desc_ext_data, int32_
                 .caller = __FUNCTION__, .on = NULL, .cn = NULL, .op = TLV_OP_PLUGIN_MIN,
                 .handls = description_tlv_handl, .handl_max = BMX_DSC_TLV_MAX,
                 .process_filter = FRAME_TYPE_PROCESS_NONE, .custom_data = NULL,
-                .frame_type = -1,.frames_in = desc_ext_data, .frames_length = desc_ext_len, .is_virtual_header = 1 };
+                .frame_type = -1,.frames_in = desc_ext_data, .frames_length = desc_ext_len, .is_virtual_header = virtual_data };
 
 	int32_t tlv_result;
 
@@ -2979,12 +2979,12 @@ IDM_T desc_frame_changed(  struct rx_frame_iterator *it, uint8_t f_type )
 	uint8_t *fdp_old, *fdp_new;
 	
 
-	int32_t fdl_old = get_desc_frame_data( &fdp_old, fs_in_old, fs_len_old, f_type);
+	int32_t fdl_old = get_desc_frame_data( &fdp_old, fs_in_old, fs_len_old, 0, f_type);
 
 	assertion(-500000, (fdl_old >= 0));
 
 
-	int32_t fdl_new = get_desc_frame_data( &fdp_new, fs_in_new, fs_len_new, f_type);
+	int32_t fdl_new = get_desc_frame_data( &fdp_new, fs_in_new, fs_len_new, 0, f_type);
 
 	assertion(-500000, (fdl_new >= 0));
 
@@ -3013,7 +3013,7 @@ void process_description_tlvs_del( struct orig_node *on, uint8_t ft_start, uint8
 			continue;
 		
 		int32_t df_len = get_desc_frame_data(NULL, ((uint8_t*)(on->desc)) + sizeof(struct description), 
-			on->desc_len - sizeof(struct description), t);
+			on->desc_len - sizeof(struct description), 0, t);
 
 		assertion(-500000, (df_len >= 0));
 

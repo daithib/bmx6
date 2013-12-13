@@ -138,6 +138,7 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 //	return TLV_RX_DATA_IGNORED;
 	
 	assertion(-500000, (it->frame_data_length == it->frame_msgs_length && it->frame_data == it->msg));
+	assertion(-500000, (it->is_virtual_header));
 
 	if (it->op != TLV_OP_TEST || !descVerification)
 		return it->frame_data_length;
@@ -160,7 +161,7 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 	cryptShaAtomic(desc_start, desc_len, &desc_sha);
 	
 	uint8_t *pkey_frame_data;
-	pkey_len = get_desc_frame_data(&pkey_frame_data, it->frames_in, it->frames_length, BMX_DSC_TLV_PUBKEY) - sizeof(struct dsc_msg_pubkey);
+	pkey_len = get_desc_frame_data(&pkey_frame_data, it->frames_in, it->frames_length, it->is_virtual_header, BMX_DSC_TLV_PUBKEY) - sizeof(struct dsc_msg_pubkey);
 
 	if (pkey_len != sign_len)
 		goto_error( finish, "2");
