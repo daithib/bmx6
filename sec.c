@@ -41,7 +41,6 @@
 
 #define CODE_CATEGORY_NAME "sec"
 
-char key_path[MAX_PATH_SIZE] = DEF_KEY_PATH;
 
 static int32_t descVerification = DEF_DESC_VERIFY;
 
@@ -332,8 +331,9 @@ STATIC_FUNC
 int32_t opt_key_path(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
 {
 
-	char tmp_path[MAX_PATH_SIZE] = "";
 	static uint8_t checked = NO;
+	static char key_path[MAX_PATH_SIZE] = DEF_KEY_PATH;
+	char tmp_path[MAX_PATH_SIZE] = "";
 
 	if ( (cmd == OPT_CHECK || cmd == OPT_SET_POST) && initializing && !checked ) {
 
