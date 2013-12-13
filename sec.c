@@ -154,7 +154,7 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 	if ( !cryptKeyTypeAsString(msg->type) || cryptKeyLenByType(msg->type) != sign_len || desc_len < (int)sizeof(struct description))
 		goto_error( finish, "1");
 
-	if ( sign_len <= descVerification )
+	if ( sign_len > (descVerification/8) )
 		return it->frame_data_length;
 
 	cryptShaAtomic(desc_start, desc_len, &desc_sha);
