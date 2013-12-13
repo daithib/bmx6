@@ -290,6 +290,9 @@ typedef uint32_t DESC_SQN_T;
 
 extern uint32_t my_descSqn;
 
+#define ARG_DSQN_PATH "descSqnPath"
+#define DEF_DSQN_PATH "/etc/bmx6/descSqn"
+
 
 
 #define FRAME_TYPE_BIT_SIZE    (5)
@@ -664,6 +667,7 @@ void upd_time( struct timeval *precise_tv );
 
 char *get_human_uptime( uint32_t reference );
 
+DESC_SQN_T getDescriptionSqn( char* newPath, uint8_t ass );
 
 
 /***********************************************************

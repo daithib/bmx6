@@ -4398,7 +4398,8 @@ void update_my_description_adv(void)
         sscanf(GIT_REV, "%4X", &rev_u32);
         dsc->revision = htons(rev_u32);
         dsc->comp_version = my_compatibility;
-        dsc->descSqn = htonl(++my_descSqn);
+        dsc->descSqn = getDescriptionSqn( NULL, 1);
+
 
 	struct desc_extension *next_dext = init_desc_extension();
 

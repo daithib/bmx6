@@ -1152,6 +1152,98 @@ int32_t opt_hostname(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
 	return SUCCESS;
 }
 
+DESC_SQN_T getDescriptionSqn( char* newPath, uint8_t ass )
+{
+	static DESC_SQN_T currSqn = 0;
+	static char path[MAX_PATH_SIZE];
+	FILE* file = NULL;
+	int ret;
+	char *goto_error_code = NULL;
+#define DSQNIVAL 10
+
+	assertion(-500000, XOR(newPath, strlen(path) ));
+
+	if (!strlen(path)) {
+
+		strcpy(path, newPath);
+
+		if (wordlen(path) + 1 >= MAX_PATH_SIZE || path[0] != '/')
+			goto_error(finish, "path has illegal format");
+
+		char *slash = strrchr(path, '/');
+		if (slash) {
+			*slash = 0;
+			if (check_dir(path, YES, YES) == FAILURE)
+				goto_error(finish, "dir can not be created");
+			*slash = '/';
+		}
+	}
+
+	if (currSqn==0) {
+
+		if ((file = fopen(path, "r+"))) {
+			if ((fscanf(file, "%u", &currSqn) == 1) && (fseek(file, 0, SEEK_SET) == 0) &&
+				((ret = fprintf(file, "%u", (currSqn=(((currSqn+DSQNIVAL)/DSQNIVAL)*DSQNIVAL)))) > 0) &&
+				(fclose(file) == 0) && (truncate(path, ret) == 0)) {
+				dbgf_sys(DBGT_INFO, "Updating existing %s=%s +%d descSqn=%d", ARG_DSQN_PATH, path, DSQNIVAL, currSqn );
+				file=NULL;
+			} else {
+				goto_error(finish, "has illegal content");
+			}
+		} else if ((file = fopen(path, "w"))) {
+			if ((ret = fprintf(file, "%u", ++currSqn)) > 0) {
+				dbgf_sys(DBGT_WARN, "Created new %s=%s starting with descSqn=%d", ARG_DSQN_PATH, path, currSqn );
+			} else {
+				goto_error(finish, "new file can not be updated!");
+			}
+		} else {
+			goto_error(finish, "can not be created!");
+		}
+
+	} else if ((++currSqn)%DSQNIVAL) {
+
+		dbgf_sys(DBGT_INFO, "Not Updating existing %s=%s descSqn=%d", ARG_DSQN_PATH, path, currSqn );
+
+	} else if ((file = fopen(path, "w")) && ((ret = fprintf(file, "%u", currSqn)) > 0)) {
+
+		dbgf_sys(DBGT_INFO, "Updating existing %s=%s descSqn=%d", ARG_DSQN_PATH, path, currSqn );
+
+	} else {
+		goto_error(finish, "old file can not be updated!");
+	}
+
+finish: {
+
+	if(file)
+		fclose(file);
+
+	if (goto_error_code) {
+		dbgf_sys(DBGT_ERR, "%s=%s %s! errno=%s", ARG_DSQN_PATH, path, goto_error_code, strerror(errno));
+		assertion(-500000, (ass));
+		return 0;
+	}
+
+	dbgf_sys(DBGT_INFO, "new descSqn=%d", currSqn);
+	return htonl(currSqn);
+}
+}
+
+STATIC_FUNC
+int32_t opt_dsqn_path(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
+{
+	static uint8_t checked = NO;
+
+	if ( (cmd == OPT_CHECK || cmd == OPT_SET_POST) && initializing && !checked ) {
+
+		if (!getDescriptionSqn((cmd==OPT_CHECK ? patch->val : DEF_DSQN_PATH), 0))
+			return FAILURE;
+
+		checked = YES;
+        }
+
+	return SUCCESS;
+}
+
 
 static struct opt_type bmx_options[]=
 {
@@ -1165,6 +1257,9 @@ static struct opt_type bmx_options[]=
 //order must be after ARG_KEY_PATH and before ARG_AUTO_IP6_PREFIX and ARG_TUN_IN_DEV (which use self, initialized from init_self, called from opt_hostname):
 	{ODI,0,ARG_HOSTNAME,		0,  5,0,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,		0,		        0,		        0,0,	opt_hostname,
 			ARG_VALUE_FORM,	"set advertised hostname of node"},
+
+	{ODI,0,ARG_DSQN_PATH,		0,  9,1,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,		0,		0,		0,DEF_DSQN_PATH,opt_dsqn_path,
+			ARG_DIR_FORM,	"set path to file containing latest used description SQN of this node"},
 
 	{ODI,0,ARG_SHOW,		's', 9,2,A_PS1N,A_USR,A_DYN,A_ARG,A_ANY,	0,		0, 		0,		0,0, 		opt_status,
 			ARG_VALUE_FORM,		"show status information about given context. E.g.:" ARG_STATUS ", " ARG_INTERFACES ", " ARG_LINKS ", " ARG_ORIGINATORS ", ..." "\n"},
