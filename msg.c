@@ -290,21 +290,24 @@ IDM_T validate_desc_sqn(struct description *desc, struct orig_node *on)
 
 
 STATIC_FUNC
-struct description_cache_node * get_cached_description(DHASH_T *dhash, IDM_T remove)
+struct description_cache_node * get_cached_description(DHASH_T *dhash)
 {
         TRACE_FUNCTION_CALL;
+
+        return (struct description_cache_node *)avl_find_item(&description_cache_tree, dhash);
+}
+
+STATIC_FUNC
+void del_cached_description(DHASH_T *dhash)
+{
+        TRACE_FUNCTION_CALL;
+
         struct description_cache_node *dcn;
 
-        if (!(dcn = avl_find_item(&description_cache_tree, dhash)))
-                return NULL;
-
-        if(remove) {
-                avl_remove(&description_cache_tree, &dcn->dhash, -300206);
-                debugFree(dcn, -300108);
-		return NULL;
-        }
-
-        return dcn;
+        if ((dcn = avl_find_item(&description_cache_tree, dhash))) {
+		avl_remove(&description_cache_tree, &dcn->dhash, -300206);
+		debugFree(dcn, -300108);
+	}
 }
 
 STATIC_FUNC
@@ -2686,7 +2689,7 @@ struct dhash_node *process_dhash_description_neighIID4x
                 if (dsc)
                         cache_description(dsc, desc_len, dhash);
 
-                if (is_transmitters_iid && (cache = get_cached_description(dhash, NO/*remove*/))) {
+                if (is_transmitters_iid && (cache = get_cached_description(dhash))) {
                         //is about the transmitter  and  a description + dhash is known
 			
                         if ((orig_dhn = process_description(pb, cache, dhash)) &&
@@ -2703,7 +2706,7 @@ struct dhash_node *process_dhash_description_neighIID4x
                         }
 			assertion(-501587, orig_dhn);
 
-                } else if (local->neigh && (cache = get_cached_description(dhash, NO/*remove*/))) {
+                } else if (local->neigh && (cache = get_cached_description(dhash))) {
 
                         if ((orig_dhn = process_description(pb, cache, dhash)) &&
 				orig_dhn != FAILURE_PTR && orig_dhn != UNRESOLVED_PTR && orig_dhn != IGNORED_PTR) {
@@ -2958,8 +2961,10 @@ int32_t get_desc_frame_data(uint8_t **frame_data, uint8_t *desc_ext_data, int32_
 			frame_data_len = it.frame_data_length;
 		}
 	}
-
-	return frame_data_len;
+	if (tlv_result == TLV_RX_DATA_DONE)
+		return frame_data_len;
+	else
+		return tlv_result;
 }
 
 IDM_T desc_frame_changed(  struct rx_frame_iterator *it, uint8_t f_type )
@@ -4324,7 +4329,7 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 
         on->desc = cache->desc;
 	on->desc_len = cache->desc_len;
-        get_cached_description(dhash, YES/*remove*/);
+        del_cached_description(dhash);
 
 
         update_neigh_dhash(on, dhash);
