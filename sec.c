@@ -43,7 +43,7 @@
 
 char key_path[MAX_PATH_SIZE] = DEF_KEY_PATH;
 
-
+static int32_t descVerification = DEF_DESC_VERIFY;
 
 
 
@@ -77,11 +77,7 @@ int process_description_tlv_pubkey(struct rx_frame_iterator *it)
 
 	char *goto_error_code = NULL;
 	
-	if (it->op != TLV_OP_TEST 
-#ifdef EXTREME_PARANOIA
-		&& it->op != TLV_OP_NEW
-#endif
-		)
+	if (it->op != TLV_OP_TEST )
 		return it->frame_data_length;
 
 	int32_t key_len = it->frame_data_length - sizeof(struct dsc_msg_pubkey);
@@ -143,11 +139,7 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 	
 	assertion(-500000, (it->frame_data_length == it->frame_msgs_length && it->frame_data == it->msg));
 
-	if (it->op != TLV_OP_TEST 
-#ifdef EXTREME_PARANOIA
-		&& it->op != TLV_OP_NEW
-#endif	
-		)
+	if (it->op != TLV_OP_TEST || !descVerification)
 		return it->frame_data_length;
 
 	char *goto_error_code = NULL;
@@ -157,21 +149,25 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 	int32_t desc_len = it->desc_len - (sizeof(struct tlv_hdr) + it->frame_data_length);
 	CRYPTSHA1_T desc_sha;
 	CRYPTKEY_T *pkey = NULL;
+	int32_t pkey_len = 0;
 	
 	if ( !cryptKeyTypeAsString(msg->type) || cryptKeyLenByType(msg->type) != sign_len || desc_len < (int)sizeof(struct description))
 		goto_error( finish, "1");
 
+	if ( sign_len <= descVerification )
+		return it->frame_data_length;
+
 	cryptShaAtomic(desc_start, desc_len, &desc_sha);
 	
 	uint8_t *pkey_frame_data;
-	int32_t pkey_len = get_desc_frame_data(&pkey_frame_data, it->frames_in, it->frames_length, BMX_DSC_TLV_PUBKEY) - sizeof(struct dsc_msg_pubkey);
+	pkey_len = get_desc_frame_data(&pkey_frame_data, it->frames_in, it->frames_length, BMX_DSC_TLV_PUBKEY) - sizeof(struct dsc_msg_pubkey);
 
 	if (pkey_len != sign_len)
 		goto_error( finish, "2");
 
 	pkey = cryptPubKeyFromRaw(((struct dsc_msg_pubkey*)pkey_frame_data)->key, pkey_len);
 	
-	CRYPTSHA1_T plain_sha;
+	CRYPTSHA1_T plain_sha = {.h.u32={0} };
 	int32_t plain_len = sizeof(plain_sha);
 
 	if (cryptVerify(msg->signature, sign_len, (uint8_t*)&plain_sha, &plain_len, pkey) != SUCCESS )
@@ -190,13 +186,14 @@ finish: {
 		memAsHexString(msg->signature, sign_len), cryptKeyTypeAsString(msg->type), cryptKeyLenByType(msg->type), 
 		sign_len, pkey_len, pkey ? memAsHexString(pkey->rawKey, pkey->rawKeyLen) : "---",
 		plain_len, sizeof(plain_sha), memAsHexString(&plain_sha, sizeof(plain_sha)), goto_error_code);
-}	
+	
 	cryptKeyFree(&pkey);
 	
 	if (goto_error_code)
 		return TLV_RX_DATA_FAILURE;
 	else
 		return it->frame_data_length;
+}
 }
 
 STATIC_FUNC
@@ -222,11 +219,7 @@ int process_description_tlv_sha(struct rx_frame_iterator *it)
 
 //	return TLV_RX_DATA_IGNORED;
 	
-	if (it->op != TLV_OP_TEST 
-#ifdef EXTREME_PARANOIA
-		&& it->op != TLV_OP_NEW
-#endif	
-		)
+	if (it->op != TLV_OP_TEST )
 		return it->frame_data_length;
 
 	char *goto_error_code = NULL;
@@ -394,6 +387,8 @@ struct opt_type sec_options[]=
 //order must be before ARG_HOSTNAME (which initializes self via init_self):
 	{ODI,0,ARG_KEY_PATH,		0,  4,1,A_PS1,A_ADM,A_INI,A_CFA,A_ANY,	0,		0,		0,		0,DEF_KEY_PATH,	opt_key_path,
 			ARG_DIR_FORM,	"set path to rsa der-encoded private key file (used as permanent public ID"},
+	{ODI,0,ARG_DESC_VERIFY,         0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY, &descVerification,MIN_DESC_VERIFY,MAX_DESC_VERIFY,DEF_DESC_VERIFY,0, opt_purge_originators,
+			ARG_VALUE_FORM, HLP_DESC_VERIFY},
 
 };
 
