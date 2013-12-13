@@ -4287,6 +4287,7 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
                         assertion(-501364, (tlv_result == TLV_RX_DATA_DONE));
                 }
 
+		assertion(-500000, (!on->added));
                 assertion(-501365, IMPLIES(on->blocked, !on->added));
 
                 if (tlv_result == TLV_RX_DATA_FAILURE)
