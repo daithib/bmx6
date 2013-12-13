@@ -1116,6 +1116,7 @@ void init_self(void)
         self = init_orig_node(&id);
 
         self->desc = (struct description *) my_desc0;
+	self->desc_len = sizeof(struct description);
 
         self->ogmSqn_rangeMin = ((OGM_SQN_MASK) & rand_num(OGM_SQN_MAX));
 
