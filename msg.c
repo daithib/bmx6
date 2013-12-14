@@ -387,7 +387,7 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, str
 		ntohl(desc->descSqn),  dext->dlen, filter);
 
 
-        while ((tlv_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE);
+        while ((tlv_result = rx_frame_iterate(&it)) > TLV_RX_DATA_BLOCKED);
 
         if ((op >= TLV_OP_CUSTOM_MIN && op <= TLV_OP_CUSTOM_MAX) || (op >= TLV_OP_PLUGIN_MIN && op <= TLV_OP_PLUGIN_MAX))
                 return TLV_RX_DATA_DONE;
@@ -3224,7 +3224,7 @@ IDM_T rx_frames(struct packet_buff *pb)
 		.is_virtual_header = 0
         };
 
-        while ((it_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE || it_result == TLV_RX_DATA_BLOCKED);
+        while ((it_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE);
 
         if (it_result <= TLV_RX_DATA_FAILURE) {
                 dbgf_sys(DBGT_WARN, "problematic frame_type=%s data_length=%d iterator_result=%d pos=%d ",

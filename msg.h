@@ -460,15 +460,16 @@ struct frame_hdr_rhash_adv {
 
 
 // iterator return codes:
-#define TLV_RX_DATA_BLOCKED    (-6) // blocked due to DAD
 
-#define TLV_TX_DATA_FULL       (-5) // nothing done! Frame finished or not enough remining data area to write
-                                 // only returns from tx-iterations, rx- will return FAILURE
-#define TLV_RX_DATA_FAILURE    (-4) // syntax error: exit or blacklist
-#define TLV_TX_DATA_FAILURE    (-4) // syntax error: will fail assertion()
+#define TLV_TX_DATA_FULL        (-6) // nothing done! Frame finished or not enough remining data area to write
+                                    // only returns from tx-iterations, rx- will return FAILURE
+#define TLV_RX_DATA_FAILURE     (-5) // syntax error: exit or blacklist
+#define TLV_TX_DATA_FAILURE     (-5) // syntax error: will fail assertion()
 
-#define TLV_RX_DATA_DONE        (-3) // done, nothing more to do
-#define TLV_TX_DATA_DONE        (-3) // done, nothing more to do
+#define TLV_RX_DATA_DONE        (-4) // done, nothing more to do
+#define TLV_TX_DATA_DONE        (-4) // done, nothing more to do
+
+#define TLV_RX_DATA_BLOCKED     (-3) // blocked due to DAD
 
 #define TLV_RX_DATA_UNRESOLVED  (-2) // TBD: remove !!?? (unknown, filtered, nothing to send, or ignored due to bad link...)
 
