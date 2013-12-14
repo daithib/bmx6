@@ -2599,23 +2599,19 @@ static const void* FAILURE_PTR = (void*) & FAILURE_PTR;
 
 STATIC_FUNC
 struct dhash_node *process_dhash_description_neighIID4x
-(struct packet_buff *pb, DHASH_T *dhash, struct description *dsc, uint16_t desc_len, IID_T neighIID4x)
+(struct packet_buff *pb, DHASH_T *dhash, struct description* dsc, uint16_t desc_len, IID_T neighIID4x)
 {
         TRACE_FUNCTION_CALL;
         struct dhash_node *orig_dhn = NULL;
         struct local_node *local = pb->i.link->local;
-        IDM_T invalid = NO;
         struct description_cache_node *cache = NULL;
         IDM_T is_transmitters_iid = neighIID4x > IID_RSVD_MAX && neighIID4x == pb->i.transmittersIID;
 
         assertion(-500688, (dhash));
         assertion(-500689, (!(is_transmitters_iid && !memcmp(dhash, &(self->dhn->dhash), sizeof(*dhash))))); // cant be transmitters' and myselfs'
+        assertion(-500000, (!avl_find(&dhash_invalid_tree, dhash)));
 
-        if (avl_find(&dhash_invalid_tree, dhash)) {
-
-                invalid = YES;
-
-        } else if ((orig_dhn = avl_find_item(&dhash_tree, dhash))) {
+        if ((orig_dhn = avl_find_item(&dhash_tree, dhash))) {
                 // is about a known dhash:
                 
                 if (is_transmitters_iid) {
@@ -2635,7 +2631,6 @@ struct dhash_node *process_dhash_description_neighIID4x
                         if (orig_dhn == self->dhn) {
                                 // is about myself:
 
-
                                 dbgf_all(DBGT_INFO, "msg refers myself via %s neighIID4me %d", pb->i.llip_str, neighIID4x);
 
                                 local->neigh->neighIID4me = neighIID4x;
@@ -2654,57 +2649,39 @@ struct dhash_node *process_dhash_description_neighIID4x
 
                         if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, orig_dhn->myIID4orig) == FAILURE)
                                 return (struct dhash_node *) FAILURE_PTR;
-
                 }
 
-        } else {
+        } else if ((is_transmitters_iid || local->neigh) ) {
                 // is about an unconfirmed or unkown dhash:
 
-                // its just the easiest to cache and remove because cache description is doing all the checks for us
-                if (dsc)
-                        cache_description(dsc, desc_len, dhash);
+		if (dsc)
+			cache_description(dsc, desc_len, dhash);
 
-                if (is_transmitters_iid && (cache = get_cached_description(dhash))) {
-                        //is about the transmitter  and  a description + dhash is known
-			
-                        if ((orig_dhn = process_description(pb, cache, dhash)) &&
-				orig_dhn != FAILURE_PTR && orig_dhn != UNRESOLVED_PTR && orig_dhn != IGNORED_PTR) {
+		if ((cache = get_cached_description(dhash)) && (orig_dhn = process_description(pb, cache, dhash)) &&
+			orig_dhn != FAILURE_PTR && orig_dhn != UNRESOLVED_PTR && orig_dhn != IGNORED_PTR) {
 
-                                if (update_local_neigh(pb, orig_dhn) == FAILURE)
-                                        return (struct dhash_node *) FAILURE_PTR;
+			if (is_transmitters_iid &&
+				//is about the transmitter  and  a description + dhash is known
+				update_local_neigh(pb, orig_dhn) == FAILURE)
+				return(struct dhash_node *) FAILURE_PTR;
 
-                                if (neighIID4x > IID_RSVD_MAX &&
-					iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, orig_dhn->myIID4orig) == FAILURE)
-                                        return (struct dhash_node *) FAILURE_PTR;
+			if (neighIID4x > IID_RSVD_MAX &&
+				iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, orig_dhn->myIID4orig) == FAILURE)
+				return(struct dhash_node *) FAILURE_PTR;
 
-                                assertion(-500969, (is_described_neigh(pb->i.link, pb->i.transmittersIID)));
-                        }
+			assertion(-500969, IMPLIES(is_transmitters_iid, is_described_neigh(pb->i.link, pb->i.transmittersIID)));
 			assertion(-501587, orig_dhn);
-
-                } else if (local->neigh && (cache = get_cached_description(dhash))) {
-
-                        if ((orig_dhn = process_description(pb, cache, dhash)) &&
-				orig_dhn != FAILURE_PTR && orig_dhn != UNRESOLVED_PTR && orig_dhn != IGNORED_PTR) {
-
-                                if (neighIID4x > IID_RSVD_MAX &&
-					iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, orig_dhn->myIID4orig) == FAILURE)
-                                        return (struct dhash_node *) FAILURE_PTR;
-                        }
-			assertion(-501589, orig_dhn);
-                }
+		}
         }
 
-
-        dbgf_track(DBGT_INFO, "via dev=%s NB=%s dhash=%8X.. %s %s %s neighIID4x=%d  is_sender=%d %s",
+	dbgf_track(DBGT_INFO, "via dev=%s NB=%s dhash=%8X.. %s %s %s neighIID4x=%d is_sender=%d %s",
                 pb->i.iif->label_cfg.str, pb->i.llip_str, dhash->h.u32[0],
                 (dsc ? globalIdAsString(&dsc->globalId) : "NO DESCRIPTION"), (cache ? "CACHED" : "-"),
-		(orig_dhn?(orig_dhn==FAILURE_PTR?"FAILURE":
-			(orig_dhn==UNRESOLVED_PTR?"UNRESOLVED":(orig_dhn==IGNORED_PTR?"IGNORED":"RESOLVED"))):"UNKNOWN"),
+                (orig_dhn?(orig_dhn==FAILURE_PTR?"FAILURE":
+                        (orig_dhn==UNRESOLVED_PTR?"UNRESOLVED":(orig_dhn==IGNORED_PTR?"IGNORED":"RESOLVED"))):"UNKNOWN"),
                 neighIID4x, is_transmitters_iid,
-                invalid ? "INVALIDATED" : 
-			(orig_dhn && orig_dhn!=FAILURE_PTR && orig_dhn!=UNRESOLVED_PTR && orig_dhn!=IGNORED_PTR && orig_dhn->on ?
-				globalIdAsString(&orig_dhn->on->global_id) : DBG_NIL));
-
+		(orig_dhn && orig_dhn!=FAILURE_PTR && orig_dhn!=UNRESOLVED_PTR && orig_dhn!=IGNORED_PTR && orig_dhn->on ?
+			globalIdAsString(&orig_dhn->on->global_id) : DBG_NIL));
 
         return orig_dhn;
 }
@@ -2730,7 +2707,9 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
                 return sizeof (struct msg_dhash_adv);
         }
 
-        if ((dhn = process_dhash_description_neighIID4x(pb, &adv->dhash, NULL, 0, neighIID4x)) == FAILURE_PTR) {
+	if (avl_find(&dhash_invalid_tree, &adv->dhash)) {
+
+        } else if ((dhn = process_dhash_description_neighIID4x(pb, &adv->dhash, NULL, 0, neighIID4x)) == FAILURE_PTR) {
                 
 		return FAILURE;
 
@@ -2763,9 +2742,8 @@ int32_t rx_frame_description_advs(struct rx_frame_iterator *it)
 
 	struct msg_description_adv *adv = (struct msg_description_adv*)it->frame_data;
 	struct description *desc = &adv->desc;
-	DHASH_T dhash0;
-	struct dhash_node *dhn;
-                struct packet_buff *pb = it->pb;
+	DHASH_T dhash;
+	struct packet_buff *pb = it->pb;
 
 	dbgf_track( DBGT_INFO, "rcvd desc: global_id=%s via_dev=%s via_ip=%s",
 		globalIdAsString(&desc->globalId), pb->i.iif->label_cfg.str, pb->i.llip_str);
@@ -2773,32 +2751,32 @@ int32_t rx_frame_description_advs(struct rx_frame_iterator *it)
 	if (it->frame_msgs_length - sizeof(struct description) > DESC_FRAMES_SIZE_MAX)
 		return FAILURE;
 
-	cryptShaAtomic(desc, it->frame_msgs_length, &dhash0);
+	cryptShaAtomic(desc, it->frame_msgs_length, &dhash);
 
-	if ((dhn = process_dhash_description_neighIID4x(pb, &dhash0, desc, it->frame_msgs_length, IID_RSVD_UNUSED)) == FAILURE_PTR) {
+	if (!avl_find(&dhash_invalid_tree, &dhash)) {
 
-		return FAILURE;
+		struct dhash_node *dhn =  process_dhash_description_neighIID4x(pb, &dhash, desc, it->frame_data_length, IID_RSVD_UNUSED);
+
+		if (dhn == FAILURE_PTR) {
 			
-	} else if (dhn == UNRESOLVED_PTR || dhn == IGNORED_PTR) {
+			return FAILURE;
 
-	} else if (dhn) {
+		} else if (dhn == NULL || dhn == UNRESOLVED_PTR || dhn == IGNORED_PTR) {
 
-		assertion(-500691, (dhn->on));
-//		assertion(-500692, (IMPLIES(neighIID4x == pb->i.transmittersIID, is_described_neigh(pb->i.link, pb->i.transmittersIID))));
+		} else if (dhn) {
 
-		if (desc_adv_tx_unsolicited && dhn->on->updated_timestamp == bmx_time &&
-			is_described_neigh(pb->i.link, pb->i.transmittersIID)) {
+			assertion(-500691, (dhn->on));
 
-			struct link_dev_node **lndev_arr = lndevs_get_best_tp(pb->i.link->local);
-			int d;
+			if (desc_adv_tx_unsolicited && dhn->on->updated_timestamp == bmx_time &&
+				is_described_neigh(pb->i.link, pb->i.transmittersIID)) {
 
-			for (d = 0; (lndev_arr[d]); d++)
-				schedule_tx_task(lndev_arr[d], FRAME_TYPE_DESC_ADV, dhn->on->desc_len, 0, 0, dhn->myIID4orig, 0);
+				struct link_dev_node **lndev_arr = lndevs_get_best_tp(pb->i.link->local);
+				int d;
+
+				for (d = 0; (lndev_arr[d]); d++)
+					schedule_tx_task(lndev_arr[d], FRAME_TYPE_DESC_ADV, dhn->on->desc_len, 0, 0, dhn->myIID4orig, 0);
+			}
 		}
-	} else if (!dhn) {
-			
-	} else {
-		assertion(-501636, 0);
 	}
 	
         return it->frame_msgs_length;
