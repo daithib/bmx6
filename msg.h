@@ -281,80 +281,60 @@ ILV : single implicit-length value (implicit type)
 
 TLV : type length value (variable type and length, implicit dataHdrRelevance and dataBdyRelevance)
 - dataHdrFormat := { nil | FSV | TLV }
-- dataBdyFormat := { nil | ILV | {+|*}{ FSV | TLV } }
+- dataBdyFormat := { nil | ILV | +{ FSV | TLV } }
 
-data[ context=packet[ dataHdrFormat=nil dataBdyFormat=+TLV ], length= ]={
-    dataBdy={
-	TLV={
-	    type=cv16, length=,
-	    data[ context=packet.cv16[ dataHdrFormat=FSV dataBdyFormat=+TLV ], length= ]={
-		dataHdr={ FSV={transmitterIID, linkID, devID, ...} }
-		dataBdy={
-		    TLV={
-			type=hello, length=,
-			data[ context=packet.cv16.hello[ dataHdrFormat=FSV ], length= ]={
+data[ context=packet[ dataHdrFormat=nil dataBdyFormat=+TLV dataBdyHandler=packetHandl] ]={
+    dataBdy={ 
+        TLV={ type=cv16, length=, data[ context=packet.cv16[ dataHdrFormat=FSV dataBdyFormat=+TLV  dataBdyHandler=tlvHandl] ]={
+            dataHdr={ FSV={transmitterIID, linkID, devID, ...} }
+            dataBdy={ 
+                TLV={ type=hello, length=, data[ context=packet.cv16.hello[ dataHdrFormat=FSV  dataHandler=dataHandl] ]={
 			    dataHdr={ FSV={helloSqn} }
-			}
-		    }
-		    TLV={
-			type=descriptions, length=,
-			data[ context=packet.cv16.description[ dataBdyFormat=+TLV ], length= ]={
-			    dataBdy={
-				TLV={
-				    type=0, length=,
-				    data[ context=packet.cv16.description.1[ dataHdrFormat=FSV, dataBdyFormat=*TLV ], length= ]={
-					dataHdr={ FSV={name, descSqn, ...} }
-					dataBdy={
-					    TLV={
-						type=metric, length=,
-						data[ context=packet.cv16.description.1.metric[ dataHdrFormat=FSV ], length= ]={
-						    dataHdr={ FSV={algo, ...} }
-						}
-					    }
-					    TLV={
-						type=hna, length=,
-						data[ context=packet.cv16.description.1.hna[ dataBdyFormat=+FSV ], length= ]={
-						    dataBdy={
-							FSV={net,prefix}
-							FSV={net,prefix}
-							...
-						    }
-						}
-					    }
-					    TLV={
-						type=sms, length=,
-						data[ context=packet.cv16.description.1.sms[ dataBdyFormat=+TLV ], length= ]={
-						    dataBdy={
-							TLV={
-							    type=0, length=,
-							    data[ context=packet.cv16.description.1.sms.1[ dataHdrFormat=FSV, dataBdyFormat=ILV ], length= ]={
-								dataHdr={ FSV={name} }
-								dataBdy={ ILV={data} }
-							    }
-							}
-							TLV={
-							    type=0, length=,
-							    data[ context=packet.cv16.description.1.sms.2[ dataHdrFormat=FSV, dataBdyFormat=ILV ], length= ]={
-								dataHdr={ FSV={name} }
-								dataBdy={ ILV={data} }
-							    }
-							}
-						    }
-						}
-					    }
-					}
-				    }
-				}
-				TLV={
-				    type=0, length=,
-				    data[ context=packet.cv16.description.2[ dataHdrFormat=FSV, dataMsgsFormat=*TLV ], length= ]={}
-				}
-				TLV
-			    }
-			}			
-		    }
-		}
-	    }
+                } 
+                }
+                TLV={ type=descriptions, length=, data[ context=packet.cv16.description[ dataBdyFormat=+TLV  dataHandler=tlvHandl] ]={
+                    dataBdy={
+                        TLV={ type=0, length=, data[ context=packet.cv16.description.1[ dataHdrFormat=FSV, dataBdyFormat=*TLV  dataBdyHandler=tlvHandl] ]={
+                            dataHdr={ FSV={name, descSqn, ...} }
+                            dataBdy={
+                                TLV={ type=metric, length=, data[ context=packet.cv16.description.1.metric[ dataHdrFormat=FSV dataBdyHandler=dataHandl ] ]={
+                                    dataHdr={ FSV={algo, ...} }
+                                }
+                                }
+                                TLV={ type=hna, length=, data[ context=packet.cv16.description.1.hna[ dataBdyFormat=+FSV  dataBdyHandler=dataHandl] ]={
+                                    dataBdy={
+                                        FSV={net,prefix}
+                                        FSV={net,prefix}
+                                        ...
+                                    }
+                                } 
+                                }
+                                TLV={ type=sms, length=, data[ context=packet.cv16.description.1.sms[ dataBdyFormat=+TLV  dataBdyHandler=tlvHandl]= ]={
+                                    dataBdy={
+                                        TLV={ type=0, length=, data[ context=packet.cv16.description.1.sms.1[ dataHdrFormat=FSV, dataBdyFormat=ILV  dataBdyHandler=dataHandl] ]={
+                                            dataHdr={ FSV={name} }
+                                            dataBdy={ ILV={data} }
+                                        }
+                                        }
+                                        TLV={ type=0, length=, data[ context=packet.cv16.description.1.sms.2[ dataHdrFormat=FSV, dataBdyFormat=ILV ] ]={
+                                            dataHdr={ FSV={name} }
+                                            dataBdy={ ILV={data} }
+                                        } 
+                                        }
+                                    }
+                                }
+                                }
+                            }
+                        }
+                        }
+                        TLV={ type=0, length=, data[ context=packet.cv16.description.2[ dataHdrFormat=FSV, dataMsgsFormat=*TLV ] ]={}
+                        }
+                        TLV
+                    }
+                }			
+                }
+            }
+        }
 	}
     }
 }
