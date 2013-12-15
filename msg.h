@@ -44,36 +44,33 @@
 #define     PKT_FRAMES_SIZE_MAX     ( MAX_UDPD_SIZE - sizeof(struct packet_header))
 
 #define ARG_DESC_FRAME_SIZE         "descSizeOut"
-#define HLP_DESC_FRAME_SIZE         "set maximum size for own description and reference frames"
-#define MIN_DESC_FRAME_SIZE         (MIN_UDPD_SIZE - sizeof(struct packet_header))
-#define MAX_DESC_FRAME_SIZE         (MAX_UDPD_SIZE - sizeof(struct packet_header))
-#define DEF_DESC_FRAME_SIZE         (BIG_UDPD_SIZE - sizeof(struct packet_header))
-#define     REF_FRAME_BODY_SIZE_OUT (desc_frame_size_out - sizeof(struct tlv_hdr) - sizeof(struct frame_hdr_rhash_adv))
-#define     REF_FRAME_BODY_SIZE_MAX (MAX_DESC_FRAME_SIZE - sizeof(struct tlv_hdr) - sizeof(struct frame_hdr_rhash_adv))
-#define     DESC_FRAMES_SIZE_OUT    (desc_frame_size_out - sizeof(struct tlv_hdr) - sizeof (struct msg_description_adv))
-#define     DESC_FRAMES_SIZE_MAX    (MAX_DESC_FRAME_SIZE - sizeof(struct tlv_hdr) - sizeof (struct msg_description_adv))
+#define HLP_DESC_FRAME_SIZE         "set maximum size for own description and references"
+#define MIN_DESC_SIZE               (MIN_UDPD_SIZE - sizeof(struct packet_header) - (2*sizeof(struct tlv_hdr)))
+#define MAX_DESC_SIZE               (MAX_UDPD_SIZE - sizeof(struct packet_header) - (2*sizeof(struct tlv_hdr)))
+#define DEF_DESC_SIZE               (BIG_UDPD_SIZE - sizeof(struct packet_header) - (2*sizeof(struct tlv_hdr)))
+#define     REF_FRAME_BODY_SIZE_OUT (desc_size_out - sizeof(struct frame_hdr_rhash_adv))
+#define     REF_FRAME_BODY_SIZE_MAX (MAX_DESC_SIZE - sizeof(struct frame_hdr_rhash_adv))
 
 #define ARG_VRT_DESC_SIZE_OUT  "descVirtSizeOut"
 #define HLP_VRT_DESC_SIZE_OUT  "set maximum virtual size for own description"
 #define ARG_VRT_DESC_SIZE_IN   "descVirtSizeIn"
 #define HLP_VRT_DESC_SIZE_IN   "set maximum virtual size for other node descriptions"
-#define MIN_VRT_DESC_SIZE      (MIN_DESC_FRAME_SIZE)
+#define MIN_VRT_DESC_SIZE      (MIN_DESC_SIZE)
 #define DEF_VRT_DESC_SIZE      (16384) //any value less-equal then MAX_VRT_DESC_SIZE
 //#define MAX_VRT_DESC_SIZE      (INT32_MAX)
 // this should be the max possible with a reference depth of 1 :
-#define MAX_VRT_DESC_SIZE      ((DESC_FRAMES_SIZE_MAX - (5 * (sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash_adv)) )) / \
-			       sizeof(struct desc_msg_rhash_adv)) \
+#define MAX_VRT_DESC_SIZE      (((MAX_DESC_SIZE - sizeof(struct msg_description_adv)) - \
+                                 (5 * (sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash_adv)) )) / \
+			        sizeof(struct desc_msg_rhash_adv)) \
 			       * \
-			       (DEF_DESC_FRAME_SIZE - sizeof(struct tlv_hdr) - sizeof(struct frame_hdr_rhash_adv))
-#define     VRT_DESC_SIZE_OUT  (vrt_desc_size_out)
-#define     VRT_DESC_SIZE_IN   (vrt_desc_size_in)
+			       (DEF_DESC_SIZE - sizeof(struct frame_hdr_rhash_adv))
 
 
 #define ARG_VRT_FRAME_DATA_SIZE_OUT  "descVirtFrameSizeOut"
 #define HLP_VRT_FRAME_DATA_SIZE_OUT  "set maximum virtual size for own description frames"
 #define ARG_VRT_FRAME_DATA_SIZE_IN   "descVirtFrameSizeIn"
 #define HLP_VRT_FRAME_DATA_SIZE_IN   "set maximum virtual size for other description frames"
-#define MIN_VRT_FRAME_DATA_SIZE      (MIN_DESC_FRAME_SIZE - sizeof (struct tlv_hdr))
+#define MIN_VRT_FRAME_DATA_SIZE      (MIN_DESC_SIZE)
 #define DEF_VRT_FRAME_DATA_SIZE      (8192) //any value less then MAX_VRT_FRAME_DATA_SIZE
 #define MAX_VRT_FRAME_DATA_SIZE      (MAX_VRT_DESC_SIZE - sizeof(struct tlv_hdr_virtual))
 #define     VRT_FRAME_DATA_SIZE_OUT  (vrt_frame_data_size_out)
@@ -898,18 +895,18 @@ struct tx_frame_iterator {
 	struct list_head    *tx_task_list;
 	struct tx_task_node *ttn;
 	struct desc_extension *dext;
-
-	uint8_t             *frame_cache_array;
-	uint8_t             *frames_out_ptr;
 	struct frame_db     *db;
+
+	uint8_t             *frames_out_ptr;
 	int32_t              frames_out_pref;
 	int32_t              frames_out_max;
+	uint8_t             *frame_cache_array;
 	int32_t              frame_cache_size;
 
-        // updated by fs_caller():
+        // updated by tx_frame_iterate() caller():
 	uint8_t              frame_type;
 
-	// updated by tx..iterate():
+	// updated by tx_frame_iterate():
         struct frame_handl  *handl;
 	int32_t              frames_out_pos;
 	int32_t              frames_out_num;
