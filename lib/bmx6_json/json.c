@@ -533,15 +533,14 @@ void json_description_event_hook(int32_t cb_id, struct orig_node *on)
 
                 if ((jdesc_fields = fields_dbg_json(
                         FIELD_RELEVANCE_MEDI, NO, sizeof (struct msg_description_adv), (uint8_t*) desc_buff,
-                        packet_frame_handler[FRAME_TYPE_DESC_ADV].min_msg_size,
-                        packet_frame_handler[FRAME_TYPE_DESC_ADV].msg_format))) {
+                        packet_frame_db->handls[FRAME_TYPE_DESC_ADV].min_msg_size,
+                        packet_frame_db->handls[FRAME_TYPE_DESC_ADV].msg_format))) {
 
                         if (on->dext && on->dext->dlen) {
 
                                 struct rx_frame_iterator it = {
                                         .caller = __FUNCTION__, .on = on, .cn = NULL, .op = TLV_OP_PLUGIN_MIN,
-                                        .handls = description_tlv_handl, .handl_max = BMX_DSC_TLV_MAX,
-                                        .process_filter = FRAME_TYPE_PROCESS_ALL,
+                                        .db = description_tlv_db, .process_filter = FRAME_TYPE_PROCESS_ALL,
                                         .frame_type = -1, .frames_in = on->dext->data, .frames_length = on->dext->dlen,
 					.is_virtual_header = 1
                                 };
@@ -570,7 +569,7 @@ void json_description_event_hook(int32_t cb_id, struct orig_node *on)
                                         json_object_object_add(jdesc_fields, "extensions", jextensions);
 
                         }
-                        json_object_object_add(jorig, packet_frame_handler[FRAME_TYPE_DESC_ADV].name, jdesc_fields);
+                        json_object_object_add(jorig, packet_frame_db->handls[FRAME_TYPE_DESC_ADV].name, jdesc_fields);
                 }
 
                 dprintf(fd, "%s\n", json_object_to_json_string(jorig));

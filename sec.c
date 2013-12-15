@@ -410,7 +410,7 @@ int32_t init_sec( void )
         handl.tx_frame_handler = create_description_tlv_pubkey;
         handl.rx_frame_handler = process_description_tlv_pubkey;
 	handl.msg_format = pubkey_format;
-        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_PUBKEY, &handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_PUBKEY, &handl);
 
 	static const struct field_format sha_format[] = DESCRIPTION_MSG_SHA_FORMAT;
         handl.name = "EXP_SHA";
@@ -419,7 +419,7 @@ int32_t init_sec( void )
         handl.tx_frame_handler = create_description_tlv_sha;
         handl.rx_frame_handler = process_description_tlv_sha;
 	handl.msg_format = sha_format;
-        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_SHA, &handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_SHA, &handl);
 
 	static const struct field_format signature_format[] = DESCRIPTION_MSG_SIGNATURE_FORMAT;
         handl.name = "SIGNATURE";
@@ -428,7 +428,7 @@ int32_t init_sec( void )
         handl.tx_frame_handler = create_description_tlv_signature;
         handl.rx_frame_handler = process_description_tlv_signature;
 	handl.msg_format = signature_format;
-        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_SIGNATURE, &handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_SIGNATURE, &handl);
 
         return SUCCESS;
 }

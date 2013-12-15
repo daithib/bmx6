@@ -167,9 +167,10 @@ char *tlv_op_str(uint8_t op)
 }
 
 
-struct frame_handl packet_frame_handler[FRAME_TYPE_ARRSZ];
+struct frame_db *packet_frame_db = NULL;
 
-struct frame_handl description_tlv_handl[BMX_DSC_TLV_ARRSZ];
+struct frame_db *description_tlv_db = NULL;
+
 
 
 
@@ -189,15 +190,21 @@ struct tlv_hdr tlv_set_net(int16_t type, int16_t length)
 }
 
 
+struct frame_db *init_frame_db(uint8_t handlSz) {
 
+	struct frame_db *db = debugMallocReset(sizeof(struct frame_db) + (handlSz * sizeof(struct frame_handl)), -300000);
 
+	db->handl_max = handlSz;
 
-void register_frame_handler(struct frame_handl *array, int pos, struct frame_handl *handl)
+	return db;
+}
+
+void register_frame_handler(struct frame_db *db, int pos, struct frame_handl *handl)
 {
         TRACE_FUNCTION_CALL;
         
-        assertion(-500659, (pos < BMX_DSC_TLV_ARRSZ));
-        assertion(-500660, (!array[pos].min_msg_size)); // the pos MUST NOT be used yet
+        assertion(-500659, (pos < db->handl_max));
+        assertion(-500660, (!db->handls[pos].min_msg_size)); // the pos MUST NOT be used yet
         assertion(-500661, (handl && handl->min_msg_size && handl->name));
         assertion(-500806, (XOR(handl->rx_frame_handler, handl->rx_msg_handler) && XOR(handl->tx_frame_handler, handl->tx_msg_handler)));
         assertion(-500975, (handl->tx_task_interval_min <= CONTENT_MIN_TX_INTERVAL_MAX));
@@ -217,7 +224,7 @@ void register_frame_handler(struct frame_handl *array, int pos, struct frame_han
 	// without potentially conflicting message headers (frame data headers)
 */
 
-        array[pos] = *handl;
+        db->handls[pos] = *handl;
 
         memset(handl, 0, sizeof ( struct frame_handl ) );
 }
@@ -377,7 +384,7 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, str
 
         struct rx_frame_iterator it = {
                 .caller = __FUNCTION__, .on = on, .cn = cn, .op = op, .pb = pb, .desc = desc, .desc_len=desc_len,
-                .handls = description_tlv_handl, .handl_max = (BMX_DSC_TLV_MAX), .process_filter = filter,
+                .db = description_tlv_db, .process_filter = filter,
                 .frame_type = -1, .frames_in = dext->data, .frames_pos = 0,
                 .frames_length = dext->dlen, .custom_data = custom, .is_virtual_header = 1
         };
@@ -398,7 +405,7 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, str
                 assertion(-501355, (op == TLV_OP_TEST));
 
                 dbgf_sys(DBGT_WARN, "problematic description_ltv from %s, near type=%s frame_data_length=%d  pos=%d %s",
-                        pb ? pb->i.llip_str : DBG_NIL, description_tlv_handl[it.frame_type].name,
+                        pb ? pb->i.llip_str : DBG_NIL, description_tlv_db->handls[it.frame_type].name,
                         it.frame_data_length, it.frames_pos, tlv_result == TLV_RX_DATA_BLOCKED ? "BLOCKED" : "FAILURE");
 
                 block_orig_node(YES, on);
@@ -441,7 +448,7 @@ void purge_tx_task_list(struct list_head *tx_task_lists, struct link_node *only_
                                 (!only_dev || only_dev == tx_task->task.dev)) {
 
 
-                                if (packet_frame_handler[tx_task->task.type].tx_task_interval_min) {
+                                if (packet_frame_db->handls[tx_task->task.type].tx_task_interval_min) {
                                         avl_remove(&tx_task->task.dev->tx_task_interval_tree, &tx_task->task, -300313);
                                 }
 
@@ -472,7 +479,7 @@ IDM_T freed_tx_task_node(struct tx_task_node *tx_task, struct list_head *tx_task
 
         if (tx_task->tx_iterations <= 0) {
 
-                if (packet_frame_handler[tx_task->task.type].tx_task_interval_min) {
+                if (packet_frame_db->handls[tx_task->task.type].tx_task_interval_min) {
                         avl_remove(&tx_task->task.dev->tx_task_interval_tree, &tx_task->task, -300314);
                 }
 
@@ -502,8 +509,8 @@ IDM_T tx_task_obsolete(struct tx_task_node *tx_task)
                 tx_task->tx_iterations = 0;
                 problem = TLV_TX_DATA_DONE;
 
-        } else if (packet_frame_handler[tx_task->task.type].tx_task_interval_min &&
-                ((TIME_T) (bmx_time - tx_task->send_ts) < packet_frame_handler[tx_task->task.type].tx_task_interval_min)) {
+        } else if (packet_frame_db->handls[tx_task->task.type].tx_task_interval_min &&
+                ((TIME_T) (bmx_time - tx_task->send_ts) < packet_frame_db->handls[tx_task->task.type].tx_task_interval_min)) {
 
                 reason = "RECENTLY SEND";
                 problem = TLV_TX_DATA_IGNORED;
@@ -524,7 +531,7 @@ IDM_T tx_task_obsolete(struct tx_task_node *tx_task)
         dbgf_track(DBGT_INFO,
                 "%s type=%s dev=%s myIId4x=%d neighIID4x=%d local_id=%X dev_idx=0x%X name=%s or send just %d ms ago",
                 reason,
-                packet_frame_handler[tx_task->task.type].name, tx_task->task.dev->name_phy_cfg.str,
+                packet_frame_db->handls[tx_task->task.type].name, tx_task->task.dev->name_phy_cfg.str,
                 tx_task->task.myIID4x, tx_task->task.neighIID4x,
                 tx_task->task.link ? ntohl(tx_task->task.link->key.local_id) : 0,
                 tx_task->task.link ? tx_task->task.link->key.dev_idx : 0,
@@ -540,7 +547,7 @@ STATIC_FUNC
 struct tx_task_node *tx_task_new(struct link_dev_node *dest_lndev, struct tx_task_node *test)
 {
         assertion(-500909, (dest_lndev));
-        struct frame_handl *handl = &packet_frame_handler[test->task.type];
+        struct frame_handl *handl = &packet_frame_db->handls[test->task.type];
         struct tx_task_node *ttn = NULL;
         struct dhash_node *dhn;
 
@@ -605,7 +612,7 @@ void schedule_tx_task(struct link_dev_node *dest_lndev, uint16_t frame_type, int
         void *data, uint32_t dlen, IID_T myIID4x, IID_T neighIID4x)
 {
         TRACE_FUNCTION_CALL;
-        struct frame_handl *handl = &packet_frame_handler[frame_type];
+        struct frame_handl *handl = &packet_frame_db->handls[frame_type];
 
         if (!dest_lndev)
                 return;
@@ -1493,7 +1500,7 @@ int32_t tx_msg_dhash_or_description_request(struct tx_frame_iterator *it)
 
 
         dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%X dev_idx=0x%X iterations=%d time=%d requesting neighIID4x=%d %s",
-                it->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, ntohl(ttn->task.link->key.local_id),
+                it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, ntohl(ttn->task.link->key.local_id),
                 ttn->task.link->key.dev_idx, ttn->tx_iterations, ttn->considered_ts, ttn->task.neighIID4x,
                 dhn ? "ALREADY RESOLVED (req cancelled)" : ttn->task.link->local->neigh ? "ABOUT NB HIMSELF" : "ABOUT SOMEBODY");
 
@@ -1734,7 +1741,7 @@ int32_t tx_msg_dev_req(struct tx_frame_iterator *it)
         assertion(-500986, (ttn->tx_iterations > 0 && ttn->considered_ts != bmx_time));
 
         dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%X iterations=%d %s",
-                it->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, ntohl(*local_id), ttn->tx_iterations,
+                it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, ntohl(*local_id), ttn->tx_iterations,
                 !local ? "UNKNOWN" : (local->link_adv_sqn == local->packet_link_sqn_ref ? "SOLVED" : "UNSOLVED"));
 
 
@@ -1959,7 +1966,7 @@ int32_t tx_msg_link_req(struct tx_frame_iterator *it)
         assertion(-500988, (ttn->tx_iterations > 0 && ttn->considered_ts != bmx_time));
 
         dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%X iterations=%d %s",
-                it->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, ntohl(*local_id), ttn->tx_iterations,
+                it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, ntohl(*local_id), ttn->tx_iterations,
                 !local ? "UNKNOWN" : (local->link_adv_sqn == local->packet_link_sqn_ref ? "SOLVED" : "UNSOLVED"));
 
 
@@ -2297,6 +2304,7 @@ int32_t rx_frame_problem_adv(struct rx_frame_iterator *it)
 
         return it->frame_msgs_length;
 }
+
 
 
 
@@ -2863,7 +2871,7 @@ int32_t rx_msg_hello_adv(struct rx_frame_iterator *it)
         if (it->msg != it->frame_data) {
                 dbgf_sys(DBGT_WARN, "rcvd %d %s messages in frame_msgs_length=%d",
                         (it->frame_msgs_length / ((uint32_t)sizeof (struct msg_hello_adv))),
-                        packet_frame_handler[FRAME_TYPE_HELLO_ADV].name, it->frame_msgs_length);
+                        packet_frame_db->handls[FRAME_TYPE_HELLO_ADV].name, it->frame_msgs_length);
         }
 
         update_link_probe_record(pb->i.lndev, hello_sqn, 1);
@@ -2892,9 +2900,9 @@ int32_t get_desc_frame_data(uint8_t **frame_data, uint8_t *desc_ext_data, int32_
 
 	struct rx_frame_iterator it = {
                 .caller = __FUNCTION__, .on = NULL, .cn = NULL, .op = TLV_OP_PLUGIN_MIN,
-                .handls = description_tlv_handl, .handl_max = BMX_DSC_TLV_MAX,
-                .process_filter = FRAME_TYPE_PROCESS_NONE, .custom_data = NULL,
-                .frame_type = -1,.frames_in = desc_ext_data, .frames_length = desc_ext_len, .is_virtual_header = virtual_data };
+                .db = description_tlv_db, .process_filter = FRAME_TYPE_PROCESS_NONE,
+                .frame_type = -1,.frames_in = desc_ext_data, .frames_length = desc_ext_len,
+		.is_virtual_header = virtual_data };
 
 	int32_t tlv_result;
 
@@ -2948,7 +2956,7 @@ IDM_T desc_frame_changed(  struct rx_frame_iterator *it, uint8_t f_type )
 
 	dbgf_track(DBGT_INFO, "orig=%s %s type=%d (%s) old_len=%d new_len=%d",
 	           globalIdAsString(&it->on->global_id), changed ? "  CHANGED" : "UNCHANGED",
-	           f_type, it->handls[f_type].name, fdl_old, fdl_new);
+	           f_type, it->db->handls[f_type].name, fdl_old, fdl_new);
 
 	if (changed)
 		return YES;
@@ -2994,10 +3002,10 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 	
         if (it->frames_pos == it->frames_length ) {
 		
-		if ( it->handls == description_tlv_handl && it->on && it->on->added && it->op == TLV_OP_NEW && 
-			it->process_filter == FRAME_TYPE_PROCESS_ALL && it->frame_type < it->handl_max ) {
+		if ( it->db == description_tlv_db && it->on && it->on->added && it->op == TLV_OP_NEW &&
+			it->process_filter == FRAME_TYPE_PROCESS_ALL && it->frame_type < it->db->handl_max ) {
 			
-			process_description_tlvs_del( it->on, (it->frame_type + 1), it->handl_max );
+			process_description_tlvs_del( it->on, (it->frame_type + 1), it->db->handl_max );
 		}
 
                 dbgf_all(DBGT_INFO, "%s - frames_pos=%d frames_length=%d : DONE", it->caller, it->frames_pos, it->frames_length);
@@ -3041,7 +3049,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 }
 
 
-                if ( it->handls == description_tlv_handl /*&& it->process_filter == FRAME_TYPE_PROCESS_ALL*/ ? (
+                if ( it->db == description_tlv_db /*&& it->process_filter == FRAME_TYPE_PROCESS_ALL*/ ? (
 			( f_type != BMX_DSC_TLV_RHASH_ADV && it->frame_type_expanded >= f_type ) ||
 			( f_type == BMX_DSC_TLV_RHASH_ADV && (f_data_len < (int)sizeof(struct desc_hdr_rhash_adv) || 
 			it->frame_type_expanded >= ((struct desc_hdr_rhash_adv*)(f_data))->expanded_type)) 
@@ -3055,29 +3063,29 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                         return TLV_RX_DATA_FAILURE;
                 }
 
-                if (it->handls == description_tlv_handl && it->on && it->on->added && it->op == TLV_OP_NEW && 
+                if (it->db == description_tlv_db && it->on && it->on->added && it->op == TLV_OP_NEW &&
 			it->process_filter == FRAME_TYPE_PROCESS_ALL && it->frame_type + 1 < f_type) {
 			
 			process_description_tlvs_del( it->on, (it->frame_type + 1), (f_type - 1) );
 		}
 
 
-                if (f_type > it->handl_max || !(it->handls[f_type].rx_frame_handler || it->handls[f_type].rx_msg_handler)) {
+                if (f_type > it->db->handl_max || !(it->db->handls[f_type].rx_frame_handler || it->db->handls[f_type].rx_msg_handler)) {
 
                         dbgf_mute(50, DBGL_SYS, DBGT_WARN, "%s - unknown type=%d ! check for updates", it->caller, f_type);
 
-                        if (f_type > it->handl_max)
+                        if (f_type > it->db->handl_max)
                                 return TLV_RX_DATA_FAILURE;
 
                         return TLV_RX_DATA_IGNORED;
                 }
 
-                f_handl = &it->handls[f_type];
+                f_handl = &it->db->handls[f_type];
                 it->frame_data_length = f_data_len;
                 it->frame_length = f_len;
                 it->frame_data = f_data;
                 it->frame_type = f_type;
-                it->frame_type_expanded = ((it->handls == description_tlv_handl && f_type == BMX_DSC_TLV_RHASH_ADV) ? 
+                it->frame_type_expanded = ((it->db == description_tlv_db && f_type == BMX_DSC_TLV_RHASH_ADV) ?
 			((struct desc_hdr_rhash_adv*)(f_data))->expanded_type : f_type);
                 it->frame_hdr = tlv;
 
@@ -3211,6 +3219,8 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
         return TLV_RX_DATA_FAILURE;
 }
 
+
+
 IDM_T rx_frames(struct packet_buff *pb)
 {
         TRACE_FUNCTION_CALL;
@@ -3218,9 +3228,9 @@ IDM_T rx_frames(struct packet_buff *pb)
 	struct packet_header *phdr = (struct packet_header *)pb->packet.data;
         struct rx_frame_iterator it = {
                 .caller = __FUNCTION__, .on = NULL, .cn = NULL, .op = 0, .pb = pb,
-                .handls = packet_frame_handler, .handl_max = FRAME_TYPE_MAX, .process_filter = FRAME_TYPE_PROCESS_ALL,
+                .db = packet_frame_db, .process_filter = FRAME_TYPE_PROCESS_ALL,
                 .frame_type = -1, .frames_in = (pb->packet.data + sizeof (struct packet_header)),
-                .frames_length = (ntohs(phdr->pkt_length) - sizeof (struct packet_header)), .frames_pos = 0,
+                .frames_length = (ntohs(phdr->pkt_length) - sizeof (struct packet_header)),
 		.is_virtual_header = 0
         };
 
@@ -3228,7 +3238,7 @@ IDM_T rx_frames(struct packet_buff *pb)
 
         if (it_result <= TLV_RX_DATA_FAILURE) {
                 dbgf_sys(DBGT_WARN, "problematic frame_type=%s data_length=%d iterator_result=%d pos=%d ",
-                        packet_frame_handler[it.frame_type].name, it.frame_data_length, it_result, it.frames_pos);
+                        it.db->handls[it.frame_type].name, it.frame_data_length, it_result, it.frames_pos);
                 return FAILURE;
         }
 
@@ -3344,11 +3354,11 @@ uint8_t use_referencing(struct frame_handl *handl)
 int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 {
 
-	if ( use_referencing( &it->handls[it->frame_type] ) ) {
+	if ( use_referencing( &it->db->handls[it->frame_type] ) ) {
 
 		//TODO: this works only for a reference depth = 1
 		assertion(-501637, (it->dext));
-		struct frame_handl *handl = &(it->handls[it->frame_type]);
+		struct frame_handl *handl = &(it->db->handls[it->frame_type]);
 
 		int32_t used_cache_space = handl->data_header_size + it->frame_cache_msgs_size;
 
@@ -3375,7 +3385,7 @@ int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 		return (max ? it->frames_out_max : it->frames_out_pref) - (
 			it->frames_out_pos +
 			(int) sizeof(struct tlv_hdr) +
-			it->handls[it->frame_type].data_header_size +
+			it->db->handls[it->frame_type].data_header_size +
 			it->frame_cache_msgs_size );
 	}
 }
@@ -3385,7 +3395,7 @@ STATIC_FUNC
 int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-        struct frame_handl *handl = &(it->handls[it->frame_type]);
+        struct frame_handl *handl = &(it->db->handls[it->frame_type]);
         int32_t fdata_in = it->frame_cache_msgs_size + handl->data_header_size;
 	uint8_t do_fzip = use_compression(handl);
 	uint8_t do_fref = use_referencing(handl);
@@ -3402,7 +3412,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 	if (it->dext) {
 		// this is the dext creation of my description...
-		assertion(-501639, (it->handls==description_tlv_handl));
+		assertion(-501639, (it->db==description_tlv_db));
 		assertion(-501640, (it->frame_cache_msgs_size <= VRT_FRAME_DATA_SIZE_OUT));
 		it->dext->data = debugRealloc( it->dext->data, it->dext->dlen + sizeof(struct tlv_hdr_virtual) + fdata_in, -300568);
 
@@ -3418,7 +3428,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 	}
 
 	if (it->dext && do_fref) {
-		assertion(-501642, (it->handls==description_tlv_handl));
+		assertion(-501642, (it->db==description_tlv_db));
 
 		// calculate description extension frames
 		assertion(-501643, TEST_STRUCT(struct tlv_hdr)); // of type:
@@ -3510,10 +3520,12 @@ int32_t tx_frame_iterate(IDM_T iterate_msg, struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
         uint8_t t = it->frame_type;
-        struct frame_handl *handl = &(it->handls[t]);
+        struct frame_handl *handl = (it->handl = &(it->db->handls[t]));
         int32_t tlv_result;// = TLV_DATA_DONE;
         assertion(-500977, (handl->min_msg_size));
         assertion(-500776, (it->frame_cache_array));
+	assertion(-500000, IMPLIES(handl->tx_frame_handler, !iterate_msg));
+	assertion(-500000, XOR(handl->tx_frame_handler, handl->tx_msg_handler));
         assertion(-501004, (IMPLIES(it->frame_cache_msgs_size, handl->tx_msg_handler)));
 
         ASSERTION(-500777, (IMPLIES((it->frame_cache_msgs_size && handl->tx_msg_handler),
@@ -3524,7 +3536,7 @@ int32_t tx_frame_iterate(IDM_T iterate_msg, struct tx_frame_iterator *it)
 
         assertion(-500779, (it->frames_out_pos <= it->frames_out_max));
         assertion(-500780, (it->frames_out_ptr));
-        assertion(-500781, (it->frame_type <= it->handl_max));
+        assertion(-500781, (it->frame_type <= it->db->handl_max));
         assertion(-500784, (IMPLIES(it->frame_cache_msgs_size, it->frame_cache_msgs_size >= TLV_TX_DATA_PROCESSED)));
 
 	if (it->dext) {
@@ -3532,7 +3544,8 @@ int32_t tx_frame_iterate(IDM_T iterate_msg, struct tx_frame_iterator *it)
 			it->caller, iterate_msg ? "YES" : "NO ", it->frame_type,
 			it->frame_cache_msgs_size, tx_iterator_cache_data_space_pref(it), it->frames_out_pos, it->frames_out_pref);
 	}
-        if (handl->tx_frame_handler || iterate_msg) {
+	
+	if ((handl->tx_msg_handler && iterate_msg) || handl->tx_frame_handler) {
 
                 if (handl->min_msg_size > tx_iterator_cache_data_space_pref(it))
                         return TLV_TX_DATA_FULL;
@@ -3628,7 +3641,7 @@ void next_tx_task_list(struct dev_node *dev, struct tx_frame_iterator *it, struc
 
                                 dbgf_track(DBGT_INFO,
                                         "found %s   link nb: nb_local_id=%X nb_dev_idx=%d nbIP=%s   via lndev: my_dev=%s my_dev_idx=%d with lndev->tx_tasks_list[].items=%d",
-                                        it->handls[it->frame_type].name,
+                                        it->db->handls[it->frame_type].name,
                                         ntohl(link->key.local_id), link->key.dev_idx, ip6AsStr(&link->link_ip),
                                         dev->label_cfg.str, dev->llip_key.idx, it->tx_task_list->items);
 
@@ -3673,7 +3686,7 @@ void tx_packet(void *devp)
         memset(&pb.i, 0, sizeof (pb.i));
 
         struct tx_frame_iterator it = {
-                .caller = __FUNCTION__, .handls = packet_frame_handler, .handl_max = FRAME_TYPE_MAX,
+                .caller = __FUNCTION__, .db = packet_frame_db,
                 .frames_out_ptr = (pb.packet.data + sizeof (struct packet_header)),
                 .frames_out_max =  PKT_FRAMES_SIZE_MAX,
                 .frames_out_pref = PKT_FRAMES_SIZE_OUT,
@@ -3689,7 +3702,7 @@ void tx_packet(void *devp)
 
                 struct list_node *lpos, *ltmp, *lprev = (struct list_node*) it.tx_task_list;
                 int32_t tlv_result = TLV_TX_DATA_DONE;
-                struct frame_handl *handl = &packet_frame_handler[it.frame_type];
+                struct frame_handl *handl = &it.db->handls[it.frame_type];
                 uint16_t old_frames_out_pos = it.frames_out_pos;
                 uint32_t item =0;
 
@@ -3952,8 +3965,7 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, struct d
 
         struct rx_frame_iterator it = {
                 .caller = __FUNCTION__, .on = NULL, .cn = NULL, .op = TLV_OP_PLUGIN_MIN,
-                .handls = description_tlv_handl, .handl_max = BMX_DSC_TLV_MAX,
-                .process_filter = FRAME_TYPE_PROCESS_NONE, .custom_data = NULL,
+                .db = description_tlv_db, .process_filter = FRAME_TYPE_PROCESS_NONE,
                 .frame_type = -1,.frames_in = data, .frames_length = dlen, .is_virtual_header = 0 };
 
 	uint8_t vf_type = BMX_DSC_TLV_INVALID;
@@ -4023,7 +4035,7 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, struct d
 
 		dbgf_track(DBGT_INFO, "converted type=%d %s f_data_length=%d compression=%d -> type=%d %s vf_data_len=%d, dext.len=%d",
 		           it.frame_type, it.handl->name, it.frame_data_length, vf_compression,
-			   vf_type, vf_type <= it.handl_max ? it.handls[vf_type].name : "???",
+			   vf_type, vf_type <= it.db->handl_max ? it.db->handls[vf_type].name : "???",
 			   vf_data_len, dext ? dext->dlen : 0 );
 		
 		if (dext) {
@@ -4043,7 +4055,7 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, struct d
 
 	if (tlv_result != TLV_RX_DATA_DONE) {
                 dbgf_sys(DBGT_WARN, "problematic description_ltv from %s, near type=%s frame_data_length=%d  pos=%d tlv_result=%d",
-                        pb ? pb->i.llip_str : DBG_NIL, description_tlv_handl[it.frame_type].name,
+                        pb ? pb->i.llip_str : DBG_NIL, it.db->handls[it.frame_type].name,
                         it.frame_data_length, it.frames_pos, tlv_result);
 
 		goto_error( resolve_desc_extension_error, "6");
@@ -4386,7 +4398,7 @@ void update_my_description_adv(void)
         // add all tlv options:
         
         struct tx_frame_iterator it = {
-                .caller = __FUNCTION__, .handls = description_tlv_handl, .handl_max = FRAME_TYPE_MAX,
+                .caller = __FUNCTION__, .db = description_tlv_db,
 		.frames_out_ptr = (((uint8_t*) dsc) + sizeof (struct description)),
                 .frames_out_max = DESC_FRAMES_SIZE_OUT,
                 .frames_out_pref = DESC_FRAMES_SIZE_OUT,
@@ -4397,7 +4409,7 @@ void update_my_description_adv(void)
 
         for (it.frame_type = 0; it.frame_type < BMX_DSC_TLV_ARRSZ; it.frame_type++) {
        
-                if (it.handls[it.frame_type].min_msg_size) {
+                if (it.db->handls[it.frame_type].min_msg_size) {
 
 			int32_t iterator_result = tx_frame_iterate(NO/*iterate_msg*/, &it);
 
@@ -4486,19 +4498,19 @@ int32_t opt_show_descriptions(uint8_t cmd, uint8_t _save, struct opt_type *opt,
                                 on->desc_len, sizeof (struct msg_description_adv) + on->dext->dlen );
 
 
-                        dbg_printf(cn, " %s:", packet_frame_handler[FRAME_TYPE_DESC_ADV].name);
+                        dbg_printf(cn, " %s:", packet_frame_db->handls[FRAME_TYPE_DESC_ADV].name);
 
                         fields_dbg_lines(cn, relevance, sizeof (struct msg_description_adv), (uint8_t*) desc_buff,
-                                packet_frame_handler[FRAME_TYPE_DESC_ADV].min_msg_size,
-                                packet_frame_handler[FRAME_TYPE_DESC_ADV].msg_format);
+                                packet_frame_db->handls[FRAME_TYPE_DESC_ADV].min_msg_size,
+                                packet_frame_db->handls[FRAME_TYPE_DESC_ADV].msg_format);
 
                         debugFree(desc_buff, -300362);
 
                         struct rx_frame_iterator it = {
                                 .caller = __FUNCTION__, .on = on, .cn = cn, .op = TLV_OP_PLUGIN_MIN,
-                                .handls = description_tlv_handl, .handl_max = BMX_DSC_TLV_MAX, .process_filter = type_filter,
-                                .frame_type = -1, .frames_in = on->dext->data, .frames_length = on->dext->dlen, .is_virtual_header = 1
-                        };
+                                .db = description_tlv_db, .process_filter = type_filter,
+                                .frame_type = -1, .frames_in = on->dext->data, .frames_length = on->dext->dlen, 
+				.is_virtual_header = 1 };
 
                         int32_t it_result;
                         while ((it_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
@@ -4578,7 +4590,7 @@ static int32_t ref_status_creator(struct status_handl *handl, void *data)
 
 		for (rft_pos=0; rft_pos<(8*sizeof(rft_bits));rft_pos++) {
 			if (bit_get(rft_bits, (8*sizeof(rft_bits)), rft_pos)) {
-				char *fstr = description_tlv_handl[rft_pos].min_msg_size ? description_tlv_handl[rft_pos].name : "???";
+				char *fstr = description_tlv_db->handls[rft_pos].min_msg_size ? description_tlv_db->handls[rft_pos].name : "???";
 				snprintf(ref_str + strlen(ref_str), sizeof(status[i].ref_types) - strlen(ref_str),
 					"%s%s", strlen(ref_str) ? " ":"", fstr  );
 			}
@@ -4826,7 +4838,6 @@ int32_t init_msg( void )
 
 	assertion(-500000, ( (tlv_set_net(0x1B, 0x492)).u.u16 == htons(0xDC92) ) );
 
-        memset(description_tlv_handl, 0, sizeof(description_tlv_handl));
 
         ogm_aggreg_sqn_max = ((AGGREG_SQN_MASK) & rand_num(AGGREG_SQN_MAX));
 
@@ -4838,6 +4849,8 @@ int32_t init_msg( void )
 
         task_register(my_ogm_interval, schedule_my_originator_message, NULL, -300356);
 
+	packet_frame_db = init_frame_db(FRAME_TYPE_ARRSZ);
+	description_tlv_db = init_frame_db(BMX_DSC_TLV_ARRSZ);
         
         struct frame_handl handl;
         memset(&handl, 0, sizeof ( handl));
@@ -4849,7 +4862,7 @@ int32_t init_msg( void )
         handl.tx_task_interval_min = CONTENT_MIN_TX_INTERVAL__CHECK_FOR_REDUNDANCY;
         handl.tx_frame_handler = tx_frame_problem_adv;
         handl.rx_frame_handler = rx_frame_problem_adv;
-        register_frame_handler(packet_frame_handler, FRAME_TYPE_PROBLEM_ADV, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_PROBLEM_ADV, &handl);
 
 
 /*
@@ -4860,7 +4873,7 @@ int32_t init_msg( void )
         handl.fixed_msg_size = 1;
         handl.tx_frame_handler = tx_frame_test_adv;
         handl.rx_frame_handler = rx_frame_test_adv;
-        register_frame_handler(packet_frame_handler, FRAME_TYPE_TEST_ADV, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_TEST_ADV, &handl);
 */
 
         static const struct field_format ref_format[] = MSG_RHASH_ADV_FORMAT;
@@ -4871,7 +4884,7 @@ int32_t init_msg( void )
         handl.tx_frame_handler = create_description_tlv_ref;
         handl.rx_msg_handler = process_description_tlv_ref;
         handl.msg_format = ref_format;
-        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_RHASH_ADV, &handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_RHASH_ADV, &handl);
 
 
         handl.name = "REF_REQ";
@@ -4883,7 +4896,7 @@ int32_t init_msg( void )
         handl.tx_task_interval_min = DEF_TX_REF_REQ_TO;
         handl.tx_msg_handler = tx_msg_ref_request;
         handl.rx_msg_handler = rx_msg_ref_request;
-        register_frame_handler(packet_frame_handler, FRAME_TYPE_REF_REQ, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_REF_REQ, &handl);
 
         handl.name = "REF_ADV";
         handl.is_advertisement = 1;
@@ -4894,7 +4907,7 @@ int32_t init_msg( void )
         handl.tx_task_interval_min = DEF_TX_DREF_ADV_TO;
         handl.tx_frame_handler = tx_frame_ref_adv;
         handl.rx_frame_handler = rx_frame_ref_adv;
-        register_frame_handler(packet_frame_handler, FRAME_TYPE_REF_ADV, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_REF_ADV, &handl);
 
 
         handl.name = "DESC_REQ";
@@ -4908,7 +4921,7 @@ int32_t init_msg( void )
         handl.tx_task_interval_min = DEF_TX_DESC0_REQ_TO;
         handl.tx_msg_handler = tx_msg_dhash_or_description_request;
         handl.rx_msg_handler = rx_msg_dhash_or_description_request;
-        register_frame_handler(packet_frame_handler, FRAME_TYPE_DESC_REQ, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_DESC_REQ, &handl);
 
 
         static const struct field_format description_format[] = DESCRIPTION_MSG_FORMAT;
@@ -4920,7 +4933,7 @@ int32_t init_msg( void )
         handl.tx_frame_handler = tx_frame_description_adv;
         handl.rx_frame_handler = rx_frame_description_advs;
         handl.msg_format = description_format;
-        register_frame_handler(packet_frame_handler, FRAME_TYPE_DESC_ADV, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_DESC_ADV, &handl);
 
         handl.name = "DHASH_REQ";
         handl.is_destination_specific_frame = 1;
@@ -4933,7 +4946,7 @@ int32_t init_msg( void )
         handl.tx_task_interval_min = DEF_TX_DHASH0_REQ_TO;
         handl.tx_msg_handler = tx_msg_dhash_or_description_request;
         handl.rx_msg_handler = rx_msg_dhash_or_description_request;
-        register_frame_handler(packet_frame_handler, FRAME_TYPE_HASH_REQ, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_HASH_REQ, &handl);
 
         handl.name = "DHASH_ADV";
         handl.is_advertisement = 1;
@@ -4943,7 +4956,7 @@ int32_t init_msg( void )
         handl.tx_task_interval_min = DEF_TX_DHASH0_ADV_TO;
         handl.tx_msg_handler = tx_msg_dhash_adv;
         handl.rx_msg_handler = rx_msg_dhash_adv;
-        register_frame_handler(packet_frame_handler, FRAME_TYPE_HASH_ADV, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_HASH_ADV, &handl);
 
 
 
@@ -4953,7 +4966,7 @@ int32_t init_msg( void )
         handl.fixed_msg_size = 1;
         handl.tx_msg_handler = tx_msg_hello_adv;
         handl.rx_msg_handler = rx_msg_hello_adv;
-        register_frame_handler(packet_frame_handler, FRAME_TYPE_HELLO_ADV, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_HELLO_ADV, &handl);
 
 
 
@@ -4965,7 +4978,7 @@ int32_t init_msg( void )
         handl.tx_task_interval_min = CONTENT_MIN_TX_INTERVAL__CHECK_FOR_REDUNDANCY;
         handl.tx_msg_handler = tx_msg_dev_req;
         handl.rx_msg_handler = rx_msg_dev_req;
-        register_frame_handler(packet_frame_handler, FRAME_TYPE_DEV_REQ, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_DEV_REQ, &handl);
 
         handl.name = "DEV_ADV";
         handl.is_advertisement = 1;
@@ -4976,7 +4989,7 @@ int32_t init_msg( void )
         handl.data_header_size = sizeof (struct hdr_dev_adv);
         handl.tx_frame_handler = tx_frame_dev_adv;
         handl.rx_frame_handler = rx_frame_dev_adv;
-        register_frame_handler(packet_frame_handler, FRAME_TYPE_DEV_ADV, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_DEV_ADV, &handl);
 
 
         handl.name = "LINK_REQ_ADV";
@@ -4988,7 +5001,7 @@ int32_t init_msg( void )
         handl.tx_task_interval_min = CONTENT_MIN_TX_INTERVAL__CHECK_FOR_REDUNDANCY;
         handl.tx_msg_handler = tx_msg_link_req;
         handl.rx_msg_handler = rx_msg_link_req;
-        register_frame_handler(packet_frame_handler, FRAME_TYPE_LINK_REQ_ADV, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_LINK_REQ_ADV, &handl);
 
         handl.name = "LINK_ADV";
         handl.is_advertisement = 1;
@@ -4999,7 +5012,7 @@ int32_t init_msg( void )
         handl.data_header_size = sizeof (struct hdr_link_adv);
         handl.tx_frame_handler = tx_frame_link_adv;
         handl.rx_frame_handler = rx_frame_link_adv;
-        register_frame_handler(packet_frame_handler, FRAME_TYPE_LINK_ADV, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_LINK_ADV, &handl);
 
         handl.name = "RP_ADV";
         handl.is_advertisement = 1;
@@ -5007,7 +5020,7 @@ int32_t init_msg( void )
         handl.fixed_msg_size = 1;
         handl.tx_frame_handler = tx_frame_rp_adv;
         handl.rx_frame_handler = rx_frame_rp_adv;
-        register_frame_handler(packet_frame_handler, FRAME_TYPE_RP_ADV, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_RP_ADV, &handl);
 
 
         handl.name = "OGM_ADV";
@@ -5018,7 +5031,7 @@ int32_t init_msg( void )
         handl.fixed_msg_size = 0;
         handl.tx_frame_handler = tx_frame_ogm_advs;
         handl.rx_frame_handler = rx_frame_ogm_advs;
-        register_frame_handler(packet_frame_handler, FRAME_TYPE_OGM_ADV, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_OGM_ADV, &handl);
 
         handl.name = "OGM_ACK";
         handl.rx_requires_described_neigh = 0;
@@ -5028,7 +5041,7 @@ int32_t init_msg( void )
         handl.tx_task_interval_min = CONTENT_MIN_TX_INTERVAL__CHECK_FOR_REDUNDANCY;
         handl.tx_msg_handler = tx_msg_ogm_ack;
         handl.rx_frame_handler = rx_frame_ogm_acks;
-        register_frame_handler(packet_frame_handler, FRAME_TYPE_OGM_ACK, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_OGM_ACK, &handl);
 
         return SUCCESS;
 }

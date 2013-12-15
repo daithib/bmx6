@@ -71,7 +71,7 @@ void check_for_changed_sms(void *unused)
         struct sms_node * sms = NULL;
         struct avl_node *an = NULL;
 
-	int32_t max_sms_data_len = (use_referencing(&description_tlv_handl[BMX_DSC_TLV_SMS])) ? MAX_SMS_DATA_LEN_REF : MAX_SMS_DATA_LEN;
+	int32_t max_sms_data_len = (use_referencing(&description_tlv_db->handls[BMX_DSC_TLV_SMS])) ? MAX_SMS_DATA_LEN_REF : MAX_SMS_DATA_LEN;
 
         char name[MAX_SMS_NAME_LEN];
         char data[max_sms_data_len + 1];
@@ -455,7 +455,7 @@ static int32_t sms_init( void ) {
         tlv_handl.tx_frame_handler = create_description_sms;
         tlv_handl.rx_frame_handler = process_description_sms;
         tlv_handl.msg_format = json_extension_format;
-        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_SMS, &tlv_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_SMS, &tlv_handl);
 
 	return SUCCESS;
 }

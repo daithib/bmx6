@@ -1615,7 +1615,7 @@ int32_t init_metrics( void )
         metric_handl.tx_frame_handler = create_description_tlv_metricalgo;
         metric_handl.rx_frame_handler = process_description_tlv_metricalgo;
         metric_handl.msg_format = metric_format;
-        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_METRIC, &metric_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_METRIC, &metric_handl);
 
         
         register_path_metricalgo(BIT_METRIC_ALGO_MP, path_metricalgo_MultiplyQuality);

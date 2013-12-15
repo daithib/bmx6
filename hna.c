@@ -3436,7 +3436,7 @@ int32_t hna_init( void )
         tlv_handl.tx_frame_handler = create_description_tlv_hna;
         tlv_handl.rx_frame_handler = process_description_tlv_hna;
         tlv_handl.msg_format = hna6_format;
-        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_UHNA6, &tlv_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_UHNA6, &tlv_handl);
 
 
 
@@ -3450,7 +3450,7 @@ int32_t hna_init( void )
         tlv_handl.tx_frame_handler = create_description_tlv_tun6_adv;
         tlv_handl.rx_frame_handler = process_description_tlv_tun6_adv;
         tlv_handl.msg_format = tun6_adv_format;
-        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_TUN6_ADV, &tlv_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN6_ADV, &tlv_handl);
 
 
         memset(&tlv_handl, 0, sizeof (tlv_handl));
@@ -3460,7 +3460,7 @@ int32_t hna_init( void )
         tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_ingress_adv;
         tlv_handl.rx_frame_handler = process_description_tlv_tunXin6_ingress_adv;
         tlv_handl.msg_format = tun4in6_ingress_adv_format;
-        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_TUN4IN6_INGRESS_ADV, &tlv_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN4IN6_INGRESS_ADV, &tlv_handl);
 
         memset(&tlv_handl, 0, sizeof (tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct description_msg_tun6in6_ingress_adv);
@@ -3469,7 +3469,7 @@ int32_t hna_init( void )
         tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_ingress_adv;
         tlv_handl.rx_frame_handler = process_description_tlv_tunXin6_ingress_adv;
         tlv_handl.msg_format = tun6in6_ingress_adv_format;
-        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_TUN6IN6_INGRESS_ADV, &tlv_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN6IN6_INGRESS_ADV, &tlv_handl);
 
 
         memset(&tlv_handl, 0, sizeof (tlv_handl));
@@ -3479,7 +3479,7 @@ int32_t hna_init( void )
         tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_src_adv;
         tlv_handl.rx_frame_handler = process_description_tlv_tunXin6_src_adv;
         tlv_handl.msg_format = tun4in6_src_adv_format;
-        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_TUN4IN6_SRC_ADV, &tlv_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN4IN6_SRC_ADV, &tlv_handl);
 
         memset(&tlv_handl, 0, sizeof (tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct description_msg_tun6in6_src_adv);
@@ -3488,7 +3488,7 @@ int32_t hna_init( void )
         tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_src_adv;
         tlv_handl.rx_frame_handler = process_description_tlv_tunXin6_src_adv;
         tlv_handl.msg_format = tun6in6_src_adv_format;
-        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_TUN6IN6_SRC_ADV, &tlv_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN6IN6_SRC_ADV, &tlv_handl);
 
 
         memset(&tlv_handl, 0, sizeof (tlv_handl));
@@ -3500,7 +3500,7 @@ int32_t hna_init( void )
         tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_net_adv;
         tlv_handl.rx_frame_handler = process_description_tlv_tunXin6_net_adv;
         tlv_handl.msg_format = tun4in6_adv_format;
-        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_TUN4IN6_NET_ADV, &tlv_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN4IN6_NET_ADV, &tlv_handl);
 
         memset(&tlv_handl, 0, sizeof (tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct description_msg_tun6in6_net_adv);
@@ -3511,7 +3511,7 @@ int32_t hna_init( void )
         tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_net_adv;
         tlv_handl.rx_frame_handler = process_description_tlv_tunXin6_net_adv;
         tlv_handl.msg_format = tun6in6_adv_format;
-        register_frame_handler(description_tlv_handl, BMX_DSC_TLV_TUN6IN6_NET_ADV, &tlv_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN6IN6_NET_ADV, &tlv_handl);
 
         register_options_array(hna_options, sizeof ( hna_options), CODE_CATEGORY_NAME);
 

@@ -153,7 +153,7 @@ void dump(struct packet_buff *pb)
 
         struct rx_frame_iterator it = {
                 .caller = __FUNCTION__, .on = NULL, .cn = NULL, .op = 0, .pb = NULL,
-                .handls = packet_frame_handler, .handl_max = FRAME_TYPE_MAX, .process_filter = FRAME_TYPE_PROCESS_NONE,
+                .db = packet_frame_db, .process_filter = FRAME_TYPE_PROCESS_NONE,
                 .frame_type = -1, .frames_in = (((uint8_t*) phdr) + sizeof (struct packet_header)),
                 .frames_length = (plength - sizeof (struct packet_header)), .frames_pos = 0, .is_virtual_header = 0
         };
@@ -167,25 +167,25 @@ void dump(struct packet_buff *pb)
                 char *tname;
                 int16_t frame_msgs = -1;
 
-                if (!(tname = packet_frame_handler[it.frame_type].name)) {
+                if (!(tname = it.db->handls[it.frame_type].name)) {
                         sprintf(tnum, "%d", it.frame_type);
                         tname = tnum;
                 }
 
-                if (packet_frame_handler[it.frame_type].fixed_msg_size) {
-                        frame_msgs = it.frame_msgs_length / packet_frame_handler[it.frame_type].min_msg_size;
+                if (it.db->handls[it.frame_type].fixed_msg_size) {
+                        frame_msgs = it.frame_msgs_length / it.db->handls[it.frame_type].min_msg_size;
                 }
 
 
                 dbgf_dump(DBGT_NONE, "%s             frame_type=%-12s data_header_size=%-3d msgs=%-3d frame_length=%-4d",
                         direction == DUMP_DIRECTION_IN ? "in " : "out", tname,
-                        packet_frame_handler[it.frame_type].data_header_size, frame_msgs, it.frame_length);
+                        it.db->handls[it.frame_type].data_header_size, frame_msgs, it.frame_length);
 
                 dbgf_dump(DBGT_NONE, "%s         data [%3d...%3d]:%s",
                         direction == DUMP_DIRECTION_IN ? "in  hex" : "out hex",
                         pkt_pos, pkt_pos + it.frame_length - 1, memAsHexString(((uint8_t*) phdr) + pkt_pos, it.frame_length));
 
-                //assertion(-500991, (packet_frame_handler[it.frame_type].min_msg_size));
+                //assertion(-500991, (it.hands->hands[it.frame_type].min_msg_size));
                 assertion(-500992, (it.frame_msgs_length >= 0));
 
                 (*dev_plugin_data)->tmp_frame[direction][it.frame_type] += (it.frame_length << IMPROVE_ROUNDOFF);
@@ -270,10 +270,10 @@ void dbg_traffic_statistics(struct dump_data *data, struct ctrl_node *cn, char* 
 
         for (t = 0; t < FRAME_TYPE_NOP; t++) {
 
-                if (packet_frame_handler[t].name || data->avg_frame[DUMP_DIRECTION_IN][t] || data->avg_frame[DUMP_DIRECTION_OUT][t]) {
+                if (packet_frame_db->handls[t].name || data->avg_frame[DUMP_DIRECTION_IN][t] || data->avg_frame[DUMP_DIRECTION_OUT][t]) {
 
                         char tnum[4];
-                        char *tname = packet_frame_handler[t].name;
+                        char *tname = packet_frame_db->handls[t].name;
                         if (!tname) {
                                 sprintf(tnum, "%d", t);
                                 tname = tnum;

@@ -859,11 +859,10 @@ struct rx_frame_iterator {
         struct description *desc; //as received on wire
         uint16_t desc_len;
         uint8_t *frames_in;
-        struct frame_handl *handls;
+        struct frame_db *db;
         struct frame_handl *handl;
         uint8_t op;
         uint8_t process_filter;
-        uint8_t handl_max;
         uint8_t is_virtual_header;
         int32_t frames_length;
 
@@ -902,15 +901,16 @@ struct tx_frame_iterator {
 
 	uint8_t             *frame_cache_array;
 	uint8_t             *frames_out_ptr;
-	struct frame_handl  *handls;
-	uint8_t              handl_max;
+	struct frame_db     *db;
 	int32_t              frames_out_pref;
 	int32_t              frames_out_max;
 	int32_t              frame_cache_size;
+
         // updated by fs_caller():
 	uint8_t              frame_type;
 
 	// updated by tx..iterate():
+        struct frame_handl  *handl;
 	int32_t              frames_out_pos;
 	int32_t              frames_out_num;
 	int32_t              frame_cache_msgs_size;
@@ -938,7 +938,8 @@ struct frame_handl {
         UMETRIC_T *rx_tp_min;
         UMETRIC_T *rx_rp_min;
         char *name;
-
+        struct frame_db *next_db;
+        uint8_t next_type;
 	int32_t (*rx_frame_handler) (struct rx_frame_iterator *); // returns: TLV_RX_DATA_code or rcvd frame_msgs_len (without data_header_size)
 	int32_t (*rx_msg_handler)   (struct rx_frame_iterator *); // returns: TLV_RX_DATA_code or rcvd frame_msg_len  (without data_header_size)
 	int32_t (*tx_frame_handler) (struct tx_frame_iterator *); // returns: TLV_TX_DATA_code or send frame_msgs_len (without data_header_size)
@@ -947,6 +948,11 @@ struct frame_handl {
 	const struct field_format *msg_format;
 };
 
+struct frame_db {
+    uint8_t handl_max;
+    
+    struct frame_handl handls[];
+};
 
 static inline uint8_t * tx_iterator_cache_hdr_ptr(struct tx_frame_iterator *it)
 {
@@ -955,7 +961,7 @@ static inline uint8_t * tx_iterator_cache_hdr_ptr(struct tx_frame_iterator *it)
 
 static inline uint8_t * tx_iterator_cache_msg_ptr(struct tx_frame_iterator *it)
 {
-	return it->frame_cache_array + it->handls[it->frame_type].data_header_size + it->frame_cache_msgs_size;
+	return it->frame_cache_array + it->db->handls[it->frame_type].data_header_size + it->frame_cache_msgs_size;
 }
 
 int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max);
@@ -971,8 +977,8 @@ static inline int32_t tx_iterator_cache_data_space_sched(struct tx_frame_iterato
 
 static inline int32_t tx_iterator_cache_msg_space_pref(struct tx_frame_iterator *it)
 {
-        if (it->handls[it->frame_type].min_msg_size && it->handls[it->frame_type].fixed_msg_size)
-                return tx_iterator_cache_data_space_pref(it) / it->handls[it->frame_type].min_msg_size;
+        if (it->db->handls[it->frame_type].min_msg_size && it->db->handls[it->frame_type].fixed_msg_size)
+                return tx_iterator_cache_data_space_pref(it) / it->db->handls[it->frame_type].min_msg_size;
         else
                 return 0;
 }
@@ -989,8 +995,8 @@ extern TIME_T myIID4me_timestamp;
 //extern IDM_T my_dev_adv_changed;
 
 
-extern struct frame_handl packet_frame_handler[FRAME_TYPE_ARRSZ];
-extern struct frame_handl description_tlv_handl[BMX_DSC_TLV_ARRSZ];
+extern struct frame_db *packet_frame_db;
+extern struct frame_db *description_tlv_db;
 
 
 /***********************************************************
@@ -1025,7 +1031,7 @@ void rx_packet( struct packet_buff *pb );
 void schedule_tx_task(struct link_dev_node *dest_lndev, uint16_t frame_type, int16_t frame_msgs_len,
         void *data, uint32_t dlen, IID_T myIID4x, IID_T neighIID4x);
 
-void register_frame_handler(struct frame_handl *array, int pos, struct frame_handl *handl);
+void register_frame_handler(struct frame_db *db, int pos, struct frame_handl *handl);
 
 struct plugin *msg_get_plugin( void );
 
