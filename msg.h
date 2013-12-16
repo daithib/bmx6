@@ -993,6 +993,7 @@ extern TIME_T myIID4me_timestamp;
 
 
 extern struct frame_db *packet_frame_db;
+extern struct frame_db *packet_desc_db;
 extern struct frame_db *description_tlv_db;
 
 

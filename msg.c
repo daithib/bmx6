@@ -4558,11 +4558,11 @@ int32_t opt_show_descriptions(uint8_t cmd, uint8_t _save, struct opt_type *opt,
                                 on->desc_len, sizeof (struct msg_description_adv) + on->dext->dlen );
 
 
-                        dbg_printf(cn, " %s:", packet_frame_db->handls[FRAME_TYPE_DESC_ADV].name);
+                        dbg_printf(cn, " %s:", packet_desc_db->handls->name);
 
                         fields_dbg_lines(cn, relevance, sizeof (struct msg_description_adv), (uint8_t*) desc_buff,
-                                packet_frame_db->handls[FRAME_TYPE_DESC_ADV].min_msg_size,
-                                packet_frame_db->handls[FRAME_TYPE_DESC_ADV].msg_format);
+                                packet_desc_db->handls->min_msg_size,
+                                packet_desc_db->handls->msg_format);
 
                         debugFree(desc_buff, -300362);
 
