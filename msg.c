@@ -2602,7 +2602,7 @@ struct dhash_node *process_dhash_description_neighIID4x
 (struct packet_buff *pb, DHASH_T *dhash, struct description* dsc, uint16_t desc_len, IID_T neighIID4x)
 {
         TRACE_FUNCTION_CALL;
-        struct dhash_node *orig_dhn = NULL;
+        struct dhash_node *odhn = NULL;
         struct local_node *local = pb->i.link->local;
         struct description_cache_node *cache = NULL;
         IDM_T is_transmitters_iid = neighIID4x > IID_RSVD_MAX && neighIID4x == pb->i.transmittersIID;
@@ -2611,16 +2611,16 @@ struct dhash_node *process_dhash_description_neighIID4x
         assertion(-500689, (!(is_transmitters_iid && !memcmp(dhash, &(self->dhn->dhash), sizeof(*dhash))))); // cant be transmitters' and myselfs'
         assertion(-500000, (!avl_find(&dhash_invalid_tree, dhash)));
 
-        if ((orig_dhn = avl_find_item(&dhash_tree, dhash))) {
+        if ((odhn = avl_find_item(&dhash_tree, dhash))) {
                 // is about a known dhash:
                 
                 if (is_transmitters_iid) {
                         // is about the transmitter:
 
-                        if (update_local_neigh(pb, orig_dhn) == FAILURE)
+                        if (update_local_neigh(pb, odhn) == FAILURE)
                                 return (struct dhash_node *) FAILURE_PTR;
 
-                        if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, orig_dhn->myIID4orig) == FAILURE)
+                        if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, odhn->myIID4orig) == FAILURE)
                                 return (struct dhash_node *) FAILURE_PTR;
 
                         assertion(-500968, (is_described_neigh(pb->i.link, pb->i.transmittersIID)));
@@ -2628,18 +2628,18 @@ struct dhash_node *process_dhash_description_neighIID4x
                 } else if (neighIID4x > IID_RSVD_MAX && local->neigh) {
                         // received via a known neighbor, and is NOT about the transmitter:
 
-                        if (orig_dhn == self->dhn) {
+                        if (odhn == self->dhn) {
                                 // is about myself:
 
                                 dbgf_all(DBGT_INFO, "msg refers myself via %s neighIID4me %d", pb->i.llip_str, neighIID4x);
 
                                 local->neigh->neighIID4me = neighIID4x;
 
-                        } else if (orig_dhn == local->neigh->dhn && !is_transmitters_iid) {
+                        } else if (odhn == local->neigh->dhn && !is_transmitters_iid) {
                                 // is about a neighbors' dhash itself which is NOT the transmitter ???!!!
 
                                 dbgf_sys(DBGT_ERR, "%s via %s neighIID4x=%d IS NOT transmitter=%d",
-                                        globalIdAsString(&orig_dhn->on->global_id), pb->i.llip_str, neighIID4x, pb->i.transmittersIID);
+                                        globalIdAsString(&odhn->on->global_id), pb->i.llip_str, neighIID4x, pb->i.transmittersIID);
 
                                 return (struct dhash_node *) FAILURE_PTR;
 
@@ -2647,43 +2647,45 @@ struct dhash_node *process_dhash_description_neighIID4x
                                 // is about.a another dhash known by me and a (neighboring) transmitter..:
                         }
 
-                        if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, orig_dhn->myIID4orig) == FAILURE)
+                        if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, odhn->myIID4orig) == FAILURE)
                                 return (struct dhash_node *) FAILURE_PTR;
                 }
 
-        } else if ((is_transmitters_iid || local->neigh) ) {
+        } else {
                 // is about an unconfirmed or unkown dhash:
 
 		if (dsc)
 			cache_description(dsc, desc_len, dhash);
 
-		if ((cache = get_cached_description(dhash)) && (orig_dhn = process_description(pb, cache, dhash)) &&
-			orig_dhn != FAILURE_PTR && orig_dhn != UNRESOLVED_PTR && orig_dhn != IGNORED_PTR) {
+		if (((is_transmitters_iid || local->neigh) ) &&
+			(cache = get_cached_description(dhash)) &&
+			(odhn = process_description(pb, cache, dhash)) &&
+			odhn != FAILURE_PTR && odhn != UNRESOLVED_PTR && odhn != IGNORED_PTR) {
 
 			if (is_transmitters_iid &&
 				//is about the transmitter  and  a description + dhash is known
-				update_local_neigh(pb, orig_dhn) == FAILURE)
+				update_local_neigh(pb, odhn) == FAILURE)
 				return(struct dhash_node *) FAILURE_PTR;
 
 			if (neighIID4x > IID_RSVD_MAX &&
-				iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, orig_dhn->myIID4orig) == FAILURE)
+				iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, odhn->myIID4orig) == FAILURE)
 				return(struct dhash_node *) FAILURE_PTR;
 
 			assertion(-500969, IMPLIES(is_transmitters_iid, is_described_neigh(pb->i.link, pb->i.transmittersIID)));
-			assertion(-501587, orig_dhn);
+			assertion(-501587, odhn);
 		}
         }
 
 	dbgf_track(DBGT_INFO, "via dev=%s NB=%s dhash=%8X.. %s %s %s neighIID4x=%d is_sender=%d %s",
                 pb->i.iif->label_cfg.str, pb->i.llip_str, dhash->h.u32[0],
                 (dsc ? globalIdAsString(&dsc->globalId) : "NO DESCRIPTION"), (cache ? "CACHED" : "-"),
-                (orig_dhn?(orig_dhn==FAILURE_PTR?"FAILURE":
-                        (orig_dhn==UNRESOLVED_PTR?"UNRESOLVED":(orig_dhn==IGNORED_PTR?"IGNORED":"RESOLVED"))):"UNKNOWN"),
+                (odhn?(odhn==FAILURE_PTR?"FAILURE":
+                        (odhn==UNRESOLVED_PTR?"UNRESOLVED":(odhn==IGNORED_PTR?"IGNORED":"RESOLVED"))):"UNKNOWN"),
                 neighIID4x, is_transmitters_iid,
-		(orig_dhn && orig_dhn!=FAILURE_PTR && orig_dhn!=UNRESOLVED_PTR && orig_dhn!=IGNORED_PTR && orig_dhn->on ?
-			globalIdAsString(&orig_dhn->on->global_id) : DBG_NIL));
+		(odhn && odhn!=FAILURE_PTR && odhn!=UNRESOLVED_PTR && odhn!=IGNORED_PTR && odhn->on ?
+			globalIdAsString(&odhn->on->global_id) : DBG_NIL));
 
-        return orig_dhn;
+        return odhn;
 }
 
 
