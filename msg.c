@@ -388,6 +388,7 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, str
         assertion(-501354, IMPLIES(op == TLV_OP_DEL, on->added));
 
         int32_t tlv_result;
+	int8_t blocked = NO;
 
         struct rx_frame_iterator it = {
                 .caller = __FUNCTION__, .on = on, .cn = cn, .op = op, .pb = pb, .desc = desc, .desc_len=desc_len,
@@ -401,32 +402,45 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, str
 		ntohl(desc->descSqn),  dext->dlen, filter);
 
 
-        while ((tlv_result = rx_frame_iterate(&it)) > TLV_RX_DATA_BLOCKED);
+        while ((tlv_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
+		
+		if (tlv_result == TLV_RX_DATA_BLOCKED)
+			blocked = YES;
+	}
+
+	assertion( -500000, (tlv_result==TLV_RX_DATA_DONE || tlv_result==TLV_RX_DATA_FAILURE));
 
         if ((op >= TLV_OP_CUSTOM_MIN && op <= TLV_OP_CUSTOM_MAX) || (op >= TLV_OP_PLUGIN_MIN && op <= TLV_OP_PLUGIN_MAX))
-                return TLV_RX_DATA_DONE;
+                return tlv_result;
 
-        if (tlv_result == TLV_RX_DATA_BLOCKED || tlv_result == TLV_RX_DATA_FAILURE) {
+        if (tlv_result == TLV_RX_DATA_FAILURE || blocked) {
 
-                assertion(-500356, IMPLIES(tlv_result == TLV_RX_DATA_BLOCKED, op == TLV_OP_TEST));
                 assertion(-501355, (op == TLV_OP_TEST));
 
                 dbgf_sys(DBGT_WARN, "problematic description_ltv from %s, near type=%s frame_data_length=%d  pos=%d %s",
                         pb ? pb->i.llip_str : DBG_NIL, description_tlv_db->handls[it.frame_type].name,
-                        it.frame_data_length, it.frames_pos, tlv_result == TLV_RX_DATA_BLOCKED ? "BLOCKED" : "FAILURE");
+                        it.frame_data_length, it.frames_pos, blocked ? "BLOCKED" : "", tlv_result==TLV_RX_DATA_FAILURE ? "FAILURE" : "");
 
-                block_orig_node(YES, on);
-
-                return tlv_result;
+		if (tlv_result==TLV_RX_DATA_FAILURE)
+			return TLV_RX_DATA_FAILURE;
+		else
+			return TLV_RX_DATA_BLOCKED;
         }
 
-        if (filter == FRAME_TYPE_PROCESS_ALL && op == TLV_OP_NEW) {
-                on->added = YES;
-                block_orig_node(NO, on);
+	if (filter == FRAME_TYPE_PROCESS_ALL && (op == TLV_OP_NEW || op == TLV_OP_DEL)) {
 
-        } else if (filter == FRAME_TYPE_PROCESS_ALL && op == TLV_OP_DEL) {
-                on->added = NO;
-        }
+		assertion( -500000, (on));
+		assertion( -500000, (on->added != on->blocked));
+	
+		if (filter == FRAME_TYPE_PROCESS_ALL && op == TLV_OP_NEW) {
+
+			on->added = YES;
+
+		} else if (filter == FRAME_TYPE_PROCESS_ALL && op == TLV_OP_DEL) {
+
+			on->added = NO;
+		}
+	}
 
         return TLV_RX_DATA_DONE;
 }
@@ -3186,14 +3200,6 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 
                                 return TLV_RX_DATA_BLOCKED;
 
-                        } else if (receptor_result == TLV_RX_DATA_UNRESOLVED) {
-
-				assertion(-501591, 0); //not used. Case can be purged??!!
-                                dbgf_sys(DBGT_ERR, "%s - rx_frame_handler(%s)=%d frame_msgs_len=%d : UNRESOLVED",
-                                        it->caller, f_handl->name, receptor_result, it->frame_msgs_length );
-
-                                return TLV_RX_DATA_UNRESOLVED;
-
 			} else if (receptor_result == TLV_RX_DATA_IGNORED ) {
 
 				return TLV_RX_DATA_IGNORED;
@@ -4262,23 +4268,6 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
         TRACE_FUNCTION_CALL;
         assertion(-500262, (pb && pb->i.link && cache && cache->desc));
         assertion(-500381, (!avl_find( &dhash_tree, dhash )));
-
-        struct orig_node *on = avl_find_item(&orig_tree, &cache->desc->globalId);
-
-	assertion(-500000, IMPLIES(on, on->desc && on->dext));
-
-        if ( on && ntohl(cache->desc->descSqn) < ntohl(on->desc->descSqn) ) {
-		
-		dbgf_sys(DBGT_WARN, "IGNORED rcvd descSqn=%d (current descSqn=%d) from global_id=%s via_dev=%s via_ip=%s",
-			ntohl(cache->desc->descSqn), ntohl(on->desc->descSqn),
-			globalIdAsString(&cache->desc->globalId), pb->i.iif->label_cfg.str, pb->i.llip_str);
-
-		invalidate_dhash(NULL, dhash);
-
-		return (struct dhash_node *) IGNORED_PTR;
-	}
-	assertion(-500000, IMPLIES(on && cache->desc->descSqn==on->desc->descSqn, !on->added));
-
 	
 	// First check if dext is fully resolvable::
         struct desc_extension *dext = resolve_desc_extensions(pb, cache, NULL);
@@ -4296,6 +4285,7 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 		
 	} else if (dext == NULL) {
 
+		// only if dext is fully resolvable then allocate it, so this should always succeed!!!
 		dext = init_desc_extension();
 
 		if ( dext != resolve_desc_extensions(pb, cache, dext) )
@@ -4305,7 +4295,28 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 		cleanup_all(-500000);
 	}
 	
-	// only if dext is fully resolvable then allocate it, so this should always succeed!!!
+       struct orig_node *on = avl_find_item(&orig_tree, &cache->desc->globalId);
+       assertion(-500000, IMPLIES(on, on->desc && on->dext));
+
+        int32_t tlv_result = process_description_tlvs(pb, on, cache->desc, cache->desc_len, dext, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
+
+	assertion( -500000, (tlv_result==TLV_RX_DATA_BLOCKED || tlv_result==TLV_RX_DATA_DONE || tlv_result==TLV_RX_DATA_FAILURE));
+
+	if (tlv_result == TLV_RX_DATA_FAILURE)
+		goto process_desc0_error;
+
+        if ( on && ntohl(cache->desc->descSqn) < ntohl(on->desc->descSqn) ) {
+
+		dbgf_sys(DBGT_WARN, "IGNORED rcvd descSqn=%d (current descSqn=%d) from global_id=%s via_dev=%s via_ip=%s",
+			ntohl(cache->desc->descSqn), ntohl(on->desc->descSqn),
+			globalIdAsString(&cache->desc->globalId), pb->i.iif->label_cfg.str, pb->i.llip_str);
+
+		invalidate_dhash(NULL, dhash);
+
+		return (struct dhash_node *) IGNORED_PTR;
+	}
+
+	assertion(-500000, IMPLIES(on && cache->desc->descSqn==on->desc->descSqn, !on->added));
 
         if (!on) // create new orig:
                 on = init_orig_node(&cache->desc->globalId);
@@ -4321,29 +4332,24 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 
         assertion(-501361, IMPLIES(on->blocked, !on->added));
 
-        int32_t tlv_result = process_description_tlvs(pb, on, cache->desc, cache->desc_len, dext, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
-
-	assertion( -500000, (tlv_result==TLV_RX_DATA_DONE || tlv_result==TLV_RX_DATA_BLOCKED || tlv_result==TLV_RX_DATA_FAILURE));
 
         if (tlv_result == TLV_RX_DATA_DONE) {
 
+		block_orig_node(NO, on);
                 tlv_result = process_description_tlvs(pb, on, cache->desc, cache->desc_len, dext, TLV_OP_NEW, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
                 assertion(-501362, (tlv_result == TLV_RX_DATA_DONE)); // checked, so MUST SUCCEED!!
                 assertion(-501363, (on->blocked != on->added));
 
-        } else {
+        } else if (tlv_result == TLV_RX_DATA_BLOCKED ) {
 
                 if (on->added) {
 			assertion(-500000, (on->desc));
                         tlv_result = process_description_tlvs(pb, on, on->desc, on->desc_len, on->dext, TLV_OP_DEL, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
                         assertion(-501364, (tlv_result == TLV_RX_DATA_DONE));
+			assertion(-500000, (on->blocked && !on->added));
                 }
+		block_orig_node(YES, on);
 
-		assertion(-500000, (!on->added));
-                assertion(-501365, IMPLIES(on->blocked, !on->added));
-
-                if (tlv_result == TLV_RX_DATA_FAILURE)
-                        goto process_desc0_error;
         }
 
 
@@ -4380,9 +4386,6 @@ process_desc0_error:
 
         if (dext && dext!=IGNORED_PTR && dext!= FAILURE_PTR && dext!=UNRESOLVED_PTR)
 		free_desc_extensions(&dext);
-
-        if (on)
-                free_orig_node(on);
 
 	dbgf_sys(DBGT_ERR, "FAILED global_id=%s rcvd via_dev=%s via_ip=%s",
 		cache ? globalIdAsString(&cache->desc->globalId) : "???", pb->i.iif->label_cfg.str, pb->i.llip_str);

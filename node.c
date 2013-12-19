@@ -973,7 +973,7 @@ void purge_local_node(struct local_node *local)
 void block_orig_node(IDM_T block, struct orig_node *on)
 {
 
-        if (block) {
+        if (block && !on->blocked) {
 
                 on->blocked = YES;
 
@@ -981,13 +981,11 @@ void block_orig_node(IDM_T block, struct orig_node *on)
                         avl_insert(&blocked_tree, on, -300165);
 
 
-        } else {
+        } else if (!block && on->blocked) {
 
                 on->blocked = NO;
                 avl_remove(&blocked_tree, &on->global_id, -300201);
-
         }
-
 }
 
 void free_orig_node(struct orig_node *on)
