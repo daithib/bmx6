@@ -134,8 +134,6 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-//	return TLV_RX_DATA_IGNORED;
-	
 	assertion(-500000, (it->frame_data_length == it->frame_msgs_length && it->frame_data == it->msg));
 	assertion(-500000, (it->dext));
 
@@ -149,29 +147,35 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 	uint8_t *desc_start = (uint8_t*)it->desc;
 	int32_t desc_len = it->desc_len - (sizeof(struct tlv_hdr) + it->frame_data_length);
 	CRYPTSHA1_T desc_sha;
-	CRYPTKEY_T *pkey = NULL;
+	CRYPTKEY_T *pkey_crypt = NULL;
 
 	struct dsc_msg_pubkey *pkey_msg = (struct dsc_msg_pubkey*)(dext->dtd[BMX_DSC_TLV_PUBKEY].len ?
 		dext->data + dext->dtd[BMX_DSC_TLV_PUBKEY].pos : NULL);
 
-	if ( !pkey_msg || !cryptKeyTypeAsString(pkey_msg->type) || cryptKeyLenByType(pkey_msg->type) != sign_len || desc_len < (int)sizeof(struct description))
+	if ( !cryptKeyTypeAsString(msg->type) || cryptKeyLenByType(msg->type) != sign_len )
 		goto_error( finish, "1");
 
-	if ( sign_len > (descVerification/8) )
+	if ( !pkey_msg || !cryptKeyTypeAsString(pkey_msg->type) || cryptKeyLenByType(pkey_msg->type) != sign_len )
 		goto_error( finish, "2");
+
+	if ( desc_len < (int)sizeof(struct description))
+		goto_error( finish, "3");
+
+	if ( sign_len > (descVerification/8) )
+		goto_error( finish, "4");
 
 	cryptShaAtomic(desc_start, desc_len, &desc_sha);
 
-	pkey = cryptPubKeyFromRaw(pkey_msg->key, sign_len);
+	pkey_crypt = cryptPubKeyFromRaw(pkey_msg->key, sign_len);
 	
 	CRYPTSHA1_T plain_sha = {.h.u32={0} };
 	int32_t plain_len = sizeof(plain_sha);
 
-	if (cryptVerify(msg->signature, sign_len, (uint8_t*)&plain_sha, &plain_len, pkey) != SUCCESS )
-		goto_error( finish, "3");
+	if (cryptVerify(msg->signature, sign_len, (uint8_t*)&plain_sha, &plain_len, pkey_crypt) != SUCCESS )
+		goto_error( finish, "5");
 	
 	if (plain_len != sizeof(desc_sha) || memcmp(&plain_sha, &desc_sha, sizeof(desc_sha)))
-		goto_error( finish, "4");
+		goto_error( finish, "6");
 	
 finish: {
 	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
@@ -182,10 +186,10 @@ finish: {
 		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", desc_len, memAsHexString(&desc_sha, sizeof(desc_sha)),
 		sign_len, memAsHexString(msg->signature, sign_len),
 		pkey_msg ? cryptKeyTypeAsString(pkey_msg->type) : "---", pkey_msg ? cryptKeyLenByType(pkey_msg->type) : 0,
-		pkey ? memAsHexString(pkey->rawKey, pkey->rawKeyLen) : "---",
+		pkey_crypt ? memAsHexString(pkey_crypt->rawKey, pkey_crypt->rawKeyLen) : "---",
 		plain_len, sizeof(plain_sha), memAsHexString(&plain_sha, sizeof(plain_sha)), goto_error_code);
 	
-	cryptKeyFree(&pkey);
+	cryptKeyFree(&pkey_crypt);
 	
 	if (goto_error_code)
 		return TLV_RX_DATA_FAILURE;
