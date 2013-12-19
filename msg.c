@@ -4277,6 +4277,8 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 			ntohl(cache->desc->descSqn), ntohl(on->desc->descSqn),
 			globalIdAsString(&cache->desc->globalId), pb->i.iif->label_cfg.str, pb->i.llip_str);
 
+		invalidate_dhash(NULL, dhash);
+
 		return (struct dhash_node *) IGNORED_PTR;
 	}
 	assertion(-500000, IMPLIES(on && cache->desc->descSqn==on->desc->descSqn, !on->added));

@@ -518,7 +518,7 @@ struct dhash_node* create_dhash_node(DHASH_T *dhash, struct orig_node *on)
 }
 
 STATIC_FUNC
-void purge_dhash_iid(struct dhash_node *dhn)
+void purge_dhash_iid(IID_T myIID4orig)
 {
         TRACE_FUNCTION_CALL;
         struct avl_node *an;
@@ -527,7 +527,7 @@ void purge_dhash_iid(struct dhash_node *dhn)
         //reset all neigh_node->oid_repos[x]=dhn->mid4o entries
         for (an = NULL; (neigh = avl_iterate_item(&neigh_tree, &an));) {
 
-                iid_free_neighIID4x_by_myIID4x(&neigh->neighIID4x_repos, dhn->myIID4orig);
+                iid_free_neighIID4x_by_myIID4x(&neigh->neighIID4x_repos, myIID4orig);
 
         }
 }
@@ -549,9 +549,12 @@ void purge_dhash_invalid_list( IDM_T force_purge_all ) {
                         plist_del_head(&dhash_invalid_plist);
                         avl_remove(&dhash_invalid_tree, &dhn->dhash, -300194);
 
-                        iid_free(&my_iid_repos, dhn->myIID4orig);
+			if (dhn->myIID4orig > IID_RSVD_MAX) {
 
-                        purge_dhash_iid(dhn);
+				iid_free(&my_iid_repos, dhn->myIID4orig);
+
+				purge_dhash_iid(dhn->myIID4orig);
+			}
 
                         debugFree(dhn, -300112);
 
@@ -559,6 +562,32 @@ void purge_dhash_invalid_list( IDM_T force_purge_all ) {
                         break;
                 }
         }
+}
+
+
+void invalidate_dhash( struct dhash_node *dhn, DHASH_T *dhash )
+{
+        TRACE_FUNCTION_CALL;
+
+	assertion( -500000, XOR(dhn, dhash));
+
+	if (!dhn) {
+		dhn = debugMallocReset(sizeof(DHASH_T), -300000);
+		dhn->dhash = *dhash;
+	}
+
+        dbgf_track(DBGT_INFO,
+                "dhash %8X myIID4orig %d, my_iid_repository: used=%d, inactive=%d  min_free=%d  max_free=%d ",
+                dhn->dhash.h.u32[0], dhn->myIID4orig,
+                my_iid_repos.tot_used, dhash_invalid_tree.items+1, my_iid_repos.min_free, my_iid_repos.max_free);
+
+        assertion( -500698, (!dhn->on));
+        assertion( -500699, (!dhn->neigh));
+	assertion( -500000, !avl_find(&dhash_tree, &dhn->dhash));
+
+        avl_insert(&dhash_invalid_tree, dhn, -300168);
+        plist_add_tail(&dhash_invalid_plist, dhn);
+        dhn->referred_by_me_timestamp = bmx_time;
 }
 
 // called to not leave blocked dhash values:
@@ -576,39 +605,17 @@ void free_dhash_node( struct dhash_node *dhn )
 
         avl_remove(&dhash_tree, &dhn->dhash, -300195);
 
-        purge_dhash_iid(dhn);
+        purge_dhash_iid(dhn->myIID4orig);
 
         // It must be ensured that I am not reusing this IID for a while, so it must be invalidated
         // but the description and its' resulting dhash might become valid again, so I give it a unique and illegal value.
         memset(&dhn->dhash, 0, sizeof ( DHASH_T));
         dhn->dhash.h.u32[(sizeof ( DHASH_T) / sizeof (uint32_t)) - 1] = blocked_counter++;
 
-        avl_insert(&dhash_invalid_tree, dhn, -300168);
-        plist_add_tail(&dhash_invalid_plist, dhn);
-        dhn->referred_by_me_timestamp = bmx_time;
+	invalidate_dhash(dhn, NULL);
 }
 
 
-// called due to updated description, block previously used dhash:
-STATIC_FUNC
-void invalidate_dhash_node( struct dhash_node *dhn )
-{
-        TRACE_FUNCTION_CALL;
-
-        dbgf_track(DBGT_INFO,
-                "dhash %8X myIID4orig %d, my_iid_repository: used=%d, inactive=%d  min_free=%d  max_free=%d ",
-                dhn->dhash.h.u32[0], dhn->myIID4orig,
-                my_iid_repos.tot_used, dhash_invalid_tree.items+1, my_iid_repos.min_free, my_iid_repos.max_free);
-
-        assertion( -500698, (!dhn->on));
-        assertion( -500699, (!dhn->neigh));
-
-        avl_remove(&dhash_tree, &dhn->dhash, -300195);
-
-        avl_insert(&dhash_invalid_tree, dhn, -300168);
-        plist_add_tail(&dhash_invalid_plist, dhn);
-        dhn->referred_by_me_timestamp = bmx_time;
-}
 
 
 void update_neigh_dhash(struct orig_node *on, DHASH_T *dhash)
@@ -620,7 +627,10 @@ void update_neigh_dhash(struct orig_node *on, DHASH_T *dhash)
                 neigh = on->dhn->neigh;
                 on->dhn->neigh = NULL;
                 on->dhn->on = NULL;
-                invalidate_dhash_node(on->dhn);
+
+		avl_remove(&dhash_tree, &on->dhn->dhash, -300195);
+
+                invalidate_dhash(on->dhn, NULL);
         }
 
         on->dhn = create_dhash_node(dhash, on);

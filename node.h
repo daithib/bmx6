@@ -553,6 +553,7 @@ IDM_T blacklisted_neighbor(struct packet_buff *pb, DHASH_T *dhash);
 
 struct neigh_node *is_described_neigh( struct link_node *link, IID_T transmittersIID4x );
 void purge_dhash_invalid_list( IDM_T force_purge_all );
+void invalidate_dhash( struct dhash_node *dhn, DHASH_T *dhash );
 void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired);
 void block_orig_node(IDM_T block, struct orig_node *on);
 void free_orig_node(struct orig_node *on);
