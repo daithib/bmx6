@@ -424,12 +424,8 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, str
                 on->added = YES;
                 block_orig_node(NO, on);
 
-		if (!on->path_metricalgo)
-			metricalgo_assign(on, NULL);
-
         } else if (filter == FRAME_TYPE_PROCESS_ALL && op == TLV_OP_DEL) {
                 on->added = NO;
-		metricalgo_remove(on);
         }
 
         return TLV_RX_DATA_DONE;
@@ -4326,6 +4322,8 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
         assertion(-501361, IMPLIES(on->blocked, !on->added));
 
         int32_t tlv_result = process_description_tlvs(pb, on, cache->desc, cache->desc_len, dext, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
+
+	assertion( -500000, (tlv_result==TLV_RX_DATA_DONE || tlv_result==TLV_RX_DATA_BLOCKED || tlv_result==TLV_RX_DATA_FAILURE));
 
         if (tlv_result == TLV_RX_DATA_DONE) {
 

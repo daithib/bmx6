@@ -1250,6 +1250,7 @@ int create_description_tlv_metricalgo(struct tx_frame_iterator *it)
 }
 
 
+STATIC_FUNC
 void metricalgo_remove(struct orig_node *on)
 {
 	if (on->path_metricalgo) {
@@ -1263,6 +1264,7 @@ void metricalgo_remove(struct orig_node *on)
 	}
 }
 
+STATIC_FUNC
 void metricalgo_assign(struct orig_node *on, struct host_metricalgo *host_algo)
 {
 
@@ -1288,6 +1290,27 @@ void metricalgo_assign(struct orig_node *on, struct host_metricalgo *host_algo)
 		reconfigure_metric_record_position(&rn->mr, on->path_metricalgo, on->ogmSqn_rangeMin, on->ogmSqn_rangeMin, 0, NO);
 }
 
+
+STATIC_FUNC
+void metrics_description_event_hook(int32_t cb_id, struct orig_node *on)
+{
+        TRACE_FUNCTION_CALL;
+
+        assertion(-501306, (on));
+        assertion(-501270, IMPLIES(cb_id == PLUGIN_CB_DESCRIPTION_CREATED, (on && on->desc)));
+        assertion(-501273, (cb_id == PLUGIN_CB_DESCRIPTION_DESTROY || cb_id == PLUGIN_CB_DESCRIPTION_CREATED));
+        assertion(-501274, IMPLIES(initializing, cb_id == PLUGIN_CB_DESCRIPTION_CREATED));
+
+	if (cb_id==PLUGIN_CB_DESCRIPTION_CREATED) {
+
+		if (!on->path_metricalgo)
+			metricalgo_assign(on, NULL);
+
+	} else {
+
+		metricalgo_remove(on);
+	}
+}
 
 STATIC_FUNC
 int process_description_tlv_metricalgo(struct rx_frame_iterator *it )
@@ -1651,6 +1674,8 @@ struct plugin *metrics_get_plugin( void ) {
 
 	metrics_plugin.plugin_name = CODE_CATEGORY_NAME;
 	metrics_plugin.plugin_size = sizeof ( struct plugin );
+        metrics_plugin.cb_plugin_handler[PLUGIN_CB_DESCRIPTION_CREATED] = (void (*) (int32_t, void*)) metrics_description_event_hook;
+        metrics_plugin.cb_plugin_handler[PLUGIN_CB_DESCRIPTION_DESTROY] = (void (*) (int32_t, void*)) metrics_description_event_hook;
         metrics_plugin.cb_init = init_metrics;
 	metrics_plugin.cb_cleanup = cleanup_metrics;
 

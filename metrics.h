@@ -262,9 +262,6 @@ UMETRIC_T apply_metric_algo(UMETRIC_T *tr, UMETRIC_T *umetric_max, const UMETRIC
 void lndev_assign_best(struct local_node *local, struct link_dev_node *lndev );
 void update_link_probe_record(struct link_dev_node *lndev, HELLO_SQN_T sqn, uint8_t probe);
 
-void metricalgo_remove(struct orig_node *on);
-void metricalgo_assign(struct orig_node *on, struct host_metricalgo *host_algo);
-
 IDM_T update_path_metrics(struct packet_buff *pb, struct orig_node *on, OGM_SQN_T in_sqn, UMETRIC_T *in_umetric);
 
 
