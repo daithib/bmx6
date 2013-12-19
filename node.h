@@ -397,16 +397,18 @@ struct refnl_node {
 	struct ref_node *refn;
 };
 
+struct dext_type_data {
+    uint32_t len;
+    uint32_t pos;
+};
+
 struct desc_extension {
 	struct list_head refnl_list;
 	struct orig_node *on;
         uint8_t max_nesting;
         uint8_t *data;
         uint32_t dlen;
-        struct {
-            uint32_t len;
-            uint32_t pos;
-        } td[BMX_DSC_TLV_ARRSZ];
+        struct dext_type_data dtd[BMX_DSC_TLV_ARRSZ];
 };
 
 struct orig_node {

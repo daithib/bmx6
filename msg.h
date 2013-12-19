@@ -780,24 +780,24 @@ struct rx_frame_iterator {
         // remains unchanged:
         const char *caller;
         struct packet_buff *pb;
-        struct orig_node *on;
         struct ctrl_node *cn;
+        struct frame_db *db;
+        struct orig_node *on;
         struct description *desc; //as received on wire
         uint16_t desc_len;
         uint8_t *frames_in;
-        struct frame_db *db;
-        struct frame_handl *handl;
+        int32_t frames_length;
+        struct desc_extension *dext;
         uint8_t op;
         uint8_t process_filter;
-        uint8_t is_virtual_header;
-        int32_t frames_length;
 
-        // MUST be initialized, updated by rx..iterate(), and consumed by handl[].rx_tlv_handler
+        // MUST be initialized, updated by rx_frame_iterate(), and consumed by handl->rx_tlv_handler
         int32_t frames_pos;
         int8_t frame_type; //init to -1 !!
         int8_t frame_type_expanded; //init to -1 !!
 
-        // set by rx..iterate(), and consumed by handl[].rx_tlv_handler
+        // set by rx_frame_iterate(), and consumed by handl->rx_tlv_handler
+        struct frame_handl *handl;
         int32_t frame_data_length;
         int32_t frame_length;
         int32_t frame_msgs_length;
@@ -940,7 +940,6 @@ void free_desc_extensions(struct desc_extension **dext);
 struct dhash_node * process_description(struct packet_buff *pb, struct description_cache_node *desc, DHASH_T *dhash);
 IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, struct description *desc, uint16_t desc_len, 
         struct desc_extension *dext, uint8_t op, uint8_t filter, void *custom, struct ctrl_node *cn);
-int32_t get_desc_frame_data(uint8_t **frame_data, uint8_t *desc_ext_data, int32_t desc_ext_len, uint8_t virtual_data, uint8_t frame_type);
 IDM_T desc_frame_changed(  struct rx_frame_iterator *it, uint8_t f_type );
 void purge_tx_task_list(struct list_head *tx_tasks_list, struct link_node *only_link, struct dev_node *only_dev);
 SHA1_T *ref_node_key(uint8_t *f_body, uint32_t f_body_len, uint8_t compression, uint8_t nested, uint8_t reserved);

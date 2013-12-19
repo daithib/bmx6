@@ -137,35 +137,32 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 //	return TLV_RX_DATA_IGNORED;
 	
 	assertion(-500000, (it->frame_data_length == it->frame_msgs_length && it->frame_data == it->msg));
-	assertion(-500000, (it->is_virtual_header));
+	assertion(-500000, (it->dext));
 
 	if (it->op != TLV_OP_TEST || !descVerification)
 		return it->frame_data_length;
 
 	char *goto_error_code = NULL;
+	struct desc_extension *dext = it->dext;
 	int32_t sign_len = it->frame_data_length - sizeof(struct dsc_msg_signature);
 	struct dsc_msg_signature *msg = (struct dsc_msg_signature*)(it->frame_data);
 	uint8_t *desc_start = (uint8_t*)it->desc;
 	int32_t desc_len = it->desc_len - (sizeof(struct tlv_hdr) + it->frame_data_length);
 	CRYPTSHA1_T desc_sha;
 	CRYPTKEY_T *pkey = NULL;
-	int32_t pkey_len = 0;
-	
-	if ( !cryptKeyTypeAsString(msg->type) || cryptKeyLenByType(msg->type) != sign_len || desc_len < (int)sizeof(struct description))
+
+	struct dsc_msg_pubkey *pkey_msg = (struct dsc_msg_pubkey*)(dext->dtd[BMX_DSC_TLV_PUBKEY].len ?
+		dext->data + dext->dtd[BMX_DSC_TLV_PUBKEY].pos : NULL);
+
+	if ( !pkey_msg || !cryptKeyTypeAsString(pkey_msg->type) || cryptKeyLenByType(pkey_msg->type) != sign_len || desc_len < (int)sizeof(struct description))
 		goto_error( finish, "1");
 
 	if ( sign_len > (descVerification/8) )
-		return it->frame_data_length;
-
-	cryptShaAtomic(desc_start, desc_len, &desc_sha);
-	
-	uint8_t *pkey_frame_data;
-	pkey_len = get_desc_frame_data(&pkey_frame_data, it->frames_in, it->frames_length, it->is_virtual_header, BMX_DSC_TLV_PUBKEY) - sizeof(struct dsc_msg_pubkey);
-
-	if (pkey_len != sign_len)
 		goto_error( finish, "2");
 
-	pkey = cryptPubKeyFromRaw(((struct dsc_msg_pubkey*)pkey_frame_data)->key, pkey_len);
+	cryptShaAtomic(desc_start, desc_len, &desc_sha);
+
+	pkey = cryptPubKeyFromRaw(pkey_msg->key, sign_len);
 	
 	CRYPTSHA1_T plain_sha = {.h.u32={0} };
 	int32_t plain_len = sizeof(plain_sha);
@@ -179,12 +176,13 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 finish: {
 	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
 		"%s %s verifying  desc_len=%d desc_sha=%s \n"
-		"signature=%s\n"
-		"sign_type=%s sign_type_len=%d == sign_len=%d == pkey_len=%d pkey=%s \n"
+		"sign_len=%d signature=%s\n"
+		"pkey_type=%s pkey_type_len=%d pkey=%s \n"
 		"plain_len=%d==%d plain_sha=%s problem?=%s",
 		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", desc_len, memAsHexString(&desc_sha, sizeof(desc_sha)),
-		memAsHexString(msg->signature, sign_len), cryptKeyTypeAsString(msg->type), cryptKeyLenByType(msg->type), 
-		sign_len, pkey_len, pkey ? memAsHexString(pkey->rawKey, pkey->rawKeyLen) : "---",
+		sign_len, memAsHexString(msg->signature, sign_len),
+		pkey_msg ? cryptKeyTypeAsString(pkey_msg->type) : "---", pkey_msg ? cryptKeyLenByType(pkey_msg->type) : 0,
+		pkey ? memAsHexString(pkey->rawKey, pkey->rawKeyLen) : "---",
 		plain_len, sizeof(plain_sha), memAsHexString(&plain_sha, sizeof(plain_sha)), goto_error_code);
 	
 	cryptKeyFree(&pkey);

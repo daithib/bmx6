@@ -155,7 +155,7 @@ void dump(struct packet_buff *pb)
                 .caller = __FUNCTION__, .on = NULL, .cn = NULL, .op = 0, .pb = NULL,
                 .db = packet_frame_db, .process_filter = FRAME_TYPE_PROCESS_NONE,
                 .frame_type = -1, .frames_in = (((uint8_t*) phdr) + sizeof (struct packet_header)),
-                .frames_length = (plength - sizeof (struct packet_header)), .frames_pos = 0, .is_virtual_header = 0
+                .frames_length = (plength - sizeof (struct packet_header)), .frames_pos = 0, .dext = 0
         };
 
         int32_t iterator_result;
@@ -202,7 +202,7 @@ void dump(struct packet_buff *pb)
         if (iterator_result != TLV_RX_DATA_DONE) {
 
                 dbgf_dump(DBGT_NONE, "%s             ERROR frame_type=%d frame_length=%d frame_data_length=%d virtual_header=%d iterator_result=%d - ignoring further frames!!",
-                        direction == DUMP_DIRECTION_IN ? "in " : "out", it.frame_type, it.frame_length, it.frame_data_length, it.is_virtual_header, iterator_result);
+                        direction == DUMP_DIRECTION_IN ? "in " : "out", it.frame_type, it.frame_length, it.frame_data_length, it.dext, iterator_result);
 
                 dbgf_dump(DBGT_NONE, "%s         data [%3d...%3d]:%s",
                         direction == DUMP_DIRECTION_IN ? "in  hex" : "out hex",
