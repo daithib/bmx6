@@ -403,6 +403,10 @@ struct desc_extension {
         uint8_t max_nesting;
         uint8_t *data;
         uint32_t dlen;
+        struct {
+            uint32_t len;
+            uint32_t pos;
+        } td[BMX_DSC_TLV_ARRSZ];
 };
 
 struct orig_node {

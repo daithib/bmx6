@@ -3421,6 +3421,10 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		// this is the dext creation of my description...
 		assertion(-501639, (it->db==description_tlv_db));
 		assertion(-501640, (it->frame_cache_msgs_size <= VRT_FRAME_DATA_SIZE_OUT));
+
+		it->dext->td[it->frame_type].len = fdata_in;
+		it->dext->td[it->frame_type].pos = it->dext->dlen + sizeof(struct tlv_hdr_virtual);
+
 		it->dext->data = debugRealloc( it->dext->data, it->dext->dlen + sizeof(struct tlv_hdr_virtual) + fdata_in, -300568);
 
 		struct tlv_hdr_virtual *vth = (struct tlv_hdr_virtual *)(it->dext->data + it->dext->dlen);
@@ -4101,6 +4105,10 @@ struct desc_extension * resolve_desc_extensions(struct packet_buff *pb, struct d
 			   vf_data_len, dext ? dext->dlen : 0 );
 		
 		if (dext) {
+
+			dext->td[vf_type].pos = dext_dlen_old + sizeof(struct tlv_hdr_virtual);
+			dext->td[vf_type].len = sizeof(struct tlv_hdr_virtual) + vf_data_len;
+
 			struct tlv_hdr_virtual *vf_hdr = (struct tlv_hdr_virtual *)(dext->data + dext_dlen_old);
 			memset(vf_hdr, 0, sizeof(struct tlv_hdr_virtual));
 			vf_hdr->type = vf_type;

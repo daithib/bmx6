@@ -304,7 +304,7 @@ struct tlv_hdr_virtual { // 6 bytes
     uint8_t type;
     uint8_t mbz;
     uint32_t length;  // lenght of (always uncompressed and resolved) frame in 1-Byte steps, including frame_header and variable data field
-//	uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
+    uint8_t  data[];  // frame-type specific data consisting of 0-1 data headers and 1-n data messages
 } __attribute__((packed));
 
 
