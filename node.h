@@ -235,17 +235,8 @@ typedef CRYPTSHA1_T RHASH_T;
 #define GLOBAL_ID_PKID_LEN CRYPT_SHA1_LEN
 
 
-struct GLOBAL_ID {
-	char    name[GLOBAL_ID_NAME_LEN];
-	union {
-		uint8_t u8[GLOBAL_ID_PKID_LEN];
-		uint16_t u16[GLOBAL_ID_PKID_LEN / sizeof(uint16_t)];
-		uint32_t u32[GLOBAL_ID_PKID_LEN / sizeof(uint32_t)];
-		SHA1_T  sha1;
-	} pkid;
-} __attribute__((packed));
 
-typedef struct GLOBAL_ID GLOBAL_ID_T;
+typedef CRYPTSHA1_T GLOBAL_ID_T;
 
 
 struct local_node {
@@ -411,16 +402,18 @@ struct desc_extension {
         struct dext_type_data dtd[BMX_DSC_TLV_ARRSZ];
 };
 
+void *dext_dptr( struct desc_extension *dext, uint8_t type);
+
+
 struct orig_node {
 	// filled in by validate_new_link_desc0():
 
 	GLOBAL_ID_T global_id;
 
 	struct dhash_node *dhn;
-	struct description *desc;
-	struct desc_extension *dext;
-
+	uint8_t *desc;
         uint16_t desc_len;
+	struct desc_extension *dext;
 
 	TIME_T updated_timestamp; // last time this on's desc was succesfully updated
 
@@ -565,7 +558,9 @@ void block_orig_node(IDM_T block, struct orig_node *on);
 void free_orig_node(struct orig_node *on);
 struct orig_node * init_orig_node(GLOBAL_ID_T *id);
 
-char *globalIdAsString( struct GLOBAL_ID *id );
+
+SHA1_T *nodeIdFromDescAdv( uint8_t *desc_adv );
+char *nodeIdAsStringFromDescAdv( uint8_t *desc_adv );
 
 void purge_local_node(struct local_node *local);
 

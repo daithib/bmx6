@@ -416,7 +416,7 @@ void json_originator_event_hook(int32_t cb_id, struct orig_node *orig)
 
                 if ((on = orig)) {
 
-                        sprintf(path_name, "%s/%s", json_orig_dir, globalIdAsString(&on->global_id));
+                        sprintf(path_name, "%s/%s", json_orig_dir, cryptShaAsString(&on->global_id));
 
                         if ((fd = open(path_name, O_RDONLY)) > 0 && close(fd) == 0) {
                                 
@@ -434,7 +434,7 @@ void json_originator_event_hook(int32_t cb_id, struct orig_node *orig)
                 struct avl_node *it = NULL;
                 while ((on = orig ? orig : avl_iterate_item(&orig_tree, &it))) {
 
-                        sprintf(path_name, "%s/%s", json_orig_dir, globalIdAsString(&on->global_id));
+                        sprintf(path_name, "%s/%s", json_orig_dir, cryptShaAsString(&on->global_id));
 
                         if ((fd = open(path_name, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) < 0) {
 
@@ -495,7 +495,7 @@ void json_description_event_hook(int32_t cb_id, struct orig_node *on)
 
         int fd;
         char path_name[MAX_PATH_SIZE];
-        sprintf(path_name, "%s/%s", json_desc_dir, globalIdAsString(&on->global_id));
+        sprintf(path_name, "%s/%s", json_desc_dir, cryptShaAsString(&on->global_id));
 
         if (cb_id == PLUGIN_CB_DESCRIPTION_DESTROY) {
 

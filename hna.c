@@ -235,7 +235,7 @@ int _create_tlv_hna(uint8_t* data, uint16_t max_size, uint16_t pos, struct net_k
 }
 
 STATIC_FUNC
-IFNAME_T tun_out_get_free_name(char *typename, char *postname)
+IFNAME_T tun_out_get_free_name(char *typename, char *proposedName)
 {
 	assertion(-501446, (strlen(tun_name_prefix.str) + strlen(typename) + 4 <= IFNAMSIZ - 1));
 
@@ -252,7 +252,7 @@ IFNAME_T tun_out_get_free_name(char *typename, char *postname)
 	snprintf(name.str + strlen(name.str), IFNAMSIZ - 1 - strlen(name.str), "%s", typename);
 
 	if (IFNAMSIZ - 1 > strlen(name.str))
-		snprintf(name.str + strlen(name.str), IFNAMSIZ - 1 - strlen(name.str), "%s", postname);
+		snprintf(name.str + strlen(name.str), IFNAMSIZ - 1 - strlen(name.str), "%s", proposedName);
 	//check if tun->name is already used:
 
 	check_string(name.str, ifNameChars, '_');
@@ -269,7 +269,7 @@ IFNAME_T tun_out_get_free_name(char *typename, char *postname)
 		snprintf(name.str + strlen(name.str), IFNAMSIZ - 5 - strlen(name.str), "%s", typename);
 
 		if (IFNAMSIZ - 5 > strlen(name.str))
-			snprintf(name.str + strlen(name.str), IFNAMSIZ - 5 - strlen(name.str), "%s", postname);
+			snprintf(name.str + strlen(name.str), IFNAMSIZ - 5 - strlen(name.str), "%s", proposedName);
 
 		assertion(-501449, (IFNAMSIZ - 5 >= strlen(name.str) ));
 		snprintf(name.str  + strlen(name.str), IFNAMSIZ - 1 - strlen(name.str), "%.4X", tun_idx++);
@@ -535,8 +535,8 @@ int process_description_tlv_hna(struct rx_frame_iterator *it)
 		flags = set_hna_to_key(&key, (struct description_msg_hna6 *) (it->frame_data + pos));
 
 
-                dbgf_track(DBGT_INFO, "%s %s %s=%s",
-                        tlv_op_str(op), globalIdAsString(&on->global_id), ARG_UHNA, netAsStr(&key));
+                dbgf_track(DBGT_INFO, "%s nodeId=%s %s=%s",
+                        tlv_op_str(op), cryptShaAsString(&on->global_id), ARG_UHNA, netAsStr(&key));
 
                 if (op == TLV_OP_TEST) {
 
@@ -546,9 +546,9 @@ int process_description_tlv_hna(struct rx_frame_iterator *it)
                                 is_ip_net_equal(&key.ip, &IP6_LINKLOCAL_UC_PREF, IP6_LINKLOCAL_UC_PLEN, AF_INET6) ||
                                 (un = find_overlapping_hna(&key.ip, key.mask, on))) {
 
-                                dbgf_sys(DBGT_ERR, "global_id=%s %s=%s blocked (by global_id=%s)",
-                                        globalIdAsString(&on->global_id), ARG_UHNA, netAsStr(&key),
-                                        un ? globalIdAsString(&un->on->global_id) : "???");
+                                dbgf_sys(DBGT_ERR, "nodeId=%s %s=%s blocked (by nodeId=%s)",
+                                        cryptShaAsString(&on->global_id), ARG_UHNA, netAsStr(&key),
+                                        un ? cryptShaAsString(&un->on->global_id) : "???");
 
                                 return TLV_RX_DATA_BLOCKED;
                         }
@@ -559,8 +559,8 @@ int process_description_tlv_hna(struct rx_frame_iterator *it)
                         for (i = 0; i < hna_net_curr; i++) {
 				if (is_ip_net_equal(&(hna_net_keys[i].ip), &key.ip, XMIN(hna_net_keys[i].mask, key.mask), AF_INET6)) {
 //                                if (!memcmp(&hna_net_keys[i], &key, sizeof (key))) {
-                                        dbgf_sys(DBGT_ERR, "global_id=%s FAILURE due to overlapping hnas %s %s",
-                                                globalIdAsString(&on->global_id), netAsStr(&hna_net_keys[i]), netAsStr(&key));
+                                        dbgf_sys(DBGT_ERR, "nodeId=%s FAILURE due to overlapping hnas %s %s",
+                                                cryptShaAsString(&on->global_id), netAsStr(&hna_net_keys[i]), netAsStr(&key));
                                         return TLV_RX_DATA_FAILURE;
                                 }
                         }
@@ -590,8 +590,8 @@ int process_description_tlv_hna(struct rx_frame_iterator *it)
 
                 } else if (op >= TLV_OP_CUSTOM_MIN) {
 
-                        dbgf_all(DBGT_INFO, "configure TLV_OP_CUSTOM op=%d  global_id=%s blocked=%d",
-                                op, globalIdAsString(&on->global_id), on->blocked);
+                        dbgf_all(DBGT_INFO, "configure TLV_OP_CUSTOM op=%d  nodeId=%s blocked=%d",
+                                op, cryptShaAsString(&on->global_id), on->blocked);
 
                         if (!on->blocked  && !(flags & DESC_MSG_HNA_FLAG_NO_ROUTE)) {
                                 //ASSERTION(-501314, (avl_find(&global_uhna_tree, &key)));
@@ -645,8 +645,8 @@ int32_t opt_uhna(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_pa
                         if (patch->diff != DEL && (un = find_overlapping_hna(&hna.ip, hna.mask, self))) {
 
                                 dbg_cn(cn, DBGL_CHANGES, DBGT_ERR,
-                                        "%s=%s already blocked by global_id=%s !", ARG_UHNA, netAsStr(&hna),
-                                        globalIdAsString(&un->on->global_id));
+                                        "%s=%s already blocked by nodeId=%s !", ARG_UHNA, netAsStr(&hna),
+                                        cryptShaAsString(&un->on->global_id));
 
                                 return FAILURE;
                         }
@@ -798,8 +798,8 @@ void tun_out_catchAll_hook(int fd)
 							tun_out_state_set(ton, TDN_STATE_DEDICATED);
 
 						} else {
-							dbgf_track(DBGT_WARN,"tunnel dev=%s to orig=%s already dedicated!",
-								tbn->active_tdn->nameKey.str, globalIdAsString(&ton->tunOutKey.on->global_id));
+							dbgf_track(DBGT_WARN,"tunnel dev=%s to nodeId=%s already dedicated!",
+								tbn->active_tdn->nameKey.str, cryptShaAsString(&ton->tunOutKey.on->global_id));
 						}
 						break;
 					}
@@ -1123,7 +1123,7 @@ struct tun_dev_node *tun_dev_out_add(struct tun_bit_node *tbn, IDM_T tdn_state)
 				AVL_INIT_TREE(tdn->tun_bit_tree[0], struct tun_bit_node, tunBitKey.keyNodes);
 				AVL_INIT_TREE(tdn->tun_bit_tree[1], struct tun_bit_node, tunBitKey.keyNodes);
 
-				tdn->nameKey  = tun_out_get_free_name(DEF_TUN_NAME_TYPE_OUT,ton->tunOutKey.on->global_id.name);
+				tdn->nameKey  = tun_out_get_free_name(DEF_TUN_NAME_TYPE_OUT,cryptShaAsString(&ton->tunOutKey.on->global_id));
 				tdn->ifIdx = kernel_tun_add(tdn->nameKey.str, IPPROTO_IP, &ton->localIp, &ton->remoteIp);
 				tdn->orig_mtu = kernel_get_mtu(tdn->nameKey.str);
 				tdn->curr_mtu = set_tun_out_mtu( tdn->nameKey.str, tdn->orig_mtu, DEF_TUN_OUT_MTU, tun_out_mtu);
@@ -1275,8 +1275,8 @@ void configure_tun_bit(uint8_t del, struct tun_bit_node *tbn, IDM_T tdn_state)
 		dbgl = DBGL_ALL;
 	}
 
-	dbgf(dbgl, DBGT_INFO, "%s %s via orig %s asDfltTun=%d tbn_active=%s",
-	       del?"DEL":"ADD", netAsStr(&routeKey), globalIdAsString(&ton->tunOutKey.on->global_id),
+	dbgf(dbgl, DBGT_INFO, "%s %s via nodeId%s asDfltTun=%d tbn_active=%s",
+	       del?"DEL":"ADD", netAsStr(&routeKey), cryptShaAsString(&ton->tunOutKey.on->global_id),
 	       tdn_state, tbn->active_tdn ? tbn->active_tdn->nameKey.str : "---");
 
 }
@@ -1301,7 +1301,7 @@ void _add_tun_bit_node(struct tun_search_node *tsna, struct tun_net_node *tnna)
 		uint8_t isv4 = (tsn_netKey->af==AF_INET);
 
                 dbgf_track(DBGT_INFO, "%s=%s: %s=%s %s=%d %s=%s",
-                        ARG_TUN_OUT, tbkn.tsn->nameKey, ARG_TUN_OUT_HOSTNAME, globalIdAsString(&tbkn.tsn->global_id),
+                        ARG_TUN_OUT, tbkn.tsn->nameKey, ARG_TUN_OUT_PKID, cryptShaAsString(&tbkn.tsn->global_id),
                         ARG_TUN_OUT_TYPE, tbkn.tsn->srcType, ARG_TUN_OUT_NET, netAsStr(tsn_netKey));
 
                 while ((tbkn.tnn = tnna ? tnna : avl_iterate_item(&tun_net_tree, &itnn))) {
@@ -1315,10 +1315,10 @@ void _add_tun_bit_node(struct tun_search_node *tsna, struct tun_net_node *tnna)
                         struct net_key *tnn_netKey = &tbkn.tnn->tunNetKey.netKey;
                         struct net_key ingressPrefix = tbkn.tnn->tunNetKey.ton->ingressPrefix[isv4];
 
-                        dbgf_track(DBGT_INFO, "checking network=%s bw_fmu8=%d, ingress=%s localIp=%s tun6Id=%d from orig=%s",
+                        dbgf_track(DBGT_INFO, "checking network=%s bw_fmu8=%d, ingress=%s localIp=%s tun6Id=%d from nodeId=%s",
                                 netAsStr(tnn_netKey), tbkn.tnn->bandwidth.val.u8, netAsStr(&ingressPrefix),
                                 ip6AsStr(&tbkn.tnn->tunNetKey.ton->localIp), tbkn.tnn->tunNetKey.ton->tunOutKey.tun6Id,
-                                globalIdAsString(&on->global_id));
+                                cryptShaAsString(&on->global_id));
 
                         if (!(
                                 (tbkn.tsn->bmx6RouteBits == 0 ||
@@ -1329,8 +1329,8 @@ void _add_tun_bit_node(struct tun_search_node *tsna, struct tun_net_node *tnna)
                                 (tbkn.tsn->netPrefixMin == TYP_TUN_OUT_PREFIX_NET ?
                                 tsn_netKey->mask <= tnn_netKey->mask : tbkn.tsn->netPrefixMin <= tnn_netKey->mask) &&
                                 is_ip_net_equal(&tsn_netKey->ip, &tnn_netKey->ip, XMIN(tsn_netKey->mask, tnn_netKey->mask), tnn_netKey->af) &&
-                                IMPLIES(strlen(tsn_gid->name), !strcmp(tsn_gid->name, tnn_gid->name)) &&
-                                IMPLIES(!is_zero(&tsn_gid->pkid, GLOBAL_ID_PKID_LEN), !memcmp(&tsn_gid->pkid, &tnn_gid->pkid, GLOBAL_ID_PKID_LEN))
+                                //IMPLIES(strlen(tsn_gid->name), !strcmp(tsn_gid->name, tnn_gid->name)) &&
+                                IMPLIES(!is_zero(tsn_gid, sizeof(GLOBAL_ID_T)), !memcmp(tsn_gid, tnn_gid, sizeof(GLOBAL_ID_T)))
                                 )) {
 
                                 dbgf_track(DBGT_INFO, "failed A");
@@ -1544,10 +1544,10 @@ void eval_tun_bit_tree(void  *onlyIfOrderChanged)
 				}
 			}
 
-			dbgf_track(DBGT_INFO, "current: pref=%d ipmetric=%d route=%s tunMtc=%s gw=%s possible=%d dev=%s",
+			dbgf_track(DBGT_INFO, "current: pref=%d ipmetric=%d route=%s tunMtc=%s gwId=%s possible=%d dev=%s",
 				ntohl(currBKey.beIpRule), ntohl(currBKey.beIpMetric), netAsStr(&currRoute),
 				umetric_to_human(UMETRIC_MAX - ntoh64(currBKey.beInvTunBitMetric)),
-				globalIdAsString(&tbn_curr->tunBitKey.keyNodes.tnn->tunNetKey.ton->tunOutKey.on->global_id),
+				cryptShaAsString(&tbn_curr->tunBitKey.keyNodes.tnn->tunNetKey.ton->tunOutKey.on->global_id),
 				tbn_curr->possible, tbn_curr->active_tdn ? tbn_curr->active_tdn->nameKey.str : "---");
 
 			if (!tbn_curr->possible)
@@ -1595,10 +1595,10 @@ void eval_tun_bit_tree(void  *onlyIfOrderChanged)
 				}
 
 
-				dbgf_track(DBGT_INFO, " crash?: pref=%d ipmetric=%d route=%s tunMtc=%s gw=%s possible=%d dev=%s ",
+				dbgf_track(DBGT_INFO, " crash?: pref=%d ipmetric=%d route=%s tunMtc=%s gwId=%s possible=%d dev=%s ",
 				ntohl(crashBKey.beIpRule), ntohl(crashBKey.beIpMetric), netAsStr(&crashRoute),
 				umetric_to_human(UMETRIC_MAX - ntoh64(crashBKey.beInvTunBitMetric)),
-				globalIdAsString(&tbn_crash->tunBitKey.keyNodes.tnn->tunNetKey.ton->tunOutKey.on->global_id),
+				cryptShaAsString(&tbn_crash->tunBitKey.keyNodes.tnn->tunNetKey.ton->tunOutKey.on->global_id),
 				tbn_crash->possible, tbn_crash->active_tdn ? tbn_crash->active_tdn->nameKey.str : "---");
 
 				if (break_loop)
@@ -1606,10 +1606,10 @@ void eval_tun_bit_tree(void  *onlyIfOrderChanged)
 			}
 
 			if (tbn_curr->possible) {
-				dbgf_track(DBGT_INFO, " adding: pref=%d ipmetric=%d route=%s tunMtc=%s gw=%s possible=%d dev=%s ",
+				dbgf_track(DBGT_INFO, " adding: pref=%d ipmetric=%d route=%s tunMtc=%s gwId=%s possible=%d dev=%s ",
 					ntohl(currBKey.beIpRule), ntohl(currBKey.beIpMetric), netAsStr(&currRoute),
 					umetric_to_human(UMETRIC_MAX - ntoh64(currBKey.beInvTunBitMetric)),
-					globalIdAsString(&tbn_curr->tunBitKey.keyNodes.tnn->tunNetKey.ton->tunOutKey.on->global_id),
+					cryptShaAsString(&tbn_curr->tunBitKey.keyNodes.tnn->tunNetKey.ton->tunOutKey.on->global_id),
 					tbn_curr->possible, tbn_curr->active_tdn ? tbn_curr->active_tdn->nameKey.str : "---");
 
 				configure_tun_bit(ADD, tbn_curr, TDN_STATE_CURRENT);
@@ -1684,8 +1684,8 @@ IDM_T terminate_tun_out(struct orig_node *on, struct tun_out_node *tona, struct 
 
                 assertion(-501247, (ton));
 
-                dbgf_all(DBGT_INFO, "should remove tunnel_node localIp=%s tun6Id=%d orig=%s key=%s (tunnel_out.items=%d, tun->net.items=%d)",
-                        ip6AsStr(&ton->localIp), ton->tunOutKey.tun6Id, globalIdAsString(&ton->tunOutKey.on->global_id),
+                dbgf_all(DBGT_INFO, "should remove tunnel_node localIp=%s tun6Id=%d nodeId=%s key=%s (tunnel_out.items=%d, tun->net.items=%d)",
+                        ip6AsStr(&ton->localIp), ton->tunOutKey.tun6Id, cryptShaAsString(&ton->tunOutKey.on->global_id),
                         memAsHexString(&ton->tunOutKey, sizeof (key)), tun_out_tree.items, ton->tun_net_tree.items);
 
                 used |= (ton->tdnDedicated[0] || ton->tdnDedicated[1] || ton->tdnCatchAll[0] || ton->tdnCatchAll[1]);
@@ -1699,13 +1699,13 @@ IDM_T terminate_tun_out(struct orig_node *on, struct tun_out_node *tona, struct 
                         tnn2 = avl_remove(&ton->tun_net_tree, &tnn->tunNetKey, -300423);
 
                         assertion_dbg(-501251, (tnn == tnn1 && tnn == tnn2),
-                                "should remove %s orig=%s but removed %s orig=%s and %s orig=%s !",
+                                "should remove %s %s but removed %s %s and %s %s !",
                                 netAsStr(&tnn->tunNetKey.netKey),
-                                globalIdAsString(&tnn->tunNetKey.ton->tunOutKey.on->global_id),
+                                cryptShaAsString(&tnn->tunNetKey.ton->tunOutKey.on->global_id),
                                 tnn1 ? netAsStr(&tnn1->tunNetKey.netKey) : "---",
-                                tnn1 ? globalIdAsString(&tnn1->tunNetKey.ton->tunOutKey.on->global_id) : "---",
+                                tnn1 ? cryptShaAsString(&tnn1->tunNetKey.ton->tunOutKey.on->global_id) : "---",
                                 tnn2 ? netAsStr(&tnn2->tunNetKey.netKey) : "---",
-                                tnn2 ? globalIdAsString(&tnn2->tunNetKey.ton->tunOutKey.on->global_id) : "---");
+                                tnn2 ? cryptShaAsString(&tnn2->tunNetKey.ton->tunOutKey.on->global_id) : "---");
 
 
                         debugFree(tnn, -300424);
@@ -1808,9 +1808,9 @@ int process_description_tlv_tun6_adv(struct rx_frame_iterator *it)
                 struct description_msg_tun6_adv *adv = &(((struct description_msg_tun6_adv *) (it->frame_data))[m]);
                 struct tun_out_key key = set_tun_adv_key(it->on, m);
 
-                dbgf_all(DBGT_INFO, "op=%s tunnel_out.items=%d tun_net.items=%d msg=%d/%d localIp=%s orig=%s (%p) key=%s",
+                dbgf_all(DBGT_INFO, "op=%s tunnel_out.items=%d tun_net.items=%d msg=%d/%d localIp=%s nodeId=%s (%p) key=%s",
                         tlv_op_str(it->op), tun_out_tree.items, tun_net_tree.items, m, it->frame_msgs_fixed,
-                        ip6AsStr(&adv->localIp), globalIdAsString(&it->on->global_id), (void*) (it->on), memAsHexString(&key, sizeof (key)));
+                        ip6AsStr(&adv->localIp), cryptShaAsString(&it->on->global_id), (void*) (it->on), memAsHexString(&key, sizeof (key)));
 
                 if (it->op == TLV_OP_TEST) {
 
@@ -1821,10 +1821,10 @@ int process_description_tlv_tun6_adv(struct rx_frame_iterator *it)
                                 is_ip_net_equal(&adv->localIp, &IP6_LINKLOCAL_UC_PREF, IP6_LINKLOCAL_UC_PLEN, AF_INET6) ||
                                 (tin = avl_find_item_by_field(&tun_in_tree, &adv->localIp, tun_in_node, remote)) ||
                                 (un = find_overlapping_hna(&adv->localIp, 128, it->on))) {
-                                dbgf_sys(DBGT_ERR, "globalId=%s %s=%s blocked (by my %s=%s or other's %s with globalId=%s)",
-                                        globalIdAsString(&it->on->global_id), ARG_TUN_DEV, ip6AsStr(&adv->localIp),
+                                dbgf_sys(DBGT_ERR, "nodeId=%s %s=%s blocked (by my %s=%s or other's %s with nodeId=%s)",
+                                        cryptShaAsString(&it->on->global_id), ARG_TUN_DEV, ip6AsStr(&adv->localIp),
                                         ARG_TUN_IN, tin ? tin->nameKey.str : DBG_NIL,
-                                        ARG_UHNA, un ? globalIdAsString(&un->on->global_id) : DBG_NIL);
+                                        ARG_UHNA, un ? cryptShaAsString(&un->on->global_id) : DBG_NIL);
 
                                 return TLV_RX_DATA_BLOCKED;
                         }
@@ -2206,8 +2206,8 @@ int process_description_tlv_tunXin6_net_adv(struct rx_frame_iterator *it)
 
 
                                 } else {
-                                        dbgf_sys(DBGT_WARN, "no matching tunnel_node found for orig=%s tun6Id=%d",
-                                                globalIdAsString(&tok.on->global_id), tok.tun6Id);
+                                        dbgf_sys(DBGT_WARN, "no matching tunnel_node found for nodeId=%s tun6Id=%d",
+                                                cryptShaAsString(&tok.on->global_id), tok.tun6Id);
                                 }
                         }
                 }
@@ -2408,7 +2408,7 @@ static int32_t tun_out_status_creator(struct status_handl *handl, void *data)
 
                                 assertion(-501391, (tun));
 
-                                status->remoteName = tun->tunOutKey.on->global_id.name;
+                                status->remoteName = DBG_NIL;
                                 status->remoteId = &tun->tunOutKey.on->global_id;
                                 status->localTunIp = &tun->localIp;
                                 status->remoteTunIp = &tun->remoteIp;
@@ -2627,31 +2627,31 @@ int32_t opt_tun_search(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct 
                                                 return FAILURE;
 
                                         if (cmd == OPT_APPLY && tsn) {
-                                                memset(tsn->global_id.name, 0, sizeof (tsn->global_id.name));
-                                                strcpy(tsn->global_id.name, c->val);
+                                                memset(tsn->nodeName, 0, sizeof (tsn->nodeName));
+                                                strcpy(tsn->nodeName, c->val);
                                         }
 
                                 } else if ( cmd == OPT_APPLY && tsn ) {
-                                        memset(tsn->global_id.name, 0, sizeof (tsn->global_id.name));
+                                        memset(tsn->nodeName, 0, sizeof (tsn->nodeName));
                                 }
 
                         } else if (!strcmp(c->opt->name, ARG_TUN_OUT_PKID)) {
 
+				GLOBAL_ID_T pkid = {.h.u32 = {0}};
+				
                                 if (c->val) {
 
-                                        uint8_t pkid[GLOBAL_ID_PKID_LEN] = {0};
-
-                                        if (hexStrToMem(c->val, pkid, GLOBAL_ID_PKID_LEN) == FAILURE)
+					if (hexStrToMem(c->val, pkid.h.u8, sizeof(pkid)) == FAILURE)
                                                         return FAILURE;
 
 
-                                        set_opt_child_val(c, memAsHexString(pkid, GLOBAL_ID_PKID_LEN));
+                                        set_opt_child_val(c, memAsHexString(&pkid, sizeof(pkid)));
 
                                         if (cmd == OPT_APPLY && tsn)
-                                                memcpy(&tsn->global_id.pkid, pkid, GLOBAL_ID_PKID_LEN);
+                                                memcpy(&tsn->global_id, &pkid, sizeof(pkid));
 
                                 } else if (cmd == OPT_APPLY && tsn) {
-                                        memset(&tsn->global_id.pkid, 0, GLOBAL_ID_PKID_LEN);
+                                        memset(&tsn->global_id, 0, sizeof(pkid));
                                 }
 
 			} else if (!strcmp(c->opt->name, ARG_TUN_OUT_MIN_BW)) {
@@ -2914,8 +2914,8 @@ int32_t opt_tun_in_dev(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct 
 
 				} else if (net.af == AF_CFG && (hna = find_overlapping_hna(&net.ip, net.mask, self))) {
 
-					dbgf_cn(cn, DBGL_SYS, DBGT_ERR, "%s=%s /%s=%s already used by orig=%s hna=%s",
-						opt->name, patch->val, c->opt->name, netAsStr(&net), globalIdAsString(&hna->on->global_id), netAsStr(&hna->key));
+					dbgf_cn(cn, DBGL_SYS, DBGT_ERR, "%s=%s /%s=%s already used by nodeId=%s hna=%s",
+						opt->name, patch->val, c->opt->name, netAsStr(&net), cryptShaAsString(&hna->on->global_id), netAsStr(&hna->key));
 
 					return FAILURE;
 
@@ -2940,9 +2940,9 @@ int32_t opt_tun_in_dev(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct 
                                                 !is_ip_valid(&p6.ip, p6.af) ||
                                                 (un_remote = find_overlapping_hna(&p6.ip, 128, self))) {
 
-                                                dbgf_cn(cn, DBGL_SYS, DBGT_ERR, "invalid %s=%s %s=%s or blocked by %s",
+                                                dbgf_cn(cn, DBGL_SYS, DBGT_ERR, "invalid %s=%s %s=%s or blocked by nodeId=%s",
                                                         ARG_TUN_DEV, patch->val, ARG_TUN_DEV_REMOTE, c->val,
-                                                        un_remote ? globalIdAsString(&un_remote->on->global_id) : DBG_NIL);
+                                                        un_remote ? cryptShaAsString(&un_remote->on->global_id) : DBG_NIL);
 
                                                 return FAILURE;
                                         }
@@ -3339,7 +3339,7 @@ void hna_route_change_hook(uint8_t del, struct orig_node *on)
 {
         TRACE_FUNCTION_CALL;
 
-        dbgf_all(DBGT_INFO, "global_id=%s", globalIdAsString(&on->global_id));
+        dbgf_all(DBGT_INFO, "nodeId=%s", cryptShaAsString(&on->global_id));
 
         if (!is_ip_set(&on->primary_ip))
                 return;

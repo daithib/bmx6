@@ -475,6 +475,25 @@ void cryptShaFinal( CRYPTSHA1_T *sha) {
 # error "Please fix crypto lib"
 #endif
 
+char *cryptShaAsString( CRYPTSHA1_T *sha)
+{
+#define SHA1ASSTR_BUFF_SIZE 41
+#define SHA1ASSTR_BUFFERS 4
+	static uint8_t c=0;
+        static char out[SHA1ASSTR_BUFFERS][SHA1ASSTR_BUFF_SIZE];
+        uint8_t i;
+
+        if (!sha)
+                return NULL;
+
+        c = (c+1) % SHA1ASSTR_BUFFERS;
+
+	for (i=0; i<=4; i++)
+		sprintf(&(out[c][i*8]), "%.8X", sha->h.u32[i]);
+
+        return out[c];
+}
+
 int cryptKeyTypeByLen(int len) {
 	return 	len == CRYPT_RSA512_LEN ? CRYPT_RSA512_TYPE : (
 		len == CRYPT_RSA1024_LEN ? CRYPT_RSA1024_TYPE : (

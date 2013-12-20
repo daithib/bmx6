@@ -223,7 +223,7 @@ IID_NODE_T* iid_get_node_by_neighIID4x(IID_NEIGH_T *nn, IID_T neighIID4x, IDM_T 
 
                 if (verbose) {
                         dbgf_all(DBGT_INFO, "NB: global_id=%s neighIID4x=%d to large for neighIID4x_repos",
-                                nn ? globalIdAsString(&nn->dhn->on->global_id) : "???", neighIID4x);
+                                nn ? cryptShaAsString(&nn->dhn->on->global_id) : "???", neighIID4x);
                 }
                 return NULL;
         }
@@ -383,13 +383,13 @@ IDM_T iid_set_neighIID4x(struct iid_repos *neigh_rep, IID_T neighIID4x, IID_T my
                         dbgf_sys(DBGT_ERR, "demanding mapping: neighIID4x=%d to myIID4x=%d "
                                 "(global_id=%s updated=%d last_referred_by_me=%d)  "
                                 "already used for ref->myIID4x=%d (last_referred_by_neigh_sec=%d %s=%s last_referred_by_me=%jd)! Reused faster than allowed!!",
-                                neighIID4x, myIID4x, globalIdAsString(&dhn->on->global_id), dhn->on->updated_timestamp,
+                                neighIID4x, myIID4x, cryptShaAsString(&dhn->on->global_id), dhn->on->updated_timestamp,
                                 dhn->referred_by_me_timestamp,
                                 ref->myIID4x,
                                 ref->referred_by_neigh_timestamp_sec,
-                                (!dhn_old ? "???" : (dhn_old->on ? globalIdAsString(&dhn_old->on->global_id) :
+                                (!dhn_old ? "???" : (dhn_old->on ? cryptShaAsString(&dhn_old->on->global_id) :
                                 (is_zero(&dhn_old->dhash, sizeof (dhn_old->dhash)) ? "FREED" : "INVALIDATED"))),
-                                dhn_old ? memAsHexString(&dhn_old->dhash, sizeof ( dhn_old->dhash)) : "???",
+                                dhn_old ? cryptShaAsString(&dhn_old->dhash) : "???",
                                 dhn_old ? (int64_t)dhn_old->referred_by_me_timestamp : -1
                                 );
 
@@ -650,7 +650,7 @@ void free_neigh_node(struct neigh_node *neigh)
         TRACE_FUNCTION_CALL;
 
         dbgf_track(DBGT_INFO, "freeing id=%s",
-                neigh && neigh->dhn && neigh->dhn->on ? globalIdAsString(&neigh->dhn->on->global_id) : DBG_NIL);
+                neigh && neigh->dhn && neigh->dhn->on ? cryptShaAsString(&neigh->dhn->on->global_id) : DBG_NIL);
 
         assertion(-500963, (neigh));
         assertion(-500964, (neigh->dhn));
@@ -694,7 +694,7 @@ IDM_T update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
         TRACE_FUNCTION_CALL;
         struct local_node *local = pb->i.link->local;
 
-        dbgf_all(DBGT_INFO, "local_id=0x%X  dhn->id=%s", local->local_id, globalIdAsString(&dhn->on->desc->globalId));
+        dbgf_all(DBGT_INFO, "local_id=0x%X  dhn->id=%s", local->local_id, nodeIdAsStringFromDescAdv(dhn->on->desc));
 
         assertion(-500517, (dhn != self->dhn));
         ASSERTION(-500392, (pb->i.link == avl_find_item(&local->link_tree, &pb->i.link->key.dev_idx)));
@@ -707,7 +707,7 @@ IDM_T update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
 
                 dbgf_track(DBGT_INFO, "CHANGED link=%s -> LOCAL=%d->%d <- neighIID4me=%d <- dhn->id=%s",
                         pb->i.llip_str, dhn->neigh->local->local_id, local->local_id, dhn->neigh->neighIID4me,
-                        globalIdAsString(&dhn->on->desc->globalId));
+                        nodeIdAsStringFromDescAdv(dhn->on->desc));
 
                 dhn->neigh->local->neigh = NULL;
                 local->neigh = dhn->neigh;
@@ -722,7 +722,7 @@ IDM_T update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
 
                 dbgf_track(DBGT_INFO, "NEW link=%s <-> LOCAL=%d <-> NEIGHIID4me=%d <-> dhn->id=%s",
                         pb->i.llip_str, local->local_id, local->neigh->neighIID4me,
-                        globalIdAsString(&dhn->on->desc->globalId));
+                        nodeIdAsStringFromDescAdv(dhn->on->desc));
 
                 goto update_local_neigh_success;
 
@@ -741,13 +741,13 @@ IDM_T update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
         }
 
         dbgf_sys(DBGT_ERR, "NONMATCHING LINK=%s -> local=%d -> neighIID4me=%d -> dhn->id=%s",
-                pb->i.llip_str, local->local_id,
-                local->neigh ? local->neigh->neighIID4me : 0,
-                local->neigh && local->neigh->dhn->on ? globalIdAsString(&local->neigh->dhn->on->global_id) : DBG_NIL);
+		pb->i.llip_str, local->local_id,
+		local->neigh ? local->neigh->neighIID4me : 0,
+		local->neigh && local->neigh->dhn->on ? cryptShaAsString(&local->neigh->dhn->on->global_id) : DBG_NIL);
         dbgf_sys(DBGT_ERR, "NONMATCHING local=%d <- neighIID4me=%d <- DHN=%s",
-                dhn->neigh && dhn->neigh->local ? dhn->neigh->local->local_id : 0,
-                dhn->neigh ? dhn->neigh->neighIID4me : 0,
-                globalIdAsString(&dhn->on->desc->globalId));
+		dhn->neigh && dhn->neigh->local ? dhn->neigh->local->local_id : 0,
+		dhn->neigh ? dhn->neigh->neighIID4me : 0,
+		nodeIdAsStringFromDescAdv(dhn->on->desc));
 
         if (dhn->neigh)
                 free_neigh_node(dhn->neigh);
@@ -802,12 +802,12 @@ void purge_orig_router(struct orig_node *only_orig, struct link_dev_node *only_l
                                 continue;
 
                         dbgf_track(DBGT_INFO, "only_orig=%s only_lndev=%s,%s only_useless=%d purging metric=%ju router=%X (%s)",
-                                only_orig ? globalIdAsString(&only_orig->global_id) : DBG_NIL,
+                                only_orig ? cryptShaAsString(&only_orig->global_id) : DBG_NIL,
                                 only_lndev ? ip6AsStr(&only_lndev->key.link->link_ip):DBG_NIL,
                                 only_lndev ? only_lndev->key.dev->label_cfg.str : DBG_NIL,
                                 only_useless,rt->mr.umetric,
                                 ntohl(rt->local_key->local_id),
-                                rt->local_key && rt->local_key->neigh ? globalIdAsString(&rt->local_key->neigh->dhn->on->global_id) : "???");
+                                rt->local_key && rt->local_key->neigh ? cryptShaAsString(&rt->local_key->neigh->dhn->on->global_id) : "???");
 
                         if (on->best_rt_local == rt)
                                 on->best_rt_local = NULL;
@@ -991,7 +991,7 @@ void block_orig_node(IDM_T block, struct orig_node *on)
 void free_orig_node(struct orig_node *on)
 {
         TRACE_FUNCTION_CALL;
-        dbgf_all(DBGT_INFO, "id=%s ip=%s", globalIdAsString(&on->global_id), on->primary_ip_str);
+        dbgf_all(DBGT_INFO, "id=%s ip=%s", cryptShaAsString(&on->global_id), on->primary_ip_str);
 
         if ( on == self)
                 return;
@@ -1029,7 +1029,7 @@ void free_orig_node(struct orig_node *on)
                 debugFree(on->desc, -300228);
 
         if (on->dext)
-		free_desc_extensions(&on->dext);
+		dext_free(&on->dext);
 
         debugFree( on, -300086 );
 }
@@ -1055,7 +1055,7 @@ void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired)
                                 ((TIME_T) (bmx_time - dhn->referred_by_me_timestamp)) > (TIME_T) ogm_purge_to)) {
 
                                 dbgf_all(DBGT_INFO, "id=%s referred before: %d > purge_to=%d",
-                                        globalIdAsString(&dhn->on->global_id),
+                                        cryptShaAsString(&dhn->on->global_id),
                                         ((TIME_T) (bmx_time - dhn->referred_by_me_timestamp)), (TIME_T) ogm_purge_to);
 
 
@@ -1073,29 +1073,23 @@ void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired)
 }
 
 
-char *globalIdAsString( struct GLOBAL_ID *id ) {
 
+SHA1_T *nodeIdFromDescAdv( uint8_t *desc_adv )
+{
+	struct tlv_hdr tlvHdr = { .u.u16 = ntohs(((struct tlv_hdr*)desc_adv)->u.u16) };
+	struct desc_hdr_rhash_adv *rhashHdr = ((struct desc_hdr_rhash_adv*)(desc_adv + sizeof(struct tlv_hdr)));
 
-        if ( id ) {
-                uint8_t i;
-#define MAX_IDS_PER_PRINTF 4
-                static char id_str[MAX_IDS_PER_PRINTF][GLOBAL_ID_NAME_LEN + (sizeof(".")-1) + (GLOBAL_ID_PKID_LEN * 2) + 1];
-                static uint8_t a = 0;
+	assertion( -500000, (tlvHdr.u.tlv.type == BMX_DSC_TLV_RHASH_ADV ));
+	assertion( -500000, (tlvHdr.u.tlv.length == sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash_adv) + sizeof(struct desc_msg_rhash_adv) ));
+	assertion( -500000, (!rhashHdr->compression && !rhashHdr->reserved && rhashHdr->expanded_type == BMX_DSC_TLV_PUBKEY));
 
-                a = (a + 1) % MAX_IDS_PER_PRINTF;
-
-                for (i = 0; !id->pkid.u8[i] && i < GLOBAL_ID_PKID_LEN; i++);
-
-                sprintf(id_str[a], "%s.%s",
-                        validate_name_string(id->name, GLOBAL_ID_NAME_LEN, NULL) == SUCCESS ? id->name : "ILLEGAL_HOSTNAME",
-                        memAsHexString(&(id->pkid.u8[i]), GLOBAL_ID_PKID_LEN - i));
-
-                return id_str[a];
-        }
-
-        return NULL;
+	return &rhashHdr->msg->rframe_hash;
 }
 
+char *nodeIdAsStringFromDescAdv( uint8_t *desc_adv )
+{
+	return cryptShaAsString(nodeIdFromDescAdv(desc_adv));
+}
 
 struct orig_node *init_orig_node(GLOBAL_ID_T *id)
 {
@@ -1343,7 +1337,7 @@ void node_tasks(void) {
 
 		id = on->global_id;
 
-		dbgf_all( DBGT_INFO, "trying to unblock %s...", on->desc->globalId.name);
+		dbgf_all( DBGT_INFO, "trying to unblock nodeId=%s...", nodeIdAsStringFromDescAdv(on->desc) );
 
 		assertion(-501351, (on->blocked && !on->added));
 
@@ -1361,8 +1355,8 @@ void node_tasks(void) {
 
 		}
 
-		dbgf_track(DBGT_INFO, "unblocking %s %s !",
-			on->desc->globalId.name, tlvs_res == TLV_RX_DATA_DONE ? "success" : "failed");
+		dbgf_track(DBGT_INFO, "unblocking nodeId=%s %s !",
+			nodeIdAsStringFromDescAdv(on->desc), tlvs_res == TLV_RX_DATA_DONE ? "success" : "failed");
 
 	}
 

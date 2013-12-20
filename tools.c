@@ -70,6 +70,8 @@ char* memAsHexString( const void* mem, uint32_t len)
         return memAsHexStringSep(mem, len, 0, NULL);
 }
 
+
+
 IDM_T hexStrToMem(char *s, uint8_t *m, uint16_t mLen)
 {
         assertion(-501291, (s && mLen));

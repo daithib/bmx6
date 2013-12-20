@@ -79,9 +79,13 @@ void cryptShaNew( void *in, int32_t len);
 void cryptShaUpdate( void *in, int32_t len);
 void cryptShaFinal( CRYPTSHA1_T *sha);
 
+char *cryptShaAsString( CRYPTSHA1_T *sha);
+
 int cryptKeyTypeByLen(int len);
 int cryptKeyLenByType(int type);
 char *cryptKeyTypeAsString(int type);
+
+
 
 void init_crypt(void);
 void cleanup_crypt(void);

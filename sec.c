@@ -103,11 +103,10 @@ int create_description_tlv_signature(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	int32_t keySpace = tx_iterator_cache_data_space_pref(it) - sizeof(struct dsc_msg_signature);
-
-	if (keySpace < my_PubKey->rawKeyLen)
+	if ((int)(sizeof(struct dsc_msg_signature) + my_PubKey->rawKeyLen) > tx_iterator_cache_data_space_pref(it))
 		return TLV_TX_DATA_FULL;
 
+/*
 	uint8_t *sign_start = it->frames_out_ptr - sizeof (struct description);
 	uint32_t sign_len = sizeof (struct description) + it->frames_out_pos;
 
@@ -117,6 +116,7 @@ int create_description_tlv_signature(struct tx_frame_iterator *it)
 
 	CRYPTSHA1_T sha;
 	cryptShaAtomic(sign_start, sign_len, &sha);
+	int32_t keySpace;
 
 	cryptSign((uint8_t*)&sha, sizeof(sha), msg->signature, &keySpace);
 
@@ -125,8 +125,8 @@ int create_description_tlv_signature(struct tx_frame_iterator *it)
 		sign_len, ((struct description*)sign_start)->globalId.name );
 
 	assertion(-500000, (keySpace == my_PubKey->rawKeyLen));
-
-	return (sizeof(struct dsc_msg_signature) + keySpace);
+*/
+	return (sizeof(struct dsc_msg_signature) + my_PubKey->rawKeyLen);
 }
 
 STATIC_FUNC
@@ -141,16 +141,13 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 		return it->frame_data_length;
 
 	char *goto_error_code = NULL;
-	struct desc_extension *dext = it->dext;
 	int32_t sign_len = it->frame_data_length - sizeof(struct dsc_msg_signature);
 	struct dsc_msg_signature *msg = (struct dsc_msg_signature*)(it->frame_data);
-	uint8_t *desc_start = (uint8_t*)it->desc;
-	int32_t desc_len = it->desc_len - (sizeof(struct tlv_hdr) + it->frame_data_length);
+	uint8_t *desc_start = (uint8_t*)it->dsc_frame;
+	int32_t desc_len = it->dsc_frame_len - (sizeof(struct tlv_hdr) + it->frame_data_length);
 	CRYPTSHA1_T desc_sha;
 	CRYPTKEY_T *pkey_crypt = NULL;
-
-	struct dsc_msg_pubkey *pkey_msg = (struct dsc_msg_pubkey*)(dext->dtd[BMX_DSC_TLV_PUBKEY].len ?
-		dext->data + dext->dtd[BMX_DSC_TLV_PUBKEY].pos : NULL);
+	struct dsc_msg_pubkey *pkey_msg = dext_dptr(it->dext, BMX_DSC_TLV_PUBKEY);
 
 	if ( !cryptKeyTypeAsString(msg->type) || cryptKeyLenByType(msg->type) != sign_len )
 		goto_error( finish, "1");
@@ -202,7 +199,7 @@ STATIC_FUNC
 int create_description_tlv_sha(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-
+/*
 	struct dsc_msg_sha *msg = ((struct dsc_msg_sha*) tx_iterator_cache_msg_ptr(it));
 
 	msg->expInLen = htonl(it->dext->dlen);
@@ -210,7 +207,7 @@ int create_description_tlv_sha(struct tx_frame_iterator *it)
 
 	dbgf_sys(DBGT_INFO, "added description expInlen=%d expInsha=%s expIn=%s", 
 		ntohl(msg->expInLen), memAsHexString(&msg->expInSha, sizeof(SHA1_T)), memAsHexString(it->dext->data, it->dext->dlen));
-
+*/
 	return sizeof(struct dsc_msg_sha);
 }
 

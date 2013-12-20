@@ -233,7 +233,7 @@
 #define FRAME_TYPE_REF_ADV     13
 
 #define FRAME_TYPE_DESC_REQ    14
-#define FRAME_TYPE_DESC_ADV    15
+#define FRAME_TYPE_DESC_ADVS    15
 
 
 #define FRAME_TYPE_HASH_REQ    18  // Hash-for-description-of-OG-ID requests
@@ -605,27 +605,30 @@ struct msg_ref_req {
 
 
 
-#define BMX_DSC_TLV_METRIC      0x00
+#define BMX_DSC_TLV_RHASH_ADV           0x00
+#define BMX_DSC_TLV_PUBKEY              0x01
+#define BMX_DSC_TLV_SIGNATURE           0x02
+#define BMX_DSC_TLV_DESCRIPTION         0x03
+#define BMX_DSC_TLV_SHA                 0x04
 
-#define BMX_DSC_TLV_UHNA6       0x02
+#define BMX_DSC_TLV_METRIC              0x07
+#define BMX_DSC_TLV_NAME                0x08
 
-#define BMX_DSC_TLV_TUN6_MIN            0x04
-#define BMX_DSC_TLV_TUN6_ADV            0x04
-#define BMX_DSC_TLV_TUN4IN6_INGRESS_ADV 0x05
-#define BMX_DSC_TLV_TUN6IN6_INGRESS_ADV 0x06
-#define BMX_DSC_TLV_TUN4IN6_SRC_ADV     0x07
-#define BMX_DSC_TLV_TUN6IN6_SRC_ADV     0x08
-#define BMX_DSC_TLV_TUN4IN6_NET_ADV     0x09
-#define BMX_DSC_TLV_TUN6IN6_NET_ADV     0x0A
-#define BMX_DSC_TLV_TUN6_MAX            0x0A
+#define BMX_DSC_TLV_UHNA6               0x09
 
-#define BMX_DSC_TLV_SMS                 0x10
+#define BMX_DSC_TLV_TUN6_MIN            0x10
+#define BMX_DSC_TLV_TUN6_ADV            0x11
+#define BMX_DSC_TLV_TUN4IN6_INGRESS_ADV 0x12
+#define BMX_DSC_TLV_TUN6IN6_INGRESS_ADV 0x13
+#define BMX_DSC_TLV_TUN4IN6_SRC_ADV     0x14
+#define BMX_DSC_TLV_TUN6IN6_SRC_ADV     0x15
+#define BMX_DSC_TLV_TUN4IN6_NET_ADV     0x16
+#define BMX_DSC_TLV_TUN6IN6_NET_ADV     0x17
+#define BMX_DSC_TLV_TUN6_MAX            0x17
 
-#define BMX_DSC_TLV_PUBKEY      (FRAME_TYPE_ARRSZ-4) //TODO: move to struct description
-#define BMX_DSC_TLV_SHA         (FRAME_TYPE_ARRSZ-3)
-#define BMX_DSC_TLV_SIGNATURE   (FRAME_TYPE_ARRSZ-2)
+#define BMX_DSC_TLV_SMS                 0x1D
 
-#define BMX_DSC_TLV_RHASH_ADV   (FRAME_TYPE_ARRSZ-1)
+
 
 
 
@@ -634,7 +637,6 @@ struct msg_ref_req {
 
 
 struct description { // 68 bytes
-	GLOBAL_ID_T globalId; // 32 bytes name + 20 bytes pkid
 
 	uint16_t revision;     // 2 bytes
 
@@ -646,29 +648,9 @@ struct description { // 68 bytes
 	uint16_t capabilities; // 2 bytes //was tx_interval, TODOCV18: dont use before!
 
 	uint8_t comp_version;  // 1 bytes
-	uint8_t reserved;
-        uint16_t reserved2;
-//      uint16_t extensionLen;// 2 bytes
-//	uint8_t extensionData[];
 } __attribute__((packed));
 
 
-
-struct description2 {
-
-	SHA1_T globalId;       // 20 bytes, hash of pubKey
-
-        DESC_SQN_T descSqn;    // 4 bytes
-	OGM_SQN_T ogmSqnMin;   // 2 bytes
-	OGM_SQN_T ogmSqnRange; // 2 bytes
-
-//	uint8_t extensionData[];
-	
-// Additional TLV types needed for:
-// - hostname, email, revision, capabilities,
-// - expanded uint32_t rframes_data_len and SHA1_T rframes_data_hash
-
-} __attribute__((packed));
 
 
 
@@ -680,17 +662,15 @@ struct msg_description_adv { // IPv6: >= 92 bytes
 } __attribute__((packed));
 
 #define DESCRIPTION_MSG_FORMAT { \
-{FIELD_TYPE_GLOBAL_ID,        -1, (8*sizeof(GLOBAL_ID_T)), 1, FIELD_RELEVANCE_HIGH, "globalId"},  \
 {FIELD_TYPE_HEX,              -1, 16,                      0, FIELD_RELEVANCE_MEDI, "revision" }, \
 {FIELD_TYPE_UINT,             -1, 32,                      0, FIELD_RELEVANCE_MEDI, "descSqn" }, \
 {FIELD_TYPE_UINT,             -1, (8*sizeof(OGM_SQN_T)),   0, FIELD_RELEVANCE_MEDI, "ogmSqnMin" }, \
 {FIELD_TYPE_UINT,             -1, (8*sizeof(OGM_SQN_T)),   0, FIELD_RELEVANCE_MEDI, ARG_OGM_SQN_RANGE }, \
 {FIELD_TYPE_HEX,              -1, 16,                      0, FIELD_RELEVANCE_MEDI, "capabilities" }, \
 {FIELD_TYPE_UINT,             -1, 8,                       1, FIELD_RELEVANCE_LOW,  "comp_version" }, \
-{FIELD_TYPE_UINT,             -1, 8,                       1, FIELD_RELEVANCE_LOW,  "reserved" }, \
-{FIELD_TYPE_STRING_SIZE,      -1, 16,                      0, FIELD_RELEVANCE_LOW,  "reserved2" }, \
-{FIELD_TYPE_STRING_BINARY,    -1, 0,                       1, FIELD_RELEVANCE_LOW,  "extensionData" }, \
 FIELD_FORMAT_END}
+
+
 
 
 #define OGM_JUMPS_PER_AGGREGATION 10
@@ -768,7 +748,7 @@ struct description_cache_node {
 	DHASH_T dhash;
         TIME_T timestamp;
         uint16_t desc_len;
-        struct description *desc;
+        uint8_t *desc;
 };
 
 
@@ -783,8 +763,8 @@ struct rx_frame_iterator {
         struct ctrl_node *cn;
         struct frame_db *db;
         struct orig_node *on;
-        struct description *desc; //as received on wire
-        uint16_t desc_len;
+        uint8_t *dsc_frame; //as received on wire
+        uint16_t dsc_frame_len;
         uint8_t *frames_in;
         int32_t frames_length;
         struct desc_extension *dext;
@@ -936,9 +916,9 @@ void update_my_description_adv( void );
 void update_my_dev_adv(void);
 void update_my_link_adv(uint32_t changes);
 
-void free_desc_extensions(struct desc_extension **dext);
+void dext_free(struct desc_extension **dext);
 struct dhash_node * process_description(struct packet_buff *pb, struct description_cache_node *desc, DHASH_T *dhash);
-IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, struct description *desc, uint16_t desc_len, 
+IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, uint8_t *desc, uint16_t desc_len, 
         struct desc_extension *dext, uint8_t op, uint8_t filter, void *custom, struct ctrl_node *cn);
 IDM_T desc_frame_changed(  struct rx_frame_iterator *it, uint8_t f_type );
 void purge_tx_task_list(struct list_head *tx_tasks_list, struct link_node *only_link, struct dev_node *only_dev);

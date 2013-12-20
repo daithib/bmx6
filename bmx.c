@@ -479,7 +479,7 @@ char *field_dbg_value(const struct field_format *format, uint16_t min_msg_size, 
 
         } else if (field_type == FIELD_TYPE_GLOBAL_ID) {
 
-                val = globalIdAsString(((GLOBAL_ID_T*) p));
+                val = cryptShaAsString(((SHA1_T*) p));
 
         } else if (field_type == FIELD_TYPE_UMETRIC) {
 
@@ -499,7 +499,7 @@ char *field_dbg_value(const struct field_format *format, uint16_t min_msg_size, 
 
         } else if (field_type == FIELD_TYPE_POINTER_GLOBAL_ID) {
 
-                val = *pp ? globalIdAsString(*((GLOBAL_ID_T**)pp)) : DBG_NIL;
+                val = *pp ? cryptShaAsString(*((SHA1_T**)pp)) : DBG_NIL;
 
         } else if (field_type == FIELD_TYPE_POINTER_UMETRIC) {
 
@@ -807,7 +807,7 @@ static int32_t bmx_status_creator(struct status_handl *handl, void *data)
         sprintf(status->version, "%s-%s", BMX_BRANCH, BRANCH_VERSION);
         status->compat = my_compatibility;
 	snprintf(status->revision, 8, "%s", GIT_REV);
-        status->name = self->global_id.name;
+        status->name = NULL;
         status->globalId = &self->global_id;
         status->primaryIp = self->primary_ip;
         status->tun4Address = tin ? &tin->tunAddr46[1] : NULL;
@@ -901,7 +901,7 @@ static int32_t link_status_creator(struct status_handl *handl, void *data)
 
                         while ((lndev = list_iterate(&link->lndev_list, lndev))) {
 
-                                status[i].name = on->global_id.name;
+                                status[i].name = NULL;
                                 status[i].globalId = &on->global_id;
                                 status[i].llocalIp = link->link_ip;
                                 status[i].viaDev = lndev->key.dev->label_cfg;
@@ -987,7 +987,7 @@ static int32_t orig_status_creator(struct status_handl *handl, void *data)
 
 		assertion(-500000, (on->desc && on->dext));
 
-                status[i].name = on->global_id.name;
+                status[i].name = NULL;
                 status[i].globalId = &on->global_id;
                 status[i].blocked = on->blocked;
                 status[i].primaryIp = on->primary_ip;
@@ -996,7 +996,7 @@ static int32_t orig_status_creator(struct status_handl *handl, void *data)
                 status[i].viaDev = on->curr_rt_lndev && on->curr_rt_lndev->key.dev ? on->curr_rt_lndev->key.dev->name_phy_cfg.str : DBG_NIL;
                 status[i].metric = (on->curr_rt_local ? (on->curr_rt_local->mr.umetric) : (on == self ? UMETRIC_MAX : 0));
                 status[i].myIid4x = on->dhn->myIID4orig;
-                status[i].descSqn = ntohl(on->desc->descSqn);
+                status[i].descSqn = ntohl(((struct description*)dext_dptr(on->dext, BMX_DSC_TLV_DESCRIPTION))->descSqn);
                 status[i].ogmSqn = on->ogmSqn_next;
                 status[i].ogmSqnDiff = (on->ogmSqn_maxRcvd - on->ogmSqn_next);
                 status[i].lastDesc = (bmx_time - on->updated_timestamp) / 1000;
@@ -1109,19 +1109,19 @@ void init_self(void)
 	assertion(-500000, (strlen(my_Hostname)));
 	assertion(-500000, (my_PubKey));
 
-	strcpy(id.name, my_Hostname);
+	//strcpy(id.name, my_Hostname);
 
-	assertion(-500000, (sizeof(SHA1_T)==sizeof(id.pkid)));
+	assertion(-500000, (sizeof(SHA1_T)==sizeof(id)));
 	struct dsc_msg_pubkey *msg = debugMallocReset(sizeof(struct dsc_msg_pubkey) + my_PubKey->rawKeyLen, -300000);
 	msg->type = my_PubKey->rawKeyType;
 	memcpy(msg->key, my_PubKey->rawKey, my_PubKey->rawKeyLen);
-	id.pkid.sha1 = *ref_node_key((uint8_t*)msg, sizeof(struct dsc_msg_pubkey) + my_PubKey->rawKeyLen, 0, 0, 0);
+	id = *ref_node_key((uint8_t*)msg, sizeof(struct dsc_msg_pubkey) + my_PubKey->rawKeyLen, 0, 0, 0);
 	debugFree(msg, -300000);
 
         self = init_orig_node(&id);
 
-        self->desc = (struct description *) my_desc0;
-	self->desc_len = sizeof(struct description);
+        self->desc = my_desc0;
+	self->desc_len = 0;
 
         self->ogmSqn_rangeMin = ((OGM_SQN_MASK) & rand_num(OGM_SQN_MAX));
 }
@@ -1321,7 +1321,7 @@ void bmx(void)
         for (an = NULL; (dev = avl_iterate_item(&dev_ip_tree, &an));) {
 
                 schedule_tx_task(&dev->dummy_lndev, FRAME_TYPE_DEV_ADV, SCHEDULE_UNKNOWN_MSGS_SIZE, 0, 0, 0, 0);
-                schedule_tx_task(&dev->dummy_lndev, FRAME_TYPE_DESC_ADV, self->desc_len, 0, 0, myIID4me, 0);
+                schedule_tx_task(&dev->dummy_lndev, FRAME_TYPE_DESC_ADVS, self->desc_len, 0, 0, myIID4me, 0);
         }
 
         initializing = NO;
