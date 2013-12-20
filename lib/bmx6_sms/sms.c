@@ -252,7 +252,7 @@ int process_description_sms(struct rx_frame_iterator *it)
         int mlen;
 
         if (op == TLV_OP_NEW || op == TLV_OP_DEL)
-                rm_dir_content(smsRx_dir, cryptShaAsString(&on->global_id));
+                rm_dir_content(smsRx_dir, cryptShaAsString(&on->nodeId));
 
         do {
 
@@ -272,7 +272,7 @@ int process_description_sms(struct rx_frame_iterator *it)
 
                         int fd;
                         char path_name[MAX_PATH_SIZE];
-                        sprintf(path_name, "%s/%s:%s", smsRx_dir, cryptShaAsString(&on->global_id), sms->name);
+                        sprintf(path_name, "%s/%s:%s", smsRx_dir, cryptShaAsString(&on->nodeId), sms->name);
 
                         if ((fd = open(path_name, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) < 0) {
 

@@ -408,11 +408,11 @@ void *dext_dptr( struct desc_extension *dext, uint8_t type);
 struct orig_node {
 	// filled in by validate_new_link_desc0():
 
-	GLOBAL_ID_T global_id;
+	GLOBAL_ID_T nodeId;
 
 	struct dhash_node *dhn;
-	uint8_t *desc;
-        uint16_t desc_len;
+	uint8_t *desc_frame;
+        uint16_t desc_frame_len;
 	struct desc_extension *dext;
 
 	TIME_T updated_timestamp; // last time this on's desc was succesfully updated

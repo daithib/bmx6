@@ -59,7 +59,7 @@
 #define DEF_VRT_DESC_SIZE      (16384) //any value less-equal then MAX_VRT_DESC_SIZE
 //#define MAX_VRT_DESC_SIZE      (INT32_MAX)
 // this should be the max possible with a reference depth of 1 :
-#define MAX_VRT_DESC_SIZE      (((MAX_DESC_SIZE - sizeof(struct msg_description_adv)) - \
+#define MAX_VRT_DESC_SIZE      (((MAX_DESC_SIZE - sizeof(struct dsc_msg_description)) - \
                                  (5 * (sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash_adv)) )) / \
 			        sizeof(struct desc_msg_rhash_adv)) \
 			       * \
@@ -636,7 +636,7 @@ struct msg_ref_req {
 #define hdr_description_request hdr_dhash_request
 
 
-struct description { // 68 bytes
+struct dsc_msg_description {
 
 	uint16_t revision;     // 2 bytes
 
@@ -651,15 +651,6 @@ struct description { // 68 bytes
 } __attribute__((packed));
 
 
-
-
-
-struct msg_description_adv { // IPv6: >= 92 bytes
-	
-	// the hashed pard:
-	struct description desc;   // 68 bytes + extension frames (>= (metric-algo:2+16 bytes + hna6: 2+(x*22) bytes  ))
-
-} __attribute__((packed));
 
 #define DESCRIPTION_MSG_FORMAT { \
 {FIELD_TYPE_HEX,              -1, 16,                      0, FIELD_RELEVANCE_MEDI, "revision" }, \

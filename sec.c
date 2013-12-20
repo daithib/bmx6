@@ -48,7 +48,7 @@ static int32_t descVerification = DEF_DESC_VERIFY;
 
 
 STATIC_FUNC
-int create_description_tlv_pubkey(struct tx_frame_iterator *it)
+int create_dsc_tlv_pubkey(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
@@ -68,7 +68,7 @@ int create_description_tlv_pubkey(struct tx_frame_iterator *it)
 }
 
 STATIC_FUNC
-int process_description_tlv_pubkey(struct rx_frame_iterator *it)
+int process_dsc_tlv_pubkey(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
@@ -99,7 +99,7 @@ finish: {
 }
 
 STATIC_FUNC
-int create_description_tlv_signature(struct tx_frame_iterator *it)
+int create_dsc_tlv_signature(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
@@ -130,7 +130,7 @@ int create_description_tlv_signature(struct tx_frame_iterator *it)
 }
 
 STATIC_FUNC
-int process_description_tlv_signature(struct rx_frame_iterator *it)
+int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
@@ -155,7 +155,7 @@ int process_description_tlv_signature(struct rx_frame_iterator *it)
 	if ( !pkey_msg || !cryptKeyTypeAsString(pkey_msg->type) || cryptKeyLenByType(pkey_msg->type) != sign_len )
 		goto_error( finish, "2");
 
-	if ( desc_len < (int)sizeof(struct description))
+	if ( desc_len < (int)sizeof(struct dsc_msg_description))
 		goto_error( finish, "3");
 
 	if ( sign_len > (descVerification/8) )
@@ -196,7 +196,7 @@ finish: {
 }
 
 STATIC_FUNC
-int create_description_tlv_sha(struct tx_frame_iterator *it)
+int create_dsc_tlv_sha(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 /*
@@ -212,7 +212,7 @@ int create_description_tlv_sha(struct tx_frame_iterator *it)
 }
 
 STATIC_FUNC
-int process_description_tlv_sha(struct rx_frame_iterator *it)
+int process_dsc_tlv_sha(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
@@ -406,8 +406,8 @@ int32_t init_sec( void )
         handl.min_msg_size = sizeof(struct dsc_msg_pubkey);
         handl.fixed_msg_size = 0;
 	handl.dextReferencing = (int32_t*)&always_fref;
-        handl.tx_frame_handler = create_description_tlv_pubkey;
-        handl.rx_frame_handler = process_description_tlv_pubkey;
+        handl.tx_frame_handler = create_dsc_tlv_pubkey;
+        handl.rx_frame_handler = process_dsc_tlv_pubkey;
 	handl.msg_format = pubkey_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_PUBKEY, &handl);
 
@@ -415,8 +415,8 @@ int32_t init_sec( void )
         handl.name = "EXP_SHA";
         handl.min_msg_size = sizeof(struct dsc_msg_sha);
         handl.fixed_msg_size = 1;
-        handl.tx_frame_handler = create_description_tlv_sha;
-        handl.rx_frame_handler = process_description_tlv_sha;
+        handl.tx_frame_handler = create_dsc_tlv_sha;
+        handl.rx_frame_handler = process_dsc_tlv_sha;
 	handl.msg_format = sha_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_SHA, &handl);
 
@@ -424,8 +424,8 @@ int32_t init_sec( void )
         handl.name = "SIGNATURE";
         handl.min_msg_size = sizeof(struct dsc_msg_signature);
         handl.fixed_msg_size = 0;
-        handl.tx_frame_handler = create_description_tlv_signature;
-        handl.rx_frame_handler = process_description_tlv_signature;
+        handl.tx_frame_handler = create_dsc_tlv_signature;
+        handl.rx_frame_handler = process_dsc_tlv_signature;
 	handl.msg_format = signature_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_SIGNATURE, &handl);
 

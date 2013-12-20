@@ -416,7 +416,7 @@ void json_originator_event_hook(int32_t cb_id, struct orig_node *orig)
 
                 if ((on = orig)) {
 
-                        sprintf(path_name, "%s/%s", json_orig_dir, cryptShaAsString(&on->global_id));
+                        sprintf(path_name, "%s/%s", json_orig_dir, cryptShaAsString(&on->nodeId));
 
                         if ((fd = open(path_name, O_RDONLY)) > 0 && close(fd) == 0) {
                                 
@@ -434,7 +434,7 @@ void json_originator_event_hook(int32_t cb_id, struct orig_node *orig)
                 struct avl_node *it = NULL;
                 while ((on = orig ? orig : avl_iterate_item(&orig_tree, &it))) {
 
-                        sprintf(path_name, "%s/%s", json_orig_dir, cryptShaAsString(&on->global_id));
+                        sprintf(path_name, "%s/%s", json_orig_dir, cryptShaAsString(&on->nodeId));
 
                         if ((fd = open(path_name, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) < 0) {
 
@@ -486,7 +486,7 @@ void json_description_event_hook(int32_t cb_id, struct orig_node *on)
         TRACE_FUNCTION_CALL;
 
         assertion(-501306, (on));
-        assertion(-501270, IMPLIES(cb_id == PLUGIN_CB_DESCRIPTION_CREATED, (on && on->desc)));
+        assertion(-501270, IMPLIES(cb_id == PLUGIN_CB_DESCRIPTION_CREATED, (on && on->desc_frame)));
         assertion(-501273, (cb_id == PLUGIN_CB_DESCRIPTION_DESTROY || cb_id == PLUGIN_CB_DESCRIPTION_CREATED));
         assertion(-501274, IMPLIES(initializing, cb_id == PLUGIN_CB_DESCRIPTION_CREATED));
         assertion(-501275, (json_desc_dir));
@@ -495,7 +495,7 @@ void json_description_event_hook(int32_t cb_id, struct orig_node *on)
 
         int fd;
         char path_name[MAX_PATH_SIZE];
-        sprintf(path_name, "%s/%s", json_desc_dir, cryptShaAsString(&on->global_id));
+        sprintf(path_name, "%s/%s", json_desc_dir, cryptShaAsString(&on->nodeId));
 
         if (cb_id == PLUGIN_CB_DESCRIPTION_DESTROY) {
 
@@ -525,14 +525,14 @@ void json_description_event_hook(int32_t cb_id, struct orig_node *on)
                 json_object *jblocked = json_object_new_int(on->blocked);
                 json_object_object_add(jorig, "blocked", jblocked);
 
-                struct msg_description_adv * desc_buff = debugMalloc(sizeof (struct msg_description_adv), -300361);
+                struct dsc_msg_description * desc_buff = debugMalloc(sizeof (struct dsc_msg_description), -300361);
 
-                memcpy(&desc_buff->desc, on->desc, sizeof (struct description));
+                memcpy(desc_buff, on->desc_frame, sizeof (struct dsc_msg_description));
 
                 json_object *jdesc_fields = NULL;
 
                 if ((jdesc_fields = fields_dbg_json(
-                        FIELD_RELEVANCE_MEDI, NO, sizeof (struct msg_description_adv), (uint8_t*) desc_buff,
+                        FIELD_RELEVANCE_MEDI, NO, sizeof (struct dsc_msg_description), (uint8_t*) desc_buff,
                         packet_desc_db->handls->min_msg_size,
                         packet_desc_db->handls->msg_format))) {
 

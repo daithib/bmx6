@@ -2966,9 +2966,9 @@ int32_t opt_auto_prefix(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct
         } else if (cmd == OPT_SET_POST && initializing ) {
 
 		assertion(-500000, (self));
-		assertion(-500000, (!is_zero(&self->global_id, sizeof(self->global_id))));
+		assertion(-500000, (!is_zero(&self->nodeId, sizeof(self->nodeId))));
 		self->primary_ip = autoconf_prefix_cfg.ip;
-		memcpy(&self->primary_ip.s6_addr[(autoconf_prefix_cfg.mask/8)], &self->global_id, ((128-autoconf_prefix_cfg.mask)/8));
+		memcpy(&self->primary_ip.s6_addr[(autoconf_prefix_cfg.mask/8)], &self->nodeId, ((128-autoconf_prefix_cfg.mask)/8));
 
 /*		if (is_zero(&self->global_id.pkid, sizeof(self->global_id.pkid)/2))
 			memcpy(&self->primary_ip.s6_addr[(autoconf_prefix_cfg.mask/8)], &self->global_id.pkid.u8[sizeof(self->global_id.pkid)/2],

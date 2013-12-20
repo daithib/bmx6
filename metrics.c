@@ -981,18 +981,18 @@ IDM_T update_path_metrics(struct packet_buff *pb, struct orig_node *on, OGM_SQN_
 
         OGM_SQN_T ogm_sqn_max = UXX_GET_MAX(OGM_SQN_MASK, on->ogmSqn_maxRcvd, ogmSqn);
 
-        dbgf_all(DBGT_INFO, "nodeId=%s ogmSqn=%d via neigh=%s", cryptShaAsString(&on->global_id), ogmSqn, pb->i.llip_str);
+        dbgf_all(DBGT_INFO, "nodeId=%s ogmSqn=%d via neigh=%s", cryptShaAsString(&on->nodeId), ogmSqn, pb->i.llip_str);
 
 
         if (UXX_LT(OGM_SQN_MASK, ogmSqn, (OGM_SQN_MASK & (ogm_sqn_max - on->path_metricalgo->lounge_size)))) {
                 dbgf_track(DBGT_WARN, "dropping late sqn=%d via neigh=%s from nodeId=%s",
-                        ogmSqn, pb->i.llip_str, cryptShaAsString(&on->global_id));
+                        ogmSqn, pb->i.llip_str, cryptShaAsString(&on->nodeId));
                 return SUCCESS;
         }
 
         if (UXX_LT(OGM_SQN_MASK, ogmSqn, on->ogmSqn_next) || (ogmSqn == on->ogmSqn_next && *ogmMetric <= on->ogmMetric_next)) {
                 dbgf_all(DBGT_WARN, "dropping already scheduled sqn=%d via neigh=%s from nodeId=%s",
-                        ogmSqn, pb->i.llip_str, cryptShaAsString(&on->global_id));
+                        ogmSqn, pb->i.llip_str, cryptShaAsString(&on->nodeId));
                 return SUCCESS;
         }
 
@@ -1032,7 +1032,7 @@ IDM_T update_path_metrics(struct packet_buff *pb, struct orig_node *on, OGM_SQN_
                         (ogmSqn == rt->ogm_sqn_last &&
                         (*ogmMetric <= rt->ogm_umetric_last || best_rt_metric <= rt->path_metric_best))) {
                         dbgf_track(DBGT_WARN, "dropping already rcvd sqn=%d via neigh=%s from nodeId=%s",
-                                ogmSqn, pb->i.llip_str, cryptShaAsString(&on->global_id));
+                                ogmSqn, pb->i.llip_str, cryptShaAsString(&on->nodeId));
                         return SUCCESS;
                 }
 
@@ -1041,7 +1041,7 @@ IDM_T update_path_metrics(struct packet_buff *pb, struct orig_node *on, OGM_SQN_
                 rt = router_node_create(local, on, ogm_sqn_max);
 
                 dbg_track(DBGT_INFO, "new router via_ip=%s to nodeId=%s metric=%ju (curr_rt=%s metric=%ju total %d)",
-                        ip6AsStr(&best_rt_lndev->key.link->link_ip), cryptShaAsString(&on->global_id), best_rt_metric,
+                        ip6AsStr(&best_rt_lndev->key.link->link_ip), cryptShaAsString(&on->nodeId), best_rt_metric,
                         on->curr_rt_lndev ? ip6AsStr(&on->curr_rt_lndev->key.link->link_ip) : DBG_NIL,
                         on->curr_rt_lndev ? on->curr_rt_local->mr.umetric : 0, on->rt_tree.items);
 
@@ -1079,7 +1079,7 @@ IDM_T update_path_metrics(struct packet_buff *pb, struct orig_node *on, OGM_SQN_
                         if (next_rt != on->curr_rt_local || on->curr_rt_local->path_lndev_best != on->curr_rt_lndev ) {
 
                                 dbg_track(DBGT_INFO, "changed route to nodeId=%s ip=%s via_ip=%s via_dev=%s metric=%s   (prev %s %s metric=%s sqn_max=%d sqn_in=%d)",
-                                        cryptShaAsString(&on->global_id), on->primary_ip_str,
+                                        cryptShaAsString(&on->nodeId), on->primary_ip_str,
                                         ip6AsStr(&next_rt->path_lndev_best->key.link->link_ip),
                                         next_rt->path_lndev_best->key.dev->label_cfg.str,
                                         umetric_to_human(next_rt->mr.umetric),
@@ -1297,7 +1297,7 @@ void metrics_description_event_hook(int32_t cb_id, struct orig_node *on)
         TRACE_FUNCTION_CALL;
 
         assertion(-501306, (on));
-        assertion(-501270, IMPLIES(cb_id == PLUGIN_CB_DESCRIPTION_CREATED, (on && on->desc)));
+        assertion(-501270, IMPLIES(cb_id == PLUGIN_CB_DESCRIPTION_CREATED, (on && on->desc_frame)));
         assertion(-501273, (cb_id == PLUGIN_CB_DESCRIPTION_DESTROY || cb_id == PLUGIN_CB_DESCRIPTION_CREATED));
         assertion(-501274, IMPLIES(initializing, cb_id == PLUGIN_CB_DESCRIPTION_CREATED));
 

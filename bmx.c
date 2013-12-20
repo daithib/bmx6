@@ -808,7 +808,7 @@ static int32_t bmx_status_creator(struct status_handl *handl, void *data)
         status->compat = my_compatibility;
 	snprintf(status->revision, 8, "%s", GIT_REV);
         status->name = NULL;
-        status->globalId = &self->global_id;
+        status->globalId = &self->nodeId;
         status->primaryIp = self->primary_ip;
         status->tun4Address = tin ? &tin->tunAddr46[1] : NULL;
         status->tun6Address = tin ? &tin->tunAddr46[0] : NULL;
@@ -902,7 +902,7 @@ static int32_t link_status_creator(struct status_handl *handl, void *data)
                         while ((lndev = list_iterate(&link->lndev_list, lndev))) {
 
                                 status[i].name = NULL;
-                                status[i].globalId = &on->global_id;
+                                status[i].globalId = &on->nodeId;
                                 status[i].llocalIp = link->link_ip;
                                 status[i].viaDev = lndev->key.dev->label_cfg;
                                 status[i].rxRate = ((lndev->timeaware_rx_probe * 100) / UMETRIC_MAX);
@@ -985,10 +985,10 @@ static int32_t orig_status_creator(struct status_handl *handl, void *data)
 
         while (data ? (on = data) : (on = avl_iterate_item(&orig_tree, &it))) {
 
-		assertion(-500000, (on->desc && on->dext));
+		assertion(-500000, (on->desc_frame && on->dext));
 
                 status[i].name = NULL;
-                status[i].globalId = &on->global_id;
+                status[i].globalId = &on->nodeId;
                 status[i].blocked = on->blocked;
                 status[i].primaryIp = on->primary_ip;
                 status[i].routes = on->rt_tree.items;
@@ -996,7 +996,7 @@ static int32_t orig_status_creator(struct status_handl *handl, void *data)
                 status[i].viaDev = on->curr_rt_lndev && on->curr_rt_lndev->key.dev ? on->curr_rt_lndev->key.dev->name_phy_cfg.str : DBG_NIL;
                 status[i].metric = (on->curr_rt_local ? (on->curr_rt_local->mr.umetric) : (on == self ? UMETRIC_MAX : 0));
                 status[i].myIid4x = on->dhn->myIID4orig;
-                status[i].descSqn = ntohl(((struct description*)dext_dptr(on->dext, BMX_DSC_TLV_DESCRIPTION))->descSqn);
+                status[i].descSqn = ntohl(((struct dsc_msg_description*)dext_dptr(on->dext, BMX_DSC_TLV_DESCRIPTION))->descSqn);
                 status[i].ogmSqn = on->ogmSqn_next;
                 status[i].ogmSqnDiff = (on->ogmSqn_maxRcvd - on->ogmSqn_next);
                 status[i].lastDesc = (bmx_time - on->updated_timestamp) / 1000;
@@ -1120,8 +1120,8 @@ void init_self(void)
 
         self = init_orig_node(&id);
 
-        self->desc = my_desc0;
-	self->desc_len = 0;
+        self->desc_frame = my_desc0;
+	self->desc_frame_len = 0;
 
         self->ogmSqn_rangeMin = ((OGM_SQN_MASK) & rand_num(OGM_SQN_MAX));
 }
@@ -1321,7 +1321,7 @@ void bmx(void)
         for (an = NULL; (dev = avl_iterate_item(&dev_ip_tree, &an));) {
 
                 schedule_tx_task(&dev->dummy_lndev, FRAME_TYPE_DEV_ADV, SCHEDULE_UNKNOWN_MSGS_SIZE, 0, 0, 0, 0);
-                schedule_tx_task(&dev->dummy_lndev, FRAME_TYPE_DESC_ADVS, self->desc_len, 0, 0, myIID4me, 0);
+                schedule_tx_task(&dev->dummy_lndev, FRAME_TYPE_DESC_ADVS, self->desc_frame_len, 0, 0, myIID4me, 0);
         }
 
         initializing = NO;
