@@ -3107,8 +3107,8 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 
                 if ( it->db == description_tlv_db /*&& it->process_filter == FRAME_TYPE_PROCESS_ALL*/ ? (
 			( f_type != BMX_DSC_TLV_RHASH && it->frame_type_expanded >= f_type ) ||
-			( f_type == BMX_DSC_TLV_RHASH && (f_data_len < (int)sizeof(struct desc_hdr_rhash) || 
-			it->frame_type_expanded >= ((struct desc_hdr_rhash*)(f_data))->expanded_type)) 
+			( f_type == BMX_DSC_TLV_RHASH && (f_data_len < (int)sizeof(struct desc_hdr_rhash) ||
+			it->frame_type_expanded >= ((struct desc_hdr_rhash*)(f_data))->expanded_type))
 			) : (
 			it->frame_type > f_type  
 			) ) {
@@ -4361,7 +4361,7 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 		goto process_desc0_error;
 
 
-
+	IDM_T TODO;
 
         if (!on) // create new orig:
                 on = init_orig_node(nodeIdFromDescAdv(cache->desc));
