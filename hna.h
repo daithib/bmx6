@@ -176,7 +176,7 @@ struct hna_node {
         uint8_t flags;
 };
 
-struct description_msg_hna6 {
+struct dsc_msg_hna6 {
 	uint8_t prefixlen;
 	uint8_t flags;
 	IP6_T    ip6;
@@ -192,7 +192,7 @@ FIELD_FORMAT_END }
 
 
 
-struct description_msg_tun6_adv {
+struct dsc_msg_tun6 {
         IP6_T localIp;
 } __attribute__((packed));
 
@@ -203,7 +203,7 @@ FIELD_FORMAT_END }
 
 
 
-struct description_msg_tun4in6_ingress_adv {
+struct dsc_msg_tun4in6ingress {
         uint8_t tun6Id;
 //        uint8_t srcType;
 //        uint8_t srcPrefixMin;
@@ -217,7 +217,7 @@ struct description_msg_tun4in6_ingress_adv {
 {FIELD_TYPE_IP4,      -1,  32, 1, FIELD_RELEVANCE_HIGH, "ingressPrefix" },  \
 FIELD_FORMAT_END }
 
-struct description_msg_tun6in6_ingress_adv {
+struct dsc_msg_tun6in6ingress {
         uint8_t tun6Id;
 //        uint8_t srcType;
 //        uint8_t srcPrefixMin;
@@ -240,7 +240,7 @@ FIELD_FORMAT_END }
 #define TUN_SRC_TYPE_AHCP          0x03
 #define TUN_SRC_TYPE_MAX           0x03
 
-struct description_msg_tun4in6_src_adv {
+struct dsc_msg_tun4in6src {
         uint8_t tun6Id;
         uint8_t srcType;
         uint8_t srcPrefixMin;
@@ -256,7 +256,7 @@ struct description_msg_tun4in6_src_adv {
 {FIELD_TYPE_IP4,      -1,  32, 1, FIELD_RELEVANCE_HIGH, "srcPrefix" },  \
 FIELD_FORMAT_END }
 
-struct description_msg_tun6in6_src_adv {
+struct dsc_msg_tun6in6src {
         uint8_t tun6Id;
         uint8_t srcType;
         uint8_t srcPrefixMin;
@@ -275,7 +275,7 @@ FIELD_FORMAT_END }
 
 
 
-struct description_msg_tun4in6_net_adv {
+struct dsc_msg_tun4in6net {
         uint8_t tun6Id;
         uint8_t bmx6_route_type;
         FMETRIC_U8_T bandwidth;
@@ -291,7 +291,7 @@ struct description_msg_tun4in6_net_adv {
 {FIELD_TYPE_IP4,      -1,  32, 1, FIELD_RELEVANCE_HIGH, "network" },  \
 FIELD_FORMAT_END }
 
-struct description_msg_tun6in6_net_adv {
+struct dsc_msg_tun6in6net {
         uint8_t tun6Id;
         uint8_t bmx6_route_type;
         FMETRIC_U8_T bandwidth;

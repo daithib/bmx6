@@ -184,7 +184,7 @@ IDM_T configure_route(IDM_T del, struct orig_node *on, struct net_key *key)
 
 
 STATIC_FUNC
-uint8_t set_hna_to_key(struct net_key *key, struct description_msg_hna6 *uhna6)
+uint8_t set_hna_to_key(struct net_key *key, struct dsc_msg_hna6 *uhna6)
 {
         uint8_t flags;
 
@@ -205,7 +205,7 @@ int _create_tlv_hna(uint8_t* data, uint16_t max_size, uint16_t pos, struct net_k
         uint16_t i;
 
 
-        if ((pos + sizeof (struct description_msg_hna6)) > max_size) {
+        if ((pos + sizeof (struct dsc_msg_hna6)) > max_size) {
                 dbgf_sys(DBGT_ERR, "unable to announce %s! Exceeded %s=%d", netAsStr(net), ARG_UDPD_SIZE, max_size);
                 return pos;
         }
@@ -215,23 +215,23 @@ int _create_tlv_hna(uint8_t* data, uint16_t max_size, uint16_t pos, struct net_k
         assertion(-500610, (!(is_ip_net_equal(&net->ip, &IP6_LINKLOCAL_UC_PREF, IP6_LINKLOCAL_UC_PLEN, AF_INET6))));
         // this should be catched during configuration!!
 
-	struct description_msg_hna6 *msg6 = ((struct description_msg_hna6 *) data);
+	struct dsc_msg_hna6 *msg6 = ((struct dsc_msg_hna6 *) data);
 
-	struct description_msg_hna6 hna6;
+	struct dsc_msg_hna6 hna6;
 	memset( &hna6, 0, sizeof(hna6));
 	hna6.ip6 = net->ip;
 	hna6.prefixlen = net->mask;
 	hna6.flags = flags;
 
-	for (i = 0; i < pos / sizeof (struct description_msg_hna6); i++) {
+	for (i = 0; i < pos / sizeof (struct dsc_msg_hna6); i++) {
 
-		if (!memcmp(&(msg6[i]), &hna6, sizeof (struct description_msg_hna6)))
+		if (!memcmp(&(msg6[i]), &hna6, sizeof (struct dsc_msg_hna6)))
 			return pos;
 	}
 
 	msg6[i] = hna6;
 
-        return (pos + sizeof (struct description_msg_hna6));
+        return (pos + sizeof (struct dsc_msg_hna6));
 }
 
 STATIC_FUNC
@@ -367,7 +367,7 @@ void reconfigure_tun_ins(void)
 
 
 STATIC_FUNC
-int create_description_tlv_hna(struct tx_frame_iterator *it)
+int create_dsc_tlv_hna(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
         assertion(-500765, (it->frame_type == BMX_DSC_TLV_UHNA6));
@@ -496,7 +496,7 @@ static struct net_key *hna_net_keys = NULL;
 static uint32_t hna_net_key_elements = 0;
 
 STATIC_FUNC
-int process_description_tlv_hna(struct rx_frame_iterator *it)
+int process_dsc_tlv_hna(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
         ASSERTION(-500357, (it->frame_type == BMX_DSC_TLV_UHNA6));
@@ -532,7 +532,7 @@ int process_description_tlv_hna(struct rx_frame_iterator *it)
                 struct net_key key;
                 uint8_t flags;
 
-		flags = set_hna_to_key(&key, (struct description_msg_hna6 *) (it->frame_data + pos));
+		flags = set_hna_to_key(&key, (struct dsc_msg_hna6 *) (it->frame_data + pos));
 
 
                 dbgf_track(DBGT_INFO, "%s nodeId=%s %s=%s",
@@ -1627,13 +1627,13 @@ void eval_tun_bit_tree(void  *onlyIfOrderChanged)
 
 
 STATIC_FUNC
-int create_description_tlv_tun6_adv(struct tx_frame_iterator *it)
+int create_dsc_tlv_tun6(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
         uint16_t m = 0;
         struct tun_in_node *tin;
         struct avl_node *an = NULL;
-        struct description_msg_tun6_adv *adv = (struct description_msg_tun6_adv *) tx_iterator_cache_msg_ptr(it);
+        struct dsc_msg_tun6 *adv = (struct dsc_msg_tun6 *) tx_iterator_cache_msg_ptr(it);
 
         assertion(-500000, is_ip_set(&self->primary_ip));
 
@@ -1648,7 +1648,7 @@ int create_description_tlv_tun6_adv(struct tx_frame_iterator *it)
 	}
 
 	if (m)
-		return m * sizeof ( struct description_msg_tun6_adv);
+		return m * sizeof ( struct dsc_msg_tun6);
 	else
 		return TLV_TX_DATA_IGNORED;
 }
@@ -1735,7 +1735,7 @@ IDM_T terminate_tun_out(struct orig_node *on, struct tun_out_node *tona, struct 
 static uint8_t new_tun6_advs_changed;
 
 STATIC_FUNC
-int process_description_tlv_tun6_adv(struct rx_frame_iterator *it)
+int process_dsc_tlv_tun6(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
         int16_t m;
@@ -1776,9 +1776,9 @@ int process_description_tlv_tun6_adv(struct rx_frame_iterator *it)
                 
                 if (!new_tun6_advs_changed) {
                         uint8_t t;
-                        uint8_t tlv_types[] = { BMX_DSC_TLV_TUN6_ADV
-			,BMX_DSC_TLV_TUN4IN6_INGRESS_ADV ,BMX_DSC_TLV_TUN6IN6_INGRESS_ADV
-			,BMX_DSC_TLV_TUN4IN6_SRC_ADV, BMX_DSC_TLV_TUN6IN6_SRC_ADV
+                        uint8_t tlv_types[] = { BMX_DSC_TLV_TUN6
+			,BMX_DSC_TLV_TUN4IN6_INGRESS ,BMX_DSC_TLV_TUN6IN6_INGRESS
+			,BMX_DSC_TLV_TUN4IN6_SRC, BMX_DSC_TLV_TUN6IN6_SRC
 //                      ,BMX_DSC_TLV_TUN4IN6_NET_ADV, BMX_DSC_TLV_TUN6IN6_NET_ADV
                         };
 
@@ -1805,7 +1805,7 @@ int process_description_tlv_tun6_adv(struct rx_frame_iterator *it)
 
         for (m = 0; m < it->frame_msgs_fixed; m++) {
 
-                struct description_msg_tun6_adv *adv = &(((struct description_msg_tun6_adv *) (it->frame_data))[m]);
+                struct dsc_msg_tun6 *adv = &(((struct dsc_msg_tun6 *) (it->frame_data))[m]);
                 struct tun_out_key key = set_tun_adv_key(it->on, m);
 
                 dbgf_all(DBGT_INFO, "op=%s tunnel_out.items=%d tun_net.items=%d msg=%d/%d localIp=%s nodeId=%s (%p) key=%s",
@@ -1850,14 +1850,14 @@ int process_description_tlv_tun6_adv(struct rx_frame_iterator *it)
 
 
 STATIC_FUNC
-int create_description_tlv_tunXin6_ingress_adv(struct tx_frame_iterator *it)
+int create_dsc_tlv_tunXin6ingress(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
         struct tun_in_node *tin;
         struct avl_node *an = NULL;
-        uint8_t isSrc4in6 = (it->frame_type == BMX_DSC_TLV_TUN4IN6_INGRESS_ADV);
+        uint8_t isSrc4in6 = (it->frame_type == BMX_DSC_TLV_TUN4IN6_INGRESS);
         uint16_t pos = 0;
-        uint16_t msg_size = isSrc4in6 ? sizeof (struct description_msg_tun4in6_ingress_adv) : sizeof (struct description_msg_tun6in6_ingress_adv);
+        uint16_t msg_size = isSrc4in6 ? sizeof (struct dsc_msg_tun4in6ingress) : sizeof (struct dsc_msg_tun6in6ingress);
 
 
         while ((tin = avl_iterate_item(&tun_in_tree, &an))) {
@@ -1869,8 +1869,8 @@ int create_description_tlv_tunXin6_ingress_adv(struct tx_frame_iterator *it)
                                 return TLV_TX_DATA_FULL;
                         }
 
-                        struct description_msg_tun6in6_ingress_adv *adv =
-                                (struct description_msg_tun6in6_ingress_adv *) (tx_iterator_cache_msg_ptr(it) + pos);
+                        struct dsc_msg_tun6in6ingress *adv =
+                                (struct dsc_msg_tun6in6ingress *) (tx_iterator_cache_msg_ptr(it) + pos);
 
                         adv->tun6Id = tin->tun6Id;
                         adv->ingressPrefixLen = tin->ingressPrefix46[isSrc4in6].mask;
@@ -1887,10 +1887,10 @@ int create_description_tlv_tunXin6_ingress_adv(struct tx_frame_iterator *it)
 }
 
 STATIC_FUNC
-int process_description_tlv_tunXin6_ingress_adv(struct rx_frame_iterator *it)
+int process_dsc_tlv_tunXin6ingress(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-        uint8_t isSrc4 = (it->frame_type == BMX_DSC_TLV_TUN4IN6_INGRESS_ADV);
+        uint8_t isSrc4 = (it->frame_type == BMX_DSC_TLV_TUN4IN6_INGRESS);
         uint16_t pos;
 
         if (it->op == TLV_OP_NEW) {
@@ -1904,8 +1904,8 @@ int process_description_tlv_tunXin6_ingress_adv(struct rx_frame_iterator *it)
         if (it->op == TLV_OP_TEST || it->op == TLV_OP_NEW) {
                 for (pos = 0; pos < it->frame_msgs_length; pos += it->handl->min_msg_size) {
 
-                        struct description_msg_tun6in6_ingress_adv *adv =
-                                (struct description_msg_tun6in6_ingress_adv *) (it->frame_data + pos);
+                        struct dsc_msg_tun6in6ingress *adv =
+                                (struct dsc_msg_tun6in6ingress *) (it->frame_data + pos);
                         struct tun_out_key key = set_tun_adv_key(it->on, adv->tun6Id);
                         struct tun_out_node *tun = avl_find_item(&tun_out_tree, &key);
                         IPX_T prefix = isSrc4 ? ip4ToX(*((IP4_T*) & adv->ingressPrefix)) : adv->ingressPrefix;
@@ -1928,7 +1928,7 @@ int process_description_tlv_tunXin6_ingress_adv(struct rx_frame_iterator *it)
 }
 
 STATIC_FUNC
-int create_description_tlv_tunXin6_src_adv(struct tx_frame_iterator *it)
+int create_dsc_tlv_tunXin6src(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
         return TLV_TX_DATA_IGNORED;
@@ -1936,14 +1936,14 @@ int create_description_tlv_tunXin6_src_adv(struct tx_frame_iterator *it)
 
 
 STATIC_FUNC
-int process_description_tlv_tunXin6_src_adv(struct rx_frame_iterator *it)
+int process_dsc_tlv_tunXin6src(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
         return it->frame_msgs_length;
 }
 
 STATIC_FUNC
-struct tun_in_node * set_tun6Id(char *tun_name, struct description_msg_tun6in6_net_adv *adv)
+struct tun_in_node * set_tun6Id(char *tun_name, struct dsc_msg_tun6in6net *adv)
 {
         struct tun_in_node * tun = NULL;
 
@@ -1972,11 +1972,11 @@ struct tun_in_node * set_tun6Id(char *tun_name, struct description_msg_tun6in6_n
 }
 
 STATIC_FUNC
-uint16_t create_description_tlv_tunXin6_net_adv_msg(struct tx_frame_iterator *it, struct description_msg_tun6in6_net_adv *adv, uint16_t m, char *tun_name)
+uint16_t create_description_tlv_tunXin6_net_adv_msg(struct tx_frame_iterator *it, struct dsc_msg_tun6in6net *adv, uint16_t m, char *tun_name)
 {
         TRACE_FUNCTION_CALL;
 
-        IDM_T is4in6 = (it->frame_type == BMX_DSC_TLV_TUN4IN6_NET_ADV) ? YES : NO;
+        IDM_T is4in6 = (it->frame_type == BMX_DSC_TLV_TUN4IN6_NET) ? YES : NO;
         struct tun_in_node *tun = set_tun6Id(tun_name, adv);
 
 
@@ -1989,8 +1989,8 @@ uint16_t create_description_tlv_tunXin6_net_adv_msg(struct tx_frame_iterator *it
 	if (tun && m < tx_iterator_cache_msg_space_pref(it)) {
 
 		if (is4in6) {
-			struct description_msg_tun4in6_net_adv *msg4 =
-			  &(((struct description_msg_tun4in6_net_adv *) tx_iterator_cache_msg_ptr(it))[m]);
+			struct dsc_msg_tun4in6net *msg4 =
+			  &(((struct dsc_msg_tun4in6net *) tx_iterator_cache_msg_ptr(it))[m]);
 
 
 			msg4->network = ipXto4(adv->network);
@@ -2000,7 +2000,7 @@ uint16_t create_description_tlv_tunXin6_net_adv_msg(struct tx_frame_iterator *it
 			msg4->tun6Id = adv->tun6Id;
 
                 } else {
-                        ((struct description_msg_tun6in6_net_adv *) tx_iterator_cache_msg_ptr(it))[m] = *adv;
+                        ((struct dsc_msg_tun6in6net *) tx_iterator_cache_msg_ptr(it))[m] = *adv;
                 }
 
 		m++;
@@ -2014,13 +2014,13 @@ uint16_t create_description_tlv_tunXin6_net_adv_msg(struct tx_frame_iterator *it
 }
 
 STATIC_FUNC
-int create_description_tlv_tunXin6_net_adv(struct tx_frame_iterator *it)
+int create_dsc_tlv_tunXin6net(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-        IDM_T is4in6 = (it->frame_type == BMX_DSC_TLV_TUN4IN6_NET_ADV) ? YES : NO;
+        IDM_T is4in6 = (it->frame_type == BMX_DSC_TLV_TUN4IN6_NET) ? YES : NO;
 	uint8_t af = is4in6 ? AF_INET : AF_INET6;
         uint16_t m = 0;
-        struct description_msg_tun6in6_net_adv adv;
+        struct dsc_msg_tun6in6net adv;
 	UMETRIC_T umax = UMETRIC_FM8_MAX;
 
 	struct tun_in_node *tin;
@@ -2111,14 +2111,14 @@ int create_description_tlv_tunXin6_net_adv(struct tx_frame_iterator *it)
 
         }
 
-        return m * (is4in6 ? sizeof (struct description_msg_tun4in6_net_adv) : sizeof (struct description_msg_tun6in6_net_adv));
+        return m * (is4in6 ? sizeof (struct dsc_msg_tun4in6net) : sizeof (struct dsc_msg_tun6in6net));
 }
 
 STATIC_FUNC
-int process_description_tlv_tunXin6_net_adv(struct rx_frame_iterator *it)
+int process_dsc_tlv_tunXin6net(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-        uint8_t family = it->frame_type == BMX_DSC_TLV_TUN4IN6_NET_ADV ? AF_INET : AF_INET6;
+        uint8_t family = it->frame_type == BMX_DSC_TLV_TUN4IN6_NET ? AF_INET : AF_INET6;
         uint16_t msg_size = it->handl->min_msg_size;
         uint16_t pos;
         static uint32_t tlv_new_counter = 0;
@@ -2138,7 +2138,7 @@ int process_description_tlv_tunXin6_net_adv(struct rx_frame_iterator *it)
 
                 for (pos = 0; pos < it->frame_msgs_length; pos += msg_size) {
 
-                        struct description_msg_tun6in6_net_adv *adv = (((struct description_msg_tun6in6_net_adv *) (it->frame_data + pos)));
+                        struct dsc_msg_tun6in6net *adv = (((struct dsc_msg_tun6in6net *) (it->frame_data + pos)));
                         struct net_key net;
                         IPX_T ipx = (family == AF_INET) ? ip4ToX(*((IP4_T*) & adv->network)) : adv->network;
                         setNet(&net, family, adv->networkLen, &ipx);
@@ -3428,13 +3428,13 @@ int32_t hna_init( void )
 
 
         memset( &tlv_handl, 0, sizeof(tlv_handl));
-        tlv_handl.min_msg_size = sizeof (struct description_msg_hna6);
+        tlv_handl.min_msg_size = sizeof (struct dsc_msg_hna6);
         tlv_handl.fixed_msg_size = 1;
 	tlv_handl.dextCompression = &hna6_fzip;
 	tlv_handl.dextReferencing = &hna6_fref;
         tlv_handl.name = "HNA6_EXTENSION";
-        tlv_handl.tx_frame_handler = create_description_tlv_hna;
-        tlv_handl.rx_frame_handler = process_description_tlv_hna;
+        tlv_handl.tx_frame_handler = create_dsc_tlv_hna;
+        tlv_handl.rx_frame_handler = process_dsc_tlv_hna;
         tlv_handl.msg_format = hna6_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_UHNA6, &tlv_handl);
 
@@ -3442,76 +3442,76 @@ int32_t hna_init( void )
 
 
         memset(&tlv_handl, 0, sizeof (tlv_handl));
-        tlv_handl.min_msg_size = sizeof (struct description_msg_tun6_adv);
+        tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun6);
         tlv_handl.fixed_msg_size = 1;
 	tlv_handl.dextCompression = &tun6_fzip;
 	tlv_handl.dextReferencing = &tun6_fref;
         tlv_handl.name = "TUN6_EXTENSION";
-        tlv_handl.tx_frame_handler = create_description_tlv_tun6_adv;
-        tlv_handl.rx_frame_handler = process_description_tlv_tun6_adv;
+        tlv_handl.tx_frame_handler = create_dsc_tlv_tun6;
+        tlv_handl.rx_frame_handler = process_dsc_tlv_tun6;
         tlv_handl.msg_format = tun6_adv_format;
-        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN6_ADV, &tlv_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN6, &tlv_handl);
 
 
         memset(&tlv_handl, 0, sizeof (tlv_handl));
-        tlv_handl.min_msg_size = sizeof (struct description_msg_tun4in6_ingress_adv);
+        tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun4in6ingress);
         tlv_handl.fixed_msg_size = 1;
         tlv_handl.name = "TUN4IN6_INGRESS_EXTENSION";
-        tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_ingress_adv;
-        tlv_handl.rx_frame_handler = process_description_tlv_tunXin6_ingress_adv;
+        tlv_handl.tx_frame_handler = create_dsc_tlv_tunXin6ingress;
+        tlv_handl.rx_frame_handler = process_dsc_tlv_tunXin6ingress;
         tlv_handl.msg_format = tun4in6_ingress_adv_format;
-        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN4IN6_INGRESS_ADV, &tlv_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN4IN6_INGRESS, &tlv_handl);
 
         memset(&tlv_handl, 0, sizeof (tlv_handl));
-        tlv_handl.min_msg_size = sizeof (struct description_msg_tun6in6_ingress_adv);
+        tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun6in6ingress);
         tlv_handl.fixed_msg_size = 1;
         tlv_handl.name = "TUN6IN6_INGRESS_EXTENSION";
-        tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_ingress_adv;
-        tlv_handl.rx_frame_handler = process_description_tlv_tunXin6_ingress_adv;
+        tlv_handl.tx_frame_handler = create_dsc_tlv_tunXin6ingress;
+        tlv_handl.rx_frame_handler = process_dsc_tlv_tunXin6ingress;
         tlv_handl.msg_format = tun6in6_ingress_adv_format;
-        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN6IN6_INGRESS_ADV, &tlv_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN6IN6_INGRESS, &tlv_handl);
 
 
         memset(&tlv_handl, 0, sizeof (tlv_handl));
-        tlv_handl.min_msg_size = sizeof (struct description_msg_tun4in6_src_adv);
+        tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun4in6src);
         tlv_handl.fixed_msg_size = 1;
         tlv_handl.name = "TUN4IN6_SRC_EXTENSION";
-        tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_src_adv;
-        tlv_handl.rx_frame_handler = process_description_tlv_tunXin6_src_adv;
+        tlv_handl.tx_frame_handler = create_dsc_tlv_tunXin6src;
+        tlv_handl.rx_frame_handler = process_dsc_tlv_tunXin6src;
         tlv_handl.msg_format = tun4in6_src_adv_format;
-        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN4IN6_SRC_ADV, &tlv_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN4IN6_SRC, &tlv_handl);
 
         memset(&tlv_handl, 0, sizeof (tlv_handl));
-        tlv_handl.min_msg_size = sizeof (struct description_msg_tun6in6_src_adv);
+        tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun6in6src);
         tlv_handl.fixed_msg_size = 1;
         tlv_handl.name = "TUN6IN6_SRC_EXTENSION";
-        tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_src_adv;
-        tlv_handl.rx_frame_handler = process_description_tlv_tunXin6_src_adv;
+        tlv_handl.tx_frame_handler = create_dsc_tlv_tunXin6src;
+        tlv_handl.rx_frame_handler = process_dsc_tlv_tunXin6src;
         tlv_handl.msg_format = tun6in6_src_adv_format;
-        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN6IN6_SRC_ADV, &tlv_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN6IN6_SRC, &tlv_handl);
 
 
         memset(&tlv_handl, 0, sizeof (tlv_handl));
-        tlv_handl.min_msg_size = sizeof (struct description_msg_tun4in6_net_adv);
+        tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun4in6net);
         tlv_handl.fixed_msg_size = 1;
 	tlv_handl.dextCompression = &tun6_fzip;
 	tlv_handl.dextReferencing = &tun6_fref;
         tlv_handl.name = "TUN4IN6_NET_EXTENSION";
-        tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_net_adv;
-        tlv_handl.rx_frame_handler = process_description_tlv_tunXin6_net_adv;
+        tlv_handl.tx_frame_handler = create_dsc_tlv_tunXin6net;
+        tlv_handl.rx_frame_handler = process_dsc_tlv_tunXin6net;
         tlv_handl.msg_format = tun4in6_adv_format;
-        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN4IN6_NET_ADV, &tlv_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN4IN6_NET, &tlv_handl);
 
         memset(&tlv_handl, 0, sizeof (tlv_handl));
-        tlv_handl.min_msg_size = sizeof (struct description_msg_tun6in6_net_adv);
+        tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun6in6net);
         tlv_handl.fixed_msg_size = 1;
 	tlv_handl.dextCompression = &tun6_fzip;
 	tlv_handl.dextReferencing = &tun6_fref;
         tlv_handl.name = "TUN6IN6_NET_EXTENSION";
-        tlv_handl.tx_frame_handler = create_description_tlv_tunXin6_net_adv;
-        tlv_handl.rx_frame_handler = process_description_tlv_tunXin6_net_adv;
+        tlv_handl.tx_frame_handler = create_dsc_tlv_tunXin6net;
+        tlv_handl.rx_frame_handler = process_dsc_tlv_tunXin6net;
         tlv_handl.msg_format = tun6in6_adv_format;
-        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN6IN6_NET_ADV, &tlv_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN6IN6_NET, &tlv_handl);
 
         register_options_array(hna_options, sizeof ( hna_options), CODE_CATEGORY_NAME);
 

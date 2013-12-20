@@ -617,13 +617,13 @@ struct msg_ref_req {
 #define BMX_DSC_TLV_UHNA6               0x09
 
 #define BMX_DSC_TLV_TUN6_MIN            0x10
-#define BMX_DSC_TLV_TUN6_ADV            0x11
-#define BMX_DSC_TLV_TUN4IN6_INGRESS_ADV 0x12
-#define BMX_DSC_TLV_TUN6IN6_INGRESS_ADV 0x13
-#define BMX_DSC_TLV_TUN4IN6_SRC_ADV     0x14
-#define BMX_DSC_TLV_TUN6IN6_SRC_ADV     0x15
-#define BMX_DSC_TLV_TUN4IN6_NET_ADV     0x16
-#define BMX_DSC_TLV_TUN6IN6_NET_ADV     0x17
+#define BMX_DSC_TLV_TUN6            0x11
+#define BMX_DSC_TLV_TUN4IN6_INGRESS 0x12
+#define BMX_DSC_TLV_TUN6IN6_INGRESS 0x13
+#define BMX_DSC_TLV_TUN4IN6_SRC     0x14
+#define BMX_DSC_TLV_TUN6IN6_SRC     0x15
+#define BMX_DSC_TLV_TUN4IN6_NET     0x16
+#define BMX_DSC_TLV_TUN6IN6_NET     0x17
 #define BMX_DSC_TLV_TUN6_MAX            0x17
 
 #define BMX_DSC_TLV_SMS                 0x1D
