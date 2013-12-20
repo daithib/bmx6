@@ -1077,10 +1077,10 @@ void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired)
 SHA1_T *nodeIdFromDescAdv( uint8_t *desc_adv )
 {
 	struct tlv_hdr tlvHdr = { .u.u16 = ntohs(((struct tlv_hdr*)desc_adv)->u.u16) };
-	struct desc_hdr_rhash_adv *rhashHdr = ((struct desc_hdr_rhash_adv*)(desc_adv + sizeof(struct tlv_hdr)));
+	struct desc_hdr_rhash *rhashHdr = ((struct desc_hdr_rhash*)(desc_adv + sizeof(struct tlv_hdr)));
 
-	assertion( -500000, (tlvHdr.u.tlv.type == BMX_DSC_TLV_RHASH_ADV ));
-	assertion( -500000, (tlvHdr.u.tlv.length == sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash_adv) + sizeof(struct desc_msg_rhash_adv) ));
+	assertion( -500000, (tlvHdr.u.tlv.type == BMX_DSC_TLV_RHASH ));
+	assertion( -500000, (tlvHdr.u.tlv.length == sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) ));
 	assertion( -500000, (!rhashHdr->compression && !rhashHdr->reserved && rhashHdr->expanded_type == BMX_DSC_TLV_PUBKEY));
 
 	return &rhashHdr->msg->rframe_hash;

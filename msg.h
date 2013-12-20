@@ -60,8 +60,8 @@
 //#define MAX_VRT_DESC_SIZE      (INT32_MAX)
 // this should be the max possible with a reference depth of 1 :
 #define MAX_VRT_DESC_SIZE      (((MAX_DESC_SIZE - sizeof(struct dsc_msg_description)) - \
-                                 (5 * (sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash_adv)) )) / \
-			        sizeof(struct desc_msg_rhash_adv)) \
+                                 (5 * (sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash)) )) / \
+			        sizeof(struct desc_msg_rhash)) \
 			       * \
 			       (DEF_DESC_SIZE - sizeof(struct frame_hdr_rhash_adv))
 
@@ -335,12 +335,12 @@ struct ilv_hdr { // 1 bytes
 
 
 // for BMX_DSC_TLV_RHASH_ADV:
-struct desc_msg_rhash_adv {
+struct desc_msg_rhash {
     SHA1_T rframe_hash;       // hash over full frame (including frame-header and data) as transmitted
 } __attribute__((packed));
 
 
-struct desc_hdr_rhash_adv {
+struct desc_hdr_rhash {
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 	unsigned int reserved :      1;
 	unsigned int compression :   2; // 0:= NO compresson, 1:= gzip compression, 2-7:=reserved; only data field is compressed
@@ -353,7 +353,7 @@ struct desc_hdr_rhash_adv {
 #else
 # error "Please fix <bits/endian.h>"
 #endif
-    struct   desc_msg_rhash_adv msg[];
+    struct   desc_msg_rhash msg[];
 } __attribute__((packed));
 
 
@@ -375,12 +375,12 @@ struct frame_hdr_rhash_adv {
 #else
 # error "Please fix <bits/endian.h>"
 #endif
-    struct   desc_msg_rhash_adv msg[];
+    struct   frame_msg_rhash_adv msg[];
 } __attribute__((packed));
 
 
 
-#define MSG_RHASH_ADV_FORMAT { \
+#define MSG_RHASH_FORMAT { \
 {FIELD_TYPE_STRING_BINARY, -1, 160, 1, FIELD_RELEVANCE_LOW,  "rframe_hash"},  \
 	FIELD_FORMAT_END }
 
@@ -605,7 +605,7 @@ struct msg_ref_req {
 
 
 
-#define BMX_DSC_TLV_RHASH_ADV           0x00
+#define BMX_DSC_TLV_RHASH           0x00
 #define BMX_DSC_TLV_PUBKEY              0x01
 #define BMX_DSC_TLV_SIGNATURE           0x02
 #define BMX_DSC_TLV_DESCRIPTION         0x03
