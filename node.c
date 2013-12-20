@@ -694,7 +694,7 @@ IDM_T update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
         TRACE_FUNCTION_CALL;
         struct local_node *local = pb->i.link->local;
 
-        dbgf_all(DBGT_INFO, "local_id=0x%X  dhn->id=%s", local->local_id, nodeIdAsStringFromDescAdv(dhn->on->desc_frame));
+        dbgf_all(DBGT_INFO, "local_id=0x%X  dhn->id=%s", local->local_id, cryptShaAsString(&dhn->on->nodeId));
 
         assertion(-500517, (dhn != self->dhn));
         ASSERTION(-500392, (pb->i.link == avl_find_item(&local->link_tree, &pb->i.link->key.dev_idx)));
@@ -707,7 +707,7 @@ IDM_T update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
 
                 dbgf_track(DBGT_INFO, "CHANGED link=%s -> LOCAL=%d->%d <- neighIID4me=%d <- dhn->id=%s",
                         pb->i.llip_str, dhn->neigh->local->local_id, local->local_id, dhn->neigh->neighIID4me,
-                        nodeIdAsStringFromDescAdv(dhn->on->desc_frame));
+                        cryptShaAsString(&dhn->on->nodeId));
 
                 dhn->neigh->local->neigh = NULL;
                 local->neigh = dhn->neigh;
@@ -722,7 +722,7 @@ IDM_T update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
 
                 dbgf_track(DBGT_INFO, "NEW link=%s <-> LOCAL=%d <-> NEIGHIID4me=%d <-> dhn->id=%s",
                         pb->i.llip_str, local->local_id, local->neigh->neighIID4me,
-                        nodeIdAsStringFromDescAdv(dhn->on->desc_frame));
+                        cryptShaAsString(&dhn->on->nodeId));
 
                 goto update_local_neigh_success;
 
@@ -747,7 +747,7 @@ IDM_T update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
         dbgf_sys(DBGT_ERR, "NONMATCHING local=%d <- neighIID4me=%d <- DHN=%s",
 		dhn->neigh && dhn->neigh->local ? dhn->neigh->local->local_id : 0,
 		dhn->neigh ? dhn->neigh->neighIID4me : 0,
-		nodeIdAsStringFromDescAdv(dhn->on->desc_frame));
+		cryptShaAsString(&dhn->on->nodeId));
 
         if (dhn->neigh)
                 free_neigh_node(dhn->neigh);
