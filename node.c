@@ -498,26 +498,6 @@ struct neigh_node *is_described_neigh( struct link_node *link, IID_T transmitter
 
 
 STATIC_FUNC
-struct dhash_node* create_dhash_node(DHASH_T *dhash, struct orig_node *on)
-{
-        TRACE_FUNCTION_CALL;
-
-        struct dhash_node * dhn = debugMallocReset(sizeof ( struct dhash_node), -300001);
-        dhn->dhash = *dhash;
-        avl_insert(&dhash_tree, dhn, -300142);
-
-        dhn->myIID4orig = iid_new_myIID4x(dhn);
-
-        on->updated_timestamp = bmx_time;
-        dhn->on = on;
-        on->dhn = dhn;
-
-        dbgf_track(DBGT_INFO, "dhash %8X.. myIID4orig %d", dhn->dhash.h.u32[0], dhn->myIID4orig);
-
-        return dhn;
-}
-
-STATIC_FUNC
 void purge_dhash_iid(IID_T myIID4orig)
 {
         TRACE_FUNCTION_CALL;
@@ -616,6 +596,26 @@ void free_dhash_node( struct dhash_node *dhn )
 }
 
 
+
+STATIC_FUNC
+struct dhash_node* create_dhash_node(DHASH_T *dhash, struct orig_node *on)
+{
+        TRACE_FUNCTION_CALL;
+
+        struct dhash_node * dhn = debugMallocReset(sizeof ( struct dhash_node), -300001);
+        dhn->dhash = *dhash;
+        avl_insert(&dhash_tree, dhn, -300142);
+
+        dhn->myIID4orig = iid_new_myIID4x(dhn);
+
+        on->updated_timestamp = bmx_time;
+        dhn->on = on;
+        on->dhn = dhn;
+
+        dbgf_track(DBGT_INFO, "dhash %8X.. myIID4orig %d", dhn->dhash.h.u32[0], dhn->myIID4orig);
+
+        return dhn;
+}
 
 
 void update_neigh_dhash(struct orig_node *on, DHASH_T *dhash)
@@ -1002,7 +1002,7 @@ void free_orig_node(struct orig_node *on)
 
         if (on->added) {
 		assertion(-500000, (on->desc_frame));
-                process_description_tlvs(NULL, on, on->desc_frame, on->desc_frame_len, on->dext, TLV_OP_DEL, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
+                process_description_tlvs(NULL, on, on->desc_frame, on->desc_frame_len, on->dext, TLV_OP_DEL, FRAME_TYPE_PROCESS_ALL);
         }
 
         if ( on->dhn ) {
@@ -1341,13 +1341,13 @@ void node_tasks(void) {
 
 		assertion(-501351, (on->blocked && !on->added));
 
-		IDM_T tlvs_res = process_description_tlvs(NULL, on, on->desc_frame, on->desc_frame_len, on->dext, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
+		IDM_T tlvs_res = process_description_tlvs(NULL, on, on->desc_frame, on->desc_frame_len, on->dext, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL);
 
 		if (tlvs_res == TLV_RX_DATA_DONE) {
 
 			cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, on);
 
-			tlvs_res = process_description_tlvs(NULL, on, on->desc_frame, on->desc_frame_len, on->dext, TLV_OP_NEW, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
+			tlvs_res = process_description_tlvs(NULL, on, on->desc_frame, on->desc_frame_len, on->dext, TLV_OP_NEW, FRAME_TYPE_PROCESS_ALL);
 
 			assertion(-500364, (tlvs_res == TLV_RX_DATA_DONE)); // checked, so MUST SUCCEED!!
 

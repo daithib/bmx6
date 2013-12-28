@@ -152,7 +152,7 @@ void dump(struct packet_buff *pb)
 
 
         struct rx_frame_iterator it = {
-                .caller = __FUNCTION__, .on = NULL, .cn = NULL, .op = 0, .pb = NULL,
+                .caller = __FUNCTION__, .on = NULL, .op = 0, .pb = NULL,
                 .db = packet_frame_db, .process_filter = FRAME_TYPE_PROCESS_NONE,
                 .frame_type = -1, .frames_in = (((uint8_t*) phdr) + sizeof (struct packet_header)),
                 .frames_length = (plength - sizeof (struct packet_header)), .frames_pos = 0, .dext = 0

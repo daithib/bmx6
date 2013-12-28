@@ -280,7 +280,7 @@ struct description_cache_node *purge_cached_descriptions(IDM_T purge_all)
                 if (purge_all || ((TIME_T) (bmx_time - dcn->timestamp)) > DEF_DESC0_CACHE_TO) {
 
                         avl_remove(&description_cache_tree, &dcn->dhash, -300208);
-                        debugFree(dcn->desc, -300100);
+                        debugFree(dcn->desc_frame, -300100);
                         debugFree(dcn, -300101);
 
                 } else {
@@ -318,15 +318,15 @@ void cache_description(uint8_t *desc, uint16_t desc_len, DHASH_T *dhash)
 
                 if (description_cache_tree.items == DEF_DESC0_CACHE_SIZE) {
                         avl_remove(&description_cache_tree, &dcn_min->dhash, -300209);
-                        debugFree(dcn_min->desc, -300102);
+                        debugFree(dcn_min->desc_frame, -300102);
                         debugFree(dcn_min, -300103);
                 }
         }
 
         dcn = debugMalloc(sizeof ( struct description_cache_node), -300104);
-        dcn->desc = debugMalloc(desc_len, -300105);
-	dcn->desc_len = desc_len;
-        memcpy(dcn->desc, desc, desc_len);
+        dcn->desc_frame = debugMalloc(desc_len, -300105);
+	dcn->desc_frame_len = desc_len;
+        memcpy(dcn->desc_frame, desc, desc_len);
         dcn->dhash = *dhash;
         dcn->timestamp = bmx_time;
         avl_insert(&description_cache_tree, dcn, -300145);
@@ -334,7 +334,7 @@ void cache_description(uint8_t *desc, uint16_t desc_len, DHASH_T *dhash)
 
 
 IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, uint8_t *dsc_frame, uint16_t dsc_frame_len,
-	struct desc_extension *dext, uint8_t op, uint8_t filter, void *custom, struct ctrl_node *cn)
+	struct desc_extension *dext, uint8_t op, uint8_t filter)
 {
         TRACE_FUNCTION_CALL;
         assertion(-500370, (op == TLV_OP_DEL || op == TLV_OP_TEST || op == TLV_OP_NEW || op == TLV_OP_DEBUG ||
@@ -348,14 +348,14 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, uin
 
         int32_t tlv_result;
 	int8_t blocked = NO;
-
+	struct frame_db *db = description_tlv_db;
         struct rx_frame_iterator it = {
-                .caller = __FUNCTION__, .on = on, .cn = cn, .op = op, .pb = pb, .dsc_frame = dsc_frame, .dsc_frame_len=dsc_frame_len,
-                .db = description_tlv_db, .process_filter = filter,
-                .frame_type    = (filter==FRAME_TYPE_PROCESS_ALL ? -1 : filter-1),
-		.frames_length = (filter==FRAME_TYPE_PROCESS_ALL ? dext->dlen : dext->dtd[filter].len),
-		.frames_in     = (filter==FRAME_TYPE_PROCESS_ALL ? dext->data : dext_dptr(dext, filter)),
-		.custom_data = custom, .dext = dext
+                .caller = __FUNCTION__, .op = op, .pb = pb, .db = db, .process_filter = filter,
+		.on = on, .dsc_frame = dsc_frame, .dsc_frame_len=dsc_frame_len, .dext = dext,
+                .frame_type    = (filter<=db->handl_max ? -1 : filter-1),
+		.frames_length = (filter<=db->handl_max ? dext->dlen : dext->dtd[filter].len),
+		.frames_in     = (filter<=db->handl_max ? dext->data : dext_dptr(dext, filter))
+		
         };
 
         dbgf_track(DBGT_INFO, "op=%s nodeId=%s size=%d, filter=%d",
@@ -377,8 +377,8 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, uin
 
                 assertion(-501355, (op == TLV_OP_TEST));
 
-                dbgf_sys(DBGT_WARN, "problematic description_ltv from %s, near type=%s frame_data_length=%d  pos=%d %s",
-                        pb ? pb->i.llip_str : DBG_NIL, description_tlv_db->handls[it.frame_type].name,
+                dbgf_sys(DBGT_WARN, "problematic description_ltv from %s, near type=%d=%s frame_data_length=%d  pos=%d %s",
+                        pb ? pb->i.llip_str : DBG_NIL, it.frame_type, (((uint8_t)it.frame_type) <= db->handl_max) ? db->handls[it.frame_type].name : "",
                         it.frame_data_length, it.frames_pos, blocked ? "BLOCKED" : "", tlv_result==TLV_RX_DATA_FAILURE ? "FAILURE" : "");
 
 		if (tlv_result==TLV_RX_DATA_FAILURE)
@@ -1517,11 +1517,7 @@ int32_t create_dsc_tlv_description(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	IDM_T TODO;
-/*
-
-        // put obligatory stuff:
-        memset(dsc, 0, sizeof (struct description));
+	struct dsc_msg_description *dsc = (struct dsc_msg_description *)tx_iterator_cache_msg_ptr(it);
 
         // add some randomness to the ogm_sqn_range, that not all nodes invalidate at the same time:
         int32_t random_range = first_packet ? rand_num(ogmSqnRange) :
@@ -1542,13 +1538,11 @@ int32_t create_dsc_tlv_description(struct tx_frame_iterator *it)
         dsc->capabilities = htons(my_desc_capabilities);
 
         uint32_t rev_u32;
-        sscanf(GIT_REV, "%4X", &rev_u32);
-        dsc->revision = htons(rev_u32);
+        sscanf(GIT_REV, "%8X", &rev_u32);
+        dsc->revision = htonl(rev_u32);
         dsc->comp_version = my_compatibility;
         dsc->descSqn = getDescriptionSqn( NULL, 1);
 
-
- */
 	return sizeof(struct dsc_msg_description);
 }
 
@@ -1556,42 +1550,66 @@ STATIC_FUNC
 int32_t process_dsc_tlv_description(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-	IDM_T TODO;
-/*
-	assertion(-500000, IMPLIES(on && cache->desc->descSqn==on->desc->descSqn, !on->added));
-        if ( on && ntohl(cache->desc->descSqn) < ntohl(on->desc->descSqn) ) {
 
-		dbgf_sys(DBGT_WARN, "IGNORED rcvd descSqn=%d (current descSqn=%d) from global_id=%s via_dev=%s via_ip=%s",
-			ntohl(cache->desc->descSqn), ntohl(on->desc->descSqn),
-			cryptShaAsString(&cache->desc->globalId), pb->i.iif->label_cfg.str, pb->i.llip_str);
+	if (it->op != TLV_OP_TEST && it->op != TLV_OP_NEW)
+		return it->frame_data_length;
 
-		invalidate_dhash(NULL, dhash);
+	struct dsc_msg_description *old = it->on ? dext_dptr(it->on->dext, BMX_DSC_TLV_DESCRIPTION) : NULL;
+	struct dsc_msg_description *new = (struct dsc_msg_description*)it->frame_data;
 
-		return (struct dhash_node *) IGNORED_PTR;
+        if ( old && ntohl(old->descSqn) >= ntohl(new->descSqn) ) {
+
+		dbgf_sys(DBGT_WARN, "IGNORED rcvd descSqn=%d (current descSqn=%d) from nodeId=%s via dev=%s ip=%s",
+			ntohl(new->descSqn), ntohl(old->descSqn), nodeIdAsStringFromDescAdv(it->dsc_frame),
+			it->pb->i.iif->label_cfg.str, it->pb->i.llip_str);
+
+		IDM_T TODO;
+		//invalidate_dhash(NULL, dhash);
+
+		return TLV_RX_DATA_IGNORED;
 	}
 
-         if (validate_name_string(desc->globalId.name, GLOBAL_ID_NAME_LEN, NULL) == FAILURE) {
+        if (validate_param(new->comp_version, my_compatibility>=CV17?(my_compatibility-1):0, (my_compatibility+1), "compatibilty version"))
+		return TLV_RX_DATA_IGNORED;
+	
+	if (validate_param(ntohs(new->ogmSqnRange), _MIN_OGM_SQN_RANGE, _MAX_OGM_SQN_RANGE, ARG_OGM_SQN_RANGE))
+		return TLV_RX_DATA_FAILURE;
+
+	if (it->op == TLV_OP_NEW) {
+
+		struct orig_node *on = it->on;
+		on->updated_timestamp = bmx_time;
+		on->ogmSqn_rangeMin = ntohs(new->ogmSqnMin);
+		on->ogmSqn_rangeSize = ntohs(new->ogmSqnRange);
+		on->ogmSqn_maxRcvd = (OGM_SQN_MASK & (on->ogmSqn_rangeMin - OGM_SQN_STEP));
+		set_ogmSqn_toBeSend_and_aggregated(on, on->ogmMetric_next, on->ogmSqn_maxRcvd, on->ogmSqn_maxRcvd);
+	}
+	
+	return sizeof(struct dsc_msg_description);
+}
+
+STATIC_FUNC
+int32_t create_dsc_tlv_node(struct rx_frame_iterator *it)
+{
+        TRACE_FUNCTION_CALL;
+	IDM_T TODO;
+	return TLV_TX_DATA_IGNORED;
+}
+
+STATIC_FUNC
+int32_t process_dsc_tlv_node(struct rx_frame_iterator *it)
+{
+        TRACE_FUNCTION_CALL;
+	IDM_T TODO;
+	/*
+	if (validate_name_string(desc->globalId.name, GLOBAL_ID_NAME_LEN, NULL) == FAILURE) {
 
                 dbg_sys(DBGT_ERR, "illegal hostname=%s ", cryptShaAsString(&desc->globalId));
 		goto validate_desc_structure_failure;
         }
+	 */
 
-        if (
-                validate_param(desc->comp_version, my_compatibility>=CV17?(my_compatibility-1):0, (my_compatibility+1), "compatibilty version") ||
-                validate_param(ntohs(desc->ogmSqnRange), _MIN_OGM_SQN_RANGE, _MAX_OGM_SQN_RANGE, ARG_OGM_SQN_RANGE) ||
-                0
-                ) {
-
-		goto validate_desc_structure_failure;
-        }
-
-        on->updated_timestamp = bmx_time;
-        on->ogmSqn_rangeMin = ntohs(cache->desc->ogmSqnMin);
-        on->ogmSqn_rangeSize = ntohs(cache->desc->ogmSqnRange);
-        on->ogmSqn_maxRcvd = (OGM_SQN_MASK & (on->ogmSqn_rangeMin - OGM_SQN_STEP));
-        set_ogmSqn_toBeSend_and_aggregated(on, on->ogmMetric_next, on->ogmSqn_maxRcvd, on->ogmSqn_maxRcvd);
-*/
-	return sizeof(struct dsc_msg_description);
+	return TLV_RX_DATA_IGNORED;
 }
 
 STATIC_FUNC
@@ -2666,7 +2684,7 @@ struct dhash_node *process_dhash_description_neighIID4x
 (struct packet_buff *pb, DHASH_T *dhash, uint8_t* dsc, uint16_t desc_len, IID_T neighIID4x)
 {
         TRACE_FUNCTION_CALL;
-        struct dhash_node *odhn = NULL;
+        struct dhash_node *dhn = NULL;
         struct local_node *local = pb->i.link->local;
         struct description_cache_node *cache = NULL;
         IDM_T is_transmitters_iid = neighIID4x > IID_RSVD_MAX && neighIID4x == pb->i.transmittersIID;
@@ -2675,16 +2693,16 @@ struct dhash_node *process_dhash_description_neighIID4x
         assertion(-500689, (!(is_transmitters_iid && !memcmp(dhash, &(self->dhn->dhash), sizeof(*dhash))))); // cant be transmitters' and myselfs'
         assertion(-500000, (!avl_find(&dhash_invalid_tree, dhash)));
 
-        if ((odhn = avl_find_item(&dhash_tree, dhash))) {
+        if ((dhn = avl_find_item(&dhash_tree, dhash))) {
                 // is about a known dhash:
                 
                 if (is_transmitters_iid) {
                         // is about the transmitter:
 
-                        if (update_local_neigh(pb, odhn) == FAILURE)
+                        if (update_local_neigh(pb, dhn) == FAILURE)
                                 return (struct dhash_node *) FAILURE_PTR;
 
-                        if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, odhn->myIID4orig) == FAILURE)
+                        if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
                                 return (struct dhash_node *) FAILURE_PTR;
 
                         assertion(-500968, (is_described_neigh(pb->i.link, pb->i.transmittersIID)));
@@ -2692,18 +2710,18 @@ struct dhash_node *process_dhash_description_neighIID4x
                 } else if (neighIID4x > IID_RSVD_MAX && local->neigh) {
                         // received via a known neighbor, and is NOT about the transmitter:
 
-                        if (odhn == self->dhn) {
+                        if (dhn == self->dhn) {
                                 // is about myself:
 
                                 dbgf_all(DBGT_INFO, "msg refers myself via %s neighIID4me %d", pb->i.llip_str, neighIID4x);
 
                                 local->neigh->neighIID4me = neighIID4x;
 
-                        } else if (odhn == local->neigh->dhn && !is_transmitters_iid) {
+                        } else if (dhn == local->neigh->dhn && !is_transmitters_iid) {
                                 // is about a neighbors' dhash itself which is NOT the transmitter ???!!!
 
                                 dbgf_sys(DBGT_ERR, "%s via %s neighIID4x=%d IS NOT transmitter=%d",
-                                        cryptShaAsString(&odhn->on->nodeId), pb->i.llip_str, neighIID4x, pb->i.transmittersIID);
+                                        cryptShaAsString(&dhn->on->nodeId), pb->i.llip_str, neighIID4x, pb->i.transmittersIID);
 
                                 return (struct dhash_node *) FAILURE_PTR;
 
@@ -2711,7 +2729,7 @@ struct dhash_node *process_dhash_description_neighIID4x
                                 // is about.a another dhash known by me and a (neighboring) transmitter..:
                         }
 
-                        if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, odhn->myIID4orig) == FAILURE)
+                        if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
                                 return (struct dhash_node *) FAILURE_PTR;
                 }
 
@@ -2723,33 +2741,33 @@ struct dhash_node *process_dhash_description_neighIID4x
 
 		if (((is_transmitters_iid || local->neigh) ) &&
 			(cache = get_cached_description(dhash)) &&
-			(odhn = process_description(pb, cache, dhash)) &&
-			odhn != FAILURE_PTR && odhn != UNRESOLVED_PTR && odhn != IGNORED_PTR) {
+			(dhn = process_description(pb, cache, dhash)) &&
+			dhn != FAILURE_PTR && dhn != UNRESOLVED_PTR && dhn != IGNORED_PTR) {
 
 			if (is_transmitters_iid &&
 				//is about the transmitter  and  a description + dhash is known
-				update_local_neigh(pb, odhn) == FAILURE)
+				update_local_neigh(pb, dhn) == FAILURE)
 				return(struct dhash_node *) FAILURE_PTR;
 
 			if (neighIID4x > IID_RSVD_MAX &&
-				iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, odhn->myIID4orig) == FAILURE)
+				iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
 				return(struct dhash_node *) FAILURE_PTR;
 
 			assertion(-500969, IMPLIES(is_transmitters_iid, is_described_neigh(pb->i.link, pb->i.transmittersIID)));
-			assertion(-501587, odhn);
+			assertion(-501587, dhn);
 		}
         }
 
 	dbgf_track(DBGT_INFO, "via dev=%s NB=%s dhash=%8X.. %s %s %s neighIID4x=%d is_sender=%d %s",
                 pb->i.iif->label_cfg.str, pb->i.llip_str, dhash->h.u32[0],
                 (dsc ? nodeIdAsStringFromDescAdv(dsc) : "NO DESCRIPTION"), (cache ? "CACHED" : "-"),
-                (odhn?(odhn==FAILURE_PTR?"FAILURE":
-                        (odhn==UNRESOLVED_PTR?"UNRESOLVED":(odhn==IGNORED_PTR?"IGNORED":"RESOLVED"))):"UNKNOWN"),
+                (dhn?(dhn==FAILURE_PTR?"FAILURE":
+                        (dhn==UNRESOLVED_PTR?"UNRESOLVED":(dhn==IGNORED_PTR?"IGNORED":"RESOLVED"))):"UNKNOWN"),
                 neighIID4x, is_transmitters_iid,
-		(odhn && odhn!=FAILURE_PTR && odhn!=UNRESOLVED_PTR && odhn!=IGNORED_PTR && odhn->on ?
-			cryptShaAsString(&odhn->on->nodeId) : DBG_NIL));
+		(dhn && dhn!=FAILURE_PTR && dhn!=UNRESOLVED_PTR && dhn!=IGNORED_PTR && dhn->on ?
+			cryptShaAsString(&dhn->on->nodeId) : DBG_NIL));
 
-        return odhn;
+        return dhn;
 }
 
 
@@ -3038,7 +3056,7 @@ void process_description_tlvs_del( struct orig_node *on, uint8_t ft_start, uint8
 			continue;
 		
 		if (on->dext->dtd[t].len) {
-			int tlv_result = process_description_tlvs(NULL, on, on->desc_frame, on->desc_frame_len, on->dext, TLV_OP_DEL, t, NULL, NULL);
+			int tlv_result = process_description_tlvs(NULL, on, on->desc_frame, on->desc_frame_len, on->dext, TLV_OP_DEL, t);
 			assertion(-501360, (tlv_result == TLV_RX_DATA_DONE));
 		}
 	}
@@ -3275,7 +3293,7 @@ IDM_T rx_frames(struct packet_buff *pb)
         int32_t it_result;
 	struct packet_header *phdr = (struct packet_header *)pb->packet.data;
         struct rx_frame_iterator it = {
-                .caller = __FUNCTION__, .on = NULL, .cn = NULL, .op = 0, .pb = pb,
+                .caller = __FUNCTION__, .on = NULL, .op = 0, .pb = pb,
                 .db = packet_frame_db, .process_filter = FRAME_TYPE_PROCESS_ALL,
                 .frame_type = -1, .frames_in = (pb->packet.data + sizeof (struct packet_header)),
                 .frames_length = (ntohs(phdr->pkt_length) - sizeof (struct packet_header)),
@@ -3701,7 +3719,7 @@ int32_t rx_tlv_frame(struct rx_frame_iterator *in)
 
         int32_t result;
         struct rx_frame_iterator out = {
-                .caller = in->caller, .on = NULL, .cn = in->cn, .op = in->op, .pb = in->pb,
+                .caller = in->caller, .on = NULL, .op = in->op, .pb = in->pb,
                 .db = in->handl->next_db, .process_filter = in->process_filter,
                 .frame_type = -1, .frames_in = in->frame_data, .frames_length = in->frame_data_length,
 		.dext = NULL
@@ -4070,14 +4088,14 @@ struct desc_extension * dext_resolve(struct packet_buff *pb, struct description_
         TRACE_FUNCTION_CALL;
 	assertion(-501655, (BMX_DSC_TLV_INVALID > BMX_DSC_TLV_MAX && BMX_DSC_TLV_INVALID <= UINT8_MAX));
 
-	uint8_t *data = (((uint8_t*) cache->desc) + sizeof(struct dsc_msg_description));
-	uint32_t dlen = cache->desc_len - sizeof(struct dsc_msg_description);
+	uint8_t *data = (((uint8_t*) cache->desc_frame) + sizeof(struct dsc_msg_description));
+	uint32_t dlen = cache->desc_frame_len - sizeof(struct dsc_msg_description);
 	IDM_T unresolved = 0;
 	uint8_t dsc_frame_types[BMX_DSC_TLV_ARRSZ] = {0};
 	int32_t tlv_result;
 
         struct rx_frame_iterator it = {
-                .caller = __FUNCTION__, .on = NULL, .cn = NULL, .op = TLV_OP_PLUGIN_MIN,
+                .caller = __FUNCTION__, .on = NULL, .op = TLV_OP_PLUGIN_MIN,
                 .db = description_tlv_db, .process_filter = FRAME_TYPE_PROCESS_NONE,
                 .frame_type = -1,.frames_in = data, .frames_length = dlen, .dext = 0 };
 
@@ -4321,7 +4339,7 @@ resolve_ref_frame_error:
 struct dhash_node * process_description(struct packet_buff *pb, struct description_cache_node *cache, DHASH_T *dhash)
 {
         TRACE_FUNCTION_CALL;
-        assertion(-500262, (pb && pb->i.link && cache && cache->desc));
+        assertion(-500262, (pb && pb->i.link && cache && cache->desc_frame));
         assertion(-500381, (!avl_find( &dhash_tree, dhash )));
 	
 	// First check if dext is fully resolvable::
@@ -4334,7 +4352,7 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
         } else if (dext == UNRESOLVED_PTR) {
 		
 		dbgf_sys(DBGT_WARN, "UNRESOLVED global_id=%s rcvd via_dev=%s via_ip=%s",
-			cache ? nodeIdAsStringFromDescAdv(cache->desc) : "???", pb->i.iif->label_cfg.str, pb->i.llip_str);
+			nodeIdAsStringFromDescAdv(cache->desc_frame), pb->i.iif->label_cfg.str, pb->i.llip_str);
 
 		return (struct dhash_node *) UNRESOLVED_PTR;
 		
@@ -4350,10 +4368,10 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 		cleanup_all(-500000);
 	}
 	
-	struct orig_node *on = avl_find_item(&orig_tree, nodeIdFromDescAdv(cache->desc));
+	struct orig_node *on = avl_find_item(&orig_tree, nodeIdFromDescAdv(cache->desc_frame));
 	assertion(-500000, IMPLIES(on, on->desc_frame && on->dext));
 
-	int32_t tlv_result = process_description_tlvs(pb, on, cache->desc, cache->desc_len, dext, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
+	int32_t tlv_result = process_description_tlvs(pb, on, cache->desc_frame, cache->desc_frame_len, dext, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL);
 
 	assertion( -500000, (tlv_result==TLV_RX_DATA_BLOCKED || tlv_result==TLV_RX_DATA_DONE || tlv_result==TLV_RX_DATA_FAILURE));
 
@@ -4364,7 +4382,7 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 	IDM_T TODO;
 
         if (!on) // create new orig:
-                on = init_orig_node(nodeIdFromDescAdv(cache->desc));
+                on = init_orig_node(nodeIdFromDescAdv(cache->desc_frame));
 
 
         if (on->desc_frame)
@@ -4376,7 +4394,7 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
         if (tlv_result == TLV_RX_DATA_DONE) {
 
 		block_orig_node(NO, on);
-                tlv_result = process_description_tlvs(pb, on, cache->desc, cache->desc_len, dext, TLV_OP_NEW, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
+                tlv_result = process_description_tlvs(pb, on, cache->desc_frame, cache->desc_frame_len, dext, TLV_OP_NEW, FRAME_TYPE_PROCESS_ALL);
                 assertion(-501362, (tlv_result == TLV_RX_DATA_DONE)); // checked, so MUST SUCCEED!!
                 assertion(-501363, (on->blocked != on->added));
 
@@ -4384,12 +4402,12 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 
                 if (on->added) {
 			assertion(-500000, (on->desc_frame));
-                        tlv_result = process_description_tlvs(pb, on, on->desc_frame, on->desc_frame_len, on->dext, TLV_OP_DEL, FRAME_TYPE_PROCESS_ALL, NULL, NULL);
+                        tlv_result = process_description_tlvs(pb, on, on->desc_frame, on->desc_frame_len, on->dext, TLV_OP_DEL, FRAME_TYPE_PROCESS_ALL);
                         assertion(-501364, (tlv_result == TLV_RX_DATA_DONE));
 			assertion(-500000, (on->blocked && !on->added));
                 }
-		block_orig_node(YES, on);
 
+		block_orig_node(YES, on);
         }
 
 
@@ -4404,8 +4422,8 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
         on->dext = dext;
 	dext = NULL;
 
-        on->desc_frame = cache->desc;
-	on->desc_frame_len = cache->desc_len;
+        on->desc_frame = cache->desc_frame;
+	on->desc_frame_len = cache->desc_frame_len;
         del_cached_description(dhash);
 
 
@@ -4428,7 +4446,7 @@ process_desc0_error:
 		dext_free(&dext);
 
 	dbgf_sys(DBGT_ERR, "FAILED global_id=%s rcvd via_dev=%s via_ip=%s",
-		cache ? nodeIdAsStringFromDescAdv(cache->desc) : "???", pb->i.iif->label_cfg.str, pb->i.llip_str);
+		cache ? nodeIdAsStringFromDescAdv(cache->desc_frame) : "???", pb->i.iif->label_cfg.str, pb->i.llip_str);
 
         blacklist_neighbor(pb);
 
@@ -4577,7 +4595,7 @@ int32_t opt_show_descriptions(uint8_t cmd, uint8_t _save, struct opt_type *opt,
                         debugFree(desc_buff, -300362);
 
                         struct rx_frame_iterator it = {
-                                .caller = __FUNCTION__, .on = on, .cn = cn, .op = TLV_OP_PLUGIN_MIN,
+                                .caller = __FUNCTION__, .on = on, .op = TLV_OP_PLUGIN_MIN,
                                 .db = description_tlv_db, .process_filter = type_filter,
                                 .frame_type = -1, .frames_in = on->dext->data, .frames_length = on->dext->dlen, 
 				.dext = on->dext };

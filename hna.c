@@ -3345,7 +3345,7 @@ void hna_route_change_hook(uint8_t del, struct orig_node *on)
                 return;
 
         process_description_tlvs(NULL, on, on->desc_frame, on->desc_frame_len, on->dext, del ? TLV_OP_CUSTOM_HNA_ROUTE_DEL : TLV_OP_CUSTOM_HNA_ROUTE_ADD,
-                BMX_DSC_TLV_UHNA6, NULL, NULL);
+                BMX_DSC_TLV_UHNA6);
 
 }
 

@@ -411,6 +411,7 @@ struct orig_node {
 	GLOBAL_ID_T nodeId;
 
 	struct dhash_node *dhn;
+
 	uint8_t *desc_frame;
         uint16_t desc_frame_len;
 	struct desc_extension *dext;

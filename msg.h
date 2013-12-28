@@ -389,22 +389,18 @@ struct frame_hdr_rhash_adv {
 
 // iterator return codes:
 
-#define TLV_TX_DATA_FULL        (-5) // nothing done! Frame finished or not enough remining data area to write
-                                    // only returns from tx-iterations, rx- will return FAILURE
 #define TLV_RX_DATA_FAILURE     (-4) // syntax error: exit or blacklist
-#define TLV_TX_DATA_FAILURE     (-4) // syntax error: will fail assertion()
-
 #define TLV_RX_DATA_DONE        (-3) // done, nothing more to do
-#define TLV_TX_DATA_DONE        (-3) // done, nothing more to do
-
 #define TLV_RX_DATA_BLOCKED     (-2) // blocked due to DAD
-
 #define TLV_RX_DATA_IGNORED     (-1) // unknown, filtered, nothing to send, or ignored due to bad link...
+#define TLV_RX_DATA_PROCESSED   (0) // > means succesfully processed returned amount of data
+
+
+#define TLV_TX_DATA_FULL        (-5) // nothing done! Frame finished or not enough remining data area to write
+#define TLV_TX_DATA_FAILURE     (-4) // syntax error: will fail assertion()
+#define TLV_TX_DATA_DONE        (-3) // done, nothing more to do
 #define TLV_TX_DATA_IGNORED     (-1) // unknown, filtered, nothing to send, or ignored due to bad link...
-
-#define TLV_RX_DATA_PROCESSED   (0) // >= means succesfully processed returned amount of data
 #define TLV_TX_DATA_PROCESSED   (0) // >= means succesfully processed returned amount of data
-
 
 
 // rx_frame_iterator operation codes:
@@ -638,16 +634,15 @@ struct msg_ref_req {
 
 struct dsc_msg_description {
 
-	uint16_t revision;     // 2 bytes
+	uint8_t comp_version;
+	uint8_t capabilities;
 
-        DESC_SQN_T descSqn;    // 4 bytes
+        DESC_SQN_T descSqn;
 
-	OGM_SQN_T ogmSqnMin;   // 2 bytes
-	OGM_SQN_T ogmSqnRange; // 2 bytes
+	OGM_SQN_T ogmSqnMin;
+	OGM_SQN_T ogmSqnRange;
 
-	uint16_t capabilities; // 2 bytes //was tx_interval, TODOCV18: dont use before!
-
-	uint8_t comp_version;  // 1 bytes
+	uint32_t revision;    //TODO: move to dsc_msg_node
 } __attribute__((packed));
 
 
@@ -738,8 +733,8 @@ struct ogm_aggreg_node {
 struct description_cache_node {
 	DHASH_T dhash;
         TIME_T timestamp;
-        uint16_t desc_len;
-        uint8_t *desc;
+        uint16_t desc_frame_len;
+        uint8_t *desc_frame;
 };
 
 
@@ -751,7 +746,6 @@ struct rx_frame_iterator {
         // remains unchanged:
         const char *caller;
         struct packet_buff *pb;
-        struct ctrl_node *cn;
         struct frame_db *db;
         struct orig_node *on;
         uint8_t *dsc_frame; //as received on wire
@@ -778,9 +772,6 @@ struct rx_frame_iterator {
         uint8_t *msg;
 
         // allocated by handl[].rx_tlv_handler and freed by calling function of rx_frame_iterate() (e.g. process_description_tlvs())
-
-        // allocated and freed by function calling process_description_tlvs(), eg. process_description(), bmx(), plugins,...
-        void *custom_data;
 };
 
 
@@ -910,7 +901,7 @@ void update_my_link_adv(uint32_t changes);
 void dext_free(struct desc_extension **dext);
 struct dhash_node * process_description(struct packet_buff *pb, struct description_cache_node *desc, DHASH_T *dhash);
 IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, uint8_t *desc, uint16_t desc_len, 
-        struct desc_extension *dext, uint8_t op, uint8_t filter, void *custom, struct ctrl_node *cn);
+        struct desc_extension *dext, uint8_t op, uint8_t filter);
 IDM_T desc_frame_changed(  struct rx_frame_iterator *it, uint8_t f_type );
 void purge_tx_task_list(struct list_head *tx_tasks_list, struct link_node *only_link, struct dev_node *only_dev);
 SHA1_T *ref_node_key(uint8_t *f_body, uint32_t f_body_len, uint8_t compression, uint8_t nested, uint8_t reserved);
