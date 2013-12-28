@@ -554,6 +554,11 @@ void invalidate_dhash( struct dhash_node *dhn, DHASH_T *dhash )
 	if (!dhn) {
 		dhn = debugMallocReset(sizeof(DHASH_T), -300000);
 		dhn->dhash = *dhash;
+	} else {
+		dext_free(&dhn->dext);
+		debugFree(dhn->desc_frame, -300000);
+		dhn->desc_frame = NULL;
+		dhn->desc_frame_len = 0;
 	}
 
         dbgf_track(DBGT_INFO,
@@ -572,7 +577,7 @@ void invalidate_dhash( struct dhash_node *dhn, DHASH_T *dhash )
 
 // called to not leave blocked dhash values:
 STATIC_FUNC
-void free_dhash_node( struct dhash_node *dhn )
+void release_dhash( struct dhash_node *dhn )
 {
         TRACE_FUNCTION_CALL;
         static uint32_t blocked_counter = 1;
@@ -595,30 +600,22 @@ void free_dhash_node( struct dhash_node *dhn )
 	invalidate_dhash(dhn, NULL);
 }
 
-
-
-STATIC_FUNC
-struct dhash_node* create_dhash_node(DHASH_T *dhash, struct orig_node *on)
+struct dhash_node* get_dhash_node(uint8_t *desc_frame, uint32_t desc_frame_len, struct desc_extension* dext, DHASH_T *dhash)
 {
-        TRACE_FUNCTION_CALL;
 
         struct dhash_node * dhn = debugMallocReset(sizeof ( struct dhash_node), -300001);
-        dhn->dhash = *dhash;
-        avl_insert(&dhash_tree, dhn, -300142);
 
-        dhn->myIID4orig = iid_new_myIID4x(dhn);
+	dhn->desc_frame = desc_frame;
+	dhn->desc_frame_len = desc_frame_len;
+	dhn->dext = dext;
+	dext->dhn = dhn;
+	dhn->dhash = *dhash;
 
-        on->updated_timestamp = bmx_time;
-        dhn->on = on;
-        on->dhn = dhn;
-
-        dbgf_track(DBGT_INFO, "dhash %8X.. myIID4orig %d", dhn->dhash.h.u32[0], dhn->myIID4orig);
-
-        return dhn;
+	return dhn;
 }
 
 
-void update_neigh_dhash(struct orig_node *on, DHASH_T *dhash)
+void update_neigh_dhash(struct orig_node *on, struct dhash_node *dhn)
 {
 
         struct neigh_node *neigh = NULL;
@@ -633,7 +630,14 @@ void update_neigh_dhash(struct orig_node *on, DHASH_T *dhash)
                 invalidate_dhash(on->dhn, NULL);
         }
 
-        on->dhn = create_dhash_node(dhash, on);
+        on->dhn = dhn;
+        avl_insert(&dhash_tree, dhn, -300142);
+        dhn->myIID4orig = iid_new_myIID4x(dhn);
+        on->updated_timestamp = bmx_time;
+        dhn->on = on;
+        on->dhn = dhn;
+
+        dbgf_track(DBGT_INFO, "dhash %8X.. myIID4orig %d", dhn->dhash.h.u32[0], dhn->myIID4orig);
 
         if (neigh) {
                 neigh->dhn = on->dhn;
@@ -993,16 +997,13 @@ void free_orig_node(struct orig_node *on)
         TRACE_FUNCTION_CALL;
         dbgf_all(DBGT_INFO, "id=%s ip=%s", cryptShaAsString(&on->nodeId), on->primary_ip_str);
 
-        if ( on == self)
-                return;
-
         //cb_route_change_hooks(DEL, on, 0, &on->ort.rt_key.llip);
 
         purge_orig_router(on, NULL, NO);
 
         if (on->added) {
-		assertion(-500000, (on->desc_frame));
-                process_description_tlvs(NULL, on, on->desc_frame, on->desc_frame_len, on->dext, TLV_OP_DEL, FRAME_TYPE_PROCESS_ALL);
+		assertion(-500000, (on->dhn && on->dhn->desc_frame));
+                process_description_tlvs(NULL, on, on->dhn, TLV_OP_DEL, FRAME_TYPE_PROCESS_ALL);
         }
 
         if ( on->dhn ) {
@@ -1011,7 +1012,7 @@ void free_orig_node(struct orig_node *on)
                 if (on->dhn->neigh)
                         free_neigh_node(on->dhn->neigh);
 
-                free_dhash_node(on->dhn);
+                release_dhash(on->dhn);
         }
 
         avl_remove(&orig_tree, &on->nodeId, -300200);
@@ -1024,12 +1025,6 @@ void free_orig_node(struct orig_node *on)
 
 
         block_orig_node(NO, on);
-
-        if (on->desc_frame)
-                debugFree(on->desc_frame, -300228);
-
-        if (on->dext)
-		dext_free(&on->dext);
 
         debugFree( on, -300086 );
 }
@@ -1059,7 +1054,7 @@ void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired)
                                         ((TIME_T) (bmx_time - dhn->referred_by_me_timestamp)), (TIME_T) ogm_purge_to);
 
 
-                                if (dhn->on->desc_frame && dhn->on != self)
+                                if (dhn->desc_frame && dhn->on != self)
                                         cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, dhn->on);
 
                                 free_orig_node(dhn->on);
@@ -1337,17 +1332,17 @@ void node_tasks(void) {
 
 		id = on->nodeId;
 
-		dbgf_all( DBGT_INFO, "trying to unblock nodeId=%s...", nodeIdAsStringFromDescAdv(on->desc_frame) );
+		dbgf_all( DBGT_INFO, "trying to unblock nodeId=%s...", nodeIdAsStringFromDescAdv(on->dhn->desc_frame) );
 
 		assertion(-501351, (on->blocked && !on->added));
 
-		IDM_T tlvs_res = process_description_tlvs(NULL, on, on->desc_frame, on->desc_frame_len, on->dext, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL);
+		IDM_T tlvs_res = process_description_tlvs(NULL, on, on->dhn, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL);
 
 		if (tlvs_res == TLV_RX_DATA_DONE) {
 
 			cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, on);
 
-			tlvs_res = process_description_tlvs(NULL, on, on->desc_frame, on->desc_frame_len, on->dext, TLV_OP_NEW, FRAME_TYPE_PROCESS_ALL);
+			tlvs_res = process_description_tlvs(NULL, on, on->dhn, TLV_OP_NEW, FRAME_TYPE_PROCESS_ALL);
 
 			assertion(-500364, (tlvs_res == TLV_RX_DATA_DONE)); // checked, so MUST SUCCEED!!
 
@@ -1356,7 +1351,7 @@ void node_tasks(void) {
 		}
 
 		dbgf_track(DBGT_INFO, "unblocking nodeId=%s %s !",
-			nodeIdAsStringFromDescAdv(on->desc_frame), tlvs_res == TLV_RX_DATA_DONE ? "success" : "failed");
+			nodeIdAsStringFromDescAdv(on->dhn->desc_frame), tlvs_res == TLV_RX_DATA_DONE ? "success" : "failed");
 
 	}
 
@@ -1385,7 +1380,7 @@ void cleanup_node(void) {
 	if (self) {
 		if (self->dhn) {
 			self->dhn->on = NULL;
-			free_dhash_node(self->dhn);
+			release_dhash(self->dhn);
 		}
 
 		avl_remove(&orig_tree, &(self->nodeId), -300203);

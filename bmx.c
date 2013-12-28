@@ -985,7 +985,7 @@ static int32_t orig_status_creator(struct status_handl *handl, void *data)
 
         while (data ? (on = data) : (on = avl_iterate_item(&orig_tree, &it))) {
 
-		assertion(-500000, (on->desc_frame && on->dext));
+		assertion(-500000, (on->dhn && on->dhn->desc_frame && on->dhn->dext));
 
                 status[i].name = NULL;
                 status[i].globalId = &on->nodeId;
@@ -996,7 +996,7 @@ static int32_t orig_status_creator(struct status_handl *handl, void *data)
                 status[i].viaDev = on->curr_rt_lndev && on->curr_rt_lndev->key.dev ? on->curr_rt_lndev->key.dev->name_phy_cfg.str : DBG_NIL;
                 status[i].metric = (on->curr_rt_local ? (on->curr_rt_local->mr.umetric) : (on == self ? UMETRIC_MAX : 0));
                 status[i].myIid4x = on->dhn->myIID4orig;
-                status[i].descSqn = ntohl(((struct dsc_msg_description*)dext_dptr(on->dext, BMX_DSC_TLV_DESCRIPTION))->descSqn);
+                status[i].descSqn = ntohl(((struct dsc_msg_description*)dext_dptr(on->dhn->dext, BMX_DSC_TLV_DESCRIPTION))->descSqn);
                 status[i].ogmSqn = on->ogmSqn_next;
                 status[i].ogmSqnDiff = (on->ogmSqn_maxRcvd - on->ogmSqn_next);
                 status[i].lastDesc = (bmx_time - on->updated_timestamp) / 1000;
@@ -1102,7 +1102,6 @@ int32_t opt_update_description(uint8_t cmd, uint8_t _save, struct opt_type *opt,
 STATIC_FUNC
 void init_self(void)
 {
-        static uint8_t my_desc0[PKT_FRAMES_SIZE_MAX - sizeof(struct tlv_hdr)];
         GLOBAL_ID_T id;
 	memset(&id, 0, sizeof(id));
 
@@ -1119,9 +1118,6 @@ void init_self(void)
 	debugFree(msg, -300000);
 
         self = init_orig_node(&id);
-
-        self->desc_frame = my_desc0;
-	self->desc_frame_len = 0;
 
         self->ogmSqn_rangeMin = ((OGM_SQN_MASK) & rand_num(OGM_SQN_MAX));
 }
@@ -1321,7 +1317,7 @@ void bmx(void)
         for (an = NULL; (dev = avl_iterate_item(&dev_ip_tree, &an));) {
 
                 schedule_tx_task(&dev->dummy_lndev, FRAME_TYPE_DEV_ADV, SCHEDULE_UNKNOWN_MSGS_SIZE, 0, 0, 0, 0);
-                schedule_tx_task(&dev->dummy_lndev, FRAME_TYPE_DESC_ADVS, self->desc_frame_len, 0, 0, myIID4me, 0);
+                schedule_tx_task(&dev->dummy_lndev, FRAME_TYPE_DESC_ADVS, self->dhn->desc_frame_len, 0, 0, myIID4me, 0);
         }
 
         initializing = NO;

@@ -395,7 +395,7 @@ struct dext_type_data {
 
 struct desc_extension {
 	struct list_head refnl_list;
-	struct orig_node *on;
+	struct dhash_node *dhn;
         uint8_t max_nesting;
         uint8_t *data;
         uint32_t dlen;
@@ -411,10 +411,6 @@ struct orig_node {
 	GLOBAL_ID_T nodeId;
 
 	struct dhash_node *dhn;
-
-	uint8_t *desc_frame;
-        uint16_t desc_frame_len;
-	struct desc_extension *dext;
 
 	TIME_T updated_timestamp; // last time this on's desc was succesfully updated
 
@@ -469,6 +465,10 @@ struct dhash_node {
 
 
 	struct orig_node *on;
+
+	uint8_t *desc_frame;
+        uint16_t desc_frame_len;
+	struct desc_extension *dext;
 };
 
 
@@ -566,7 +566,8 @@ char *nodeIdAsStringFromDescAdv( uint8_t *desc_adv );
 void purge_local_node(struct local_node *local);
 
 IDM_T update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn);
-void update_neigh_dhash(struct orig_node *on, DHASH_T *dhash);
+void update_neigh_dhash(struct orig_node *on, struct dhash_node *dhn);
+struct dhash_node* get_dhash_node(uint8_t *desc_frame, uint32_t desc_frame_len, struct desc_extension* dext, DHASH_T *dhash);
 
 LOCAL_ID_T new_local_id(struct dev_node *dev);
 

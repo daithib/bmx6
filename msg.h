@@ -748,11 +748,10 @@ struct rx_frame_iterator {
         struct packet_buff *pb;
         struct frame_db *db;
         struct orig_node *on;
-        uint8_t *dsc_frame; //as received on wire
-        uint16_t dsc_frame_len;
+        struct dhash_node *dhn;
+
         uint8_t *frames_in;
         int32_t frames_length;
-        struct desc_extension *dext;
         uint8_t op;
         uint8_t process_filter;
 
@@ -900,8 +899,7 @@ void update_my_link_adv(uint32_t changes);
 
 void dext_free(struct desc_extension **dext);
 struct dhash_node * process_description(struct packet_buff *pb, struct description_cache_node *desc, DHASH_T *dhash);
-IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, uint8_t *desc, uint16_t desc_len, 
-        struct desc_extension *dext, uint8_t op, uint8_t filter);
+IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, struct dhash_node *dhn, uint8_t op, uint8_t filter);
 IDM_T desc_frame_changed(  struct rx_frame_iterator *it, uint8_t f_type );
 void purge_tx_task_list(struct list_head *tx_tasks_list, struct link_node *only_link, struct dev_node *only_dev);
 SHA1_T *ref_node_key(uint8_t *f_body, uint32_t f_body_len, uint8_t compression, uint8_t nested, uint8_t reserved);

@@ -486,7 +486,7 @@ void json_description_event_hook(int32_t cb_id, struct orig_node *on)
         TRACE_FUNCTION_CALL;
 
         assertion(-501306, (on));
-        assertion(-501270, IMPLIES(cb_id == PLUGIN_CB_DESCRIPTION_CREATED, (on && on->desc_frame)));
+        assertion(-501270, IMPLIES(cb_id == PLUGIN_CB_DESCRIPTION_CREATED, (on && on->dhn && on->dhn->desc_frame)));
         assertion(-501273, (cb_id == PLUGIN_CB_DESCRIPTION_DESTROY || cb_id == PLUGIN_CB_DESCRIPTION_CREATED));
         assertion(-501274, IMPLIES(initializing, cb_id == PLUGIN_CB_DESCRIPTION_CREATED));
         assertion(-501275, (json_desc_dir));
@@ -525,24 +525,19 @@ void json_description_event_hook(int32_t cb_id, struct orig_node *on)
                 json_object *jblocked = json_object_new_int(on->blocked);
                 json_object_object_add(jorig, "blocked", jblocked);
 
-                struct dsc_msg_description * desc_buff = debugMalloc(sizeof (struct dsc_msg_description), -300361);
-
-                memcpy(desc_buff, on->desc_frame, sizeof (struct dsc_msg_description));
-
                 json_object *jdesc_fields = NULL;
 
                 if ((jdesc_fields = fields_dbg_json(
-                        FIELD_RELEVANCE_MEDI, NO, sizeof (struct dsc_msg_description), (uint8_t*) desc_buff,
+                        FIELD_RELEVANCE_MEDI, NO, sizeof (struct dsc_msg_description), on->dhn->desc_frame,
                         packet_desc_db->handls->min_msg_size,
                         packet_desc_db->handls->msg_format))) {
 
-                        if (on->dext && on->dext->dlen) {
+                        if (on->dhn && on->dhn->dext && on->dhn->dext->dlen) {
 
                                 struct rx_frame_iterator it = {
-                                        .caller = __FUNCTION__, .on = on, .op = TLV_OP_PLUGIN_MIN,
+                                        .caller = __FUNCTION__, .on = on, .dhn = on->dhn, .op = TLV_OP_PLUGIN_MIN,
                                         .db = description_tlv_db, .process_filter = FRAME_TYPE_PROCESS_ALL,
-                                        .frame_type = -1, .frames_in = on->dext->data, .frames_length = on->dext->dlen,
-					.dext = on->dext
+                                        .frame_type = -1, .frames_in = on->dhn->dext->data, .frames_length = on->dhn->dext->dlen,
                                 };
 				
 
@@ -577,7 +572,6 @@ void json_description_event_hook(int32_t cb_id, struct orig_node *on)
                 dbgf_all(DBGT_INFO, "creating json-description=%s", path_name);
 
                 json_object_put(jorig);
-                debugFree(desc_buff, -300362);
                 close(fd);
         }
 

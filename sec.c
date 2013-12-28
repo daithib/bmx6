@@ -135,7 +135,7 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
         TRACE_FUNCTION_CALL;
 
 	assertion(-500000, (it->frame_data_length == it->frame_msgs_length && it->frame_data == it->msg));
-	assertion(-500000, (it->dext));
+	assertion(-500000, (it->dhn && it->dhn->dext));
 
 	if (it->op != TLV_OP_TEST || !descVerification)
 		return it->frame_data_length;
@@ -143,11 +143,12 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 	char *goto_error_code = NULL;
 	int32_t sign_len = it->frame_data_length - sizeof(struct dsc_msg_signature);
 	struct dsc_msg_signature *msg = (struct dsc_msg_signature*)(it->frame_data);
-	uint8_t *desc_start = (uint8_t*)it->dsc_frame;
-	int32_t desc_len = it->dsc_frame_len - (sizeof(struct tlv_hdr) + it->frame_data_length);
+	uint32_t desc_offset = (2*sizeof(struct tlv_hdr)) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) + it->frame_data_length;
+	uint8_t *desc_start = (uint8_t*)it->dhn->desc_frame + desc_offset;
+	int32_t desc_len = it->dhn->desc_frame_len - desc_offset;
 	CRYPTSHA1_T desc_sha;
 	CRYPTKEY_T *pkey_crypt = NULL;
-	struct dsc_msg_pubkey *pkey_msg = dext_dptr(it->dext, BMX_DSC_TLV_PUBKEY);
+	struct dsc_msg_pubkey *pkey_msg = dext_dptr(it->dhn->dext, BMX_DSC_TLV_PUBKEY);
 
 	if ( !cryptKeyTypeAsString(msg->type) || cryptKeyLenByType(msg->type) != sign_len )
 		goto_error( finish, "1");
