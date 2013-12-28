@@ -500,9 +500,9 @@ int process_dsc_tlv_hna(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
         ASSERTION(-500357, (it->frame_type == BMX_DSC_TLV_UHNA6));
-        assertion(-500588, (it->on));
+        assertion(-500588, (it->onOld));
 
-        struct orig_node *on = it->on;
+        struct orig_node *on = it->onOld;
         uint8_t op = it->op;
 
         uint32_t hna_net_curr = 0;
@@ -1743,27 +1743,27 @@ int process_dsc_tlv_tun6(struct rx_frame_iterator *it)
 
         if (it->op == TLV_OP_DEL) {
 
-                if (terminate_tun_out(it->on, NULL, NULL))
+                if (terminate_tun_out(it->onOld, NULL, NULL))
                         eval_tun_bit_tree(NULL);
 
                 return it->frame_msgs_length;
 
         } else if (it->op == TLV_OP_NEW) {
 
-                new_tun6_advs_changed = (it->on->added ? NO : YES);
+                new_tun6_advs_changed = (it->onOld->added ? NO : YES);
 
                 if (!new_tun6_advs_changed) {
-			if( !is_ip_set(&it->on->primary_ip) )
+			if( !is_ip_set(&it->onOld->primary_ip) )
 				new_tun6_advs_changed = YES;
 		}
 
                 if (!new_tun6_advs_changed) {
-                        struct tun_out_key key = set_tun_adv_key(it->on, 0);
+                        struct tun_out_key key = set_tun_adv_key(it->onOld, 0);
                         struct tun_out_node *tun;
 
                         for (key.tun6Id = 0; (tun = avl_find_item(&tun_out_tree, &key)); key.tun6Id++) {
 
-                                if (!is_ip_equal(&tun->remoteIp, &it->on->primary_ip)) {
+                                if (!is_ip_equal(&tun->remoteIp, &it->onOld->primary_ip)) {
                                         new_tun6_advs_changed = YES;
                                         break;
                                 }
@@ -1795,10 +1795,10 @@ int process_dsc_tlv_tun6(struct rx_frame_iterator *it)
                 if (!new_tun6_advs_changed)
                         return it->frame_msgs_length;
 
-		if (terminate_tun_out(it->on, NULL, NULL))
+		if (terminate_tun_out(it->onOld, NULL, NULL))
 			eval_tun_bit_tree(NULL);
 
-		if ( !is_ip_set(&it->on->primary_ip) )
+		if ( !is_ip_set(&it->onOld->primary_ip) )
 			return it->frame_msgs_length;
         }
 
@@ -1806,11 +1806,11 @@ int process_dsc_tlv_tun6(struct rx_frame_iterator *it)
         for (m = 0; m < it->frame_msgs_fixed; m++) {
 
                 struct dsc_msg_tun6 *adv = &(((struct dsc_msg_tun6 *) (it->frame_data))[m]);
-                struct tun_out_key key = set_tun_adv_key(it->on, m);
+                struct tun_out_key key = set_tun_adv_key(it->onOld, m);
 
                 dbgf_all(DBGT_INFO, "op=%s tunnel_out.items=%d tun_net.items=%d msg=%d/%d localIp=%s nodeId=%s (%p) key=%s",
                         tlv_op_str(it->op), tun_out_tree.items, tun_net_tree.items, m, it->frame_msgs_fixed,
-                        ip6AsStr(&adv->localIp), cryptShaAsString(&it->on->nodeId), (void*) (it->on), memAsHexString(&key, sizeof (key)));
+                        ip6AsStr(&adv->localIp), cryptShaAsString(&it->onOld->nodeId), (void*) (it->onOld), memAsHexString(&key, sizeof (key)));
 
                 if (it->op == TLV_OP_TEST) {
 
@@ -1820,9 +1820,9 @@ int process_dsc_tlv_tun6(struct rx_frame_iterator *it)
                         if (!is_ip_valid(&adv->localIp, AF_INET6) ||
                                 is_ip_net_equal(&adv->localIp, &IP6_LINKLOCAL_UC_PREF, IP6_LINKLOCAL_UC_PLEN, AF_INET6) ||
                                 (tin = avl_find_item_by_field(&tun_in_tree, &adv->localIp, tun_in_node, remote)) ||
-                                (un = find_overlapping_hna(&adv->localIp, 128, it->on))) {
+                                (un = find_overlapping_hna(&adv->localIp, 128, it->onOld))) {
                                 dbgf_sys(DBGT_ERR, "nodeId=%s %s=%s blocked (by my %s=%s or other's %s with nodeId=%s)",
-                                        cryptShaAsString(&it->on->nodeId), ARG_TUN_DEV, ip6AsStr(&adv->localIp),
+                                        cryptShaAsString(&it->onOld->nodeId), ARG_TUN_DEV, ip6AsStr(&adv->localIp),
                                         ARG_TUN_IN, tin ? tin->nameKey.str : DBG_NIL,
                                         ARG_UHNA, un ? cryptShaAsString(&un->on->nodeId) : DBG_NIL);
 
@@ -1836,7 +1836,7 @@ int process_dsc_tlv_tun6(struct rx_frame_iterator *it)
                         struct tun_out_node *tun = debugMallocReset(sizeof (struct tun_out_node), -300426);
                         tun->tunOutKey = key;
                         tun->localIp = adv->localIp;
-                        tun->remoteIp = it->on->primary_ip;
+                        tun->remoteIp = it->onOld->primary_ip;
 			tun->ingressPrefix[1] = ZERO_NET4_KEY;
 			tun->ingressPrefix[0] = ZERO_NET6_KEY;
                         AVL_INIT_TREE(tun->tun_net_tree, struct tun_net_node, tunNetKey);
@@ -1906,13 +1906,13 @@ int process_dsc_tlv_tunXin6ingress(struct rx_frame_iterator *it)
 
                         struct dsc_msg_tun6in6ingress *adv =
                                 (struct dsc_msg_tun6in6ingress *) (it->frame_data + pos);
-                        struct tun_out_key key = set_tun_adv_key(it->on, adv->tun6Id);
+                        struct tun_out_key key = set_tun_adv_key(it->onOld, adv->tun6Id);
                         struct tun_out_node *tun = avl_find_item(&tun_out_tree, &key);
                         IPX_T prefix = isSrc4 ? ip4ToX(*((IP4_T*) & adv->ingressPrefix)) : adv->ingressPrefix;
 
                         if (it->op == TLV_OP_TEST) {
 
-                                assertion(-501265, (!tun || (tun->tunOutKey.on == it->on)));
+                                assertion(-501265, (!tun || (tun->tunOutKey.on == it->onOld)));
 
                                 if (ip_netmask_validate(&prefix, adv->ingressPrefixLen, (isSrc4?AF_INET:AF_INET6), NO) == FAILURE)
                                         return TLV_RX_DATA_FAILURE;
@@ -2156,7 +2156,7 @@ int process_dsc_tlv_tunXin6net(struct rx_frame_iterator *it)
 
                         if (it->op == TLV_OP_NEW) {
 
-                                struct tun_out_key tok = set_tun_adv_key(it->on, adv->tun6Id);
+                                struct tun_out_key tok = set_tun_adv_key(it->onOld, adv->tun6Id);
                                 struct tun_out_node *ton = avl_find_item(&tun_out_tree, &tok);
 
                                 if (ton) {
@@ -2216,7 +2216,7 @@ int process_dsc_tlv_tunXin6net(struct rx_frame_iterator *it)
         if (it->op == TLV_OP_NEW || it->op == TLV_OP_DEL) {
 
                 // Purge tun6Xin6_net advertisements that were not updated:
-                struct tun_out_key tok = set_tun_adv_key(it->on, 0);
+                struct tun_out_key tok = set_tun_adv_key(it->onOld, 0);
                 struct tun_out_node *ton;
 
                 while ((ton = avl_find_item(&tun_out_tree, &tok))) {
@@ -2236,7 +2236,7 @@ int process_dsc_tlv_tunXin6net(struct rx_frame_iterator *it)
                         if (tnn) {
                                 assertion(-501389, (tnn->tlv_new_counter != tlv_new_counter));
                                 assertion(-501390, (tnn->tunNetKey.netKey.af == family));
-                                used |= terminate_tun_out(it->on, ton, tnn);
+                                used |= terminate_tun_out(it->onOld, ton, tnn);
                                 continue;
                         }
 

@@ -245,7 +245,7 @@ int create_description_sms(struct tx_frame_iterator *it)
 STATIC_FUNC
 int process_description_sms(struct rx_frame_iterator *it)
 {
-        struct orig_node *on = it->on;
+        struct orig_node *on = it->onOld;
         uint8_t op = it->op;
 
         int pos = 0;

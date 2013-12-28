@@ -630,12 +630,12 @@ void update_neigh_dhash(struct orig_node *on, struct dhash_node *dhn)
                 invalidate_dhash(on->dhn, NULL);
         }
 
-        on->dhn = dhn;
-        avl_insert(&dhash_tree, dhn, -300142);
         dhn->myIID4orig = iid_new_myIID4x(dhn);
-        on->updated_timestamp = bmx_time;
         dhn->on = on;
+        avl_insert(&dhash_tree, dhn, -300142);
+
         on->dhn = dhn;
+        on->updated_timestamp = bmx_time;
 
         dbgf_track(DBGT_INFO, "dhash %8X.. myIID4orig %d", dhn->dhash.h.u32[0], dhn->myIID4orig);
 

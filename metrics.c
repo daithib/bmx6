@@ -1317,9 +1317,9 @@ int process_description_tlv_metricalgo(struct rx_frame_iterator *it )
 {
         TRACE_FUNCTION_CALL;
         assertion(-500683, (it->frame_type == BMX_DSC_TLV_METRIC));
-        assertion(-500684, (it->on));
+        assertion(-500684, (it->onOld));
 
-        struct orig_node *on = it->on;
+        struct orig_node *on = it->onOld;
         uint8_t op = it->op;
 
         struct description_tlv_metricalgo *tlv_algo = (struct description_tlv_metricalgo *) (it->frame_data);

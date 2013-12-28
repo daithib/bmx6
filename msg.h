@@ -747,8 +747,8 @@ struct rx_frame_iterator {
         const char *caller;
         struct packet_buff *pb;
         struct frame_db *db;
-        struct orig_node *on;
-        struct dhash_node *dhn;
+        struct orig_node *onOld;
+        struct dhash_node *dhnNew;
 
         uint8_t *frames_in;
         int32_t frames_length;
