@@ -139,9 +139,56 @@ STATIC_FUNC
 int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it);
 
 
+static const void* REJECTED_PTR = (void*) & REJECTED_PTR;
+static const void* UNRESOLVED_PTR = (void*) & UNRESOLVED_PTR;
+static const void* FAILURE_PTR = (void*) & FAILURE_PTR;
+
+
 /***********************************************************
   The core frame/message structures and handlers
  ************************************************************/
+
+char *tlv_rx_result_str(int32_t r)
+{
+        switch (r) {
+        case TLV_RX_DATA_FAILURE:
+                return "TLV_FAILURE";
+        case TLV_RX_DATA_REJECTED:
+                return "TLV_REJECTED";
+        case TLV_RX_DATA_DONE:
+                return "TLV_DONE";
+        case TLV_RX_DATA_BLOCKED:
+                return "TLV_BLOCKED";
+        case TLV_RX_DATA_PROCESSED:
+                return "TLV_PROCESSED";
+        }
+
+	if (r > TLV_RX_DATA_PROCESSED)
+		return "TLV_PROCESSED++";
+
+        return "TLV_ILLEGAL";
+}
+
+char *tlv_tx_result_str(int32_t r)
+{
+        switch (r) {
+        case TLV_TX_DATA_FAILURE:
+                return "TLV_FAILURE";
+        case TLV_TX_DATA_FULL:
+                return "TLV_FULL";
+        case TLV_TX_DATA_DONE:
+                return "TLV_DONE";
+        case TLV_TX_DATA_IGNORED:
+                return "TLV_IGNORED";
+        case TLV_TX_DATA_PROCESSED:
+                return "TLV_PROCESSED";
+        }
+
+	if (r > TLV_TX_DATA_PROCESSED)
+		return "TLV_PROCESSED++";
+
+        return "TLV_ILLEGAL";
+}
 
 char *tlv_op_str(uint8_t op)
 {
@@ -166,7 +213,6 @@ char *tlv_op_str(uint8_t op)
 
         return "TLV_OP_ERROR";
 }
-
 
 struct frame_db *packet_frame_db = NULL;
 struct frame_db *packet_desc_db = NULL;
@@ -212,9 +258,10 @@ void register_frame_handler(struct frame_db *db, int pos, struct frame_handl *ha
         TRACE_FUNCTION_CALL;
         
         assertion(-500659, (pos < db->handl_max));
-        assertion(-500660, (!db->handls[pos].min_msg_size)); // the pos MUST NOT be used yet
-        assertion(-500661, (handl && handl->min_msg_size && handl->name));
+        assertion(-500660, (!db->handls[pos].name)); // the pos MUST NOT be used yet
+        assertion(-500661, (handl && handl->name));
         assertion(-500806, (XOR(handl->rx_frame_handler, handl->rx_msg_handler) && XOR(handl->tx_frame_handler, handl->tx_msg_handler)));
+	assertion(-500000, IMPLIES(handl->rx_msg_handler, handl->fixed_msg_size));
         assertion(-500975, (handl->tx_task_interval_min <= CONTENT_MIN_TX_INTERVAL_MAX));
 
         assertion(-501213, IMPLIES(handl->msg_format, handl->min_msg_size ==
@@ -344,7 +391,7 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *onOld, 
 //        assertion(-500829, IMPLIES(op == TLV_OP_DEL, !on->blocked));
         assertion(-501354, IMPLIES(op == TLV_OP_DEL, onOld->added));
 
-        int32_t tlv_result;
+        int32_t result;
 	int8_t blocked = NO;
 	struct frame_db *db = description_tlv_db;
         struct rx_frame_iterator it = {
@@ -360,27 +407,27 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *onOld, 
                 tlv_op_str(op), nodeIdAsStringFromDescAdv(dhnNew->desc_frame), dhnNew->dext->dlen, filter);
 
 
-        while ((tlv_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
+        while ((result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
 		
-		if (tlv_result == TLV_RX_DATA_BLOCKED)
+		if (result == TLV_RX_DATA_BLOCKED)
 			blocked = YES;
 	}
 
-	assertion( -500000, (tlv_result==TLV_RX_DATA_DONE || tlv_result==TLV_RX_DATA_FAILURE));
+	assertion( -500000, (result==TLV_RX_DATA_DONE || result==TLV_RX_DATA_REJECTED || result==TLV_RX_DATA_FAILURE));
 
         if ((op >= TLV_OP_CUSTOM_MIN && op <= TLV_OP_CUSTOM_MAX) || (op >= TLV_OP_PLUGIN_MIN && op <= TLV_OP_PLUGIN_MAX))
-                return tlv_result;
+                return result;
 
-        if (tlv_result == TLV_RX_DATA_FAILURE || blocked) {
+        if (result==TLV_RX_DATA_REJECTED || result == TLV_RX_DATA_FAILURE || blocked) {
 
                 assertion(-501355, (op == TLV_OP_TEST));
 
                 dbgf_sys(DBGT_WARN, "problematic description_ltv from %s, near type=%d=%s frame_data_length=%d  pos=%d %s",
                         pb ? pb->i.llip_str : DBG_NIL, it.frame_type, (((uint8_t)it.frame_type) <= db->handl_max) ? db->handls[it.frame_type].name : "",
-                        it.frame_data_length, it.frames_pos, blocked ? "BLOCKED" : "", tlv_result==TLV_RX_DATA_FAILURE ? "FAILURE" : "");
+                        it.frame_data_length, it.frames_pos, blocked ? "BLOCKED" : "", tlv_rx_result_str(result));
 
-		if (tlv_result==TLV_RX_DATA_FAILURE)
-			return TLV_RX_DATA_FAILURE;
+		if (result==TLV_RX_DATA_FAILURE || result==TLV_RX_DATA_REJECTED)
+			return result;
 		else
 			return TLV_RX_DATA_BLOCKED;
         }
@@ -662,15 +709,8 @@ void schedule_tx_task(struct link_dev_node *dest_lndev, uint16_t frame_type, int
         test_task.frame_msgs_length = frame_msgs_len == SCHEDULE_MIN_MSG_SIZE ? handl->min_msg_size : frame_msgs_len;
 
 
-        assertion(-500371, IMPLIES(handl->fixed_msg_size, !(test_task.frame_msgs_length % handl->min_msg_size)));
-/*
-        if (frame_msgs_len) {
-                test_task.frame_msgs_length = frame_msgs_len;
-        } else {
-                assertion(-500769, (handl->fixed_msg_size && handl->min_msg_size));
-                test_task.frame_msgs_length = handl->min_msg_size;
-        }
-*/
+        assertion(-500371, IMPLIES(handl->fixed_msg_size && handl->min_msg_size, !(test_task.frame_msgs_length % handl->min_msg_size)));
+        assertion(-500371, IMPLIES(handl->fixed_msg_size && !handl->min_msg_size, !test_task.frame_msgs_length));
 
         tx_task_new(dest_lndev, &test_task);
 }
@@ -1438,7 +1478,7 @@ int process_dsc_tlv_rhash(struct rx_frame_iterator *it)
         TRACE_FUNCTION_CALL;
 
 	// description reference extenstions are processed explicitly in:
-	assertion(-501625, ( TEST_FUNCTION(process_description))); //calling:
+	//assertion(-501625, ( TEST_FUNCTION(process_description))); //calling:
 	assertion(-501626, ( TEST_FUNCTION(dext_resolve))); //calling:
 	assertion(-501627, ( TEST_FUNCTION(resolve_ref_frame)) );
 	assertion(-501628, ( TEST_FUNCTION(ref_node_get)) );
@@ -1461,6 +1501,412 @@ int process_dsc_tlv_rhash(struct rx_frame_iterator *it)
 	
         return TLV_RX_DATA_FAILURE;
 }
+
+
+
+STATIC_FUNC
+struct desc_extension * dext_init(void)
+{
+	struct desc_extension *dext = debugMallocReset(sizeof(struct desc_extension), -300572);
+	LIST_INIT_HEAD(dext->refnl_list, struct refnl_node, list, list);
+	return dext;
+
+}
+
+void dext_free(struct desc_extension **dext)
+{
+	assertion(-501600, dext);
+	assertion(-501608, IMPLIES(*dext, *dext!=REJECTED_PTR && *dext!=FAILURE_PTR && *dext!=UNRESOLVED_PTR));
+
+        if(*dext) {
+
+		ref_node_release(*dext);
+
+		if((*dext)->data)
+			debugFree((*dext)->data, -300530);
+
+                debugFree((*dext), -300570);
+	}
+
+	*dext = NULL;
+}
+
+void *dext_dptr( struct desc_extension *dext, uint8_t type)
+{
+    return (dext && dext->dtd[type].len) ? dext->data + dext->dtd[type].pos : NULL;
+}
+
+
+STATIC_FUNC
+struct desc_extension * dext_resolve(struct packet_buff *pb, struct description_cache_node *cache, struct desc_extension *dext)
+{
+        TRACE_FUNCTION_CALL;
+	assertion(-501655, (BMX_DSC_TLV_INVALID > BMX_DSC_TLV_MAX && BMX_DSC_TLV_INVALID <= UINT8_MAX));
+
+	uint8_t *data = (((uint8_t*) cache->desc_frame) + sizeof(struct dsc_msg_description));
+	uint32_t dlen = cache->desc_frame_len - sizeof(struct dsc_msg_description);
+	IDM_T unresolved = 0;
+	uint8_t dsc_frame_types[BMX_DSC_TLV_ARRSZ] = {0};
+	int32_t result;
+
+        struct rx_frame_iterator it = {
+                .caller = __FUNCTION__, .onOld = NULL, .op = TLV_OP_PLUGIN_MIN,
+                .db = description_tlv_db, .process_filter = FRAME_TYPE_PROCESS_NONE,
+                .frame_type = -1,.frames_in = data, .frames_length = dlen };
+
+	uint8_t vf_type = BMX_DSC_TLV_INVALID;
+	int32_t vf_data_len = 0;
+	uint8_t vf_compression = 0;
+	char *goto_error_code = "???";
+	int32_t vd_len = 0;
+
+
+        while ((result=rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
+
+		uint32_t dext_dlen_old = 0;
+		vf_type = BMX_DSC_TLV_INVALID;
+		vf_data_len = 0;
+		vf_compression = 0;
+
+		if (dext) {
+			dext_dlen_old = dext->dlen;
+			dext->dlen += sizeof(struct tlv_hdr_virtual);
+			// hdr setting is done when succeeded
+			// data reallocation is done before writing new data
+		}
+
+                if (it.frame_type != BMX_DSC_TLV_RHASH) {
+
+			vf_type = it.frame_type;
+			vf_data_len = it.frame_data_length;
+
+			if ( vf_data_len <= 0 || vf_data_len > VRT_FRAME_DATA_SIZE_MAX)
+				goto_error( resolve_desc_extension_error, "1");
+
+			if (dext) {
+				dext->data = debugRealloc(dext->data, dext->dlen + vf_data_len, -300429 );
+				memcpy(dext->data + dext->dlen, it.frame_data, vf_data_len);
+				dext->dlen += vf_data_len;
+			}
+
+
+                } else if (it.frame_type == BMX_DSC_TLV_RHASH) {
+
+			vf_type = ((struct desc_hdr_rhash*)(it.frame_data))->expanded_type;
+			vf_compression = ((struct desc_hdr_rhash*)(it.frame_data))->compression;
+			vf_data_len = resolve_ref_frame(pb,
+				it.frame_data+sizeof(struct desc_hdr_rhash), it.frame_data_length-sizeof(struct desc_hdr_rhash),
+				dext, vf_type, vf_compression, 1);
+
+			if (vf_data_len == 0) {
+				unresolved = 1;
+			} else if ( vf_data_len < 0) {
+				goto_error( resolve_desc_extension_error, "2");
+			}
+
+
+                } else {
+			goto_error( resolve_desc_extension_error, "3");
+		}
+
+		if (!unresolved) {
+			if (vf_type > BMX_DSC_TLV_MAX || dsc_frame_types[vf_type])
+				goto_error( resolve_desc_extension_error, "4");
+			else
+				dsc_frame_types[vf_type] = 1;
+		}
+
+		if ((vd_len = vd_len + vf_data_len) > vrt_desc_size_in)
+			goto_error( resolve_desc_extension_error, "5");
+
+		dbgf_track(DBGT_INFO, "converted type=%d %s f_data_length=%d compression=%d -> type=%d %s vf_data_len=%d, dext.len=%d",
+		           it.frame_type, it.handl->name, it.frame_data_length, vf_compression,
+			   vf_type, vf_type <= it.db->handl_max ? it.db->handls[vf_type].name : "???",
+			   vf_data_len, dext ? dext->dlen : 0 );
+
+		if (dext) {
+
+			dext->dtd[vf_type].pos = dext_dlen_old + sizeof(struct tlv_hdr_virtual);
+			dext->dtd[vf_type].len = vf_data_len;
+
+			struct tlv_hdr_virtual *vf_hdr = (struct tlv_hdr_virtual *)(dext->data + dext_dlen_old);
+			memset(vf_hdr, 0, sizeof(struct tlv_hdr_virtual));
+			vf_hdr->type = vf_type;
+			vf_hdr->mbz = 0;
+			vf_hdr->length = htonl(sizeof(struct tlv_hdr_virtual) + vf_data_len);
+
+			assertion(-501659, (vf_data_len <= VRT_FRAME_DATA_SIZE_MAX));
+			assertion(-501660, (vf_data_len > 0 && vf_type <= BMX_DSC_TLV_MAX));
+			assertion(-501661, (dext->dlen == dext_dlen_old + ntohl(vf_hdr->length)));
+			assertion(-501662, (dext->dlen <= (uint32_t)vrt_desc_size_in));
+		}
+        }
+
+
+	if (result != TLV_RX_DATA_DONE) {
+                dbgf_sys(DBGT_WARN, "problematic description_ltv from %s, near type=%s frame_data_length=%d  pos=%d tlv_result=%s",
+                        pb ? pb->i.llip_str : DBG_NIL, it.db->handls[it.frame_type].name,
+                        it.frame_data_length, it.frames_pos, tlv_tx_result_str(result));
+
+		goto_error( resolve_desc_extension_error, "6");
+        }
+
+	if (unresolved)
+		return (struct desc_extension *) UNRESOLVED_PTR;
+
+        return dext;
+
+
+resolve_desc_extension_error:
+
+	assertion(-501663, (!dext)); //otherwise the check should have failed!
+	//free_desc_extensions(&dext);
+        dbgf_sys(DBGT_ERR, "Failed converting type=%d max_known=%d f_data_len=%d compression=%d -> type=%d vf_data_len=%d vf_error=%s",
+                 it.frame_type, BMX_DSC_TLV_MAX_KNOWN, it.frame_data_length, vf_compression, vf_type, vf_data_len, goto_error_code);
+
+	return (struct desc_extension *) FAILURE_PTR;
+}
+
+
+
+
+
+/*
+ * tries to resolve data,len and requests unknown ref-hashes, updates dext if available and successfull
+ * returns: > 0 if successfully resolved
+ *          ==0 if unresolved
+ *          < 0 if error (nest_level exceeded, ...)
+ */
+STATIC_FUNC
+int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *f_body, uint32_t f_body_len, struct desc_extension *dext, uint8_t rf_type, uint8_t compression, uint8_t nest_level )
+{
+	assertion(-501598, (FAILURE==-1 && SUCCESS==0));
+
+        struct desc_msg_rhash *msg = (struct desc_msg_rhash *)f_body;
+	int32_t m = 0, msgs = f_body_len / sizeof(struct desc_msg_rhash);
+	int32_t ref_len = 0;
+	struct desc_extension *solvable = dext ? dext : dext_init();
+	struct desc_extension *solvable_free = dext ? NULL : solvable;
+	uint32_t solvable_begin = solvable->dlen;
+	char *goto_error_code = " ";
+
+	if ((++nest_level) > MAX_REF_NESTING)
+		goto_error( resolve_ref_frame_error, "exceeded nest level");
+
+	solvable->max_nesting = nest_level;
+
+	for (; m < msgs && ref_len < MAX_DESC_LEN; m++) {
+
+                struct ref_node *refn = ref_node_get(&(msg[m].rframe_hash));
+
+		if (!refn) {
+
+			if(pb)
+				schedule_tx_task(pb->i.link->local->best_tp_lndev, FRAME_TYPE_REF_REQ, SCHEDULE_MIN_MSG_SIZE,
+					&(msg[m].rframe_hash), sizeof(SHA1_T), 0, 0);
+
+			solvable = NULL;
+
+		} else if (refn->nested) {
+
+			int32_t tmp_len = resolve_ref_frame(pb, refn->f_body, refn->f_body_len, solvable, rf_type, refn->compression, nest_level);
+
+			if (tmp_len < 0)
+				goto_error( resolve_ref_frame_error, "failed next recursion");
+			if (tmp_len == 0)
+				solvable = NULL;
+			if (tmp_len > 0)
+				ref_len += tmp_len;
+
+		} else if (refn->compression == FRAME_COMPRESSION_NONE  && solvable) {
+
+			solvable->data = debugRealloc(solvable->data, solvable->dlen + refn->f_body_len, -300569);
+			memcpy(solvable->data + solvable->dlen, refn->f_body, refn->f_body_len);
+			solvable->dlen += refn->f_body_len;
+
+			if (solvable == dext)
+				ref_node_use(solvable, refn, rf_type);
+
+			ref_len += refn->f_body_len;
+
+		} else if (refn->compression == FRAME_COMPRESSION_GZIP  && solvable) {
+
+			int32_t tmp_len = z_decompress(refn->f_body, refn->f_body_len, &solvable->data, solvable->dlen);
+
+			if (tmp_len <= 0)
+				goto_error( resolve_ref_frame_error, "failed inner decompression");
+
+			solvable->dlen += tmp_len;
+
+			if (solvable == dext)
+				ref_node_use(solvable, refn, rf_type);
+
+			ref_len += tmp_len;
+
+		} else {
+			goto_error( resolve_ref_frame_error, "invalid case");
+		}
+
+		assertion(-501599, IMPLIES(solvable, solvable_begin + ref_len == solvable->dlen));
+		assertion(-501653, IMPLIES(solvable, rf_type <= BMX_DSC_TLV_MAX));
+        }
+
+	if (m != msgs)
+		goto_error( resolve_ref_frame_error, "invalid msgs");
+
+	if (!solvable)
+		goto resolve_ref_frame_unresolved;
+
+	if (compression == FRAME_COMPRESSION_NONE) {
+
+	} else if (compression == FRAME_COMPRESSION_GZIP) {
+
+		if ((ref_len = z_decompress(solvable->data + solvable_begin, ref_len, &solvable->data, solvable_begin)) <= 0)
+			goto_error( resolve_ref_frame_error, "failed outer decompression");
+
+		solvable->dlen = solvable_begin + ref_len;
+
+	} else {
+		goto_error( resolve_ref_frame_error, "invalid outer decompression");
+	}
+
+	dext_free(&solvable_free);
+	return ref_len;
+
+resolve_ref_frame_unresolved:
+	dext_free(&solvable_free);
+	return SUCCESS; // 0 == unresolved
+
+resolve_ref_frame_error:
+{
+	dbgf_sys(DBGT_ERR, "dlen=%d compression=%d dext=%d  msgs=%d nest_level=%d solvable=%d rf_type=%d m=%d ref_len=%d error=%s",
+		f_body_len, compression, dext?1:0, msgs, nest_level, solvable?1:0, rf_type, m, ref_len, goto_error_code);
+
+
+	dext_free(&solvable_free);
+	assertion(-501654, !dext); // this function should only be called with dext if a prior call with dext=NULL succeeded
+	return FAILURE;
+}
+}
+
+
+STATIC_FUNC
+struct dhash_node * process_description(struct packet_buff *pb, struct description_cache_node *cache, DHASH_T *dhash)
+{
+        TRACE_FUNCTION_CALL;
+        assertion(-500262, (pb && pb->i.link && cache && cache->desc_frame));
+        assertion(-500381, (!avl_find( &dhash_tree, dhash )));
+
+	// First check if dext is fully resolvable::
+        struct desc_extension *dext = dext_resolve(pb, cache, NULL);
+	struct dhash_node *dhnNew = NULL;
+	struct orig_node *on = NULL;
+	int32_t result = TLV_RX_DATA_FAILURE;
+
+	if (dext == FAILURE_PTR) {
+
+		goto process_desc0_error;
+
+        } else if (dext == UNRESOLVED_PTR) {
+
+		dbgf_sys(DBGT_WARN, "UNRESOLVED global_id=%s rcvd via_dev=%s via_ip=%s",
+			nodeIdAsStringFromDescAdv(cache->desc_frame), pb->i.iif->label_cfg.str, pb->i.llip_str);
+
+		return (struct dhash_node *) UNRESOLVED_PTR;
+
+	} else if (dext) {
+		cleanup_all(-500000);
+	}
+
+	// only if dext is fully resolvable then allocate it, so this should always succeed!!!
+	dext = dext_init();
+
+	if ( dext != dext_resolve(pb, cache, dext) )
+		cleanup_all(-500000);
+
+
+	dhnNew = get_dhash_node(cache->desc_frame, cache->desc_frame_len, dext, dhash);
+	on = avl_find_item(&orig_tree, nodeIdFromDescAdv(cache->desc_frame));
+	assertion(-500000, IMPLIES(on, on->dhn && on->dhn->desc_frame && on->dhn->dext));
+
+	result = process_description_tlvs(pb, on, dhnNew, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL);
+
+	assertion( -500000, (result==TLV_RX_DATA_BLOCKED || result==TLV_RX_DATA_DONE || result==TLV_RX_DATA_REJECTED || result==TLV_RX_DATA_FAILURE));
+
+	if (result==TLV_RX_DATA_FAILURE || result==TLV_RX_DATA_REJECTED)
+		goto process_desc0_error;
+
+
+	IDM_T TODO;
+
+        if (!on) // create new orig:
+                on = init_orig_node(nodeIdFromDescAdv(dhnNew->desc_frame));
+
+
+        if (on->dhn)
+                cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, on);
+
+        assertion(-501361, IMPLIES(on->blocked, !on->added));
+
+
+        if (result == TLV_RX_DATA_DONE) {
+
+		block_orig_node(NO, on);
+                result = process_description_tlvs(pb, on, dhnNew, TLV_OP_NEW, FRAME_TYPE_PROCESS_ALL);
+                assertion(-501362, (result == TLV_RX_DATA_DONE)); // checked, so MUST SUCCEED!!
+                assertion(-501363, (on->blocked != on->added));
+
+        } else if (result == TLV_RX_DATA_BLOCKED ) {
+
+                if (on->added) {
+			assertion(-500000, (on->dhn && on->dhn->desc_frame && on->dhn->dext));
+                        result = process_description_tlvs(pb, on, on->dhn, TLV_OP_DEL, FRAME_TYPE_PROCESS_ALL);
+                        assertion(-501364, (result == TLV_RX_DATA_DONE));
+			assertion(-500000, (on->blocked && !on->added));
+                }
+
+		block_orig_node(YES, on);
+        }
+
+        del_cached_description(&dhnNew->dhash);
+
+        update_neigh_dhash(on, dhnNew);
+
+	assertion(-500000, (on->dhn == dhnNew));
+        assertion(-500970, (dhnNew->on == on));
+        assertion(-500309, (dhnNew == avl_find_item(&dhash_tree, &on->dhn->dhash)));
+        assertion(-500310, (on == avl_find_item(&orig_tree, nodeIdFromDescAdv(on->dhn->desc_frame))));
+	assertion(-500000, (dhnNew->desc_frame));
+
+	cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_CREATED, on);
+
+        return dhnNew;
+
+
+process_desc0_error:
+
+        if (dhnNew) {
+		dext_free(&dhnNew->dext);
+		debugFree(dhnNew->desc_frame, -300000);
+		debugFree(dhnNew, -300000);
+	}
+
+	dbgf_sys(DBGT_ERR, "%s global_id=%s rcvd via_dev=%s via_ip=%s", tlv_rx_result_str(result),
+		cache ? nodeIdAsStringFromDescAdv(cache->desc_frame) : "???", pb->i.iif->label_cfg.str, pb->i.llip_str);
+
+
+	if (result==TLV_RX_DATA_FAILURE) {
+
+		blacklist_neighbor(pb);
+		return (struct dhash_node *) FAILURE_PTR;
+
+	} else {
+		return (struct dhash_node *) REJECTED_PTR;
+	}
+}
+
+
+
 
 STATIC_FUNC
 int32_t tx_msg_dhash_or_description_request(struct tx_frame_iterator *it)
@@ -1555,21 +2001,18 @@ int32_t process_dsc_tlv_description(struct rx_frame_iterator *it)
 	struct dsc_msg_description *old = it->onOld ? dext_dptr(it->onOld->dhn->dext, BMX_DSC_TLV_DESCRIPTION) : NULL;
 	struct dsc_msg_description *new = (struct dsc_msg_description*)it->frame_data;
 
+        if (validate_param(new->comp_version, (my_compatibility-(my_pettiness?0:1)), (my_compatibility+(my_pettiness?0:1)), "compatibility version"))
+		return TLV_RX_DATA_REJECTED;
+
         if ( old && ntohl(old->descSqn) >= ntohl(new->descSqn) ) {
 
 		dbgf_sys(DBGT_WARN, "IGNORED rcvd descSqn=%d (current descSqn=%d) from nodeId=%s via dev=%s ip=%s",
 			ntohl(new->descSqn), ntohl(old->descSqn), nodeIdAsStringFromDescAdv(it->dhnNew->desc_frame),
 			it->pb->i.iif->label_cfg.str, it->pb->i.llip_str);
 
-		IDM_T TODO;
-		invalidate_dhash(NULL, &it->dhnNew->dhash);
-
-		return TLV_RX_DATA_IGNORED;
+		return TLV_RX_DATA_REJECTED;
 	}
 
-        if (validate_param(new->comp_version, my_compatibility>=CV17?(my_compatibility-1):0, (my_compatibility+1), "compatibilty version"))
-		return TLV_RX_DATA_IGNORED;
-	
 	if (validate_param(ntohs(new->ogmSqnRange), _MIN_OGM_SQN_RANGE, _MAX_OGM_SQN_RANGE, ARG_OGM_SQN_RANGE))
 		return TLV_RX_DATA_FAILURE;
 
@@ -1587,7 +2030,7 @@ int32_t process_dsc_tlv_description(struct rx_frame_iterator *it)
 }
 
 STATIC_FUNC
-int32_t create_dsc_tlv_node(struct rx_frame_iterator *it)
+int32_t create_dsc_tlv_names(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 	IDM_T TODO;
@@ -1595,7 +2038,7 @@ int32_t create_dsc_tlv_node(struct rx_frame_iterator *it)
 }
 
 STATIC_FUNC
-int32_t process_dsc_tlv_node(struct rx_frame_iterator *it)
+int32_t process_dsc_tlv_names(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 	IDM_T TODO;
@@ -1607,7 +2050,7 @@ int32_t process_dsc_tlv_node(struct rx_frame_iterator *it)
         }
 	 */
 
-	return TLV_RX_DATA_IGNORED;
+	return TLV_RX_DATA_PROCESSED;
 }
 
 STATIC_FUNC
@@ -1861,7 +2304,7 @@ int32_t rx_frame_dev_adv( struct rx_frame_iterator *it)
 
                         purge_local_node(local);
 
-                        return FAILURE;
+                        return TLV_RX_DATA_FAILURE;
                 }
 
         } else if (((DEVADV_SQN_T) (dev_sqn - local->dev_adv_sqn)) > DEVADV_SQN_DAD_RANGE) {
@@ -1871,7 +2314,7 @@ int32_t rx_frame_dev_adv( struct rx_frame_iterator *it)
 
                 purge_local_node(local);
                 
-                return FAILURE;
+                return TLV_RX_DATA_FAILURE;
 
 
         } else if (local->dev_adv_sqn != dev_sqn) {
@@ -2086,7 +2529,7 @@ int32_t rx_frame_link_adv( struct rx_frame_iterator *it)
 
                         purge_local_node(local);
 
-                        return FAILURE;
+                        return TLV_RX_DATA_FAILURE;
                 }
 
         } else {
@@ -2324,18 +2767,12 @@ int32_t tx_frame_problem_adv(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 	struct problem_type *problem = it->ttn ? (struct problem_type *)it->ttn->task.data : NULL;
-//      struct msg_problem_adv *adv = ((struct msg_problem_adv*) tx_iterator_cache_msg_ptr(it));
         assertion(-500860, (problem && problem->local_id ));
         assertion(-500936, (problem->local_id > LOCAL_ID_INVALID));
 
         dbgf_all(DBGT_INFO, "FRAME_TYPE_PROBLEM_CODE=%d local_id=0x%X", problem->problem_code, problem->local_id);
 
-        if (problem->problem_code == FRAME_TYPE_PROBLEM_CODE_DUP_LINK_ID) {
-		assertion(-500000, 0);
-        } else {
-
-                assertion(-500846, (0));
-        }
+	assertion(-500846, (0));
 
         return TLV_TX_DATA_FAILURE;
 }
@@ -2349,32 +2786,9 @@ int32_t rx_frame_problem_adv(struct rx_frame_iterator *it)
         TRACE_FUNCTION_CALL;
         struct msg_problem_adv *adv = (struct msg_problem_adv *) it->frame_data;
 
-        if (adv->code == FRAME_TYPE_PROBLEM_CODE_DUP_LINK_ID) {
+	dbgf_sys(DBGT_WARN, "code=%d", adv->code);
 
-#if MIN_COMPATIBILITY <= CV17
-		if ( my_compatibility <= CV17 ) {
-
-			if (it->frame_data_length != sizeof (struct msg_problem_adv)) {
-				dbgf_sys(DBGT_ERR,"frame_data_length=%d !!", it->frame_data_length);
-				return TLV_RX_DATA_FAILURE;
-			}
-
-			if (adv->local_id == my_local_id) {
-				if (new_local_id(NULL) == LOCAL_ID_INVALID) {
-					return TLV_RX_DATA_FAILURE;
-				}
-
-				dbgf_sys(DBGT_ERR, "reselect my_local_id=%X (old %X) as signalled by NB=%s via dev=%s",
-					ntohl(my_local_id), ntohl(adv->local_id), it->pb->i.llip_str, it->pb->i.iif->label_cfg.str);
-			}
-		}
-#endif
-
-        } else {
-                return TLV_RX_DATA_IGNORED;
-        }
-
-        return it->frame_msgs_length;
+	return TLV_RX_DATA_PROCESSED;
 }
 
 
@@ -2507,7 +2921,7 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
                         neighIID4x = absolute;
 
                         if ((m + 1) >= msgs)
-                                return FAILURE;
+                                return TLV_RX_DATA_FAILURE;
 
                         continue;
 
@@ -2539,14 +2953,7 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
 
                                 purge_local_node(pb->i.link->local);
 
-/*
-                                if (on->desc)
-                                        cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, on);
-
-                                free_orig_node(on);
-*/
-
-                                return FAILURE;
+                                return TLV_RX_DATA_FAILURE;
                         }
 
                         if (dhn == self->dhn || on->blocked) {
@@ -2572,7 +2979,7 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
                                         "INVALID metric! orig_sqn=%d/%d orig=%s via link=%s neighIID4x=%d",
                                         ogm_sqn, on->ogmSqn_next, cryptShaAsString(&on->nodeId), pb->i.llip_str, neighIID4x);
 
-                                return FAILURE;
+                                return TLV_RX_DATA_FAILURE;
                         }
 
                         UMETRIC_T um = fmetric_to_umetric(fm);
@@ -2589,7 +2996,7 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
                         
                         if (update_path_metrics(pb, on, ogm_sqn, &um) != SUCCESS) {
                                 assertion(-501145, (0));
-                                return FAILURE;
+                                return TLV_RX_DATA_FAILURE;
                         }
 
                 } else {
@@ -2672,11 +3079,6 @@ int32_t rx_frame_ogm_acks(struct rx_frame_iterator *it)
 
 
 
-static const void* IGNORED_PTR = (void*) & IGNORED_PTR;
-static const void* UNRESOLVED_PTR = (void*) & UNRESOLVED_PTR;
-static const void* FAILURE_PTR = (void*) & FAILURE_PTR;
-
-
 STATIC_FUNC
 struct dhash_node *process_dhash_description_neighIID4x
 (struct packet_buff *pb, DHASH_T *dhash, uint8_t* dsc, uint16_t desc_len, IID_T neighIID4x)
@@ -2691,14 +3093,17 @@ struct dhash_node *process_dhash_description_neighIID4x
         assertion(-500689, (!(is_transmitters_iid && !memcmp(dhash, &(self->dhn->dhash), sizeof(*dhash))))); // cant be transmitters' and myselfs'
         assertion(-500000, (!avl_find(&dhash_invalid_tree, dhash)));
 
-        if ((dhn = avl_find_item(&dhash_tree, dhash))) {
+	if (avl_find(&dhash_invalid_tree, dhash)) {
+
+		dhn = (struct dhash_node*)REJECTED_PTR;
+
+	} else if ((dhn = avl_find_item(&dhash_tree, dhash))) {
                 // is about a known dhash:
                 
                 if (is_transmitters_iid) {
                         // is about the transmitter:
 
-                        if (update_local_neigh(pb, dhn) == FAILURE)
-                                return (struct dhash_node *) FAILURE_PTR;
+                        update_local_neigh(pb, dhn);
 
                         if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
                                 return (struct dhash_node *) FAILURE_PTR;
@@ -2739,20 +3144,26 @@ struct dhash_node *process_dhash_description_neighIID4x
 
 		if (((is_transmitters_iid || local->neigh) ) &&
 			(cache = get_cached_description(dhash)) &&
-			(dhn = process_description(pb, cache, dhash)) &&
-			dhn != FAILURE_PTR && dhn != UNRESOLVED_PTR && dhn != IGNORED_PTR) {
+			(dhn = process_description(pb, cache, dhash)) ) {
+			
+			if (dhn == REJECTED_PTR) {
+				
+				invalidate_dhash(NULL, dhash);
+				
+			} else if (dhn== FAILURE_PTR || dhn == UNRESOLVED_PTR ) {
 
-			if (is_transmitters_iid &&
-				//is about the transmitter  and  a description + dhash is known
-				update_local_neigh(pb, dhn) == FAILURE)
-				return(struct dhash_node *) FAILURE_PTR;
+			} else {
 
-			if (neighIID4x > IID_RSVD_MAX &&
-				iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
-				return(struct dhash_node *) FAILURE_PTR;
+				if (is_transmitters_iid)
+					//is about the transmitter  and  a description + dhash is known
+					update_local_neigh(pb, dhn);
 
-			assertion(-500969, IMPLIES(is_transmitters_iid, is_described_neigh(pb->i.link, pb->i.transmittersIID)));
-			assertion(-501587, dhn);
+				if (neighIID4x > IID_RSVD_MAX &&
+					iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
+					return(struct dhash_node *) FAILURE_PTR;
+
+				assertion(-500969, IMPLIES(is_transmitters_iid, is_described_neigh(pb->i.link, pb->i.transmittersIID)));
+			}
 		}
         }
 
@@ -2760,9 +3171,9 @@ struct dhash_node *process_dhash_description_neighIID4x
                 pb->i.iif->label_cfg.str, pb->i.llip_str, dhash->h.u32[0],
                 (dsc ? nodeIdAsStringFromDescAdv(dsc) : "NO DESCRIPTION"), (cache ? "CACHED" : "-"),
                 (dhn?(dhn==FAILURE_PTR?"FAILURE":
-                        (dhn==UNRESOLVED_PTR?"UNRESOLVED":(dhn==IGNORED_PTR?"IGNORED":"RESOLVED"))):"UNKNOWN"),
+                        (dhn==UNRESOLVED_PTR?"UNRESOLVED":(dhn==REJECTED_PTR?"REJECTED":"RESOLVED"))):"UNKNOWN"),
                 neighIID4x, is_transmitters_iid,
-		(dhn && dhn!=FAILURE_PTR && dhn!=UNRESOLVED_PTR && dhn!=IGNORED_PTR && dhn->on ?
+		((dhn && dhn!=FAILURE_PTR && dhn!=UNRESOLVED_PTR && dhn!=REJECTED_PTR && dhn->on) ?
 			cryptShaAsString(&dhn->on->nodeId) : DBG_NIL));
 
         return dhn;
@@ -2782,33 +3193,28 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
         dbgf_track(DBGT_INFO, "via NB: %s", pb->i.llip_str);
 
         if (neighIID4x <= IID_RSVD_MAX)
-                return FAILURE;
+                return TLV_RX_DATA_FAILURE;
 
         if (!(is_transmitter_adv || is_described_neigh(pb->i.link, pb->i.transmittersIID))) {
                 dbgf_track(DBGT_INFO, "via undescribed NB: %s", pb->i.llip_str);
                 return sizeof (struct msg_dhash_adv);
         }
 
-	if (avl_find(&dhash_invalid_tree, &adv->dhash)) {
-
-        } else if ((dhn = process_dhash_description_neighIID4x(pb, &adv->dhash, NULL, 0, neighIID4x)) == FAILURE_PTR) {
+	if ((dhn = process_dhash_description_neighIID4x(pb, &adv->dhash, NULL, 0, neighIID4x)) == FAILURE_PTR) {
                 
-		return FAILURE;
+		return TLV_RX_DATA_FAILURE;
 
-	} else if (dhn == UNRESOLVED_PTR || dhn == IGNORED_PTR) {
+	} else if (dhn == UNRESOLVED_PTR || dhn == REJECTED_PTR) {
 
-	} else if (dhn) {
+	} else if (dhn == NULL) {
+
+		schedule_tx_task(pb->i.link->local->best_tp_lndev, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, 0, 0, 0, neighIID4x);
+
+	} else {
 
 		assertion(-500690, (dhn && dhn->on)); // UNDESCRIBED or fully described
 		//if rcvd transmitters' description then it must have become a described neighbor:
 		assertion(-500488, IMPLIES(is_transmitter_adv, (is_described_neigh(pb->i.link, pb->i.transmittersIID))));
-
-	} else if (!dhn) {
-		
-		schedule_tx_task(pb->i.link->local->best_tp_lndev, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, 0, 0, 0, neighIID4x);
-
-	} else {
-		assertion(-501635, 0);
 	}
 
         return sizeof (struct msg_dhash_adv);
@@ -2823,17 +3229,17 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
         assertion(-500550, (it->frame_msgs_length >= ((int) sizeof (struct dsc_msg_description))));
 
 	if (it->frame_data_length > (int)MAX_DESC_SIZE)
-		return FAILURE;
+		return TLV_RX_DATA_FAILURE;
 
 	struct tlv_hdr tlvHdr = { .u.u16 = ntohs(((struct tlv_hdr*)it->frame_data)->u.u16) };
 	struct desc_hdr_rhash *rhashHdr = ((struct desc_hdr_rhash*)(it->frame_data + sizeof(struct tlv_hdr)));
 
 	if (tlvHdr.u.tlv.type != BMX_DSC_TLV_RHASH ||
 		tlvHdr.u.tlv.length != sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) )
-		return FAILURE;
+		return TLV_RX_DATA_FAILURE;
 
 	if (rhashHdr->compression || rhashHdr->reserved || rhashHdr->expanded_type != BMX_DSC_TLV_PUBKEY)
-		return FAILURE;
+		return TLV_RX_DATA_FAILURE;
 
 	DHASH_T dhash;
 	struct packet_buff *pb = it->pb;
@@ -2847,29 +3253,26 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 
 
 
-	if (!avl_find(&dhash_invalid_tree, &dhash)) {
+	struct dhash_node *dhn =  process_dhash_description_neighIID4x(pb, &dhash, it->frame_data, it->frame_data_length, IID_RSVD_UNUSED);
 
-		struct dhash_node *dhn =  process_dhash_description_neighIID4x(pb, &dhash, it->frame_data, it->frame_data_length, IID_RSVD_UNUSED);
+	if (dhn == FAILURE_PTR) {
 
-		if (dhn == FAILURE_PTR) {
-			
-			return FAILURE;
+		return TLV_RX_DATA_FAILURE;
 
-		} else if (dhn == NULL || dhn == UNRESOLVED_PTR || dhn == IGNORED_PTR) {
+	} else if (dhn == UNRESOLVED_PTR || dhn == REJECTED_PTR || dhn == NULL) {
 
-		} else if (dhn) {
+	} else {
 
-			assertion(-500691, (dhn->on));
+		assertion(-500691, (dhn->on));
 
-			if (desc_adv_tx_unsolicited && dhn->on->updated_timestamp == bmx_time &&
-				is_described_neigh(pb->i.link, pb->i.transmittersIID)) {
+		if (desc_adv_tx_unsolicited && dhn->on->updated_timestamp == bmx_time &&
+			is_described_neigh(pb->i.link, pb->i.transmittersIID)) {
 
-				struct link_dev_node **lndev_arr = lndevs_get_best_tp(pb->i.link->local);
-				int d;
+			struct link_dev_node **lndev_arr = lndevs_get_best_tp(pb->i.link->local);
+			int d;
 
-				for (d = 0; (lndev_arr[d]); d++)
-					schedule_tx_task(lndev_arr[d], FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, 0, 0, dhn->myIID4orig, 0);
-			}
+			for (d = 0; (lndev_arr[d]); d++)
+				schedule_tx_task(lndev_arr[d], FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, 0, 0, dhn->myIID4orig, 0);
 		}
 	}
 	
@@ -2975,47 +3378,6 @@ int32_t rx_msg_hello_adv(struct rx_frame_iterator *it)
 
         return sizeof (struct msg_hello_adv);
 }
-
-#ifdef WITH_UNUSED
-STATIC_FUNC
-int32_t get_desc_frame_data(uint8_t **frame_data, uint8_t *desc_ext_data, int32_t desc_ext_len, struct desc_extension *dext, uint8_t frame_type) {
-
-	assertion(-500000, (frame_type != BMX_DSC_TLV_RHASH));
-
-	int32_t frame_data_len = 0;
-
-	struct rx_frame_iterator it = {
-                .caller = __FUNCTION__, .onOld = NULL, .cn = NULL, .op = TLV_OP_PLUGIN_MIN,
-                .db = description_tlv_db, .process_filter = FRAME_TYPE_PROCESS_NONE,
-                .frame_type = -1,.frames_in = desc_ext_data, .frames_length = desc_ext_len,
-		.dextNew = dext };
-
-	int32_t tlv_result;
-
-	if (frame_data)
-		*frame_data = NULL;
-
-        while ((tlv_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
-
-		if ( it.frame_type == frame_type
-			|| (it.frame_type == BMX_DSC_TLV_RHASH && ((struct desc_hdr_rhash*)(it.frame_data))->expanded_type == frame_type)
-			) {
-
-			if( frame_data_len )
-				return -1;
-
-			if (frame_data)
-				*frame_data = it.frame_data;
-
-			frame_data_len = it.frame_data_length;
-		}
-	}
-	if (tlv_result == TLV_RX_DATA_DONE)
-		return frame_data_len;
-	else
-		return tlv_result;
-}
- #endif
 
 IDM_T desc_frame_changed(  struct rx_frame_iterator *it, uint8_t type )
 {
@@ -3149,10 +3511,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 
                         dbgf_mute(50, DBGL_SYS, DBGT_WARN, "%s - unknown type=%d ! check for updates", it->caller, f_type);
 
-                        if (f_type > it->db->handl_max)
-                                return TLV_RX_DATA_FAILURE;
-
-                        return TLV_RX_DATA_IGNORED;
+                        return my_pettiness ? TLV_RX_DATA_REJECTED : TLV_RX_DATA_PROCESSED;
                 }
 
                 f_handl = &it->db->handls[f_type];
@@ -3166,13 +3525,11 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 
                 it->handl = f_handl;
                 it->frame_msgs_length = f_data_len - f_handl->data_header_size;
-                it->frame_msgs_fixed = f_handl->fixed_msg_size ? (it->frame_msgs_length / f_handl->min_msg_size) : 0;
+                it->frame_msgs_fixed = (f_handl->fixed_msg_size && f_handl->min_msg_size) ? (it->frame_msgs_length / f_handl->min_msg_size) : 0;
                 it->msg = f_data + f_handl->data_header_size;
             
                 dbgf_all(DBGT_INFO, "%s - type=%s frame_length=%d frame_data_length=%d frame_msgs_length=%d",
                         it->caller, f_handl->name, f_len, f_data_len, it->frame_msgs_length);
-
-                assertion(-500994, (f_handl->min_msg_size));
 
 
                 if (f_handl->rx_msg_handler ? // only frame_handler support zero messages per frame!
@@ -3184,7 +3541,8 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 				it->caller, f_len, f_data_len, it->frame_msgs_length, f_handl->name);
                         return TLV_RX_DATA_FAILURE;
 
-                } else if (f_handl->fixed_msg_size && it->frame_msgs_length % f_handl->min_msg_size) {
+                } else if (f_handl->fixed_msg_size && (f_handl->min_msg_size ?
+			(it->frame_msgs_length % f_handl->min_msg_size) : (it->frame_msgs_length) ) ) {
 
                         dbgf_sys(DBGT_WARN, "%s - non-matching length=%d for type=%s", it->caller, f_len, f_handl->name);
                         return TLV_RX_DATA_FAILURE;
@@ -3195,7 +3553,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 
                         dbgf_all(DBGT_INFO, "%s - type=%d process_filter=%d : IGNORED", it->caller, f_type, it->process_filter);
 
-                        return TLV_RX_DATA_IGNORED;
+                        return TLV_RX_DATA_PROCESSED;
 
                 } else if (pb && f_handl->rx_tp_min &&
                         (!pb->i.lndev || pb->i.lndev->timeaware_tx_probe < *(f_handl->rx_tp_min))) {
@@ -3204,7 +3562,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                                 it->caller, pb->i.iif->ip_llocal_str, pb->i.llip_str,
                                 pb->i.lndev ? pb->i.lndev->timeaware_tx_probe : 0, f_handl->name);
 
-                        return TLV_RX_DATA_IGNORED;
+                        return TLV_RX_DATA_PROCESSED;
 
                 } else if (pb && f_handl->rx_rp_min &&
                         (!pb->i.lndev || pb->i.lndev->timeaware_rx_probe < *(f_handl->rx_rp_min))) {
@@ -3213,7 +3571,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                                 it->caller, pb->i.iif->ip_llocal_str, pb->i.llip_str,
                                 pb->i.lndev ? pb->i.lndev->timeaware_rx_probe : 0, f_handl->name);
 
-                        return TLV_RX_DATA_IGNORED;
+                        return TLV_RX_DATA_PROCESSED;
 
 
                 } else if (!IMPLIES(f_handl->rx_requires_described_neigh, (pb && is_described_neigh(pb->i.link, pb->i.transmittersIID)))) {
@@ -3221,65 +3579,57 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                         dbgf_track(DBGT_INFO, "%s - UNDESCRIBED IID=%d of neigh=%s - skipping frame type=%s",
                                 it->caller, pb->i.transmittersIID, pb->i.llip_str, f_handl->name);
 
-                        return TLV_RX_DATA_IGNORED;
+                        return TLV_RX_DATA_PROCESSED;
 
                 } else if (it->op >= TLV_OP_PLUGIN_MIN && it->op <= TLV_OP_PLUGIN_MAX) {
 
-//                        it->msg = it->frame_data + f_handl->data_header_size;
-
-                        return TLV_RX_DATA_PROCESSED;//it->frame_msgs_length;
+                        return TLV_RX_DATA_PROCESSED;
 
                 } else if (f_handl->rx_msg_handler && f_handl->fixed_msg_size) {
 
-//                        it->msg = it->frame_data + f_handl->data_header_size;
+			int32_t result = TLV_RX_DATA_FAILURE;
 
-                        while (it->msg < it->frame_data + it->frame_data_length &&
-                                ((*(f_handl->rx_msg_handler)) (it)) == f_handl->min_msg_size) {
+                        while (it->msg < it->frame_data + it->frame_data_length && (
+                                (result = ((*(f_handl->rx_msg_handler)) (it))) == f_handl->min_msg_size || result == TLV_RX_DATA_PROCESSED) ) {
 
                                 it->msg += f_handl->min_msg_size;
                         }
 
-                        if (it->msg != it->frame_data + it->frame_data_length) {
-                                dbgf_sys(DBGT_ERR, "%s- rx_msg_handler(%s)  it->msg=%p frame_data=%p frame_data_length=%d : FAILURE",
-                                        it->caller, f_handl->name, it->msg, it->frame_data, it->frame_data_length);
-                                return TLV_RX_DATA_FAILURE;
-                        }
-
-                        return TLV_RX_DATA_PROCESSED; //return it->frame_data_length;
-
-                } else if (f_handl->rx_frame_handler) {
-
-//                        it->msg = it->frame_data + f_handl->data_header_size;
-
-                        int32_t receptor_result = (*(f_handl->rx_frame_handler)) (it);
-
-                        if (receptor_result == TLV_RX_DATA_BLOCKED) {
-
-                                dbgf_sys(DBGT_ERR, "%s - rx_frame_handler(%s)=%d frame_msgs_len=%d : BLOCKED",
-                                        it->caller, f_handl->name, receptor_result, it->frame_msgs_length );
-
-                                return TLV_RX_DATA_BLOCKED;
-
-			} else if (receptor_result == TLV_RX_DATA_IGNORED ) {
-
-				return TLV_RX_DATA_IGNORED;
-
-			} else if ( receptor_result == it->frame_msgs_length) {
+                        if (it->msg == it->frame_data + it->frame_data_length) {
 
 				return TLV_RX_DATA_PROCESSED;
 
-                        } else {
+			} else {
 
-                                dbgf_sys(DBGT_ERR, "%s - rx_frame_handler(%s)=%d frame_msgs_len=%d : FAILURE",
-                                        it->caller, f_handl->name, receptor_result, it->frame_msgs_length );
+				assertion(-500000, (result == TLV_RX_DATA_BLOCKED || result == TLV_RX_DATA_FAILURE || result == TLV_RX_DATA_REJECTED));
 
-                                return TLV_RX_DATA_FAILURE;
+                                dbgf_sys(DBGT_ERR, "%s- rx_msg_handler(%s)=%s  it->msg=%p frame_data=%p frame_data_length=%d",
+                                        it->caller, f_handl->name, tlv_rx_result_str(result), it->msg, it->frame_data, it->frame_data_length);
+
+                                return result;
+                        }
+
+
+                } else if (f_handl->rx_frame_handler) {
+
+                        int32_t result = (*(f_handl->rx_frame_handler)) (it);
+
+			if ( result == it->frame_msgs_length || result == TLV_RX_DATA_PROCESSED) {
+
+				return TLV_RX_DATA_PROCESSED;
+
+			} else {
+
+				assertion(-500000, (result == TLV_RX_DATA_BLOCKED || result == TLV_RX_DATA_FAILURE || result == TLV_RX_DATA_REJECTED));
+
+                                dbgf_sys(DBGT_ERR, "%s - rx_frame_handler(%s)=%s frame_msgs_len=%d",
+                                        it->caller, f_handl->name, tlv_rx_result_str(result), it->frame_msgs_length );
+
+				return result;
                         }
                 }
 
                 assertion(-501018, (0));
-                return TLV_RX_DATA_FAILURE;
-
         }
 
         dbgf_sys(DBGT_ERR, "%s - frames_pos=%d frames_length=%d : FAILURE", it->caller, it->frames_pos, it->frames_length);
@@ -3291,7 +3641,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 IDM_T rx_frames(struct packet_buff *pb)
 {
         TRACE_FUNCTION_CALL;
-        int32_t it_result;
+        int32_t result;
 	struct packet_header *phdr = (struct packet_header *)pb->packet.data;
         struct rx_frame_iterator it = {
                 .caller = __FUNCTION__, .onOld = NULL, .op = 0, .pb = pb,
@@ -3301,11 +3651,11 @@ IDM_T rx_frames(struct packet_buff *pb)
 		.dhnNew = NULL
 	};
 
-        while ((it_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE);
+        while ((result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE);
 
-        if (it_result <= TLV_RX_DATA_FAILURE) {
-                dbgf_sys(DBGT_WARN, "problematic frame_type=%s data_length=%d iterator_result=%d pos=%d ",
-                        it.db->handls[it.frame_type].name, it.frame_data_length, it_result, it.frames_pos);
+        if (result <= TLV_RX_DATA_FAILURE) {
+                dbgf_sys(DBGT_WARN, "problematic frame_type=%s data_length=%d result=%s pos=%d ",
+                        it.db->handls[it.frame_type].name, it.frame_data_length, tlv_rx_result_str(result), it.frames_pos);
                 return FAILURE;
         }
 
@@ -3418,8 +3768,12 @@ uint8_t use_referencing(struct frame_handl *handl)
 						((dextReferencing==TYP_FREF_DONT) ? 0 : DEF_FREF==TYP_FREF_DO ))))));
 }
 
+
+
 int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 {
+	IDM_T TODO_must_be_iterative;
+
 	struct frame_handl *handl = &(it->db->handls[it->frame_type]);
 
 	if ( use_referencing( handl ) ) {
@@ -3441,9 +3795,9 @@ int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 
 		int32_t avail_cache_space_theoretical = (avail_frames_space/sizeof(struct desc_msg_rhash)) * REF_FRAME_BODY_SIZE_OUT;
 
-		int32_t avail_cache_space_practical = XMIN( it->frame_cache_size - used_cache_space, avail_cache_space_theoretical );
+		int32_t avail_cache_space_practical = XMIN(it->frame_cache_size - used_cache_space, avail_cache_space_theoretical);
 
-		int32_t avail_vrt_desc_space = vrt_desc_size_out - handl->data_header_size - sizeof(struct tlv_hdr_virtual) - it->dext->dlen;
+		int32_t avail_vrt_desc_space = vrt_desc_size_out - (it->dext->dlen + sizeof(struct tlv_hdr_virtual) + handl->data_header_size);
 
 		return XMIN(avail_cache_space_practical, avail_vrt_desc_space);
 
@@ -3473,7 +3827,8 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
         assertion(-500881, (it->frame_cache_msgs_size >= TLV_TX_DATA_PROCESSED));
 	assertion(-501638, (it->frame_cache_msgs_size <= VRT_FRAME_DATA_SIZE_MAX));
         assertion(-500786, (tx_iterator_cache_data_space_max(it) >= 0));
-        assertion(-500355, (IMPLIES(handl->fixed_msg_size, !(it->frame_cache_msgs_size % handl->min_msg_size))));
+        assertion(-500355, (IMPLIES(handl->fixed_msg_size && handl->min_msg_size, !(it->frame_cache_msgs_size % handl->min_msg_size))));
+        assertion(-500355, (IMPLIES(handl->fixed_msg_size && !handl->min_msg_size, !it->frame_cache_msgs_size)));
         ASSERTION(-501003, (is_zero((it->frame_cache_array + it->frame_cache_msgs_size + handl->data_header_size), tx_iterator_cache_data_space_max(it))));
         assertion(-501019, (fdata_in)); // there must be some data to send!!
 
@@ -3592,8 +3947,7 @@ int32_t tx_frame_iterate(IDM_T iterate_msg, struct tx_frame_iterator *it)
         TRACE_FUNCTION_CALL;
         uint8_t t = it->frame_type;
         struct frame_handl *handl = (it->handl = &(it->db->handls[t]));
-        int32_t tlv_result;// = TLV_DATA_DONE;
-        assertion(-500977, (handl->min_msg_size));
+        int32_t result;// = TLV_DATA_DONE;
         assertion(-500776, (it->frame_cache_array));
 	assertion(-500000, IMPLIES(handl->tx_frame_handler, !iterate_msg));
 	assertion(-500000, XOR(handl->tx_frame_handler, handl->tx_msg_handler));
@@ -3629,53 +3983,53 @@ int32_t tx_frame_iterate(IDM_T iterate_msg, struct tx_frame_iterator *it)
 
                 assertion(-500814, (tx_iterator_cache_data_space_pref(it) >= 0));
 
-                if ((tlv_result = (*(handl->tx_msg_handler)) (it)) >= TLV_TX_DATA_PROCESSED) {
-                        it->frame_cache_msgs_size += tlv_result;
+                if ((result = (*(handl->tx_msg_handler)) (it)) >= TLV_TX_DATA_PROCESSED) {
+                        it->frame_cache_msgs_size += result;
                         ASSERTION(-501002, (is_zero((it->frame_cache_array + it->frame_cache_msgs_size + handl->data_header_size), tx_iterator_cache_data_space_max(it))));
 
                 } else {
-                        dbgf_track(DBGT_INFO, "tx_msg_handler()=%d %s remaining iterations=%d",
-                                tlv_result, handl->name, it->ttn ? it->ttn->tx_iterations : -1);
-                        assertion(-500810, (tlv_result != TLV_TX_DATA_FAILURE));
+                        dbgf_track(DBGT_INFO, "tx_msg_handler()=%s %s remaining iterations=%d",
+                                tlv_tx_result_str(result), handl->name, it->ttn ? it->ttn->tx_iterations : -1);
+                        assertion(-500810, (result != TLV_TX_DATA_FAILURE));
                         assertion(-500874, (IMPLIES(!it->frame_cache_msgs_size, is_zero(it->frame_cache_array, handl->data_header_size))));
                 }
 
-                return tlv_result;
+                return result;
         }
 
         assertion(-500862, (!iterate_msg));
 
         if (handl->tx_msg_handler && !iterate_msg) {
 
-                tlv_result = it->frame_cache_msgs_size;
+                result = it->frame_cache_msgs_size;
 
-                assertion(-500863, (tlv_result >= handl->min_msg_size));
+                assertion(-500863, (result >= handl->min_msg_size));
 
         } else {
                 assertion(-500803, (handl->tx_frame_handler));
                 assertion(-500864, (it->frame_cache_msgs_size == 0));
 
-                tlv_result = (*(handl->tx_frame_handler)) (it);
+                result = (*(handl->tx_frame_handler)) (it);
 
-                if (!handl->data_header_size && tlv_result == 0)
-                        tlv_result = TLV_TX_DATA_IGNORED;
+                if (!handl->data_header_size && result == 0)
+                        result = TLV_TX_DATA_IGNORED;
 
-                if (tlv_result >= TLV_TX_DATA_PROCESSED) {
+                if (result >= TLV_TX_DATA_PROCESSED) {
 
-                        it->frame_cache_msgs_size = tlv_result;
+                        it->frame_cache_msgs_size = result;
 
                 } else {
-                        dbgf_track(DBGT_INFO, "tx_frame_handler()=%d %s remaining iterations=%d",
-                                tlv_result, handl->name, it->ttn ? it->ttn->tx_iterations : -1);
+                        dbgf_track(DBGT_INFO, "tx_frame_handler()=%s %s remaining iterations=%d",
+                                tlv_tx_result_str(result), handl->name, it->ttn ? it->ttn->tx_iterations : -1);
 
                         ASSERTION(-501001, (is_zero(it->frame_cache_array, tx_iterator_cache_data_space_max(it))));
-                        assertion(-500811, (tlv_result != TLV_TX_DATA_FAILURE));
-                        return tlv_result;
+                        assertion(-500811, (result != TLV_TX_DATA_FAILURE));
+                        return result;
                 }
         }
 
 
-        assertion(-500865, (tlv_result == it->frame_cache_msgs_size));
+        assertion(-500865, (result == it->frame_cache_msgs_size));
 
 	return tx_frame_iterate_finish(it);
 }
@@ -3701,8 +4055,11 @@ int32_t tx_tlv_msg(struct tx_frame_iterator *in)
 	};
 
 	if (out.db->handls[in->handl->next_type].tx_frame_handler) {
+
 		int32_t result = tx_frame_iterate(NO/*iterate_msg*/, &out);
-		dbgf_sys(DBGT_INFO, "t=%s result=%d", out.db->handls[in->handl->next_type].name, result);
+
+		dbgf_sys(DBGT_INFO, "t=%s result=%s", out.db->handls[in->handl->next_type].name, tlv_rx_result_str(result));
+
 		if (result >= TLV_TX_DATA_PROCESSED)
 			return out.frames_out_pos;
 	}
@@ -3728,10 +4085,10 @@ int32_t rx_tlv_frame(struct rx_frame_iterator *in)
 
 	dbgf_sys(DBGT_INFO, "t=%s result=%d", out.db->handls[in->handl->next_type].name, result);
 
-	if (result == TLV_TX_DATA_DONE)
-		return in->frame_data_length;
+	if (result == TLV_RX_DATA_DONE || TLV_RX_DATA_REJECTED)
+		return TLV_RX_DATA_PROCESSED;
 
-	return result;
+	return TLV_RX_DATA_FAILURE;
 }
 
 STATIC_FUNC
@@ -3825,7 +4182,7 @@ void tx_packet(void *devp)
                 next_tx_task_list(dev, &it, &link_tree_iterator);
 
                 struct list_node *lpos, *ltmp, *lprev = (struct list_node*) it.tx_task_list;
-                int32_t tlv_result = TLV_TX_DATA_DONE;
+                int32_t result = TLV_TX_DATA_DONE;
                 struct frame_handl *handl = &it.db->handls[it.frame_type];
                 uint16_t old_frames_out_pos = it.frames_out_pos;
                 uint32_t item =0;
@@ -3849,43 +4206,43 @@ void tx_packet(void *devp)
 
                         if (it.ttn->tx_iterations <= 0) {
 
-                                tlv_result = TLV_TX_DATA_DONE;
+                                result = TLV_TX_DATA_DONE;
 
                         } else if (it.ttn->considered_ts == bmx_time) {
                                 // already considered during this tx iteration
-                                tlv_result = TLV_TX_DATA_IGNORED;
+                                result = TLV_TX_DATA_IGNORED;
 
-                        } else if ((tlv_result = tx_task_obsolete(it.ttn)) <= TLV_TX_DATA_IGNORED ) {
+                        } else if ((result = tx_task_obsolete(it.ttn)) <= TLV_TX_DATA_IGNORED ) {
                                 // too recently send! send later;
                                 // tlv_result = TLV_TX_DATA_IGNORED;
 
                         } else if (handl->tx_frame_handler) {
 
-                                tlv_result = tx_frame_iterate(NO/*iterate_msg*/, &it);
+                                result = tx_frame_iterate(NO/*iterate_msg*/, &it);
 
                         } else if (handl->tx_msg_handler) {
 
-                                tlv_result = tx_frame_iterate(YES/*iterate_msg*/, &it);
+                                result = tx_frame_iterate(YES/*iterate_msg*/, &it);
 
                         } else {
                                 assertion(-500818, (0));
                         }
 
                         if (handl->tx_msg_handler && it.frame_cache_msgs_size &&
-                                (tlv_result == TLV_TX_DATA_FULL || lpos == it.tx_task_list->last)) {// last element in list:
+                                (result == TLV_TX_DATA_FULL || lpos == it.tx_task_list->last)) {// last element in list:
                                 
-                                int32_t it_result = tx_frame_iterate(NO/*iterate_msg*/, &it);
+                                int32_t fit_result = tx_frame_iterate(NO/*iterate_msg*/, &it);
                                 
-                                assertion_dbg(-500790, (it_result >= TLV_TX_DATA_PROCESSED),
-                                        "unexpected it_result=%d (tlv_result=%d) type=%d",
-                                        it_result, tlv_result, it.frame_type);
+                                assertion_dbg(-500790, (fit_result >= TLV_TX_DATA_PROCESSED),
+                                        "unexpected fit_result=%s (tlv_result=%s) type=%d",
+                                        tlv_tx_result_str(fit_result), tlv_tx_result_str(result), it.frame_type);
                         }
 
-                        dbgf_all(DBGT_INFO, "%s type=%d =%s considered=%d iterations=%d tlv_result=%d item=%d/%d",
+                        dbgf_all(DBGT_INFO, "%s type=%d =%s considered=%d iterations=%d tlv_result=%s item=%d/%d",
                                 dev->label_cfg.str, it.frame_type, handl->name, it.ttn->considered_ts,
-                                it.ttn->tx_iterations, tlv_result, item, it.tx_task_list->items);
+                                it.ttn->tx_iterations, tlv_tx_result_str(result), item, it.tx_task_list->items);
 
-                        if (tlv_result == TLV_TX_DATA_DONE) {
+                        if (result == TLV_TX_DATA_DONE) {
 
                                 it.ttn->considered_ts = bmx_time;
                                 it.ttn->tx_iterations--;
@@ -3895,14 +4252,14 @@ void tx_packet(void *devp)
 
                                 continue;
 
-                        } else if (tlv_result == TLV_TX_DATA_IGNORED) {
+                        } else if (result == TLV_TX_DATA_IGNORED) {
 
                                 it.ttn->considered_ts = bmx_time;
 
                                 lprev = lpos;
                                 continue;
 
-                        } else if (tlv_result >= TLV_TX_DATA_PROCESSED) {
+                        } else if (result >= TLV_TX_DATA_PROCESSED) {
 
                                 it.ttn->send_ts = bmx_time;
                                 it.ttn->considered_ts = bmx_time;
@@ -3916,14 +4273,14 @@ void tx_packet(void *devp)
 
                                 continue;
 
-                        } else if (tlv_result == TLV_TX_DATA_FULL) {
+                        } else if (result == TLV_TX_DATA_FULL) {
                                 // means not created because would not fit!
                                 assertion(-500430, (it.frame_cache_msgs_size || it.frames_out_pos)); // single message larger than MAX_UDPD_SIZE
                                 break;
 
                         } else {
 
-                                dbgf_sys(DBGT_ERR, "frame_type=%d tlv_result=%d", it.frame_type, tlv_result);
+                                dbgf_sys(DBGT_ERR, "frame_type=%d tlv_result=%s", it.frame_type, tlv_tx_result_str(result));
                                 assertion(-500791, (0));
                         }
                 }
@@ -3936,7 +4293,7 @@ void tx_packet(void *devp)
                 assertion(-500796, (!it.frame_cache_msgs_size));
                 assertion(-500800, (it.frames_out_pos >= old_frames_out_pos));
 
-                if (tlv_result == TLV_TX_DATA_FULL || (it.frame_type == FRAME_TYPE_NOP && it.frames_out_pos)) {
+                if (result == TLV_TX_DATA_FULL || (it.frame_type == FRAME_TYPE_NOP && it.frames_out_pos)) {
 
 			struct packet_header *phdr = (struct packet_header *)pb.packet.data;
 
@@ -4048,401 +4405,6 @@ void schedule_my_originator_message( void* unused )
 }
 
 
-STATIC_FUNC
-struct desc_extension * dext_init(void)
-{
-	struct desc_extension *dext = debugMallocReset(sizeof(struct desc_extension), -300572);
-	LIST_INIT_HEAD(dext->refnl_list, struct refnl_node, list, list);
-	return dext;
-
-}
-
-void dext_free(struct desc_extension **dext)
-{
-	assertion(-501600, dext);
-	assertion(-501608, IMPLIES(*dext, *dext!=IGNORED_PTR && *dext!=FAILURE_PTR && *dext!=UNRESOLVED_PTR));
-
-        if(*dext) {
-
-		ref_node_release(*dext);
-
-		if((*dext)->data)
-			debugFree((*dext)->data, -300530);
-
-                debugFree((*dext), -300570);
-	}
-
-	*dext = NULL;
-}
-
-void *dext_dptr( struct desc_extension *dext, uint8_t type)
-{
-    return (dext && dext->dtd[type].len) ? dext->data + dext->dtd[type].pos : NULL;
-}
-
-
-STATIC_FUNC
-struct desc_extension * dext_resolve(struct packet_buff *pb, struct description_cache_node *cache, struct desc_extension *dext)
-{
-        TRACE_FUNCTION_CALL;
-	assertion(-501655, (BMX_DSC_TLV_INVALID > BMX_DSC_TLV_MAX && BMX_DSC_TLV_INVALID <= UINT8_MAX));
-
-	uint8_t *data = (((uint8_t*) cache->desc_frame) + sizeof(struct dsc_msg_description));
-	uint32_t dlen = cache->desc_frame_len - sizeof(struct dsc_msg_description);
-	IDM_T unresolved = 0;
-	uint8_t dsc_frame_types[BMX_DSC_TLV_ARRSZ] = {0};
-	int32_t tlv_result;
-
-        struct rx_frame_iterator it = {
-                .caller = __FUNCTION__, .onOld = NULL, .op = TLV_OP_PLUGIN_MIN,
-                .db = description_tlv_db, .process_filter = FRAME_TYPE_PROCESS_NONE,
-                .frame_type = -1,.frames_in = data, .frames_length = dlen };
-
-	uint8_t vf_type = BMX_DSC_TLV_INVALID;
-	int32_t vf_data_len = 0;
-	uint8_t vf_compression = 0;
-	char *goto_error_code = "???";
-	int32_t vd_len = 0;
-
-	
-        while ((tlv_result=rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
-
-		uint32_t dext_dlen_old = 0;
-		vf_type = BMX_DSC_TLV_INVALID;
-		vf_data_len = 0;
-		vf_compression = 0;
-		
-		if (dext) {
-			dext_dlen_old = dext->dlen;
-			dext->dlen += sizeof(struct tlv_hdr_virtual);
-			// hdr setting is done when succeeded
-			// data reallocation is done before writing new data
-		}
-
-                if (it.frame_type != BMX_DSC_TLV_RHASH) {
-
-			vf_type = it.frame_type;
-			vf_data_len = it.frame_data_length;
-			
-			if ( vf_data_len <= 0 || vf_data_len > VRT_FRAME_DATA_SIZE_MAX)
-				goto_error( resolve_desc_extension_error, "1");
-			
-			if (dext) {
-				dext->data = debugRealloc(dext->data, dext->dlen + vf_data_len, -300429 );
-				memcpy(dext->data + dext->dlen, it.frame_data, vf_data_len);
-				dext->dlen += vf_data_len;
-			}
-
-
-                } else if (it.frame_type == BMX_DSC_TLV_RHASH) {
-
-			vf_type = ((struct desc_hdr_rhash*)(it.frame_data))->expanded_type;
-			vf_compression = ((struct desc_hdr_rhash*)(it.frame_data))->compression;
-			vf_data_len = resolve_ref_frame(pb, 
-				it.frame_data+sizeof(struct desc_hdr_rhash), it.frame_data_length-sizeof(struct desc_hdr_rhash),
-				dext, vf_type, vf_compression, 1);
-
-			if (vf_data_len == 0) {
-				unresolved = 1;
-			} else if ( vf_data_len < 0) {
-				goto_error( resolve_desc_extension_error, "2");
-			}
-
-
-                } else {
-			goto_error( resolve_desc_extension_error, "3");
-		}
-		
-		if (!unresolved) {
-			if (vf_type > BMX_DSC_TLV_MAX || dsc_frame_types[vf_type])
-				goto_error( resolve_desc_extension_error, "4");
-			else
-				dsc_frame_types[vf_type] = 1;
-		}
-
-		if ((vd_len = vd_len + vf_data_len) > vrt_desc_size_in)
-			goto_error( resolve_desc_extension_error, "5");
-
-		dbgf_track(DBGT_INFO, "converted type=%d %s f_data_length=%d compression=%d -> type=%d %s vf_data_len=%d, dext.len=%d",
-		           it.frame_type, it.handl->name, it.frame_data_length, vf_compression,
-			   vf_type, vf_type <= it.db->handl_max ? it.db->handls[vf_type].name : "???",
-			   vf_data_len, dext ? dext->dlen : 0 );
-		
-		if (dext) {
-
-			dext->dtd[vf_type].pos = dext_dlen_old + sizeof(struct tlv_hdr_virtual);
-			dext->dtd[vf_type].len = vf_data_len;
-
-			struct tlv_hdr_virtual *vf_hdr = (struct tlv_hdr_virtual *)(dext->data + dext_dlen_old);
-			memset(vf_hdr, 0, sizeof(struct tlv_hdr_virtual));
-			vf_hdr->type = vf_type;
-			vf_hdr->mbz = 0;
-			vf_hdr->length = htonl(sizeof(struct tlv_hdr_virtual) + vf_data_len);
-
-			assertion(-501659, (vf_data_len <= VRT_FRAME_DATA_SIZE_MAX));
-			assertion(-501660, (vf_data_len > 0 && vf_type <= BMX_DSC_TLV_MAX));
-			assertion(-501661, (dext->dlen == dext_dlen_old + ntohl(vf_hdr->length)));
-			assertion(-501662, (dext->dlen <= (uint32_t)vrt_desc_size_in));
-		}
-        }
-
-
-	if (tlv_result != TLV_RX_DATA_DONE) {
-                dbgf_sys(DBGT_WARN, "problematic description_ltv from %s, near type=%s frame_data_length=%d  pos=%d tlv_result=%d",
-                        pb ? pb->i.llip_str : DBG_NIL, it.db->handls[it.frame_type].name,
-                        it.frame_data_length, it.frames_pos, tlv_result);
-
-		goto_error( resolve_desc_extension_error, "6");
-        }
-
-	if (unresolved)
-		return (struct desc_extension *) UNRESOLVED_PTR;
-
-        return dext;
-
-	
-resolve_desc_extension_error:
-
-	assertion(-501663, (!dext)); //otherwise the check should have failed!
-	//free_desc_extensions(&dext);
-        dbgf_sys(DBGT_ERR, "Failed converting type=%d max_known=%d f_data_len=%d compression=%d -> type=%d vf_data_len=%d vf_error=%s",
-                 it.frame_type, BMX_DSC_TLV_MAX_KNOWN, it.frame_data_length, vf_compression, vf_type, vf_data_len, goto_error_code);
-
-	return (struct desc_extension *) FAILURE_PTR;
-}
-
-
-
-
-
-/*
- * tries to resolve data,len and requests unknown ref-hashes, updates dext if available and successfull
- * returns: > 0 if successfully resolved
- *          ==0 if unresolved
- *          < 0 if error (nest_level exceeded, ...)
- */
-STATIC_FUNC
-int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *f_body, uint32_t f_body_len, struct desc_extension *dext, uint8_t rf_type, uint8_t compression, uint8_t nest_level )
-{
-	assertion(-501598, (FAILURE==-1 && SUCCESS==0));
-
-        struct desc_msg_rhash *msg = (struct desc_msg_rhash *)f_body;
-	int32_t m = 0, msgs = f_body_len / sizeof(struct desc_msg_rhash);
-	int32_t ref_len = 0;
-	struct desc_extension *solvable = dext ? dext : dext_init();
-	struct desc_extension *solvable_free = dext ? NULL : solvable;
-	uint32_t solvable_begin = solvable->dlen;
-	char *goto_error_code = " ";
-
-	if ((++nest_level) > MAX_REF_NESTING)
-		goto_error( resolve_ref_frame_error, "exceeded nest level");
-
-	solvable->max_nesting = nest_level;
-
-	for (; m < msgs && ref_len < MAX_DESC_LEN; m++) {
-
-                struct ref_node *refn = ref_node_get(&(msg[m].rframe_hash));
-
-		if (!refn) {
-
-			if(pb)
-				schedule_tx_task(pb->i.link->local->best_tp_lndev, FRAME_TYPE_REF_REQ, SCHEDULE_MIN_MSG_SIZE, 
-					&(msg[m].rframe_hash), sizeof(SHA1_T), 0, 0);
-
-			solvable = NULL;
-
-		} else if (refn->nested) {
-
-			int32_t tmp_len = resolve_ref_frame(pb, refn->f_body, refn->f_body_len, solvable, rf_type, refn->compression, nest_level);
-
-			if (tmp_len < 0)
-				goto_error( resolve_ref_frame_error, "failed next recursion");
-			if (tmp_len == 0)
-				solvable = NULL;
-			if (tmp_len > 0)
-				ref_len += tmp_len;
-
-		} else if (refn->compression == FRAME_COMPRESSION_NONE  && solvable) {
-
-			solvable->data = debugRealloc(solvable->data, solvable->dlen + refn->f_body_len, -300569);
-			memcpy(solvable->data + solvable->dlen, refn->f_body, refn->f_body_len);
-			solvable->dlen += refn->f_body_len;
-
-			if (solvable == dext)
-				ref_node_use(solvable, refn, rf_type);
-
-			ref_len += refn->f_body_len;
-
-		} else if (refn->compression == FRAME_COMPRESSION_GZIP  && solvable) {
-
-			int32_t tmp_len = z_decompress(refn->f_body, refn->f_body_len, &solvable->data, solvable->dlen);
-
-			if (tmp_len <= 0)
-				goto_error( resolve_ref_frame_error, "failed inner decompression");
-
-			solvable->dlen += tmp_len;
-
-			if (solvable == dext)
-				ref_node_use(solvable, refn, rf_type);
-
-			ref_len += tmp_len;
-
-		} else {
-			goto_error( resolve_ref_frame_error, "invalid case");
-		}
-
-		assertion(-501599, IMPLIES(solvable, solvable_begin + ref_len == solvable->dlen));
-		assertion(-501653, IMPLIES(solvable, rf_type <= BMX_DSC_TLV_MAX));
-        }
-
-	if (m != msgs)
-		goto_error( resolve_ref_frame_error, "invalid msgs");
-
-	if (!solvable)
-		goto resolve_ref_frame_unresolved;
-
-	if (compression == FRAME_COMPRESSION_NONE) {
-
-	} else if (compression == FRAME_COMPRESSION_GZIP) {
-
-		if ((ref_len = z_decompress(solvable->data + solvable_begin, ref_len, &solvable->data, solvable_begin)) <= 0)
-			goto_error( resolve_ref_frame_error, "failed outer decompression");
-
-		solvable->dlen = solvable_begin + ref_len;
-
-	} else {
-		goto_error( resolve_ref_frame_error, "invalid outer decompression");
-	}
-
-	dext_free(&solvable_free);
-	return ref_len;
-
-resolve_ref_frame_unresolved:
-	dext_free(&solvable_free);
-	return SUCCESS; // 0 == unresolved
-
-resolve_ref_frame_error:
-{
-	dbgf_sys(DBGT_ERR, "dlen=%d compression=%d dext=%d  msgs=%d nest_level=%d solvable=%d rf_type=%d m=%d ref_len=%d error=%s",
-		f_body_len, compression, dext?1:0, msgs, nest_level, solvable?1:0, rf_type, m, ref_len, goto_error_code);
-
-
-	dext_free(&solvable_free);
-	assertion(-501654, !dext); // this function should only be called with dext if a prior call with dext=NULL succeeded
-	return FAILURE;
-}
-}
-
-
-
-struct dhash_node * process_description(struct packet_buff *pb, struct description_cache_node *cache, DHASH_T *dhash)
-{
-        TRACE_FUNCTION_CALL;
-        assertion(-500262, (pb && pb->i.link && cache && cache->desc_frame));
-        assertion(-500381, (!avl_find( &dhash_tree, dhash )));
-	
-	// First check if dext is fully resolvable::
-        struct desc_extension *dext = dext_resolve(pb, cache, NULL);
-	struct dhash_node *dhnNew = NULL;
-	struct orig_node *on = NULL;
-
-	if (dext == FAILURE_PTR) {
-		
-		goto process_desc0_error;
-		
-        } else if (dext == UNRESOLVED_PTR) {
-		
-		dbgf_sys(DBGT_WARN, "UNRESOLVED global_id=%s rcvd via_dev=%s via_ip=%s",
-			nodeIdAsStringFromDescAdv(cache->desc_frame), pb->i.iif->label_cfg.str, pb->i.llip_str);
-
-		return (struct dhash_node *) UNRESOLVED_PTR;
-		
-	} else if (dext) {
-		cleanup_all(-500000);
-	}
-
-	// only if dext is fully resolvable then allocate it, so this should always succeed!!!
-	dext = dext_init();
-
-	if ( dext != dext_resolve(pb, cache, dext) )
-		cleanup_all(-500000);
-
-
-	dhnNew = get_dhash_node(cache->desc_frame, cache->desc_frame_len, dext, dhash);
-	on = avl_find_item(&orig_tree, nodeIdFromDescAdv(cache->desc_frame));
-	assertion(-500000, IMPLIES(on, on->dhn && on->dhn->desc_frame && on->dhn->dext));
-
-	int32_t tlv_result = process_description_tlvs(pb, on, dhnNew, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL);
-
-	assertion( -500000, (tlv_result==TLV_RX_DATA_BLOCKED || tlv_result==TLV_RX_DATA_DONE || tlv_result==TLV_RX_DATA_FAILURE));
-
-	if (tlv_result == TLV_RX_DATA_FAILURE)
-		goto process_desc0_error;
-
-
-	IDM_T TODO;
-
-        if (!on) // create new orig:
-                on = init_orig_node(nodeIdFromDescAdv(dhnNew->desc_frame));
-
-
-        if (on->dhn)
-                cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, on);
-
-        assertion(-501361, IMPLIES(on->blocked, !on->added));
-
-
-        if (tlv_result == TLV_RX_DATA_DONE) {
-
-		block_orig_node(NO, on);
-                tlv_result = process_description_tlvs(pb, on, dhnNew, TLV_OP_NEW, FRAME_TYPE_PROCESS_ALL);
-                assertion(-501362, (tlv_result == TLV_RX_DATA_DONE)); // checked, so MUST SUCCEED!!
-                assertion(-501363, (on->blocked != on->added));
-
-        } else if (tlv_result == TLV_RX_DATA_BLOCKED ) {
-
-                if (on->added) {
-			assertion(-500000, (on->dhn && on->dhn->desc_frame && on->dhn->dext));
-                        tlv_result = process_description_tlvs(pb, on, on->dhn, TLV_OP_DEL, FRAME_TYPE_PROCESS_ALL);
-                        assertion(-501364, (tlv_result == TLV_RX_DATA_DONE));
-			assertion(-500000, (on->blocked && !on->added));
-                }
-
-		block_orig_node(YES, on);
-        }
-
-        del_cached_description(&dhnNew->dhash);
-
-        update_neigh_dhash(on, dhnNew);
-
-	assertion(-500000, (on->dhn == dhnNew));
-        assertion(-500970, (dhnNew->on == on));
-        assertion(-500309, (dhnNew == avl_find_item(&dhash_tree, &on->dhn->dhash)));
-        assertion(-500310, (on == avl_find_item(&orig_tree, nodeIdFromDescAdv(on->dhn->desc_frame))));
-	assertion(-500000, (dhnNew->desc_frame));
-
-	cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_CREATED, on);
-
-        return dhnNew;
-
-
-process_desc0_error:
-
-        if (dhnNew) {
-		dext_free(&dhnNew->dext);
-		debugFree(dhnNew->desc_frame, -300000);
-		debugFree(dhnNew, -300000);
-	}
-
-	dbgf_sys(DBGT_ERR, "FAILED global_id=%s rcvd via_dev=%s via_ip=%s",
-		cache ? nodeIdAsStringFromDescAdv(cache->desc_frame) : "???", pb->i.iif->label_cfg.str, pb->i.llip_str);
-
-        blacklist_neighbor(pb);
-
-        return (struct dhash_node *) FAILURE_PTR;
-}
-
-
 
 void update_my_description_adv(void)
 {
@@ -4488,13 +4450,13 @@ void update_my_description_adv(void)
 
         for (it.frame_type = 0; it.frame_type < BMX_DSC_TLV_ARRSZ; it.frame_type++) {
        
-                if (it.db->handls[it.frame_type].min_msg_size) {
+                if (it.db->handls[it.frame_type].name) {
 
-			int32_t iterator_result = tx_frame_iterate(NO/*iterate_msg*/, &it);
+			int32_t result = tx_frame_iterate(NO/*iterate_msg*/, &it);
 
-			if (iterator_result < TLV_TX_DATA_DONE) {
+			if (result < TLV_TX_DATA_DONE) {
 				dext_free(&next_dext);
-				assertion_dbg(-500798, 0, "frame_type=%d iterator_result=%d", it.frame_type, iterator_result);
+				assertion_dbg(-500798, 0, "frame_type=%d result=%s", it.frame_type, tlv_tx_result_str(result));
 			}
 		}
 	}
@@ -4577,15 +4539,13 @@ int32_t opt_show_descriptions(uint8_t cmd, uint8_t _save, struct opt_type *opt,
                                 .db = description_tlv_db, .process_filter = type_filter,
                                 .frame_type = -1, .frames_in = dhn->dext->data, .frames_length = dhn->dext->dlen };
 
-                        int32_t it_result;
-                        while ((it_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
+                        int32_t result;
+                        while ((result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
 
-                                if (it_result >= TLV_RX_DATA_PROCESSED) {
-                                        dbg_printf(cn, "\n %s: ", it.handl->name);
+				dbg_printf(cn, "\n %s: ", it.handl->name);
 
-                                        fields_dbg_lines(cn, relevance, it.frame_msgs_length, it.msg,
-                                                it.handl->min_msg_size, it.handl->msg_format);
-                                }
+				fields_dbg_lines(cn, relevance, it.frame_msgs_length, it.msg,
+					it.handl->min_msg_size, it.handl->msg_format);
                         }
                 }
 
@@ -4655,9 +4615,8 @@ static int32_t ref_status_creator(struct status_handl *handl, void *data)
 
 		for (rft_pos=0; rft_pos<(8*sizeof(rft_bits));rft_pos++) {
 			if (bit_get(rft_bits, (8*sizeof(rft_bits)), rft_pos)) {
-				char *fstr = description_tlv_db->handls[rft_pos].min_msg_size ? description_tlv_db->handls[rft_pos].name : "???";
 				snprintf(ref_str + strlen(ref_str), sizeof(status[i].ref_types) - strlen(ref_str),
-					"%s%s", strlen(ref_str) ? " ":"", fstr  );
+					"%s%s", strlen(ref_str) ? " ":"", description_tlv_db->handls[rft_pos].name  );
 			}
 		}
 

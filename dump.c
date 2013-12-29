@@ -157,10 +157,10 @@ void dump(struct packet_buff *pb)
                 .frame_type = -1, .frames_in = (((uint8_t*) phdr) + sizeof (struct packet_header)),
                 .frames_length = (plength - sizeof (struct packet_header)), .frames_pos = 0 };
 
-        int32_t iterator_result;
+        int32_t result;
         uint16_t pkt_pos = sizeof (struct packet_header);
 
-        while ((iterator_result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
+        while ((result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
 
                 char tnum[4];
                 char *tname;
@@ -198,17 +198,17 @@ void dump(struct packet_buff *pb)
                 pkt_pos += it.frame_length;
         }
 
-        if (iterator_result != TLV_RX_DATA_DONE) {
+        if (result != TLV_RX_DATA_DONE) {
 
-                dbgf_dump(DBGT_NONE, "%s             ERROR frame_type=%d frame_length=%d frame_data_length=%d iterator_result=%d - ignoring further frames!!",
-                        direction == DUMP_DIRECTION_IN ? "in " : "out", it.frame_type, it.frame_length, it.frame_data_length, iterator_result);
+                dbgf_dump(DBGT_NONE, "%s             ERROR frame_type=%d frame_length=%d frame_data_length=%d result=%s - ignoring further frames!!",
+                        direction == DUMP_DIRECTION_IN ? "in " : "out", it.frame_type, it.frame_length, it.frame_data_length, tlv_rx_result_str(result));
 
                 dbgf_dump(DBGT_NONE, "%s         data [%3d...%3d]:%s",
                         direction == DUMP_DIRECTION_IN ? "in  hex" : "out hex",
                         pkt_pos, pkt_pos + it.frame_length - 1, memAsHexString(((uint8_t*) phdr) + pkt_pos, it.frame_length));
         }
 
-        assertion(-500990, (IMPLIES(direction == DUMP_DIRECTION_OUT, iterator_result == TLV_RX_DATA_DONE)));
+        assertion(-500990, (IMPLIES(direction == DUMP_DIRECTION_OUT, result == TLV_RX_DATA_DONE)));
 
 }
 

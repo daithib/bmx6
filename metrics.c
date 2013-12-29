@@ -1330,7 +1330,7 @@ int process_description_tlv_metricalgo(struct rx_frame_iterator *it )
         if (op == TLV_OP_NEW || op == TLV_OP_TEST) {
 
                 if (metricalgo_tlv_to_host(tlv_algo, &host_algo, it->frame_msgs_length) == FAILURE)
-                        return FAILURE;
+                        return TLV_RX_DATA_FAILURE;
         }
 
         if (op == TLV_OP_DEL)

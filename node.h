@@ -565,7 +565,7 @@ char *nodeIdAsStringFromDescAdv( uint8_t *desc_adv );
 
 void purge_local_node(struct local_node *local);
 
-IDM_T update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn);
+void update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn);
 void update_neigh_dhash(struct orig_node *on, struct dhash_node *dhn);
 struct dhash_node* get_dhash_node(uint8_t *desc_frame, uint32_t desc_frame_len, struct desc_extension* dext, DHASH_T *dhash);
 

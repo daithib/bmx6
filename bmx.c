@@ -51,7 +51,10 @@
 
 #define CODE_CATEGORY_NAME "general"
 
+
 int32_t my_compatibility = DEF_COMPATIBILITY;
+
+int32_t my_pettiness = DEF_PETTINESS;
 
 uint32_t my_descSqn = 0;
 

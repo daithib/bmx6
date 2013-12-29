@@ -693,7 +693,7 @@ void create_neigh_node(struct local_node *local, struct dhash_node * dhn)
 
 
 
-IDM_T update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
+void update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
 {
         TRACE_FUNCTION_CALL;
         struct local_node *local = pb->i.link->local;
@@ -717,8 +717,6 @@ IDM_T update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
                 local->neigh = dhn->neigh;
                 local->neigh->local = local;
 
-                goto update_local_neigh_success;
-
 
         } else if (!local->neigh && !dhn->neigh) {
 
@@ -727,9 +725,6 @@ IDM_T update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
                 dbgf_track(DBGT_INFO, "NEW link=%s <-> LOCAL=%d <-> NEIGHIID4me=%d <-> dhn->id=%s",
                         pb->i.llip_str, local->local_id, local->neigh->neighIID4me,
                         cryptShaAsString(&dhn->on->nodeId));
-
-                goto update_local_neigh_success;
-
 
         } else if (
                 dhn->neigh &&
@@ -741,29 +736,25 @@ IDM_T update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
                 local->neigh->dhn->neigh == local->neigh
                 ) {
 
-                goto update_local_neigh_success;
-        }
+        } else {
 
-        dbgf_sys(DBGT_ERR, "NONMATCHING LINK=%s -> local=%d -> neighIID4me=%d -> dhn->id=%s",
-		pb->i.llip_str, local->local_id,
-		local->neigh ? local->neigh->neighIID4me : 0,
-		local->neigh && local->neigh->dhn->on ? cryptShaAsString(&local->neigh->dhn->on->nodeId) : DBG_NIL);
-        dbgf_sys(DBGT_ERR, "NONMATCHING local=%d <- neighIID4me=%d <- DHN=%s",
-		dhn->neigh && dhn->neigh->local ? dhn->neigh->local->local_id : 0,
-		dhn->neigh ? dhn->neigh->neighIID4me : 0,
-		cryptShaAsString(&dhn->on->nodeId));
+		dbgf_sys(DBGT_ERR, "NONMATCHING LINK=%s -> local=%d -> neighIID4me=%d -> dhn->id=%s",
+			pb->i.llip_str, local->local_id,
+			local->neigh ? local->neigh->neighIID4me : 0,
+			local->neigh && local->neigh->dhn->on ? cryptShaAsString(&local->neigh->dhn->on->nodeId) : DBG_NIL);
+		dbgf_sys(DBGT_ERR, "NONMATCHING local=%d <- neighIID4me=%d <- DHN=%s",
+			dhn->neigh && dhn->neigh->local ? dhn->neigh->local->local_id : 0,
+			dhn->neigh ? dhn->neigh->neighIID4me : 0,
+			cryptShaAsString(&dhn->on->nodeId));
 
-        if (dhn->neigh)
-                free_neigh_node(dhn->neigh);
+		if (dhn->neigh)
+			free_neigh_node(dhn->neigh);
 
-        if (local->neigh)
-                free_neigh_node(local->neigh);
+		if (local->neigh)
+			free_neigh_node(local->neigh);
 
-        return FAILURE;
-
-
-
-update_local_neigh_success:
+		cleanup_all(-500000);
+	}
 
         assertion(-500954, (dhn->neigh));
         assertion(-500953, (dhn->neigh->dhn == dhn));
@@ -772,9 +763,6 @@ update_local_neigh_success:
         assertion(-500951, (local->neigh));
         assertion(-500050, (local->neigh->local == local));
         assertion(-500949, (local->neigh->dhn->neigh == local->neigh));
-
-
-        return SUCCESS;
 }
 
 

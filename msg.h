@@ -389,12 +389,13 @@ struct frame_hdr_rhash_adv {
 
 // iterator return codes:
 
-#define TLV_RX_DATA_FAILURE     (-4) // syntax error: exit or blacklist
-#define TLV_RX_DATA_DONE        (-3) // done, nothing more to do
-#define TLV_RX_DATA_BLOCKED     (-2) // blocked due to DAD
-#define TLV_RX_DATA_IGNORED     (-1) // unknown, filtered, nothing to send, or ignored due to bad link...
-#define TLV_RX_DATA_PROCESSED   (0) // > means succesfully processed returned amount of data
+#define TLV_RX_DATA_FAILURE     (-4) // syntax error: exit or blacklist. Transmitter should NOT have send this!
+#define TLV_RX_DATA_REJECTED    (-3) // incompatible version, outdated sqn. Marked as invalid to avoid further requests
+#define TLV_RX_DATA_DONE        (-2) // done, nothing more to do
+#define TLV_RX_DATA_BLOCKED     (-1) // blocked due to DAD.
+#define TLV_RX_DATA_PROCESSED   (0)  // > means succesfully processed returned amount of data
 
+char *tlv_rx_result_str(int32_t r);
 
 #define TLV_TX_DATA_FULL        (-5) // nothing done! Frame finished or not enough remining data area to write
 #define TLV_TX_DATA_FAILURE     (-4) // syntax error: will fail assertion()
@@ -402,6 +403,7 @@ struct frame_hdr_rhash_adv {
 #define TLV_TX_DATA_IGNORED     (-1) // unknown, filtered, nothing to send, or ignored due to bad link...
 #define TLV_TX_DATA_PROCESSED   (0) // >= means succesfully processed returned amount of data
 
+char *tlv_tx_result_str(int32_t r);
 
 // rx_frame_iterator operation codes:
 enum {
@@ -430,15 +432,6 @@ struct problem_type {
 #define FRAME_TYPE_PROBLEM_CODE_MIN          0x01
 #define FRAME_TYPE_PROBLEM_CODE_DUP_LINK_ID  0x01
 #define FRAME_TYPE_PROBLEM_CODE_MAX          0x01
-
-//struct msg_test_adv { // 1 byte
-//	uint8_t adv_test;
-//} __attribute__((packed));
-//
-//struct hdr_test_adv { // 1 byte
-//	uint8_t hdr_test;
-//	struct msg_test_adv msg[];
-//} __attribute__((packed));
 
 
 
@@ -898,7 +891,6 @@ void update_my_dev_adv(void);
 void update_my_link_adv(uint32_t changes);
 
 void dext_free(struct desc_extension **dext);
-struct dhash_node * process_description(struct packet_buff *pb, struct description_cache_node *desc, DHASH_T *dhash);
 IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, struct dhash_node *dhn, uint8_t op, uint8_t filter);
 IDM_T desc_frame_changed(  struct rx_frame_iterator *it, uint8_t f_type );
 void purge_tx_task_list(struct list_head *tx_tasks_list, struct link_node *only_link, struct dev_node *only_dev);

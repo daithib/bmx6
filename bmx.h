@@ -54,6 +54,14 @@ typedef int8_t IDM_T; // smallest int which size does NOT matter
 #define ARG_COMPATIBILITY "compatibility"
 extern int32_t my_compatibility;
 
+#define MIN_PETTINESS 0
+#define MAX_PETTINESS 1
+#define DEF_PETTINESS 0
+#define ARG_PETTINESS "pettiness"
+
+extern int32_t my_pettiness;
+
+
 #ifndef GIT_REV
 #define GIT_REV "0"             // to be incremented after each critical code change
 #endif
