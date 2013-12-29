@@ -1837,8 +1837,6 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 		goto process_desc0_error;
 
 
-	IDM_T TODO;
-
         if (!on) // create new orig:
                 on = init_orig_node(nodeIdFromDescAdv(dhnNew->desc_frame));
 	else
