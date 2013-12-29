@@ -1324,25 +1324,24 @@ void node_tasks(void) {
 
 		assertion(-501351, (on->blocked && !on->added));
 
-		IDM_T tlvs_res = process_description_tlvs(NULL, on, on->dhn, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL);
+		int32_t result = process_description_tlvs(NULL, on, on->dhn, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL);
 
-		if (tlvs_res == TLV_RX_DATA_DONE) {
+		assertion(-500000, (result==TLV_RX_DATA_DONE || result==TLV_RX_DATA_BLOCKED));
+
+		if (result == TLV_RX_DATA_DONE) {
 
 			cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, on);
 
-			tlvs_res = process_description_tlvs(NULL, on, on->dhn, TLV_OP_NEW, FRAME_TYPE_PROCESS_ALL);
+			result = process_description_tlvs(NULL, on, on->dhn, TLV_OP_NEW, FRAME_TYPE_PROCESS_ALL);
 
-			assertion(-500364, (tlvs_res == TLV_RX_DATA_DONE)); // checked, so MUST SUCCEED!!
+			assertion(-500364, (result == TLV_RX_DATA_DONE)); // checked, so MUST SUCCEED!!
 
 			cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_CREATED, on);
-
 		}
 
 		dbgf_track(DBGT_INFO, "unblocking nodeId=%s %s !",
-			nodeIdAsStringFromDescAdv(on->dhn->desc_frame), tlvs_res == TLV_RX_DATA_DONE ? "success" : "failed");
-
+			nodeIdAsStringFromDescAdv(on->dhn->desc_frame), tlv_rx_result_str(result));
 	}
-
 }
 
 static struct opt_type node_options[]=

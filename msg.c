@@ -1841,9 +1841,7 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 
         if (!on) // create new orig:
                 on = init_orig_node(nodeIdFromDescAdv(dhnNew->desc_frame));
-
-
-        if (on->dhn)
+	else
                 cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, on);
 
         assertion(-501361, IMPLIES(on->blocked, !on->added));
