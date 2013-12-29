@@ -500,12 +500,14 @@ int process_dsc_tlv_hna(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
         ASSERTION(-500357, (it->frame_type == BMX_DSC_TLV_UHNA6));
-        assertion(-500588, (it->onOld));
 
         struct orig_node *on = it->onOld;
         uint8_t op = it->op;
 
+        assertion(-500588, IMPLIES(op==TLV_OP_NEW || op==TLV_OP_DEL || op>=TLV_OP_CUSTOM_MIN, on));
+
         uint32_t hna_net_curr = 0;
+	GLOBAL_ID_T *nodeId = on ? &on->nodeId : (it->dhnNew ? nodeIdFromDescAdv(it->dhnNew->desc_frame) : NULL);
 
         assertion(-600004, (on != self));
 
@@ -536,7 +538,7 @@ int process_dsc_tlv_hna(struct rx_frame_iterator *it)
 
 
                 dbgf_track(DBGT_INFO, "%s nodeId=%s %s=%s",
-                        tlv_op_str(op), cryptShaAsString(&on->nodeId), ARG_UHNA, netAsStr(&key));
+                        tlv_op_str(op), cryptShaAsString(nodeId), ARG_UHNA, netAsStr(&key));
 
                 if (op == TLV_OP_TEST) {
 
@@ -547,7 +549,7 @@ int process_dsc_tlv_hna(struct rx_frame_iterator *it)
                                 (un = find_overlapping_hna(&key.ip, key.mask, on))) {
 
                                 dbgf_sys(DBGT_ERR, "nodeId=%s %s=%s blocked (by nodeId=%s)",
-                                        cryptShaAsString(&on->nodeId), ARG_UHNA, netAsStr(&key),
+                                        cryptShaAsString(nodeId), ARG_UHNA, netAsStr(&key),
                                         un ? cryptShaAsString(&un->on->nodeId) : "???");
 
                                 return TLV_RX_DATA_BLOCKED;
@@ -560,7 +562,7 @@ int process_dsc_tlv_hna(struct rx_frame_iterator *it)
 				if (is_ip_net_equal(&(hna_net_keys[i].ip), &key.ip, XMIN(hna_net_keys[i].mask, key.mask), AF_INET6)) {
 //                                if (!memcmp(&hna_net_keys[i], &key, sizeof (key))) {
                                         dbgf_sys(DBGT_ERR, "nodeId=%s FAILURE due to overlapping hnas %s %s",
-                                                cryptShaAsString(&on->nodeId), netAsStr(&hna_net_keys[i]), netAsStr(&key));
+                                                cryptShaAsString(nodeId), netAsStr(&hna_net_keys[i]), netAsStr(&key));
                                         return TLV_RX_DATA_FAILURE;
                                 }
                         }
@@ -1808,9 +1810,9 @@ int process_dsc_tlv_tun6(struct rx_frame_iterator *it)
                 struct dsc_msg_tun6 *adv = &(((struct dsc_msg_tun6 *) (it->frame_data))[m]);
                 struct tun_out_key key = set_tun_adv_key(it->onOld, m);
 
-                dbgf_all(DBGT_INFO, "op=%s tunnel_out.items=%d tun_net.items=%d msg=%d/%d localIp=%s nodeId=%s (%p) key=%s",
+                dbgf_all(DBGT_INFO, "op=%s tunnel_out.items=%d tun_net.items=%d msg=%d/%d localIp=%s nodeId=%s key=%s",
                         tlv_op_str(it->op), tun_out_tree.items, tun_net_tree.items, m, it->frame_msgs_fixed,
-                        ip6AsStr(&adv->localIp), cryptShaAsString(&it->onOld->nodeId), (void*) (it->onOld), memAsHexString(&key, sizeof (key)));
+                        ip6AsStr(&adv->localIp), nodeIdAsStringFromDescAdv(it->dhnNew->desc_frame), memAsHexString(&key, sizeof (key)));
 
                 if (it->op == TLV_OP_TEST) {
 
@@ -1822,7 +1824,7 @@ int process_dsc_tlv_tun6(struct rx_frame_iterator *it)
                                 (tin = avl_find_item_by_field(&tun_in_tree, &adv->localIp, tun_in_node, remote)) ||
                                 (un = find_overlapping_hna(&adv->localIp, 128, it->onOld))) {
                                 dbgf_sys(DBGT_ERR, "nodeId=%s %s=%s blocked (by my %s=%s or other's %s with nodeId=%s)",
-                                        cryptShaAsString(&it->onOld->nodeId), ARG_TUN_DEV, ip6AsStr(&adv->localIp),
+                                        nodeIdAsStringFromDescAdv(it->dhnNew->desc_frame), ARG_TUN_DEV, ip6AsStr(&adv->localIp),
                                         ARG_TUN_IN, tin ? tin->nameKey.str : DBG_NIL,
                                         ARG_UHNA, un ? cryptShaAsString(&un->on->nodeId) : DBG_NIL);
 

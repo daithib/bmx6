@@ -3434,8 +3434,6 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
         dbgf_all(DBGT_INFO, "%s - f_type=%d f_pos=%d f_len=%d",
 	        it->caller, it->frame_type, it->frames_pos, it->frames_length);
 
-	assertion(-500000, IMPLIES(it->onOld, it->dhnNew));
-	
         if (it->frames_pos == it->frames_length ) {
 		
 		if ( it->db == description_tlv_db && it->onOld && it->onOld->added && it->op == TLV_OP_NEW &&
@@ -3470,7 +3468,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 			f_pos_next = it->frames_pos + f_len;
                 }
 
-                assertion(-501590, IMPLIES(it->onOld, f_type != BMX_DSC_TLV_RHASH));
+                assertion(-501590, IMPLIES(it->dhnNew, f_type != BMX_DSC_TLV_RHASH));
 
                 it->frames_pos = f_pos_next;
 
