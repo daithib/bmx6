@@ -645,7 +645,7 @@ struct dsc_msg_description {
 
 #define DESCRIPTION_MSG_FORMAT { \
 {FIELD_TYPE_UINT,             -1, 8,                       1, FIELD_RELEVANCE_LOW,  "comp_version" }, \
-{FIELD_TYPE_HEX,              -1, 8,                       0, FIELD_RELEVANCE_MEDI, "capabilities" }, \
+{FIELD_TYPE_HEX,              -1, 8,                       1, FIELD_RELEVANCE_MEDI, "capabilities" }, \
 {FIELD_TYPE_UINT,             -1, (8*sizeof(DESC_SQN_T)),  0, FIELD_RELEVANCE_MEDI, "descSqn" }, \
 {FIELD_TYPE_UINT,             -1, (8*sizeof(OGM_SQN_T)),   0, FIELD_RELEVANCE_MEDI, "ogmSqnMin" }, \
 {FIELD_TYPE_UINT,             -1, (8*sizeof(OGM_SQN_T)),   0, FIELD_RELEVANCE_MEDI, ARG_OGM_SQN_RANGE }, \
