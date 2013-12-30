@@ -39,21 +39,16 @@
 {FIELD_TYPE_STRING_BINARY, -1, 0,                                   1, FIELD_RELEVANCE_HIGH,  "key" }, \
 FIELD_FORMAT_END }
 
+struct dsc_msg_pubkey {
+        uint8_t type;
+        uint8_t key[];
+} __attribute__((packed));
+
 
 #define DESCRIPTION_MSG_SIGNATURE_FORMAT { \
 {FIELD_TYPE_UINT,          -1, 8*sizeof(struct dsc_msg_signature),  1, FIELD_RELEVANCE_HIGH,  "type"}, \
 {FIELD_TYPE_STRING_BINARY, -1, 0,                                   1, FIELD_RELEVANCE_HIGH,  "signature" }, \
 FIELD_FORMAT_END }
-
-struct dsc_msg_sha {
-        uint32_t dataLen;
-        CRYPTSHA1_T dataSha;
-} __attribute__((packed));
-
-struct dsc_msg_pubkey {
-        uint8_t type;
-        uint8_t key[];
-} __attribute__((packed));
 
 struct dsc_msg_signature {
         uint8_t type;
@@ -65,6 +60,11 @@ struct dsc_msg_signature {
 {FIELD_TYPE_UINT,          -1, 32,                        0, FIELD_RELEVANCE_HIGH,  "len"}, \
 {FIELD_TYPE_STRING_BINARY, -1, 8*sizeof(SHA1_T),          1, FIELD_RELEVANCE_HIGH,  "sha"}, \
 FIELD_FORMAT_END }
+
+struct dsc_msg_sha {
+        uint32_t dataLen;
+        CRYPTSHA1_T dataSha;
+} __attribute__((packed));
 
 
 extern CRYPTKEY_T *my_PubKey;
