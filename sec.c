@@ -103,30 +103,42 @@ int create_dsc_tlv_signature(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	if ((int)(sizeof(struct dsc_msg_signature) + my_PubKey->rawKeyLen) > tx_iterator_cache_data_space_pref(it))
-		return TLV_TX_DATA_FULL;
+	static struct dsc_msg_signature *msg = NULL;
+	static int32_t dataOffset = 0;
 
-/*
-	uint8_t *sign_start = it->frames_out_ptr - sizeof (struct description);
-	uint32_t sign_len = sizeof (struct description) + it->frames_out_pos;
+	if (it->frame_type==BMX_DSC_TLV_SIGNATURE) {
 
-	struct dsc_msg_signature *msg = (struct dsc_msg_signature*) tx_iterator_cache_msg_ptr(it);
+		assertion(-500000, (!msg && !dataOffset));
 
-	msg->type = my_PubKey->rawKeyType;
+		msg = (struct dsc_msg_signature*) (it->frames_out_ptr + it->frames_out_pos + sizeof(struct tlv_hdr));
+		dataOffset = it->frames_out_pos + sizeof(struct tlv_hdr) + sizeof(struct dsc_msg_signature) + my_PubKey->rawKeyLen;
 
-	CRYPTSHA1_T sha;
-	cryptShaAtomic(sign_start, sign_len, &sha);
-	int32_t keySpace;
+		return sizeof(struct dsc_msg_signature) + my_PubKey->rawKeyLen;
 
-	cryptSign((uint8_t*)&sha, sizeof(sha), msg->signature, &keySpace);
+	} else {
+		assertion(-500000, (it->frame_type == BMX_DSC_TLV_SIGNATURE_DUMMY));
+		assertion(-500000, (msg && dataOffset));
+		assertion(-500000, (it->frames_out_pos > dataOffset));
 
-	dbgf_sys(DBGT_INFO, "added len=%d description rsa-%d signature over hash=%s over len=%d bytes desc.name=%s", 
-		(sizeof(struct dsc_msg_signature) + keySpace), (keySpace*8), memAsHexString(&sha, sizeof(sha)),
-		sign_len, ((struct description*)sign_start)->globalId.name );
+		int32_t dataLen = it->frames_out_pos - dataOffset;
+		uint8_t *data = it->frames_out_ptr + dataOffset;
 
-	assertion(-500000, (keySpace == my_PubKey->rawKeyLen));
-*/
-	return (sizeof(struct dsc_msg_signature) + my_PubKey->rawKeyLen);
+		CRYPTSHA1_T dataSha;
+		cryptShaAtomic(data, dataLen, &dataSha);
+		int32_t keySpace;
+
+		cryptSign((uint8_t*)&dataSha, sizeof(dataSha), msg->signature, &keySpace);
+		assertion(-500000, (keySpace == my_PubKey->rawKeyLen));
+
+		msg->type = my_PubKey->rawKeyType;
+
+		dbgf_sys(DBGT_INFO, "fixed RSA%d signature over dataSha=%s over dataLen=%d data=%s",
+			(keySpace*8), cryptShaAsString(&dataSha), dataLen, memAsHexString(data, dataLen));
+
+		msg = NULL;
+		dataOffset = 0;
+		return TLV_TX_DATA_IGNORED;
+	}
 }
 
 STATIC_FUNC
@@ -134,18 +146,21 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
+	if (it->frame_type == BMX_DSC_TLV_SIGNATURE_DUMMY)
+		return TLV_RX_DATA_PROCESSED;
+
 	assertion(-500000, (it->frame_data_length == it->frame_msgs_length && it->frame_data == it->msg));
 	assertion(-500000, (it->dhnNew && it->dhnNew->dext));
 
 	if (it->op != TLV_OP_TEST || !descVerification)
-		return it->frame_data_length;
+		return TLV_RX_DATA_PROCESSED;
 
 	char *goto_error_code = NULL;
 	int32_t sign_len = it->frame_data_length - sizeof(struct dsc_msg_signature);
 	struct dsc_msg_signature *msg = (struct dsc_msg_signature*)(it->frame_data);
-	uint32_t desc_offset = (2*sizeof(struct tlv_hdr)) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) + it->frame_data_length;
-	uint8_t *desc_start = (uint8_t*)it->dhnNew->desc_frame + desc_offset;
-	int32_t desc_len = it->dhnNew->desc_frame_len - desc_offset;
+	uint32_t dataOffset = (2*sizeof(struct tlv_hdr)) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) + it->frame_data_length;
+	uint8_t *data = (uint8_t*)it->dhnNew->desc_frame + dataOffset;
+	int32_t dataLen = it->dhnNew->desc_frame_len - dataOffset;
 	CRYPTSHA1_T desc_sha;
 	CRYPTKEY_T *pkey_crypt = NULL;
 	struct dsc_msg_pubkey *pkey_msg = dext_dptr(it->dhnNew->dext, BMX_DSC_TLV_PUBKEY);
@@ -156,13 +171,13 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 	if ( !pkey_msg || !cryptKeyTypeAsString(pkey_msg->type) || cryptKeyLenByType(pkey_msg->type) != sign_len )
 		goto_error( finish, "2");
 
-	if ( desc_len < (int)sizeof(struct dsc_msg_description))
+	if ( dataLen < (int)sizeof(struct dsc_msg_description))
 		goto_error( finish, "3");
 
 	if ( sign_len > (descVerification/8) )
 		goto_error( finish, "4");
 
-	cryptShaAtomic(desc_start, desc_len, &desc_sha);
+	cryptShaAtomic(data, dataLen, &desc_sha);
 
 	pkey_crypt = cryptPubKeyFromRaw(pkey_msg->key, sign_len);
 	
@@ -181,7 +196,7 @@ finish: {
 		"sign_len=%d signature=%s\n"
 		"pkey_type=%s pkey_type_len=%d pkey=%s \n"
 		"plain_len=%d==%d plain_sha=%s problem?=%s",
-		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", desc_len, memAsHexString(&desc_sha, sizeof(desc_sha)),
+		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", dataLen, memAsHexString(&desc_sha, sizeof(desc_sha)),
 		sign_len, memAsHexString(msg->signature, sign_len),
 		pkey_msg ? cryptKeyTypeAsString(pkey_msg->type) : "---", pkey_msg ? cryptKeyLenByType(pkey_msg->type) : 0,
 		pkey_crypt ? memAsHexString(pkey_crypt->rawKey, pkey_crypt->rawKeyLen) : "---",
@@ -189,10 +204,12 @@ finish: {
 	
 	cryptKeyFree(&pkey_crypt);
 	
-	if (goto_error_code)
+	if (goto_error_code && sign_len > (descVerification/8))
+		return TLV_RX_DATA_REJECTED;
+	else if (goto_error_code)
 		return TLV_RX_DATA_FAILURE;
 	else
-		return it->frame_data_length;
+		return TLV_RX_DATA_PROCESSED;
 }
 }
 
@@ -200,16 +217,35 @@ STATIC_FUNC
 int create_dsc_tlv_sha(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-/*
-	struct dsc_msg_sha *msg = ((struct dsc_msg_sha*) tx_iterator_cache_msg_ptr(it));
 
-	msg->expInLen = htonl(it->dext->dlen);
-	cryptShaAtomic(it->dext->data, it->dext->dlen, &msg->expInSha);
+	static struct dsc_msg_sha *msg = NULL;
+	static uint32_t dataOffset = 0;
 
-	dbgf_sys(DBGT_INFO, "added description expInlen=%d expInsha=%s expIn=%s", 
-		ntohl(msg->expInLen), memAsHexString(&msg->expInSha, sizeof(SHA1_T)), memAsHexString(it->dext->data, it->dext->dlen));
-*/
-	return sizeof(struct dsc_msg_sha);
+	if (it->frame_type==BMX_DSC_TLV_SHA) {
+		assertion(-500000, (!msg && !dataOffset));
+
+		msg = (struct dsc_msg_sha*) (it->frames_out_ptr + it->frames_out_pos + sizeof(struct tlv_hdr));
+		dataOffset = it->dext->dlen + sizeof(struct tlv_hdr_virtual) + sizeof(struct dsc_msg_sha);
+
+		return sizeof(struct dsc_msg_sha);
+
+	} else {
+		assertion(-500000, (it->frame_type == BMX_DSC_TLV_SHA_DUMMY));
+		assertion(-500000, (msg && dataOffset));
+		assertion(-500000, (it->dext->dlen > dataOffset));
+
+		msg->dataLen = htonl(it->dext->dlen - dataOffset);
+		cryptShaAtomic(it->dext->data + dataOffset, it->dext->dlen - dataOffset, &msg->dataSha);
+
+		dbgf_sys(DBGT_INFO, "fixed description SHA dataLen=%d dataSha=%s data=%s",
+			ntohl(msg->dataLen), cryptShaAsString(&msg->dataSha),
+			memAsHexString(it->dext->data + dataOffset, it->dext->dlen - dataOffset));
+
+
+		msg = NULL;
+		dataOffset = 0;
+		return TLV_TX_DATA_IGNORED;
+	}
 }
 
 STATIC_FUNC
@@ -217,37 +253,40 @@ int process_dsc_tlv_sha(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-//	return TLV_RX_DATA_IGNORED;
+	if (it->frame_type == BMX_DSC_TLV_SHA_DUMMY)
+		return TLV_RX_DATA_PROCESSED;
 	
 	if (it->op != TLV_OP_TEST )
-		return it->frame_data_length;
+		return TLV_RX_DATA_PROCESSED;
 
 	char *goto_error_code = NULL;
 	struct dsc_msg_sha *msg = ((struct dsc_msg_sha*) it->frame_data);
-	int32_t expInLen = (int32_t)(((uint8_t*)it->frame_hdr) - it->frames_in);
-	
-	assertion(-500000, (expInLen>0));
-	
-	if( (int)ntohl(msg->expInLen) != expInLen )
+	uint8_t *data = it->frames_in +  it->frames_pos;
+	int32_t dataLen = it->frames_length - it->frames_pos;
+
+	if (dataLen <= 0)
 		goto_error(finish, "1");
 
-	SHA1_T expInSha;
-	cryptShaAtomic(it->frames_in, expInLen, &expInSha);
+	if( (int)ntohl(msg->dataLen) != dataLen )
+		goto_error(finish, "1");
+
+	SHA1_T dataSha;
+	cryptShaAtomic(data, dataLen, &dataSha);
 	
-	if (memcmp(&msg->expInSha, &expInSha, sizeof(SHA1_T)))
+	if (memcmp(&msg->dataSha, &dataSha, sizeof(SHA1_T)))
 		goto_error(finish, "2"); 
 
 finish: {
 	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
 		"%s %s verifying  expInLen=%d == msg.expInLen=%d expInSha=%s == msg.expInSha=%s  problem?=%s expIn=%s",
-		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", expInLen, ntohl(msg->expInLen), 
-		memAsHexString(&expInSha, sizeof(expInSha)), memAsHexString(&msg->expInSha, sizeof(expInSha)),
-		goto_error_code, memAsHexString(it->frames_in, expInLen) );
+		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", dataLen, ntohl(msg->dataLen),
+		memAsHexString(&dataSha, sizeof(dataSha)), memAsHexString(&msg->dataSha, sizeof(dataSha)),
+		goto_error_code, memAsHexString(data, dataLen) );
 
 	if (goto_error_code)
 		return TLV_RX_DATA_FAILURE;
 	else
-		return it->frame_data_length;
+		return TLV_RX_DATA_PROCESSED;
 }
 }
 
@@ -412,15 +451,6 @@ int32_t init_sec( void )
 	handl.msg_format = pubkey_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_PUBKEY, &handl);
 
-	static const struct field_format sha_format[] = DESCRIPTION_MSG_SHA_FORMAT;
-        handl.name = "EXP_SHA";
-        handl.min_msg_size = sizeof(struct dsc_msg_sha);
-        handl.fixed_msg_size = 1;
-        handl.tx_frame_handler = create_dsc_tlv_sha;
-        handl.rx_frame_handler = process_dsc_tlv_sha;
-	handl.msg_format = sha_format;
-        register_frame_handler(description_tlv_db, BMX_DSC_TLV_SHA, &handl);
-
 	static const struct field_format signature_format[] = DESCRIPTION_MSG_SIGNATURE_FORMAT;
         handl.name = "SIGNATURE";
         handl.min_msg_size = sizeof(struct dsc_msg_signature);
@@ -429,6 +459,30 @@ int32_t init_sec( void )
         handl.rx_frame_handler = process_dsc_tlv_signature;
 	handl.msg_format = signature_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_SIGNATURE, &handl);
+
+        handl.name = "SIGNATURE_DUMMY";
+        handl.min_msg_size = 0;
+        handl.fixed_msg_size = 0;
+        handl.tx_frame_handler = create_dsc_tlv_signature;
+        handl.rx_frame_handler = process_dsc_tlv_signature;
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_SIGNATURE_DUMMY, &handl);
+
+	static const struct field_format sha_format[] = DESCRIPTION_MSG_SHA_FORMAT;
+        handl.name = "SHA";
+        handl.min_msg_size = sizeof(struct dsc_msg_sha);
+        handl.fixed_msg_size = 1;
+        handl.tx_frame_handler = create_dsc_tlv_sha;
+        handl.rx_frame_handler = process_dsc_tlv_sha;
+	handl.msg_format = sha_format;
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_SHA, &handl);
+
+        handl.name = "SHA_DUMMY";
+        handl.min_msg_size = 0;
+        handl.fixed_msg_size = 0;
+        handl.tx_frame_handler = create_dsc_tlv_sha;
+        handl.rx_frame_handler = process_dsc_tlv_sha;
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_SHA_DUMMY, &handl);
+
 
         return SUCCESS;
 }

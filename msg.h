@@ -615,7 +615,10 @@ struct msg_ref_req {
 #define BMX_DSC_TLV_TUN6IN6_NET     0x17
 #define BMX_DSC_TLV_TUN6_MAX            0x17
 
-#define BMX_DSC_TLV_SMS                 0x1D
+#define BMX_DSC_TLV_SMS                 0x1A
+
+#define BMX_DSC_TLV_SHA_DUMMY           0x1E
+#define BMX_DSC_TLV_SIGNATURE_DUMMY     0x1F
 
 
 
