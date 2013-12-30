@@ -125,7 +125,7 @@ int create_dsc_tlv_signature(struct tx_frame_iterator *it)
 
 		CRYPTSHA1_T dataSha;
 		cryptShaAtomic(data, dataLen, &dataSha);
-		int32_t keySpace;
+		int32_t keySpace = my_PubKey->rawKeyLen;
 
 		cryptSign((uint8_t*)&dataSha, sizeof(dataSha), msg->signature, &keySpace);
 		assertion(-500000, (keySpace == my_PubKey->rawKeyLen));
