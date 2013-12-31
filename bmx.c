@@ -1309,7 +1309,7 @@ void bmx(void)
 
 	frequent_timeout = seldom_timeout = bmx_time;
 	
-//        update_my_description_adv();
+        update_my_description_adv();
 
         for (an = NULL; (dev = avl_iterate_item(&dev_ip_tree, &an));) {
 
