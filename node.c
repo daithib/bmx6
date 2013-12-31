@@ -987,6 +987,9 @@ void free_orig_node(struct orig_node *on)
 
         //cb_route_change_hooks(DEL, on, 0, &on->ort.rt_key.llip);
 
+	if (on==self)
+		return;
+
         purge_orig_router(on, NULL, NO);
 
         if (on->added) {

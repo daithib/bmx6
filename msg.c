@@ -3941,6 +3941,10 @@ int32_t tx_frame_iterate(IDM_T iterate_msg, struct tx_frame_iterator *it)
         TRACE_FUNCTION_CALL;
         uint8_t t = it->frame_type;
         struct frame_handl *handl = (it->handl = &(it->db->handls[t]));
+
+	if (!handl->name)
+		return TLV_TX_DATA_IGNORED;
+
         int32_t result;// = TLV_DATA_DONE;
         assertion(-500776, (it->frame_cache_array));
 	assertion(-500000, IMPLIES(handl->tx_frame_handler, !iterate_msg));
@@ -4426,38 +4430,29 @@ void update_my_description_adv(void)
         if (!initializing)
                 cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, self);
 
-	struct desc_extension *next_dext = dext_init();
-        uint8_t *next_desc = debugMallocReset(desc_size_out, -300000);
-
-
         // add all tlv options:
-        
+
         struct tx_frame_iterator it = {
                 .caller = __FUNCTION__, .db = description_tlv_db,
-		.frames_out_ptr = next_desc,
+		.frames_out_ptr = debugMallocReset(desc_size_out, -300000),
                 .frames_out_max = desc_size_out,
                 .frames_out_pref = desc_size_out,
 		.frame_cache_array = frame_cache_array,
 		.frame_cache_size = frame_cache_size,
-		.dext = next_dext
+		.dext = dext_init()
         };
 
         for (it.frame_type = 0; it.frame_type < BMX_DSC_TLV_ARRSZ; it.frame_type++) {
        
-                if (it.db->handls[it.frame_type].name) {
-
-			int32_t result = tx_frame_iterate(NO/*iterate_msg*/, &it);
-
-			if (result < TLV_TX_DATA_DONE) {
-				dext_free(&next_dext);
-				assertion_dbg(-500798, 0, "frame_type=%d result=%s", it.frame_type, tlv_tx_result_str(result));
-			}
-		}
+		int32_t result;
+		result = tx_frame_iterate(NO/*iterate_msg*/, &it);
+		assertion_dbg(-500798, result>=TLV_TX_DATA_DONE, "frame_type=%d result=%s", it.frame_type, tlv_tx_result_str(result));
 	}
 
 	dbgf_sys(DBGT_INFO, "adding my desc_frame_size=%d", it.frames_out_pos);
 
 	cryptShaAtomic(it.frames_out_ptr, it.frames_out_pos, &dhash);
+
 	struct dhash_node *dhn = get_dhash_node( it.frames_out_ptr, it.frames_out_pos, it.dext, &dhash);
 
 	update_neigh_dhash( self, dhn );
