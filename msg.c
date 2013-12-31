@@ -1580,7 +1580,7 @@ struct desc_extension * dext_resolve(struct packet_buff *pb, struct description_
 			vf_type = it.frame_type;
 			vf_data_len = it.frame_data_length;
 
-			if ( vf_data_len <= 0 || vf_data_len > VRT_FRAME_DATA_SIZE_MAX)
+			if ( vf_data_len <= 0 || vf_data_len > vrt_frame_data_size_in)
 				goto_error( resolve_desc_extension_error, "1");
 
 			if (dext) {
@@ -1635,7 +1635,7 @@ struct desc_extension * dext_resolve(struct packet_buff *pb, struct description_
 			vf_hdr->mbz = 0;
 			vf_hdr->length = htonl(sizeof(struct tlv_hdr_virtual) + vf_data_len);
 
-			assertion(-501659, (vf_data_len <= VRT_FRAME_DATA_SIZE_MAX));
+			assertion(-501659, (vf_data_len <= vrt_frame_data_size_in));
 			assertion(-501660, (vf_data_len > 0 && vf_type <= BMX_DSC_TLV_MAX));
 			assertion(-501661, (dext->dlen == dext_dlen_old + ntohl(vf_hdr->length)));
 			assertion(-501662, (dext->dlen <= (uint32_t)vrt_desc_size_in));
@@ -3819,7 +3819,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 
         assertion(-500881, (it->frame_cache_msgs_size >= TLV_TX_DATA_PROCESSED));
-	assertion(-501638, (it->frame_cache_msgs_size <= VRT_FRAME_DATA_SIZE_MAX));
+	assertion(-501638, (it->frame_cache_msgs_size <= vrt_frame_data_size_out));
         assertion(-500786, (tx_iterator_cache_data_space_max(it) >= 0));
         assertion(-500355, (IMPLIES(handl->fixed_msg_size && handl->min_msg_size, !(it->frame_cache_msgs_size % handl->min_msg_size))));
         assertion(-500355, (IMPLIES(handl->fixed_msg_size && !handl->min_msg_size, !it->frame_cache_msgs_size)));
@@ -3829,7 +3829,6 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 	if (it->dext) {
 		// this is the dext creation of my description...
 		assertion(-501639, (it->db==description_tlv_db));
-		assertion(-501640, (it->frame_cache_msgs_size <= VRT_FRAME_DATA_SIZE_OUT));
 
 		it->dext->dtd[it->frame_type].len = fdata_in;
 		it->dext->dtd[it->frame_type].pos = it->dext->dlen + sizeof(struct tlv_hdr_virtual);
@@ -4407,25 +4406,10 @@ void schedule_my_originator_message( void* unused )
 void update_my_description_adv(void)
 {
         TRACE_FUNCTION_CALL;
-//        static uint8_t cache_data_array[PREF_VRT_FRAME_DATA_SIZE_OUT] = {0};
-        DHASH_T dhash;
 
-	static uint8_t *frame_cache_array = NULL;
-	static int32_t frame_cache_size = 0;
+	assertion(-500000, (!terminating));
 
-        if (terminating) {
-		if (frame_cache_size) {
-			frame_cache_size = 0;
-			debugFree(frame_cache_array, -300585);
-		}
-                return;
-
-	} else if (frame_cache_size != VRT_FRAME_DATA_SIZE_OUT) {
-		if (frame_cache_size)
-			debugFree(frame_cache_array, -300586);
-		frame_cache_size = VRT_FRAME_DATA_SIZE_OUT;
-		frame_cache_array = debugMallocReset(frame_cache_size, -300586);
-	}
+	uint8_t *frame_cache_array = debugMallocReset(vrt_frame_data_size_out, -300586);
 
         if (!initializing)
                 cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, self);
@@ -4437,7 +4421,7 @@ void update_my_description_adv(void)
                 .frames_out_max = desc_size_out,
                 .frames_out_pref = desc_size_out,
 		.frame_cache_array = frame_cache_array,
-		.frame_cache_size = frame_cache_size,
+		.frame_cache_size = vrt_frame_data_size_out,
 		.dext = dext_init()
         };
 
@@ -4450,8 +4434,8 @@ void update_my_description_adv(void)
 
 	dbgf_sys(DBGT_INFO, "adding my desc_frame_size=%d", it.frames_out_pos);
 
+        DHASH_T dhash;
 	cryptShaAtomic(it.frames_out_ptr, it.frames_out_pos, &dhash);
-
 	struct dhash_node *dhn = get_dhash_node( it.frames_out_ptr, it.frames_out_pos, it.dext, &dhash);
 
 	update_neigh_dhash( self, dhn );
@@ -4469,10 +4453,7 @@ void update_my_description_adv(void)
 
         my_description_changed = NO;
 
-	if (!terminating)
-		cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_CREATED, self);
-//        cb_plugin_hooks(PLUGIN_CB_STATUS, NULL);
-
+	debugFree(frame_cache_array, -300585);
 }
 
 

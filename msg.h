@@ -73,8 +73,7 @@
 #define MIN_VRT_FRAME_DATA_SIZE      (MIN_DESC_SIZE)
 #define DEF_VRT_FRAME_DATA_SIZE      (8192) //any value less then MAX_VRT_FRAME_DATA_SIZE
 #define MAX_VRT_FRAME_DATA_SIZE      (MAX_VRT_DESC_SIZE - sizeof(struct tlv_hdr_virtual))
-#define     VRT_FRAME_DATA_SIZE_OUT  (vrt_frame_data_size_out)
-#define     VRT_FRAME_DATA_SIZE_MAX  XMAX(vrt_frame_data_size_in, vrt_frame_data_size_out)
+
 
 
 
