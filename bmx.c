@@ -1309,12 +1309,12 @@ void bmx(void)
 
 	frequent_timeout = seldom_timeout = bmx_time;
 	
-        update_my_description_adv();
+//        update_my_description_adv();
 
         for (an = NULL; (dev = avl_iterate_item(&dev_ip_tree, &an));) {
 
                 schedule_tx_task(&dev->dummy_lndev, FRAME_TYPE_DEV_ADV, SCHEDULE_UNKNOWN_MSGS_SIZE, 0, 0, 0, 0);
-                schedule_tx_task(&dev->dummy_lndev, FRAME_TYPE_DESC_ADVS, self->dhn->desc_frame_len, 0, 0, myIID4me, 0);
+//                schedule_tx_task(&dev->dummy_lndev, FRAME_TYPE_DESC_ADVS, self->dhn->desc_frame_len, 0, 0, myIID4me, 0);
         }
 
         initializing = NO;
@@ -1326,8 +1326,8 @@ void bmx(void)
 		if ( wait )
 			wait4Event( XMIN( wait, MAX_SELECT_TIMEOUT_MS ) );
 
-                if (my_description_changed)
-                        update_my_description_adv();
+//                if (my_description_changed)
+//                        update_my_description_adv();
 
 		// The regular tasks...
 		if ( U32_LT( frequent_timeout + 1000,  bmx_time ) ) {

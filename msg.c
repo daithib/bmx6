@@ -644,7 +644,7 @@ void schedule_tx_task(struct link_dev_node *dest_lndev, uint16_t frame_type, int
 
         assertion(-501047, (!cleaning_up)); // this function MUST NOT be called during cleanup
         assertion(-500756, (dest_lndev && dest_lndev->key.dev));
-        ASSERTION(-500713, (initializing || iid_get_node_by_myIID4x(myIID4me)));
+//        ASSERTION(-500713, (initializing || iid_get_node_by_myIID4x(myIID4me)));
         ASSERTION(-500714, IMPLIES(myIID4x, iid_get_node_by_myIID4x(myIID4x)));
         assertion(-501090, (frame_msgs_len >= SCHEDULE_MIN_MSG_SIZE));
         assertion(-501091, (dest_lndev->key.dev->active));
@@ -2090,7 +2090,7 @@ int32_t tx_frame_description_adv(struct tx_frame_iterator *it)
 		assertion(-500000, (dhn->desc_frame_len <= tx_iterator_cache_data_space_max(it)));
         }
 
-        memcpy((char*) & adv, (char*) dhn->desc_frame, dhn->desc_frame_len);
+        memcpy((char*) adv, dhn->desc_frame, dhn->desc_frame_len);
 
         dbgf_track(DBGT_INFO, "id=%s descr_size=%zu", cryptShaAsString(&dhn->on->nodeId), dhn->desc_frame_len);
 
@@ -4080,7 +4080,7 @@ int32_t rx_tlv_frame(struct rx_frame_iterator *in)
 
         while ((result = rx_frame_iterate(&out)) > TLV_RX_DATA_DONE);
 
-	dbgf_sys(DBGT_INFO, "t=%s result=%d", out.db->handls[in->handl->next_type].name, result);
+	dbgf_sys(DBGT_INFO, "t=%s result=%s", out.db->handls[in->handl->next_type].name, tlv_rx_result_str(result));
 
 	if (result == TLV_RX_DATA_DONE || TLV_RX_DATA_REJECTED)
 		return TLV_RX_DATA_PROCESSED;
@@ -4154,11 +4154,6 @@ void tx_packet(void *devp)
 
         if (my_link_adv_msgs)
                 schedule_tx_task(&dev->dummy_lndev, FRAME_TYPE_RP_ADV, (my_link_adv_msgs * sizeof (struct msg_rp_adv)), 0, 0, 0, 0);
-
-        //schedule_tx_task(&dev->dummy_lndev, FRAME_TYPE_TEST_ADV, SCHEDULE_UNKOWN_MSGS_SIZE, 0, 0, 0, 0);
-
-
-
 
 
         memset(&pb.i, 0, sizeof (pb.i));
@@ -4341,7 +4336,7 @@ void tx_packets( void *unused ) {
         TIME_T dev_next = 0;
         int8_t linklayer;
 
-        dbgf_all(DBGT_INFO, " ");
+        dbgf_sys(DBGT_INFO, " ");
 
         // MUST be checked here because:
         // description may have changed (relevantly for ogm_aggregation)
