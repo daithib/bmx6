@@ -914,7 +914,8 @@ void schedule_tx_task(struct link_dev_node *dest_lndev, uint16_t frame_type, int
 
 void register_frame_handler(struct frame_db *db, int pos, struct frame_handl *handl);
 
-struct plugin *msg_get_plugin( void );
+void init_msg( void );
+void cleanup_msg( void );
 
 uint8_t use_compression(struct frame_handl *handl);
 uint8_t use_referencing(struct frame_handl *handl);

@@ -15,8 +15,6 @@
  * 02110-1301, USA
  */
 
-#include "avl.h"
-
 
 
 #include <stdio.h>

@@ -69,5 +69,5 @@ struct dsc_msg_sha {
 
 extern CRYPTKEY_T *my_PubKey;
 
-struct plugin *sec_get_plugin( void );
-
+void init_sec( void );
+void cleanup_sec( void );

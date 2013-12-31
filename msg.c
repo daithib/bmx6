@@ -4431,7 +4431,6 @@ void update_my_description_adv(void)
                 cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, self);
 
         // add all tlv options:
-
         struct tx_frame_iterator it = {
                 .caller = __FUNCTION__, .db = description_tlv_db,
 		.frames_out_ptr = debugMallocReset(desc_size_out, -300000),
@@ -4470,7 +4469,8 @@ void update_my_description_adv(void)
 
         my_description_changed = NO;
 
-        cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_CREATED, self);
+	if (!terminating)
+		cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_CREATED, self);
 //        cb_plugin_hooks(PLUGIN_CB_STATUS, NULL);
 
 }
@@ -4837,8 +4837,7 @@ struct opt_type msg_options[]=
 };
 
 
-STATIC_FUNC
-int32_t init_msg( void )
+void init_msg( void )
 {
 	assertion(-501567, (FRAME_TYPE_MASK >= FRAME_TYPE_MAX_KNOWN));
 	assertion(-501568, (FRAME_TYPE_MASK >= BMX_DSC_TLV_MAX_KNOWN));
@@ -5075,14 +5074,11 @@ int32_t init_msg( void )
         handl.tx_msg_handler = tx_msg_ogm_ack;
         handl.rx_frame_handler = rx_frame_ogm_acks;
         register_frame_handler(packet_frame_db, FRAME_TYPE_OGM_ACK, &handl);
-
-        return SUCCESS;
 }
 
-STATIC_FUNC
 void cleanup_msg( void )
 {
-	update_my_description_adv();
+//	update_my_description_adv();
 	
         schedule_or_purge_ogm_aggregations(YES /*purge_all*/);
 	
@@ -5101,16 +5097,3 @@ void cleanup_msg( void )
 
 }
 
-
-struct plugin *msg_get_plugin( void ) {
-
-	static struct plugin msg_plugin;
-	memset( &msg_plugin, 0, sizeof ( struct plugin ) );
-
-	msg_plugin.plugin_name = CODE_CATEGORY_NAME;
-	msg_plugin.plugin_size = sizeof ( struct plugin );
-        msg_plugin.cb_init = init_msg;
-	msg_plugin.cb_cleanup = cleanup_msg;
-
-        return &msg_plugin;
-}

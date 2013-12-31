@@ -433,8 +433,7 @@ struct opt_type sec_options[]=
 };
 
 
-STATIC_FUNC
-int32_t init_sec( void )
+void init_sec( void )
 {
 	register_options_array( sec_options, sizeof( sec_options ), CODE_CATEGORY_NAME );
 
@@ -482,28 +481,10 @@ int32_t init_sec( void )
         handl.tx_frame_handler = create_dsc_tlv_sha;
         handl.rx_frame_handler = process_dsc_tlv_sha;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_SHA_DUMMY, &handl);
-
-
-        return SUCCESS;
 }
 
-STATIC_FUNC
 void cleanup_sec( void )
 {
         cryptKeyFree(&my_PubKey);
 
-}
-
-
-struct plugin *sec_get_plugin( void ) {
-
-	static struct plugin sec_plugin;
-	memset( &sec_plugin, 0, sizeof ( struct plugin ) );
-
-	sec_plugin.plugin_name = CODE_CATEGORY_NAME;
-	sec_plugin.plugin_size = sizeof ( struct plugin );
-        sec_plugin.cb_init = init_sec;
-	sec_plugin.cb_cleanup = cleanup_sec;
-
-        return &sec_plugin;
 }

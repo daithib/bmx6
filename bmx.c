@@ -304,31 +304,25 @@ void cleanup_all(int32_t status)
                 dbgf_all(DBGT_INFO, "cleaning up (status %d)...", status);
 
                 cleaning_up = YES;
-
                 terminating = YES;
 
                 // first, restore defaults...
                 cb_plugin_hooks(PLUGIN_CB_TERM, NULL);
-
 
 		cleanup_schedule();
 
                 purge_link_route_orig_nodes(NULL, NO);
 
 		cleanup_plugin();
-
+		cleanup_msg();
+		cleanup_node();
+                cleanup_ip();
+		cleanup_sec();
+		cleanup_crypt();
 		cleanup_config();
 
-                cleanup_ip();
-
-		cleanup_node();
-
-		cleanup_crypt();
-
 		// last, close debugging system and check for forgotten resources...
-
 		cleanup_control();
-
                 checkLeak();
 
 
@@ -1423,21 +1417,15 @@ int main(int argc, char *argv[])
 	init_control();
         init_avl();
 	init_crypt();
+	init_sec();
 	init_bmx();
         init_ip();
-
-	//init_schedule();
+	init_msg();
 
         if (init_plugin() == SUCCESS) {
 
-                activate_plugin((msg_get_plugin()), NULL, NULL);
-
-                struct plugin * sec_get_plugin(void);
-                activate_plugin((sec_get_plugin()), NULL, NULL);
-
                 activate_plugin((metrics_get_plugin()), NULL, NULL);
 
-                struct plugin * hna_get_plugin(void);
                 activate_plugin((hna_get_plugin()), NULL, NULL);
 
 #ifdef TRAFFIC_DUMP

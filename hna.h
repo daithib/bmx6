@@ -528,3 +528,5 @@ char* bmx6RouteBits2String(uint32_t bmx6_route_bits);
 void set_tunXin6_net_adv_list(uint8_t del, struct list_head *adv_list);
 
 struct hna_node * find_overlapping_hna( IPX_T *ipX, uint8_t prefixlen, struct orig_node *except );
+
+struct plugin *hna_get_plugin( void );

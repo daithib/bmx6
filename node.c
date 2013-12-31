@@ -987,9 +987,9 @@ void free_orig_node(struct orig_node *on)
 
         //cb_route_change_hooks(DEL, on, 0, &on->ort.rt_key.llip);
 
-	if (on==self)
+/*	if (on==self)
 		return;
-
+*/
         purge_orig_router(on, NULL, NO);
 
         if (on->added) {
@@ -1367,7 +1367,7 @@ void init_node(void) {
 
 void cleanup_node(void) {
 
-	if (self) {
+/*	if (self) {
 		if (self->dhn) {
 			self->dhn->on = NULL;
 			release_dhash(self->dhn);
@@ -1377,7 +1377,7 @@ void cleanup_node(void) {
 		debugFree(self, -300386);
 		self = NULL;
 	}
-
+*/
 	while (status_tree.items) {
 		struct status_handl *handl = avl_remove_first_item(&status_tree, -300357);
 		if (handl->data)
