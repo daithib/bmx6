@@ -314,10 +314,10 @@ void cleanup_all(int32_t status)
                 purge_link_route_orig_nodes(NULL, NO);
 
 		cleanup_plugin();
+		cleanup_sec();
 		cleanup_msg();
 		cleanup_node();
                 cleanup_ip();
-		cleanup_sec();
 		cleanup_crypt();
 		cleanup_config();
 
@@ -1417,10 +1417,10 @@ int main(int argc, char *argv[])
 	init_control();
         init_avl();
 	init_crypt();
-	init_sec();
 	init_bmx();
         init_ip();
 	init_msg();
+	init_sec();
 
         if (init_plugin() == SUCCESS) {
 
