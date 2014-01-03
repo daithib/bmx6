@@ -640,14 +640,19 @@ uint32_t fields_dbg_lines(struct ctrl_node *cn, uint16_t relevance, uint16_t dat
 
         while ((msgs_size = field_iterate(&it)) == SUCCESS) {
 
-                if (data && cn) {
+                if (data) {
 
-                        if (it.field == 0)
+                        if (cn && it.field == 0)
                                 dbg_printf(cn, "\n   ");
 
                         if (format[it.field].field_relevance >= relevance) {
-                                dbg_printf(cn, " %s=%s", format[it.field].field_name,
-                                        field_dbg_value(&format[it.field], min_msg_size, data, it.field_bit_pos, it.field_bits));
+				if (cn) {
+					dbg_printf(cn, " %s=%s", format[it.field].field_name,
+						field_dbg_value(&format[it.field], min_msg_size, data, it.field_bit_pos, it.field_bits));
+				} else {
+					dbgf_track(DBGT_INFO, " %s=%s", format[it.field].field_name,
+						field_dbg_value(&format[it.field], min_msg_size, data, it.field_bit_pos, it.field_bits));
+				}
                         }
 
 /*

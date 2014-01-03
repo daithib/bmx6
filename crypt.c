@@ -489,7 +489,7 @@ char *cryptShaAsString( CRYPTSHA1_T *sha)
         c = (c+1) % SHA1ASSTR_BUFFERS;
 
 	for (i=0; i<=4; i++)
-		sprintf(&(out[c][i*8]), "%.8X", sha->h.u32[i]);
+		sprintf(&(out[c][i*8]), "%.8X", ntohl(sha->h.u32[i]));
 
         return out[c];
 }

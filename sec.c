@@ -103,22 +103,24 @@ int create_dsc_tlv_signature(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	static struct dsc_msg_signature *msg = NULL;
+	static struct dsc_msg_signature *desc_msg = NULL;
 	static int32_t dataOffset = 0;
 
 	if (it->frame_type==BMX_DSC_TLV_SIGNATURE) {
 
-		assertion(-500000, (!msg && !dataOffset));
+		assertion(-500000, (!desc_msg && !dataOffset));
 
-		msg = (struct dsc_msg_signature*) (it->frames_out_ptr + it->frames_out_pos + sizeof(struct tlv_hdr));
+		desc_msg = (struct dsc_msg_signature*) (it->frames_out_ptr + it->frames_out_pos + sizeof(struct tlv_hdr));
+
 		dataOffset = it->frames_out_pos + sizeof(struct tlv_hdr) + sizeof(struct dsc_msg_signature) + my_PubKey->rawKeyLen;
 
 		return sizeof(struct dsc_msg_signature) + my_PubKey->rawKeyLen;
 
 	} else {
 		assertion(-500000, (it->frame_type == BMX_DSC_TLV_SIGNATURE_DUMMY));
-		assertion(-500000, (msg && dataOffset));
+		assertion(-500000, (desc_msg && dataOffset));
 		assertion(-500000, (it->frames_out_pos > dataOffset));
+		assertion(-500000, (dext_dptr(it->dext, BMX_DSC_TLV_SIGNATURE)));
 
 		int32_t dataLen = it->frames_out_pos - dataOffset;
 		uint8_t *data = it->frames_out_ptr + dataOffset;
@@ -127,15 +129,20 @@ int create_dsc_tlv_signature(struct tx_frame_iterator *it)
 		cryptShaAtomic(data, dataLen, &dataSha);
 		int32_t keySpace = my_PubKey->rawKeyLen;
 
-		cryptSign((uint8_t*)&dataSha, sizeof(dataSha), msg->signature, &keySpace);
+		struct dsc_msg_signature *dext_msg = dext_dptr(it->dext, BMX_DSC_TLV_SIGNATURE);
+
+		dext_msg->type = my_PubKey->rawKeyType;
+		cryptSign((uint8_t*)&dataSha, sizeof(dataSha), dext_msg->signature, &keySpace);
 		assertion(-500000, (keySpace == my_PubKey->rawKeyLen));
 
-		msg->type = my_PubKey->rawKeyType;
+		desc_msg->type = dext_msg->type;
+		memcpy( desc_msg->signature, dext_msg->signature, keySpace);
 
-		dbgf_sys(DBGT_INFO, "fixed RSA%d signature over dataSha=%s over dataLen=%d data=%s",
-			(keySpace*8), cryptShaAsString(&dataSha), dataLen, memAsHexString(data, dataLen));
+		dbgf_sys(DBGT_INFO, "fixed RSA%d type=%d signature=%s of dataSha=%s over dataLen=%d data=%s (dataOffset=%d)",
+			(keySpace*8), desc_msg->type, memAsHexString(desc_msg->signature, keySpace),
+			cryptShaAsString(&dataSha), dataLen, memAsHexString(data, dataLen), dataOffset);
 
-		msg = NULL;
+		desc_msg = NULL;
 		dataOffset = 0;
 		return TLV_TX_DATA_IGNORED;
 	}
@@ -218,31 +225,37 @@ int create_dsc_tlv_sha(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	static struct dsc_msg_sha *msg = NULL;
+	static struct dsc_msg_sha *desc_msg = NULL;
 	static uint32_t dataOffset = 0;
 
 	if (it->frame_type==BMX_DSC_TLV_SHA) {
-		assertion(-500000, (!msg && !dataOffset));
+		assertion(-500000, (!desc_msg && !dataOffset));
 
-		msg = (struct dsc_msg_sha*) (it->frames_out_ptr + it->frames_out_pos + sizeof(struct tlv_hdr));
+		desc_msg = (struct dsc_msg_sha*) (it->frames_out_ptr + it->frames_out_pos + sizeof(struct tlv_hdr));
 		dataOffset = it->dext->dlen + sizeof(struct tlv_hdr_virtual) + sizeof(struct dsc_msg_sha);
 
 		return sizeof(struct dsc_msg_sha);
 
 	} else {
 		assertion(-500000, (it->frame_type == BMX_DSC_TLV_SHA_DUMMY));
-		assertion(-500000, (msg && dataOffset));
+		assertion(-500000, (desc_msg && dataOffset));
 		assertion(-500000, (it->dext->dlen > dataOffset));
+		assertion(-500000, (dext_dptr(it->dext, BMX_DSC_TLV_SHA)));
 
-		msg->dataLen = htonl(it->dext->dlen - dataOffset);
-		cryptShaAtomic(it->dext->data + dataOffset, it->dext->dlen - dataOffset, &msg->dataSha);
+		// fix my dext:
+		struct dsc_msg_sha *dext_msg = dext_dptr(it->dext, BMX_DSC_TLV_SHA);
+		dext_msg->dataLen = htonl(it->dext->dlen - dataOffset);
+		cryptShaAtomic(it->dext->data + dataOffset, it->dext->dlen - dataOffset, &dext_msg->dataSha);
+
+		// fix my desc_frame:
+		desc_msg->dataLen = dext_msg->dataLen;
+		desc_msg->dataSha = dext_msg->dataSha;
 
 		dbgf_sys(DBGT_INFO, "fixed description SHA dataLen=%d dataSha=%s data=%s",
-			ntohl(msg->dataLen), cryptShaAsString(&msg->dataSha),
+			ntohl(desc_msg->dataLen), cryptShaAsString(&desc_msg->dataSha),
 			memAsHexString(it->dext->data + dataOffset, it->dext->dlen - dataOffset));
 
-
-		msg = NULL;
+		desc_msg = NULL;
 		dataOffset = 0;
 		return TLV_TX_DATA_IGNORED;
 	}

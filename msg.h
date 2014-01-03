@@ -761,7 +761,7 @@ struct rx_frame_iterator {
         int32_t frame_length;
         int32_t frame_msgs_length;
         int32_t frame_msgs_fixed;
-	struct tlv_hdr *frame_hdr;
+//	struct tlv_hdr *frame_hdr;
         uint8_t *frame_data;
         uint8_t *msg;
 

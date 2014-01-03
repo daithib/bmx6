@@ -3445,24 +3445,26 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
         
         } else if (it->frames_pos + ((int) sizeof (struct tlv_hdr)) < it->frames_length) {
 
-                struct tlv_hdr *tlv = (struct tlv_hdr *) (it->frames_in + it->frames_pos);
                 int8_t f_type;
                 int32_t f_pos_next;
                 int32_t f_len, f_data_len;
                 uint8_t *f_data;
 
-		if (it->dhnNew && it->dhnNew->dext) {
-			f_type = ((struct tlv_hdr_virtual*) tlv)->type;
-			f_len = ntohl(((struct tlv_hdr_virtual*) tlv)->length);
+		if (it->dhnNew) {
+			assertion(-500000, (it->dhnNew->dext));
+			struct tlv_hdr_virtual *tlv = (struct tlv_hdr_virtual *) (it->frames_in + it->frames_pos);
+			f_type = tlv->type;
+			f_len = ntohl(tlv->length);
 			f_data_len = f_len - sizeof (struct tlv_hdr_virtual);
-			f_data = it->frames_in + it->frames_pos + sizeof (struct tlv_hdr_virtual);
+			f_data = (uint8_t*)&(tlv[1]);
 			f_pos_next = it->frames_pos + f_len;
 		} else {
+			struct tlv_hdr *tlv = (struct tlv_hdr *) (it->frames_in + it->frames_pos);
 			struct tlv_hdr tmp = {.u.u16 = ntohs(tlv->u.u16)};
 			f_type = tmp.u.tlv.type;
 			f_len = tmp.u.tlv.length;
 			f_data_len = f_len - sizeof (struct tlv_hdr);
-			f_data = it->frames_in + it->frames_pos + sizeof (struct tlv_hdr);
+			f_data = (uint8_t*)&(tlv[1]);
 			f_pos_next = it->frames_pos + f_len;
                 }
 
@@ -3515,7 +3517,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 it->frame_type = f_type;
                 it->frame_type_expanded = ((it->db == description_tlv_db && f_type == BMX_DSC_TLV_RHASH) ?
 			((struct desc_hdr_rhash*)(f_data))->expanded_type : f_type);
-                it->frame_hdr = tlv;
+//                it->frame_hdr = tlv;
 
                 it->handl = f_handl;
                 it->frame_msgs_length = f_data_len - f_handl->data_header_size;
@@ -4336,7 +4338,7 @@ void tx_packets( void *unused ) {
         TIME_T dev_next = 0;
         int8_t linklayer;
 
-        dbgf_sys(DBGT_INFO, " ");
+        dbgf_all(DBGT_INFO, " ");
 
         // MUST be checked here because:
         // description may have changed (relevantly for ogm_aggregation)
@@ -4410,7 +4412,7 @@ void update_my_description_adv(void)
                 cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, self);
 
         // add all tlv options:
-        struct tx_frame_iterator it = {
+        struct tx_frame_iterator tx = {
                 .caller = __FUNCTION__, .db = description_tlv_db,
 		.frames_out_ptr = debugMallocReset(desc_size_out, -300000),
                 .frames_out_max = desc_size_out,
@@ -4420,20 +4422,47 @@ void update_my_description_adv(void)
 		.dext = dext_init()
         };
 
-        for (it.frame_type = 0; it.frame_type < BMX_DSC_TLV_ARRSZ; it.frame_type++) {
+        for (tx.frame_type = 0; tx.frame_type < BMX_DSC_TLV_ARRSZ; tx.frame_type++) {
        
 		int32_t result;
-		result = tx_frame_iterate(NO/*iterate_msg*/, &it);
-		assertion_dbg(-500798, result>=TLV_TX_DATA_DONE, "frame_type=%d result=%s", it.frame_type, tlv_tx_result_str(result));
+		result = tx_frame_iterate(NO/*iterate_msg*/, &tx);
+		assertion_dbg(-500798, result>=TLV_TX_DATA_DONE, "frame_type=%d result=%s", tx.frame_type, tlv_tx_result_str(result));
 	}
 
-	dbgf_sys(DBGT_INFO, "adding my desc_frame_size=%d", it.frames_out_pos);
-
         DHASH_T dhash;
-	cryptShaAtomic(it.frames_out_ptr, it.frames_out_pos, &dhash);
-	struct dhash_node *dhn = get_dhash_node( it.frames_out_ptr, it.frames_out_pos, it.dext, &dhash);
+	cryptShaAtomic(tx.frames_out_ptr, tx.frames_out_pos, &dhash);
+	struct dhash_node *dhn = get_dhash_node( tx.frames_out_ptr, tx.frames_out_pos, tx.dext, &dhash);
 
 	update_neigh_dhash( self, dhn );
+
+	dbgf_sys(DBGT_INFO, "adding my desc_frame_size=%d dhash=%s desc_frame_data=%s dext_len=%d dext_data=%s",
+		tx.frames_out_pos, cryptShaAsString(&dhash), memAsHexString(tx.frames_out_ptr, tx.frames_out_pos),
+		dhn->dext->dlen, memAsHexString(dhn->dext->data, dhn->dext->dlen));
+
+	struct rx_frame_iterator rx1 = {
+		.caller = __FUNCTION__, .onOld = NULL, .dhnNew = NULL, .op = TLV_OP_PLUGIN_MIN,
+		.db = description_tlv_db, .process_filter = FRAME_TYPE_PROCESS_ALL,
+		.frame_type = -1, .frames_in = tx.frames_out_ptr, .frames_length = tx.frames_out_pos };
+
+	while ((rx_frame_iterate(&rx1)) > TLV_RX_DATA_DONE) {
+		dbgf_track(DBGT_INFO, "%s: ", rx1.handl->name);
+		fields_dbg_lines(NULL, 0, rx1.frame_msgs_length, rx1.msg, rx1.handl->min_msg_size, rx1.handl->msg_format);
+	}
+
+
+	struct rx_frame_iterator rx2 = {
+		.caller = __FUNCTION__, .onOld = self, .dhnNew = dhn, .op = TLV_OP_PLUGIN_MIN,
+		.db = description_tlv_db, .process_filter = FRAME_TYPE_PROCESS_ALL,
+		.frame_type = -1, .frames_in = dhn->dext->data, .frames_length = dhn->dext->dlen };
+
+	while ((rx_frame_iterate(&rx2)) > TLV_RX_DATA_DONE) {
+		dbgf_track(DBGT_INFO, "%s: ", rx2.handl->name);
+		fields_dbg_lines(NULL, 0, rx2.frame_msgs_length, rx2.msg,	rx2.handl->min_msg_size, rx2.handl->msg_format);
+	}
+
+
+
+
 
         myIID4me = self->dhn->myIID4orig;
         myIID4me_timestamp = bmx_time;
@@ -4443,7 +4472,7 @@ void update_my_description_adv(void)
                 int d;
 
                 for (d = 0; (lndev_arr[d]); d++)
-                        schedule_tx_task(lndev_arr[d], FRAME_TYPE_DESC_ADVS, it.frames_out_pos, 0, 0, myIID4me, 0);
+                        schedule_tx_task(lndev_arr[d], FRAME_TYPE_DESC_ADVS, tx.frames_out_pos, 0, 0, myIID4me, 0);
         }
 
         my_description_changed = NO;
@@ -4495,9 +4524,6 @@ int32_t opt_show_descriptions(uint8_t cmd, uint8_t _save, struct opt_type *opt,
                                 dhn->desc_frame_len, dhn->dext->dlen );
 
                         dbg_printf(cn, " %s:", packet_desc_db->handls->name);
-
-                        fields_dbg_lines(cn, relevance, sizeof (struct dsc_msg_description), dhn->desc_frame,
-                                packet_desc_db->handls->min_msg_size, packet_desc_db->handls->msg_format);
 
                         struct rx_frame_iterator it = {
                                 .caller = __FUNCTION__, .onOld = on, .dhnNew = dhn, .op = TLV_OP_PLUGIN_MIN,
