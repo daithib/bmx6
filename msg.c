@@ -389,7 +389,7 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *onOld, 
         assertion(-500590, IMPLIES(onOld == self, (op == TLV_OP_DEBUG ||
                 (op >= TLV_OP_CUSTOM_MIN && op <= TLV_OP_CUSTOM_MAX) || (op >= TLV_OP_PLUGIN_MIN && op <= TLV_OP_PLUGIN_MAX))));
         assertion(-500807, (dhnNew && dhnNew->desc_frame && dhnNew->dext));
-//        assertion(-500829, IMPLIES(op == TLV_OP_DEL, !on->blocked));
+	assertion(-500000, IMPLIES(op == TLV_OP_DEL || op == TLV_OP_NEW,onOld));
         assertion(-501354, IMPLIES(op == TLV_OP_DEL, onOld->added));
 
         int32_t result;
@@ -435,17 +435,10 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *onOld, 
 
 	if (filter == FRAME_TYPE_PROCESS_ALL && (op == TLV_OP_NEW || op == TLV_OP_DEL)) {
 
-		assertion( -500000, (onOld));
-		assertion( -500000, (onOld->added != onOld->blocked));
-	
-		if (filter == FRAME_TYPE_PROCESS_ALL && op == TLV_OP_NEW) {
-
+		if (filter == FRAME_TYPE_PROCESS_ALL && op == TLV_OP_NEW)
 			onOld->added = YES;
-
-		} else if (filter == FRAME_TYPE_PROCESS_ALL && op == TLV_OP_DEL) {
-
+		else if (filter == FRAME_TYPE_PROCESS_ALL && op == TLV_OP_DEL)
 			onOld->added = NO;
-		}
 	}
 
         return TLV_RX_DATA_DONE;
@@ -1841,15 +1834,14 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 	else
                 cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_DESTROY, on);
 
-        assertion(-501361, IMPLIES(on->blocked, !on->added));
-
+        assertion(-501361, (!(on->blocked && on->added)));
 
         if (result == TLV_RX_DATA_DONE) {
 
 		block_orig_node(NO, on);
                 result = process_description_tlvs(pb, on, dhnNew, TLV_OP_NEW, FRAME_TYPE_PROCESS_ALL);
                 assertion(-501362, (result == TLV_RX_DATA_DONE)); // checked, so MUST SUCCEED!!
-                assertion(-501363, (on->blocked != on->added));
+                assertion(-501363, (!on->blocked && on->added));
 
         } else if (result == TLV_RX_DATA_BLOCKED ) {
 
@@ -1857,10 +1849,11 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 			assertion(-500000, (on->dhn && on->dhn->desc_frame && on->dhn->dext));
                         result = process_description_tlvs(pb, on, on->dhn, TLV_OP_DEL, FRAME_TYPE_PROCESS_ALL);
                         assertion(-501364, (result == TLV_RX_DATA_DONE));
-			assertion(-500000, (on->blocked && !on->added));
                 }
 
 		block_orig_node(YES, on);
+
+		assertion(-500000, (on->blocked && !on->added));
         }
 
         del_cached_description(&dhnNew->dhash);
