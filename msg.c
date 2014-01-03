@@ -1544,8 +1544,6 @@ struct desc_extension * dext_resolve(struct packet_buff *pb, struct description_
         TRACE_FUNCTION_CALL;
 	assertion(-501655, (BMX_DSC_TLV_INVALID > BMX_DSC_TLV_MAX && BMX_DSC_TLV_INVALID <= UINT8_MAX));
 
-	uint8_t *data = (((uint8_t*) cache->desc_frame) + sizeof(struct dsc_msg_description));
-	uint32_t dlen = cache->desc_frame_len - sizeof(struct dsc_msg_description);
 	IDM_T unresolved = 0;
 	uint8_t dsc_frame_types[BMX_DSC_TLV_ARRSZ] = {0};
 	int32_t result;
@@ -1553,7 +1551,7 @@ struct desc_extension * dext_resolve(struct packet_buff *pb, struct description_
         struct rx_frame_iterator it = {
                 .caller = __FUNCTION__, .onOld = NULL, .op = TLV_OP_PLUGIN_MIN,
                 .db = description_tlv_db, .process_filter = FRAME_TYPE_PROCESS_NONE,
-                .frame_type = -1,.frames_in = data, .frames_length = dlen };
+                .frame_type = -1,.frames_in = cache->desc_frame, .frames_length = cache->desc_frame_len };
 
 	uint8_t vf_type = BMX_DSC_TLV_INVALID;
 	int32_t vf_data_len = 0;
@@ -1645,7 +1643,7 @@ struct desc_extension * dext_resolve(struct packet_buff *pb, struct description_
 
 
 	if (result != TLV_RX_DATA_DONE) {
-                dbgf_sys(DBGT_ERR, "problematic description_ltv from %s, near type=%s frame_data_length=%d  pos=%d tlv_result=%s",
+                dbgf_sys(DBGT_ERR, "problematic description_ltv from %s, near type=%s frame_data_length=%d frames_pos=%d tlv_result=%s",
                         pb ? pb->i.llip_str : DBG_NIL, it.db->handls[it.frame_type].name,
                         it.frame_data_length, it.frames_pos, tlv_tx_result_str(result));
 
@@ -3430,7 +3428,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
         struct packet_buff *pb = it->pb;
         it->frame_type_expanded = ((it->frame_type == -1) ? -1 : it->frame_type_expanded); //avoids init to -1
 
-        dbgf_all(DBGT_INFO, "%s - db=%s f_type=%d f_pos=%d f_len=%d",
+        dbgf_track(DBGT_INFO, "%s - db=%s f_type=%d f_pos=%d f_len=%d",
 	        it->caller, it->db->name, it->frame_type, it->frames_pos, it->frames_length);
 
         if (it->frames_pos == it->frames_length ) {
