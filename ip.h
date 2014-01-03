@@ -365,6 +365,7 @@ struct if_addr_node {
 	uint16_t             changed;
 	struct ifaddrmsg     ifa;
 	IFNAME_T             label;
+        
 	struct nlmsghdr      nlmsghdr[];
 };
 

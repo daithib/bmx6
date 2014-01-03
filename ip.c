@@ -711,7 +711,7 @@ void kernel_get_if_addr_config(struct nlmsghdr *nh, void *index_sqnp)
         }
 
         if (!new_ian) {
-                new_ian = debugMallocReset(sizeof (struct if_addr_node) +nh->nlmsg_len, -300522);
+                new_ian = debugMallocReset(sizeof (struct if_addr_node) + nh->nlmsg_len, -300522);
                 memcpy(new_ian->nlmsghdr, nh, nh->nlmsg_len);
                 new_ian->ip_addr = ip_addr;
                 new_ian->iln = iln;
@@ -787,6 +787,7 @@ void kernel_get_if_addr_config(struct nlmsghdr *nh, void *index_sqnp)
         if (old_ian && old_ian != new_ian)
                 debugFree(old_ian, -300240);
 
+	checkIntegrity();
 }
 
 
