@@ -1992,19 +1992,25 @@ int32_t process_dsc_tlv_description(struct rx_frame_iterator *it)
 	if (it->op != TLV_OP_TEST && it->op != TLV_OP_NEW)
 		return it->frame_data_length;
 
-	struct dsc_msg_description *old = it->onOld ? dext_dptr(it->onOld->dhn->dext, BMX_DSC_TLV_DESCRIPTION) : NULL;
 	struct dsc_msg_description *new = (struct dsc_msg_description*)it->frame_data;
 
         if (validate_param(new->comp_version, (my_compatibility-(my_pettiness?0:1)), (my_compatibility+(my_pettiness?0:1)), "compatibility version"))
 		return TLV_RX_DATA_REJECTED;
 
-        if ( old && ntohl(old->descSqn) >= ntohl(new->descSqn) ) {
+        if (it->op == TLV_OP_TEST && it->onOld && it->onOld->dhn) {
 
-		dbgf_sys(DBGT_WARN, "IGNORED rcvd descSqn=%d (current descSqn=%d) from nodeId=%s via dev=%s ip=%s",
-			ntohl(new->descSqn), ntohl(old->descSqn), nodeIdAsStringFromDescAdv(it->dhnNew->desc_frame),
-			it->pb->i.iif->label_cfg.str, it->pb->i.llip_str);
+		struct dsc_msg_description *old = dext_dptr(it->onOld->dhn->dext, BMX_DSC_TLV_DESCRIPTION);
 
-		return TLV_RX_DATA_REJECTED;
+		assertion(-500000, (old));
+		
+		if (ntohl(old->descSqn) >= ntohl(new->descSqn) ) {
+
+			dbgf_sys(DBGT_WARN, "IGNORED rcvd descSqn=%d (current descSqn=%d) from nodeId=%s via dev=%s ip=%s",
+				ntohl(new->descSqn), ntohl(old->descSqn), nodeIdAsStringFromDescAdv(it->dhnNew->desc_frame),
+				it->pb->i.iif->label_cfg.str, it->pb->i.llip_str);
+
+			return TLV_RX_DATA_REJECTED;
+		}
 	}
 
 	if (validate_param(ntohs(new->ogmSqnRange), _MIN_OGM_SQN_RANGE, _MAX_OGM_SQN_RANGE, ARG_OGM_SQN_RANGE))
