@@ -1882,7 +1882,6 @@ process_desc0_error:
 
         if (dhnNew) {
 		dext_free(&dhnNew->dext);
-		debugFree(dhnNew->desc_frame, -300000);
 		debugFree(dhnNew, -300000);
 	}
 

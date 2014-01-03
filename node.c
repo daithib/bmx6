@@ -603,15 +603,13 @@ void release_dhash( struct dhash_node *dhn )
 struct dhash_node* get_dhash_node(uint8_t *desc_frame, uint32_t desc_frame_len, struct desc_extension* dext, DHASH_T *dhash)
 {
 
-        struct dhash_node * dhn = debugMallocReset(sizeof ( struct dhash_node), -300001);
+        dext->dhn = debugMallocReset(sizeof ( struct dhash_node), -300001);
+	dext->dhn->desc_frame = desc_frame;
+	dext->dhn->desc_frame_len = desc_frame_len;
+	dext->dhn->dext = dext;
+	dext->dhn->dhash = *dhash;
 
-	dhn->desc_frame = desc_frame;
-	dhn->desc_frame_len = desc_frame_len;
-	dhn->dext = dext;
-	dext->dhn = dhn;
-	dhn->dhash = *dhash;
-
-	return dhn;
+	return dext->dhn;
 }
 
 
