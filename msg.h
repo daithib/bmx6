@@ -832,7 +832,7 @@ struct frame_handl {
 
 struct frame_db {
     uint8_t handl_max;
-    
+    char *name;
     struct frame_handl handls[];
 };
 
