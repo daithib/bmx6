@@ -398,9 +398,9 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *onOld, 
         struct rx_frame_iterator it = {
                 .caller = __FUNCTION__, .op = op, .pb = pb, .db = db, .process_filter = filter,
 		.onOld = onOld, .dhnNew = dhnNew,
-                .frame_type    = (filter<=db->handl_max ? -1 : filter-1),
-		.frames_length = (filter<=db->handl_max ? dhnNew->dext->dlen : dhnNew->dext->dtd[filter].len),
-		.frames_in     = (filter<=db->handl_max ? dhnNew->dext->data : dext_dptr(dhnNew->dext, filter))
+                .frame_type    = (filter>db->handl_max ? -1 : filter-1),
+		.frames_length = (filter>db->handl_max ? dhnNew->dext->dlen : dhnNew->dext->dtd[filter].len),
+		.frames_in     = (filter>db->handl_max ? dhnNew->dext->data : dext_dptr(dhnNew->dext, filter))
 		
         };
 
