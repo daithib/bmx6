@@ -407,7 +407,7 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *onOld, 
 		.frame_type = -1, .frames_length = dhnNew->dext->dlen, .frames_in = dhnNew->dext->data 
 	};
 
-	if (filter > db->handl_max) {
+	if (filter <= db->handl_max) {
 		if (dext_dptr(dhnNew->dext, filter)) {
 			it.frame_type    = filter-1;
 			it.frames_length = dhnNew->dext->dtd[filter].len + sizeof(struct tlv_hdr_virtual);
