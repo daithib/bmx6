@@ -2040,6 +2040,7 @@ int32_t create_dsc_tlv_names(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 	IDM_T TODO;
+	dbgf_sys(DBGT_INFO, "");
 	return TLV_TX_DATA_IGNORED;
 }
 
@@ -2048,6 +2049,7 @@ int32_t process_dsc_tlv_names(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 	IDM_T TODO;
+	dbgf_sys(DBGT_INFO, "");
 	/*
 	if (validate_name_string(desc->globalId.name, GLOBAL_ID_NAME_LEN, NULL) == FAILURE) {
 
@@ -4027,7 +4029,7 @@ int32_t tx_frame_iterate(IDM_T iterate_msg, struct tx_frame_iterator *it)
 STATIC_FUNC
 int32_t tx_tlv_msg(struct tx_frame_iterator *in)
 {
-
+        TRACE_FUNCTION_CALL;
 	assertion(-500000, (in->handl->next_db));
 
 	uint8_t cache_data_array[PKT_FRAMES_SIZE_MAX - sizeof(struct tlv_hdr)] = {0};
@@ -4048,17 +4050,15 @@ int32_t tx_tlv_msg(struct tx_frame_iterator *in)
 		result = tx_frame_iterate(NO/*iterate_msg*/, &out);
 		assertion_dbg(-500798, result>=TLV_TX_DATA_DONE, "frame_type=%d result=%s", out.frame_type, tlv_tx_result_str(result));
 	}
-	
-	return out.frames_out_pos;
+
+	assertion(-500000, (out.frames_out_pos>=0));
+
+	if (out.frames_out_pos)
+		return out.frames_out_pos;
+	else
+		return TLV_TX_DATA_IGNORED;
 }
 
-STATIC_FUNC
-int32_t tx_tlv_frame(struct tx_frame_iterator *in)
-{
-        TRACE_FUNCTION_CALL;
-	IDM_T TODO;
-	return TLV_TX_DATA_IGNORED;
-}
 
 STATIC_FUNC
 int32_t rx_tlv_frame(struct rx_frame_iterator *in)
@@ -4947,7 +4947,7 @@ void init_msg( void )
 	handl.min_msg_size = sizeof (struct tlv_hdr);
 	handl.dextReferencing = (int32_t*)&dflt_fref;
 	handl.dextCompression = (int32_t*)&dflt_fzip;
-        handl.tx_frame_handler = tx_tlv_frame;
+        handl.tx_frame_handler = tx_tlv_msg;
         handl.rx_frame_handler = rx_tlv_frame;
         handl.msg_format = tlv_format;
 	handl.next_db = description_names_db;
