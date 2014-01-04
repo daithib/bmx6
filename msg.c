@@ -2036,7 +2036,7 @@ int32_t process_dsc_tlv_version(struct rx_frame_iterator *it)
 }
 
 STATIC_FUNC
-int32_t create_dsc_tlv_names(struct rx_frame_iterator *it)
+int32_t create_dsc_tlv_names(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 	IDM_T TODO;
@@ -3792,7 +3792,7 @@ int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 		return (max ? it->frames_out_max : it->frames_out_pref) - (
 			it->frames_out_pos +
 			(int) sizeof(struct tlv_hdr) + handl->data_header_size +
-			(handl->next_db ? ((int)sizeof(struct tlv_hdr) + handl->next_db->handls[handl->next_type].data_header_size ) : 0) +
+			(handl->next_db ? ((int)sizeof(struct tlv_hdr)) : 0) +
 			it->frame_cache_msgs_size );
 	}
 }
@@ -4028,9 +4028,7 @@ STATIC_FUNC
 int32_t tx_tlv_msg(struct tx_frame_iterator *in)
 {
 
-	assertion(-500000, (in->handl->tx_msg_handler == tx_tlv_msg));
 	assertion(-500000, (in->handl->next_db));
-	assertion(-500000, (in->handl->next_type <= in->handl->next_db->handl_max));
 
 	uint8_t cache_data_array[PKT_FRAMES_SIZE_MAX - sizeof(struct tlv_hdr)] = {0};
 
@@ -4040,23 +4038,18 @@ int32_t tx_tlv_msg(struct tx_frame_iterator *in)
 		.frames_out_pref = tx_iterator_cache_data_space_pref(in),
 		.frames_out_max =  tx_iterator_cache_data_space_max(in),
 		.frame_cache_array = cache_data_array, .frame_cache_size = sizeof(cache_data_array),
-		.frame_type = in->handl->next_type,
 	};
 
-	if (out.db->handls[in->handl->next_type].tx_frame_handler) {
 
-		int32_t result = tx_frame_iterate(NO/*iterate_msg*/, &out);
-
-		dbgf_sys(DBGT_INFO, "t=%s result=%s", out.db->handls[in->handl->next_type].name, tlv_rx_result_str(result));
-
-		if (result >= TLV_TX_DATA_PROCESSED)
-			return out.frames_out_pos;
+        for (; out.frame_type <= out.db->handl_max; out.frame_type++) {
+		
+		assertion(-500000, IMPLIES((out.db->handls[out.frame_type]).name, (out.db->handls[out.frame_type]).tx_frame_handler));
+		int32_t result;
+		result = tx_frame_iterate(NO/*iterate_msg*/, &out);
+		assertion_dbg(-500798, result>=TLV_TX_DATA_DONE, "frame_type=%d result=%s", out.frame_type, tlv_tx_result_str(result));
 	}
-
-
-	assertion(-500000, (0));
-
-	return TLV_TX_DATA_FAILURE;
+	
+	return out.frames_out_pos;
 }
 
 STATIC_FUNC
@@ -4080,10 +4073,10 @@ int32_t rx_tlv_frame(struct rx_frame_iterator *in)
 
         while ((result = rx_frame_iterate(&out)) > TLV_RX_DATA_DONE);
 
-	dbgf_sys(DBGT_INFO, "t=%s result=%s", out.db->handls[in->handl->next_type].name, tlv_rx_result_str(result));
-
 	if (result == TLV_RX_DATA_DONE)
 		return TLV_RX_DATA_PROCESSED;
+
+	dbgf_sys(DBGT_INFO, "t=%s result=%s", out.handl ? out.handl->name : NULL, tlv_rx_result_str(result));
 
 	return result;
 }
@@ -4420,9 +4413,10 @@ void update_my_description_adv(void)
 		.dext = dext_init()
         };
 
-        for (tx.frame_type = 0; tx.frame_type < BMX_DSC_TLV_ARRSZ; tx.frame_type++) {
+        for (; tx.frame_type <= tx.db->handl_max; tx.frame_type++) {
        
 		int32_t result;
+		assertion(-500000, IMPLIES((tx.db->handls[tx.frame_type]).name, (tx.db->handls[tx.frame_type]).tx_frame_handler));
 		result = tx_frame_iterate(NO/*iterate_msg*/, &tx);
 		assertion_dbg(-500798, result>=TLV_TX_DATA_DONE, "frame_type=%d result=%s", tx.frame_type, tlv_tx_result_str(result));
 	}
@@ -4863,7 +4857,7 @@ void init_msg( void )
 	packet_frame_db = init_frame_db(FRAME_TYPE_ARRSZ, "packet_frame_db");
 	packet_desc_db = init_frame_db(1, "packet_desc_db");
 	description_tlv_db = init_frame_db(BMX_DSC_TLV_ARRSZ, "description_tlv_db");
-        description_names_db = init_frame_db(1, "description_names_db");
+        description_names_db = init_frame_db(BMX_DSC_NAMES_ARRSZ, "description_names_db");
 
         struct frame_handl handl;
         memset(&handl, 0, sizeof ( handl));
@@ -4937,6 +4931,17 @@ void init_msg( void )
         handl.msg_format = version_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_VERSION, &handl);
 
+	static const struct field_format names_format[] = NAMES_MSG_FORMAT;
+        handl.name = "HOSTNAME";
+	handl.min_msg_size = 0;
+        handl.fixed_msg_size = 0;
+	handl.dextReferencing = (int32_t*)&never_fref;
+	handl.dextCompression = (int32_t*)&never_fzip;
+        handl.tx_frame_handler = create_dsc_tlv_names;
+        handl.rx_frame_handler = process_dsc_tlv_names;
+        handl.msg_format = names_format;
+        register_frame_handler(description_names_db, BMX_DSC_NAMES_HOSTNAME, &handl);
+
 	static const struct field_format tlv_format[] = TLV_FORMAT;
         handl.name = "NAMES";
 	handl.min_msg_size = sizeof (struct tlv_hdr);
@@ -4965,7 +4970,6 @@ void init_msg( void )
 	handl.tx_msg_handler = tx_tlv_msg;
 	handl.rx_frame_handler = rx_tlv_frame;
 	handl.next_db = packet_desc_db;
-	handl.next_type = 0;
 	register_frame_handler(packet_frame_db, FRAME_TYPE_DESC_ADVS, &handl);
 
         handl.name = "DHASH_REQ";

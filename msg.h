@@ -597,6 +597,9 @@ struct msg_ref_req {
 } __attribute__((packed));
 
 
+#define BMX_DSC_NAMES_HOSTNAME      0x00
+#define BMX_DSC_NAMES_EMAIL         0x01
+#define BMX_DSC_NAMES_ARRSZ         0x02
 
 
 
@@ -659,6 +662,9 @@ struct dsc_msg_version {
 FIELD_FORMAT_END}
 
 
+#define NAMES_MSG_FORMAT  { \
+{FIELD_TYPE_STRING_CHAR,      -1, 0,                       1, FIELD_RELEVANCE_HIGH,  "name" }, \
+FIELD_FORMAT_END }
 
 
 #define OGM_JUMPS_PER_AGGREGATION 10
@@ -828,7 +834,6 @@ struct frame_handl {
         UMETRIC_T *rx_rp_min;
         char *name;
         struct frame_db *next_db;
-        uint8_t next_type;
 	int32_t (*rx_frame_handler) (struct rx_frame_iterator *); // returns: TLV_RX_DATA_code or rcvd frame_msgs_len (without data_header_size)
 	int32_t (*rx_msg_handler)   (struct rx_frame_iterator *); // returns: TLV_RX_DATA_code or rcvd frame_msg_len  (without data_header_size)
 	int32_t (*tx_frame_handler) (struct tx_frame_iterator *); // returns: TLV_TX_DATA_code or send frame_msgs_len (without data_header_size)
