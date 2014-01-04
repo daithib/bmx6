@@ -61,6 +61,7 @@ extern int32_t my_compatibility;
 
 extern int32_t my_pettiness;
 
+extern char my_Hostname[];
 
 #ifndef GIT_REV
 #define GIT_REV "0"             // to be incremented after each critical code change

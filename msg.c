@@ -2040,8 +2040,20 @@ int32_t create_dsc_tlv_names(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 	IDM_T TODO;
-	dbgf_sys(DBGT_INFO, "");
-	return TLV_TX_DATA_IGNORED;
+	dbgf_sys(DBGT_INFO, "%s", my_Hostname);
+
+	uint8_t *name = tx_iterator_cache_msg_ptr(it);
+	int32_t nameLen = strlen(my_Hostname);
+
+	if (nameLen > tx_iterator_cache_data_space_pref(it))
+		return TLV_TX_DATA_FULL;
+
+	if (nameLen<=0)
+		return TLV_TX_DATA_IGNORED;
+
+	memcpy(name, my_Hostname, nameLen);
+
+	return nameLen;
 }
 
 STATIC_FUNC
