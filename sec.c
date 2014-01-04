@@ -203,11 +203,11 @@ finish: {
 		"sign_len=%d signature=%s\n"
 		"pkey_type=%s pkey_type_len=%d pkey=%s \n"
 		"plain_len=%d==%d plain_sha=%s problem?=%s",
-		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", dataLen, memAsHexString(&desc_sha, sizeof(desc_sha)),
+		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", dataLen, cryptShaAsString(&desc_sha),
 		sign_len, memAsHexString(msg->signature, sign_len),
 		pkey_msg ? cryptKeyTypeAsString(pkey_msg->type) : "---", pkey_msg ? cryptKeyLenByType(pkey_msg->type) : 0,
 		pkey_crypt ? memAsHexString(pkey_crypt->rawKey, pkey_crypt->rawKeyLen) : "---",
-		plain_len, sizeof(plain_sha), memAsHexString(&plain_sha, sizeof(plain_sha)), goto_error_code);
+		plain_len, sizeof(plain_sha), cryptShaAsString(&plain_sha), goto_error_code);
 	
 	cryptKeyFree(&pkey_crypt);
 	
@@ -293,7 +293,7 @@ finish: {
 	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
 		"%s %s verifying  expInLen=%d == msg.expInLen=%d expInSha=%s == msg.expInSha=%s  problem?=%s expIn=%s",
 		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", dataLen, ntohl(msg->dataLen),
-		memAsHexString(&dataSha, sizeof(dataSha)), memAsHexString(&msg->dataSha, sizeof(dataSha)),
+		cryptShaAsString(&dataSha), cryptShaAsString(&msg->dataSha),
 		goto_error_code, memAsHexString(data, dataLen) );
 
 	if (goto_error_code)
