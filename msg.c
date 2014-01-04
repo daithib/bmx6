@@ -2522,8 +2522,8 @@ int32_t rx_frame_link_adv( struct rx_frame_iterator *it)
                 if (local->link_adv_dev_sqn_ref != dev_sqn_ref || local->link_adv_msgs != msgs || memcmp(local->link_adv, adv, it->frame_msgs_length )) {
 
                         dbgf_sys(DBGT_ERR,
-                                "DAD-Alert: link_adv_dev_sqn_ref=%d != dev_sqn_ref=%d || link_adv_msgs=%d != msgs=%d || memcmp(link_adv,adv)=%d",
-                                local->link_adv_dev_sqn_ref, dev_sqn_ref, local->link_adv_msgs, msgs, memcmp(local->link_adv, adv,it->frame_msgs_length));
+                                "DAD-Alert: link_adv_dev_sqn_ref=%d != dev_sqn_ref=%d || link_adv_msgs=%d != msgs=%d || memcmp(link_adv, adv)=%d",
+                                local->link_adv_dev_sqn_ref, dev_sqn_ref, local->link_adv_msgs, msgs, memcmp(local->link_adv, adv, it->frame_msgs_length));
 
                         purge_local_node(local);
 
@@ -3427,9 +3427,15 @@ void process_description_tlvs_del( struct orig_node *on, uint8_t ft_start, uint8
 int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-        struct frame_handl *f_handl;
+	char *goto_error_code = NULL;
+        struct frame_handl *f_handl = NULL;
         struct packet_buff *pb = it->pb;
         it->frame_type_expanded = ((it->frame_type == -1) ? -1 : it->frame_type_expanded); //avoids init to -1
+	int8_t f_type = -1;
+	int32_t f_pos_next = 0;
+	int32_t f_len = 0, f_data_len = 0;
+	uint8_t *f_data = NULL;
+	int32_t result = TLV_RX_DATA_FAILURE;
 
         dbgf_track(DBGT_INFO, "%s - db=%s f_type=%d f_pos=%d f_len=%d",
 	        it->caller, it->db->name, it->frame_type, it->frames_pos, it->frames_length);
@@ -3446,11 +3452,6 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 return TLV_RX_DATA_DONE;
         
         } else if (it->frames_pos + ((int) (it->dhnNew ? sizeof (struct tlv_hdr_virtual) : sizeof(struct tlv_hdr))) < it->frames_length) {
-
-                int8_t f_type;
-                int32_t f_pos_next;
-                int32_t f_len, f_data_len;
-                uint8_t *f_data;
 
 		if (it->dhnNew) {
 			assertion(-500000, (it->dhnNew->dext));
@@ -3473,12 +3474,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 assertion(-501590, IMPLIES(it->dhnNew, f_type != BMX_DSC_TLV_RHASH));
 
 		if (f_pos_next > it->frames_length || f_data_len <= 0 ) {
-                        // not yet processed anything, so return failure:
-
-                        dbgf_sys(DBGT_ERR, "%s - db_name=%s type=%d f_virtual=%d f_pos_next=%d f_len=%d f_data_len=%d",
-                                it->caller, it->db->name, f_type, (it->dhnNew && it->dhnNew->dext), f_pos_next, it->frames_length, f_data_len);
-
-                        return TLV_RX_DATA_FAILURE;
+			goto_error(rx_frame_iterate_error, "invalid frames_length");
                 }
 
                 it->frames_pos = f_pos_next;
@@ -3492,10 +3488,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 			it->frame_type > f_type  
 			) ) {
 
-                        dbgf_sys(DBGT_WARN, "%s - unordered or double frame_type=%d prev=%d prev_expanded=%d",
-                                it->caller, f_type, it->frame_type, it->frame_type_expanded);
-
-                        return TLV_RX_DATA_FAILURE;
+			goto_error(rx_frame_iterate_error, "unordered or double frame_type");
                 }
 
                 if (it->db == description_tlv_db && it->onOld && it->onOld->added && it->op == TLV_OP_NEW &&
@@ -3508,7 +3501,6 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 if (f_type > it->db->handl_max || !(it->db->handls[f_type].rx_frame_handler || it->db->handls[f_type].rx_msg_handler)) {
 
                         dbgf_mute(50, DBGL_SYS, DBGT_WARN, "%s - unknown type=%d ! check for updates", it->caller, f_type);
-
                         return my_pettiness ? TLV_RX_DATA_REJECTED : TLV_RX_DATA_PROCESSED;
                 }
 
@@ -3519,7 +3511,6 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 it->frame_type = f_type;
                 it->frame_type_expanded = ((it->db == description_tlv_db && f_type == BMX_DSC_TLV_RHASH) ?
 			((struct desc_hdr_rhash*)(f_data))->expanded_type : f_type);
-//                it->frame_hdr = tlv;
 
                 it->handl = f_handl;
                 it->frame_msgs_length = f_data_len - f_handl->data_header_size;
@@ -3535,22 +3526,17 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                         (it->frame_msgs_length < f_handl->min_msg_size && it->frame_msgs_length != 0)
                         ) {
 
-                        dbgf_sys(DBGT_WARN, "%s - too small f_len=%d f_data_len=%d f_msgs_len=%d for type=%s",
-				it->caller, f_len, f_data_len, it->frame_msgs_length, f_handl->name);
-                        return TLV_RX_DATA_FAILURE;
+			goto_error(rx_frame_iterate_error, "too small frame_msgs_length");
 
                 } else if (f_handl->fixed_msg_size && (f_handl->min_msg_size ?
 			(it->frame_msgs_length % f_handl->min_msg_size) : (it->frame_msgs_length) ) ) {
 
-                        dbgf_sys(DBGT_WARN, "%s - non-matching length=%d for type=%s", it->caller, f_len, f_handl->name);
-                        return TLV_RX_DATA_FAILURE;
-
+			goto_error(rx_frame_iterate_error, "non-matching fixed_msgs_size");
                 }
 
                 if (!(it->process_filter == FRAME_TYPE_PROCESS_ALL || it->process_filter == f_type)) {
 
                         dbgf_all(DBGT_INFO, "%s - type=%d process_filter=%d : IGNORED", it->caller, f_type, it->process_filter);
-
                         return TLV_RX_DATA_PROCESSED;
 
                 } else if (pb && f_handl->rx_tp_min &&
@@ -3585,8 +3571,6 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 
                 } else if (f_handl->rx_msg_handler && f_handl->fixed_msg_size) {
 
-			int32_t result = TLV_RX_DATA_FAILURE;
-
                         while (it->msg < it->frame_data + it->frame_data_length && (
                                 (result = ((*(f_handl->rx_msg_handler)) (it))) == f_handl->min_msg_size || result == TLV_RX_DATA_PROCESSED) ) {
 
@@ -3594,44 +3578,40 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                         }
 
                         if (it->msg == it->frame_data + it->frame_data_length) {
-
 				return TLV_RX_DATA_PROCESSED;
-
 			} else {
-
 				assertion(-500000, (result == TLV_RX_DATA_BLOCKED || result == TLV_RX_DATA_FAILURE || result == TLV_RX_DATA_REJECTED));
-
-                                dbgf_sys(DBGT_ERR, "%s- rx_msg_handler(%s)=%s  it->msg=%p frame_data=%p frame_data_length=%d",
-                                        it->caller, f_handl->name, tlv_rx_result_str(result), it->msg, it->frame_data, it->frame_data_length);
-
-                                return result;
+				goto_error(rx_frame_iterate_error, "failed rx_msg_handler");
                         }
 
 
                 } else if (f_handl->rx_frame_handler) {
 
-                        int32_t result = (*(f_handl->rx_frame_handler)) (it);
+                        result = (*(f_handl->rx_frame_handler)) (it);
 
 			if ( result == it->frame_msgs_length || result == TLV_RX_DATA_PROCESSED) {
-
 				return TLV_RX_DATA_PROCESSED;
-
 			} else {
-
 				assertion(-500000, (result == TLV_RX_DATA_BLOCKED || result == TLV_RX_DATA_FAILURE || result == TLV_RX_DATA_REJECTED));
-
-                                dbgf_sys(DBGT_ERR, "%s - rx_frame_handler(%s)=%s frame_msgs_len=%d",
-                                        it->caller, f_handl->name, tlv_rx_result_str(result), it->frame_msgs_length );
-
-				return result;
+				goto_error(rx_frame_iterate_error, "failed rx_frame_handler");
                         }
                 }
 
                 assertion(-501018, (0));
         }
 
-        dbgf_sys(DBGT_ERR, "%s - frames_pos=%d frames_length=%d : FAILURE", it->caller, it->frames_pos, it->frames_length);
-        return TLV_RX_DATA_FAILURE;
+rx_frame_iterate_error: {
+
+	dbgf_sys(DBGT_ERR, "%s - db_name=%s problem=%s result=%s dhn=%d frame_type=%d=%d=%s prev_expanded=%d"
+		"frames_pos=%d frames_length=%d f_pos_next=%d f_data_len=%d f_len=%d frame_msgs_len=%d",
+		it->caller, it->db->name, goto_error_code, tlv_rx_result_str(result),
+		(it->dhnNew && it->dhnNew->dext),
+		it->frame_type, f_type, (f_handl ? f_handl->name : NULL), it->frame_type_expanded,
+		it->frames_pos, it->frames_length, f_pos_next, f_data_len, f_len, it->frame_msgs_length);
+
+	EXITERROR(-500000, result != TLV_RX_DATA_FAILURE);
+        return result;
+}
 }
 
 
