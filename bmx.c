@@ -559,9 +559,9 @@ uint32_t field_iterate(struct field_iterator *it)
 
                 assertion(-501172, IMPLIES(field_type == FIELD_TYPE_STRING_SIZE, !it->var_bits));
 
-                assertion(-501203, IMPLIES(field_type == FIELD_TYPE_UINT, (field_bits <= 8 || field_bits == 16 || field_bits == 32)));
-                assertion(-501204, IMPLIES(field_type == FIELD_TYPE_HEX, (field_bits <= 8 || field_bits == 16 || field_bits == 32)));
-                assertion(-501205, IMPLIES(field_type == FIELD_TYPE_STRING_SIZE, (field_bits <= 8 || field_bits == 16 || field_bits == 32)));
+                assertion(-501203, IMPLIES(field_type == FIELD_TYPE_UINT, (field_bits <= 32)));
+                assertion(-501204, IMPLIES(field_type == FIELD_TYPE_HEX, (field_bits <= 32)));
+                assertion(-501205, IMPLIES(field_type == FIELD_TYPE_STRING_SIZE, (field_bits <= 32)));
 
 //                assertion(-501186, IMPLIES(it->fixed_msg_size && it->data_size, it->data_size % it->fixed_msg_size == 0));
 //                assertion(-501187, IMPLIES(it->fixed_msg_size, field_type != FIELD_TYPE_STRING_SIZE || !format->field_bits));
