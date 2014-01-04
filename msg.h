@@ -327,6 +327,13 @@ struct tlv_hdr { // 2 bytes
 } __attribute__((packed));
 
 
+#define TLV_FORMAT { \
+{FIELD_TYPE_UINT,          -1,  5,  1, FIELD_RELEVANCE_HIGH, "type"},  \
+{FIELD_TYPE_UINT,          -1, 11,  1, FIELD_RELEVANCE_HIGH, "length"},\
+{FIELD_TYPE_STRING_BINARY, -1, 0,   1, FIELD_RELEVANCE_HIGH, "data" }, \
+FIELD_FORMAT_END }
+
+
 // Future generic ILV header:
 struct ilv_hdr { // 1 bytes
     uint8_t type;
@@ -594,17 +601,17 @@ struct msg_ref_req {
 
 
 #define BMX_DSC_TLV_RHASH           0x00
-#define BMX_DSC_TLV_PUBKEY              0x01
-#define BMX_DSC_TLV_SIGNATURE           0x02
+#define BMX_DSC_TLV_PUBKEY          0x01
+#define BMX_DSC_TLV_SIGNATURE       0x02
 #define BMX_DSC_TLV_VERSION         0x03
-#define BMX_DSC_TLV_SHA                 0x04
+#define BMX_DSC_TLV_SHA             0x04
 
-#define BMX_DSC_TLV_METRIC              0x07
-#define BMX_DSC_TLV_NAME                0x08
+#define BMX_DSC_TLV_NAMES           0x07
+#define BMX_DSC_TLV_METRIC          0x08
 
-#define BMX_DSC_TLV_HNA6               0x09
+#define BMX_DSC_TLV_HNA6            0x09
 
-#define BMX_DSC_TLV_TUN6_MIN            0x10
+#define BMX_DSC_TLV_TUN6_MIN        0x10
 #define BMX_DSC_TLV_TUN6            0x11
 #define BMX_DSC_TLV_TUN4IN6_INGRESS 0x12
 #define BMX_DSC_TLV_TUN6IN6_INGRESS 0x13
@@ -612,12 +619,12 @@ struct msg_ref_req {
 #define BMX_DSC_TLV_TUN6IN6_SRC     0x15
 #define BMX_DSC_TLV_TUN4IN6_NET     0x16
 #define BMX_DSC_TLV_TUN6IN6_NET     0x17
-#define BMX_DSC_TLV_TUN6_MAX            0x17
+#define BMX_DSC_TLV_TUN6_MAX        0x17
 
-#define BMX_DSC_TLV_SMS                 0x1A
+#define BMX_DSC_TLV_SMS             0x1A
 
-#define BMX_DSC_TLV_SHA_DUMMY           0x1E
-#define BMX_DSC_TLV_SIGNATURE_DUMMY     0x1F
+#define BMX_DSC_TLV_SHA_DUMMY       0x1E
+#define BMX_DSC_TLV_SIGNATURE_DUMMY 0x1F
 
 
 

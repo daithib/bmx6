@@ -222,7 +222,7 @@ char *tlv_op_str(uint8_t op)
 struct frame_db *packet_frame_db = NULL;
 struct frame_db *packet_desc_db = NULL;
 struct frame_db *description_tlv_db = NULL;
-
+struct frame_db *description_names_db = NULL;
 
 
 
@@ -4072,13 +4072,21 @@ int32_t tx_tlv_msg(struct tx_frame_iterator *in)
 }
 
 STATIC_FUNC
+int32_t tx_tlv_frame(struct tx_frame_iterator *in)
+{
+        TRACE_FUNCTION_CALL;
+	IDM_T TODO;
+	return TLV_TX_DATA_IGNORED;
+}
+
+STATIC_FUNC
 int32_t rx_tlv_frame(struct rx_frame_iterator *in)
 {
         TRACE_FUNCTION_CALL;
 
         int32_t result;
         struct rx_frame_iterator out = {
-                .caller = in->caller, .onOld = NULL, .op = in->op, .pb = in->pb,
+                .caller = in->caller, .onOld = in->onOld, .dhnNew=in->dhnNew, .op = in->op, .pb = in->pb,
                 .db = in->handl->next_db, .process_filter = in->process_filter,
                 .frame_type = -1, .frames_in = in->frame_data, .frames_length = in->frame_data_length };
 
@@ -4086,10 +4094,10 @@ int32_t rx_tlv_frame(struct rx_frame_iterator *in)
 
 	dbgf_sys(DBGT_INFO, "t=%s result=%s", out.db->handls[in->handl->next_type].name, tlv_rx_result_str(result));
 
-	if (result == TLV_RX_DATA_DONE || TLV_RX_DATA_REJECTED)
+	if (result == TLV_RX_DATA_DONE)
 		return TLV_RX_DATA_PROCESSED;
 
-	return TLV_RX_DATA_FAILURE;
+	return result;
 }
 
 STATIC_FUNC
@@ -4519,7 +4527,7 @@ int32_t opt_show_descriptions(uint8_t cmd, uint8_t _save, struct opt_type *opt,
 
 			struct dhash_node *dhn = on->dhn;
 
-                        if (TODOname && dext_dptr(dhn->dext, BMX_DSC_TLV_NAME))
+                        if (TODOname && dext_dptr(dhn->dext, BMX_DSC_TLV_NAMES))
                                 continue;
 
                         dbg_printf(cn, "\nnodeId=%s descSha=%s blocked=%d desc_frame_size=%d dext_len=%d:\n",
@@ -4867,7 +4875,8 @@ void init_msg( void )
 	packet_frame_db = init_frame_db(FRAME_TYPE_ARRSZ, "packet_frame_db");
 	packet_desc_db = init_frame_db(1, "packet_desc_db");
 	description_tlv_db = init_frame_db(BMX_DSC_TLV_ARRSZ, "description_tlv_db");
-        
+        description_names_db = init_frame_db(1, "description_names_db");
+
         struct frame_handl handl;
         memset(&handl, 0, sizeof ( handl));
 
@@ -4940,6 +4949,16 @@ void init_msg( void )
         handl.msg_format = version_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_VERSION, &handl);
 
+	static const struct field_format tlv_format[] = TLV_FORMAT;
+        handl.name = "NAMES";
+	handl.min_msg_size = sizeof (struct tlv_hdr);
+	handl.dextReferencing = (int32_t*)&dflt_fref;
+	handl.dextCompression = (int32_t*)&dflt_fzip;
+        handl.tx_frame_handler = tx_tlv_frame;
+        handl.rx_frame_handler = rx_tlv_frame;
+        handl.msg_format = tlv_format;
+	handl.next_db = description_names_db;
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_NAMES, &handl);
 
 	handl.name = "DESCRIPTION";
 	handl.min_msg_size = (
