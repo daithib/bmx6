@@ -400,14 +400,22 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *onOld, 
         int32_t result;
 	int8_t blocked = NO;
 	struct frame_db *db = description_tlv_db;
+
         struct rx_frame_iterator it = {
                 .caller = __FUNCTION__, .op = op, .pb = pb, .db = db, .process_filter = filter,
 		.onOld = onOld, .dhnNew = dhnNew,
-                .frame_type    = (filter>db->handl_max ? -1 : filter-1),
-		.frames_length = (filter>db->handl_max ? dhnNew->dext->dlen : dhnNew->dext->dtd[filter].len),
-		.frames_in     = (filter>db->handl_max ? dhnNew->dext->data : dext_dptr(dhnNew->dext, filter))
-		
-        };
+		.frame_type = -1, .frames_length = dhnNew->dext->dlen, .frames_in = dhnNew->dext->data 
+	};
+
+	if (filter > db->handl_max) {
+		if (dext_dptr(dhnNew->dext, filter)) {
+			it.frame_type    = filter-1;
+			it.frames_length = dhnNew->dext->dtd[filter].len + sizeof(struct tlv_hdr_virtual);
+			it.frames_in     = ((uint8_t*)dext_dptr(dhnNew->dext, filter)) - sizeof(struct tlv_hdr_virtual);
+		} else {
+			return TLV_RX_DATA_DONE;
+		}
+	}
 
         dbgf_track(DBGT_INFO, "op=%s nodeId=%s size=%d, filter=%d",
                 tlv_op_str(op), nodeIdAsStringFromDescAdv(dhnNew->desc_frame), dhnNew->dext->dlen, filter);
@@ -3602,7 +3610,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 
 rx_frame_iterate_error: {
 
-	dbgf_sys(DBGT_ERR, "%s - db_name=%s problem=%s result=%s dhn=%d frame_type=%d=%d=%s prev_expanded=%d"
+	dbgf_sys(DBGT_ERR, "%s - db_name=%s problem=\"%s\" result=%s dhn=%d frame_type=%d=%d=%s prev_expanded=%d "
 		"frames_pos=%d frames_length=%d f_pos_next=%d f_data_len=%d f_len=%d frame_msgs_len=%d",
 		it->caller, it->db->name, goto_error_code, tlv_rx_result_str(result),
 		(it->dhnNew && it->dhnNew->dext),
