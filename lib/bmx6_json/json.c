@@ -517,55 +517,42 @@ void json_description_event_hook(int32_t cb_id, struct orig_node *on)
                 }
 
                 json_object *jorig = json_object_new_object();
-
-                json_object *jhash = json_object_new_string(memAsHexString(((char*) &(on->dhn->dhash)), sizeof (on->dhn->dhash)));
-                
-                json_object_object_add(jorig, "descSha", jhash);
+                json_object_object_add(jorig, "descSha", json_object_new_string(cryptShaAsString(&on->dhn->dhash)));
 
                 json_object *jblocked = json_object_new_int(on->blocked);
                 json_object_object_add(jorig, "blocked", jblocked);
 
-                json_object *jdesc_fields = NULL;
+		if (on->dhn && on->dhn->dext && on->dhn->dext->dlen) {
 
-                if ((jdesc_fields = fields_dbg_json(
-                        FIELD_RELEVANCE_MEDI, NO, sizeof (struct dsc_msg_description), on->dhn->desc_frame,
-                        packet_desc_db->handls->min_msg_size,
-                        packet_desc_db->handls->msg_format))) {
+			struct rx_frame_iterator it = {
+				.caller = __FUNCTION__, .onOld = on, .dhnNew = on->dhn, .op = TLV_OP_PLUGIN_MIN,
+				.db = description_tlv_db, .process_filter = FRAME_TYPE_PROCESS_ALL,
+				.frame_type = -1, .frames_in = on->dhn->dext->data, .frames_length = on->dhn->dext->dlen,
+			};
 
-                        if (on->dhn && on->dhn->dext && on->dhn->dext->dlen) {
+			json_object *jextensions = NULL;
 
-                                struct rx_frame_iterator it = {
-                                        .caller = __FUNCTION__, .onOld = on, .dhnNew = on->dhn, .op = TLV_OP_PLUGIN_MIN,
-                                        .db = description_tlv_db, .process_filter = FRAME_TYPE_PROCESS_ALL,
-                                        .frame_type = -1, .frames_in = on->dhn->dext->data, .frames_length = on->dhn->dext->dlen,
-                                };
-				
+			while (rx_frame_iterate(&it) > TLV_RX_DATA_DONE) {
 
-                                json_object *jextensions = NULL;
+				json_object * jext_fields;
 
-                                while (rx_frame_iterate(&it) > TLV_RX_DATA_DONE) {
+				if ((jext_fields = fields_dbg_json(
+					FIELD_RELEVANCE_MEDI, YES, it.frame_msgs_length, it.msg,
+					it.handl->min_msg_size, it.handl->msg_format))) {
 
-                                        json_object * jext_fields;
+					json_object *jext = json_object_new_object();
+					json_object_object_add(jext, it.handl->name, jext_fields);
 
-                                        if ((jext_fields = fields_dbg_json(
-                                                FIELD_RELEVANCE_MEDI, YES, it.frame_msgs_length, it.msg,
-                                                it.handl->min_msg_size, it.handl->msg_format))) {
+					jextensions = jextensions ? jextensions : json_object_new_array();
 
-                                                json_object *jext = json_object_new_object();
-                                                json_object_object_add(jext, it.handl->name, jext_fields);
+					json_object_array_add(jextensions, jext);
+				}
+			}
 
-                                                jextensions = jextensions ? jextensions : json_object_new_array();
+			if (jextensions)
+				json_object_object_add(jorig, "extensions", jextensions);
 
-                                                json_object_array_add(jextensions, jext);
-                                        }
-                                }
-
-                                if (jextensions)
-                                        json_object_object_add(jdesc_fields, "extensions", jextensions);
-
-                        }
-                        json_object_object_add(jorig, packet_desc_db->handls->name, jdesc_fields);
-                }
+		}
 
                 dprintf(fd, "%s\n", json_object_to_json_string(jorig));
 
