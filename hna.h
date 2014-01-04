@@ -183,8 +183,8 @@ struct dsc_msg_hna6 {
 } __attribute__((packed));
 
 #define DESCRIPTION_MSG_HNA6_FORMAT { \
-{FIELD_TYPE_UINT, -1,   8, 1, FIELD_RELEVANCE_HIGH, "prefixlen"}, \
-{FIELD_TYPE_UINT, -1,   8, 1, FIELD_RELEVANCE_LOW,  "reserved"},  \
+{FIELD_TYPE_UINT, -1,   8, 1, FIELD_RELEVANCE_HIGH, "prefixLen"}, \
+{FIELD_TYPE_UINT, -1,   8, 1, FIELD_RELEVANCE_LOW,  "flags"},  \
 {FIELD_TYPE_IPX6, -1, 128, 1, FIELD_RELEVANCE_HIGH, "address" },  \
 FIELD_FORMAT_END }
 
@@ -287,7 +287,7 @@ struct dsc_msg_tun4in6net {
 {FIELD_TYPE_UINT,     -1,   8, 1, FIELD_RELEVANCE_MEDI, "tun6Id" },  \
 {FIELD_TYPE_UINT,     -1,   8, 1, FIELD_RELEVANCE_HIGH, "rtype" },  \
 {FIELD_TYPE_FMETRIC8, -1,   8, 1, FIELD_RELEVANCE_HIGH, "bandwidth" },  \
-{FIELD_TYPE_UINT,     -1,   8, 1, FIELD_RELEVANCE_HIGH, "networklen" },  \
+{FIELD_TYPE_UINT,     -1,   8, 1, FIELD_RELEVANCE_HIGH, "networkLen" },  \
 {FIELD_TYPE_IP4,      -1,  32, 1, FIELD_RELEVANCE_HIGH, "network" },  \
 FIELD_FORMAT_END }
 
@@ -303,7 +303,7 @@ struct dsc_msg_tun6in6net {
 {FIELD_TYPE_UINT,     -1,   8, 1, FIELD_RELEVANCE_MEDI, "tun6Id" },  \
 {FIELD_TYPE_UINT,     -1,   8, 1, FIELD_RELEVANCE_HIGH, "rtype" },  \
 {FIELD_TYPE_FMETRIC8, -1,   8, 1, FIELD_RELEVANCE_HIGH, "bandwidth" },  \
-{FIELD_TYPE_UINT,     -1,   8, 1, FIELD_RELEVANCE_HIGH, "networklen" },  \
+{FIELD_TYPE_UINT,     -1,   8, 1, FIELD_RELEVANCE_HIGH, "networkLen" },  \
 {FIELD_TYPE_IPX6,     -1, 128, 1, FIELD_RELEVANCE_HIGH, "network" },  \
 FIELD_FORMAT_END }
 
