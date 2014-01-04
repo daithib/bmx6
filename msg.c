@@ -5104,9 +5104,9 @@ void cleanup_msg( void )
 
 	ref_node_purge(YES /*all_unused*/);
 
+	free_frame_db(&description_names_db);
 	free_frame_db(&description_tlv_db);
 	free_frame_db(&packet_desc_db);
 	free_frame_db(&packet_frame_db);
-
 }
 
