@@ -94,6 +94,11 @@ static AVL_TREE(ref_tree, struct ref_node, rhash);
 static int32_t ref_tree_items_used = 0;
 
 const int32_t always_fref = TYP_FREF_DO;
+const int32_t never_fref = TYP_FREF_DONT;
+const int32_t dflt_fref = TYP_FREF_DFLT;
+
+const int32_t never_fzip = TYP_FZIP_DONT;
+const int32_t dflt_fzip = TYP_FZIP_DFLT;
 
 
 int32_t ref_nodes_max_unused = 200;
@@ -4928,13 +4933,15 @@ void init_msg( void )
         handl.name = "VERSION";
 	handl.min_msg_size = sizeof (struct dsc_msg_version);
         handl.fixed_msg_size = 1;
+	handl.dextReferencing = (int32_t*)&never_fref;
+	handl.dextCompression = (int32_t*)&never_fzip;
         handl.tx_frame_handler = create_dsc_tlv_version;
         handl.rx_frame_handler = process_dsc_tlv_version;
         handl.msg_format = version_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_VERSION, &handl);
 
 
-	handl.name = "DESC_ADV_FRAME";
+	handl.name = "DESCRIPTION";
 	handl.min_msg_size = (
 		sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) +
 		sizeof(struct tlv_hdr) + sizeof(struct dsc_msg_signature) +

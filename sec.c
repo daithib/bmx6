@@ -458,6 +458,7 @@ void init_sec( void )
         handl.min_msg_size = sizeof(struct dsc_msg_pubkey);
         handl.fixed_msg_size = 0;
 	handl.dextReferencing = (int32_t*)&always_fref;
+	handl.dextCompression = (int32_t*)&never_fzip;
         handl.tx_frame_handler = create_dsc_tlv_pubkey;
         handl.rx_frame_handler = process_dsc_tlv_pubkey;
 	handl.msg_format = pubkey_format;
@@ -467,6 +468,8 @@ void init_sec( void )
         handl.name = "SIGNATURE";
         handl.min_msg_size = sizeof(struct dsc_msg_signature);
         handl.fixed_msg_size = 0;
+	handl.dextReferencing = (int32_t*)&never_fref;
+	handl.dextCompression = (int32_t*)&never_fzip;
         handl.tx_frame_handler = create_dsc_tlv_signature;
         handl.rx_frame_handler = process_dsc_tlv_signature;
 	handl.msg_format = signature_format;
@@ -483,6 +486,8 @@ void init_sec( void )
         handl.name = "SHA";
         handl.min_msg_size = sizeof(struct dsc_msg_sha);
         handl.fixed_msg_size = 1;
+	handl.dextReferencing = (int32_t*)&never_fref;
+	handl.dextCompression = (int32_t*)&never_fzip;
         handl.tx_frame_handler = create_dsc_tlv_sha;
         handl.rx_frame_handler = process_dsc_tlv_sha;
 	handl.msg_format = sha_format;

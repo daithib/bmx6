@@ -868,7 +868,11 @@ static inline int32_t tx_iterator_cache_msg_space_pref(struct tx_frame_iterator 
 
 
 extern const int32_t always_fref;
+extern const int32_t never_fref;
+extern const int32_t dflt_fref;
 
+extern const int32_t never_fzip;
+extern const int32_t dflt_fzip;
 
 extern uint32_t ogm_aggreg_pending;
 extern IID_T myIID4me;
