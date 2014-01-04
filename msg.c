@@ -270,7 +270,7 @@ void register_frame_handler(struct frame_db *db, int pos, struct frame_handl *ha
 	assertion(-500000, IMPLIES(handl->rx_msg_handler, handl->fixed_msg_size));
         assertion(-500975, (handl->tx_task_interval_min <= CONTENT_MIN_TX_INTERVAL_MAX));
 
-        assertion(-501213, IMPLIES(handl->msg_format, handl->min_msg_size ==
+        assertion(-501213, IMPLIES(handl->msg_format && handl->min_msg_size, handl->min_msg_size ==
                 fields_dbg_lines(NULL, FIELD_RELEVANCE_LOW, 0, NULL, handl->min_msg_size, handl->msg_format)));
 /*
 	assertion(-501611, IMPLIES(array==description_tlv_handl && pos!=BMX_DSC_TLV_RHASH_ADV, !handl->data_header_size));
