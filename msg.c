@@ -1480,7 +1480,7 @@ int process_dsc_tlv_rhash(struct rx_frame_iterator *it)
 	// and must be ignored when processed implicitly via:
 	assertion(-501630, ( TEST_FUNCTION(rx_frame_iterate)) );
 	// either while processing:
-	assertion(-501631, ( TEST_STRUCT(struct dsc_msg_description)) );
+	assertion(-501631, ( TEST_STRUCT(struct dsc_msg_version)) );
 	// and using:
 	assertion(-501632, ( TEST_VALUE( FRAME_TYPE_PROCESS_NONE )) );
 
@@ -1944,11 +1944,11 @@ int32_t tx_msg_dhash_or_description_request(struct tx_frame_iterator *it)
 
 
 STATIC_FUNC
-int32_t create_dsc_tlv_description(struct tx_frame_iterator *it)
+int32_t create_dsc_tlv_version(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	struct dsc_msg_description *dsc = (struct dsc_msg_description *)tx_iterator_cache_msg_ptr(it);
+	struct dsc_msg_version *dsc = (struct dsc_msg_version *)tx_iterator_cache_msg_ptr(it);
 
         // add some randomness to the ogm_sqn_range, that not all nodes invalidate at the same time:
         int32_t random_range = first_packet ? rand_num(ogmSqnRange) :
@@ -1974,25 +1974,25 @@ int32_t create_dsc_tlv_description(struct tx_frame_iterator *it)
         dsc->comp_version = my_compatibility;
         dsc->descSqn = getDescriptionSqn( NULL, 1);
 
-	return sizeof(struct dsc_msg_description);
+	return sizeof(struct dsc_msg_version);
 }
 
 STATIC_FUNC
-int32_t process_dsc_tlv_description(struct rx_frame_iterator *it)
+int32_t process_dsc_tlv_version(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
 	if (it->op != TLV_OP_TEST && it->op != TLV_OP_NEW)
 		return it->frame_data_length;
 
-	struct dsc_msg_description *new = (struct dsc_msg_description*)it->frame_data;
+	struct dsc_msg_version *new = (struct dsc_msg_version*)it->frame_data;
 
         if (validate_param(new->comp_version, (my_compatibility-(my_pettiness?0:1)), (my_compatibility+(my_pettiness?0:1)), "compatibility version"))
 		return TLV_RX_DATA_REJECTED;
 
         if (it->op == TLV_OP_TEST && it->onOld && it->onOld->dhn) {
 
-		struct dsc_msg_description *old = dext_dptr(it->onOld->dhn->dext, BMX_DSC_TLV_DESCRIPTION);
+		struct dsc_msg_version *old = dext_dptr(it->onOld->dhn->dext, BMX_DSC_TLV_VERSION);
 
 		assertion(-500000, (old));
 		
@@ -2019,7 +2019,7 @@ int32_t process_dsc_tlv_description(struct rx_frame_iterator *it)
 		set_ogmSqn_toBeSend_and_aggregated(on, on->ogmMetric_next, on->ogmSqn_maxRcvd, on->ogmSqn_maxRcvd);
 	}
 	
-	return sizeof(struct dsc_msg_description);
+	return sizeof(struct dsc_msg_version);
 }
 
 STATIC_FUNC
@@ -2053,7 +2053,7 @@ int32_t tx_frame_description_adv(struct tx_frame_iterator *it)
         struct tx_task_node * ttn = it->ttn;
         struct dhash_node *dhn;
 
-        struct dsc_msg_description *adv = (struct dsc_msg_description *) tx_iterator_cache_msg_ptr(it);
+        struct dsc_msg_version *adv = (struct dsc_msg_version *) tx_iterator_cache_msg_ptr(it);
 
         dbgf_all(DBGT_INFO, "ttn->myIID4x %d", ttn->task.myIID4x);
 
@@ -3219,7 +3219,7 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-        assertion(-500550, (it->frame_msgs_length >= ((int) sizeof (struct dsc_msg_description))));
+        assertion(-500550, (it->frame_msgs_length >= ((int) sizeof (struct dsc_msg_version))));
 
 	if (it->frame_data_length > (int)MAX_DESC_SIZE)
 		return TLV_RX_DATA_FAILURE;
@@ -3880,7 +3880,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		// set frame header size and values:
 		*tlv = tlv_set_net(BMX_DSC_TLV_RHASH, (sizeof (struct tlv_hdr) + rfd_size));
 		it->frames_out_pos += sizeof(struct tlv_hdr) + rfd_size; ///TODO
-		assertion(-501651, ( it->frames_out_pos <= (int32_t)(desc_size_out - sizeof(struct dsc_msg_description))));
+		assertion(-501651, ( it->frames_out_pos <= (int32_t)(desc_size_out - sizeof(struct dsc_msg_version))));
 
 		// set: frame-data hdr:
 		struct desc_hdr_rhash *rfd_hdr = (struct desc_hdr_rhash *) ((uint8_t*)&(tlv[1]));
@@ -4506,6 +4506,7 @@ int32_t opt_show_descriptions(uint8_t cmd, uint8_t _save, struct opt_type *opt,
 			}
 		}
 
+		dbg_printf( cn, "descriptions:" );
 
                 while ((on = avl_iterate_item(&orig_tree, &an))) {
 
@@ -4516,11 +4517,9 @@ int32_t opt_show_descriptions(uint8_t cmd, uint8_t _save, struct opt_type *opt,
                         if (TODOname && dext_dptr(dhn->dext, BMX_DSC_TLV_NAME))
                                 continue;
 
-                        dbg_printf(cn, "\ndescSha=%s blocked=%d desc_frame_size=%d dext_len=%d:\n",
-                                memAsHexString(((char*) &(dhn->dhash)), sizeof (dhn->dhash)), on->blocked,
+                        dbg_printf(cn, "\nnodeId=%s descSha=%s blocked=%d desc_frame_size=%d dext_len=%d:\n",
+                                cryptShaAsString(&on->nodeId), cryptShaAsString(&dhn->dhash), on->blocked,
                                 dhn->desc_frame_len, dhn->dext->dlen );
-
-                        dbg_printf(cn, " %s:", packet_desc_db->handls->name);
 
                         struct rx_frame_iterator it = {
                                 .caller = __FUNCTION__, .onOld = on, .dhnNew = dhn, .op = TLV_OP_PLUGIN_MIN,
@@ -4530,7 +4529,7 @@ int32_t opt_show_descriptions(uint8_t cmd, uint8_t _save, struct opt_type *opt,
                         int32_t result;
                         while ((result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE) {
 
-				dbg_printf(cn, "\n %s: ", it.handl->name);
+				dbg_printf(cn, "\n  %s: ", it.handl->name);
 
 				fields_dbg_lines(cn, relevance, it.frame_msgs_length, it.msg,
 					it.handl->min_msg_size, it.handl->msg_format);
@@ -4877,19 +4876,8 @@ void init_msg( void )
         register_frame_handler(packet_frame_db, FRAME_TYPE_PROBLEM_ADV, &handl);
 
 
-/*
-        handl.name = "TEST_ADV";
-        handl.is_advertisement = 1;
-        handl.data_header_size = sizeof ( struct hdr_test_adv);
-        handl.min_msg_size = sizeof (struct msg_test_adv);
-        handl.fixed_msg_size = 1;
-        handl.tx_frame_handler = tx_frame_test_adv;
-        handl.rx_frame_handler = rx_frame_test_adv;
-        register_frame_handler(packet_frame_db, FRAME_TYPE_TEST_ADV, &handl);
-*/
-
         static const struct field_format ref_format[] = MSG_RHASH_FORMAT;
-        handl.name = "RHASH_EXTENSION";
+        handl.name = "RHASH";
         handl.data_header_size = sizeof( struct desc_hdr_rhash);
         handl.min_msg_size = sizeof (struct desc_msg_rhash);
         handl.fixed_msg_size = 1;
@@ -4936,21 +4924,21 @@ void init_msg( void )
         register_frame_handler(packet_frame_db, FRAME_TYPE_DESC_REQ, &handl);
 
 
-	static const struct field_format description_format[] = DESCRIPTION_MSG_FORMAT;
-        handl.name = "DESC_EXTENSION";
-	handl.min_msg_size = sizeof (struct dsc_msg_description);
+	static const struct field_format version_format[] = VERSION_MSG_FORMAT;
+        handl.name = "VERSION";
+	handl.min_msg_size = sizeof (struct dsc_msg_version);
         handl.fixed_msg_size = 1;
-        handl.tx_frame_handler = create_dsc_tlv_description;
-        handl.rx_frame_handler = process_dsc_tlv_description;
-        handl.msg_format = description_format;
-        register_frame_handler(description_tlv_db, BMX_DSC_TLV_DESCRIPTION, &handl);
+        handl.tx_frame_handler = create_dsc_tlv_version;
+        handl.rx_frame_handler = process_dsc_tlv_version;
+        handl.msg_format = version_format;
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_VERSION, &handl);
 
 
 	handl.name = "DESC_ADV_FRAME";
 	handl.min_msg_size = (
 		sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) +
 		sizeof(struct tlv_hdr) + sizeof(struct dsc_msg_signature) +
-		sizeof(struct tlv_hdr) + sizeof(struct dsc_msg_description) );
+		sizeof(struct tlv_hdr) + sizeof(struct dsc_msg_version) );
 	handl.tx_frame_handler = tx_frame_description_adv;
 	handl.rx_frame_handler = rx_frame_description_adv;
 	register_frame_handler(packet_desc_db, 0, &handl);

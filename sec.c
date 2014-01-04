@@ -178,7 +178,7 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 	if ( !pkey_msg || !cryptKeyTypeAsString(pkey_msg->type) || cryptKeyLenByType(pkey_msg->type) != sign_len )
 		goto_error( finish, "2");
 
-	if ( dataLen < (int)sizeof(struct dsc_msg_description))
+	if ( dataLen < (int)sizeof(struct dsc_msg_version))
 		goto_error( finish, "3");
 
 	if ( sign_len > (descVerification/8) )

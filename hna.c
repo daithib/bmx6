@@ -368,7 +368,7 @@ STATIC_FUNC
 int create_dsc_tlv_hna(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-        assertion(-500765, (it->frame_type == BMX_DSC_TLV_UHNA6));
+        assertion(-500765, (it->frame_type == BMX_DSC_TLV_HNA6));
 
         uint8_t *data = tx_iterator_cache_msg_ptr(it);
         uint16_t max_size = tx_iterator_cache_data_space_pref(it);
@@ -497,7 +497,7 @@ STATIC_FUNC
 int process_dsc_tlv_hna(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-        ASSERTION(-500357, (it->frame_type == BMX_DSC_TLV_UHNA6));
+        ASSERTION(-500357, (it->frame_type == BMX_DSC_TLV_HNA6));
 
         struct orig_node *on = it->onOld;
         uint8_t op = it->op;
@@ -3344,7 +3344,7 @@ void hna_route_change_hook(uint8_t del, struct orig_node *on)
         if (!is_ip_set(&on->primary_ip))
                 return;
 
-        process_description_tlvs(NULL, on, on->dhn, del ? TLV_OP_CUSTOM_HNA_ROUTE_DEL : TLV_OP_CUSTOM_HNA_ROUTE_ADD, BMX_DSC_TLV_UHNA6);
+        process_description_tlvs(NULL, on, on->dhn, del ? TLV_OP_CUSTOM_HNA_ROUTE_DEL : TLV_OP_CUSTOM_HNA_ROUTE_ADD, BMX_DSC_TLV_HNA6);
 
 }
 
@@ -3431,11 +3431,11 @@ int32_t hna_init( void )
         tlv_handl.fixed_msg_size = 1;
 	tlv_handl.dextCompression = &hna6_fzip;
 	tlv_handl.dextReferencing = &hna6_fref;
-        tlv_handl.name = "HNA6_EXTENSION";
+        tlv_handl.name = "HNA6";
         tlv_handl.tx_frame_handler = create_dsc_tlv_hna;
         tlv_handl.rx_frame_handler = process_dsc_tlv_hna;
         tlv_handl.msg_format = hna6_format;
-        register_frame_handler(description_tlv_db, BMX_DSC_TLV_UHNA6, &tlv_handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_HNA6, &tlv_handl);
 
 
 
@@ -3445,7 +3445,7 @@ int32_t hna_init( void )
         tlv_handl.fixed_msg_size = 1;
 	tlv_handl.dextCompression = &tun6_fzip;
 	tlv_handl.dextReferencing = &tun6_fref;
-        tlv_handl.name = "TUN6_EXTENSION";
+        tlv_handl.name = "TUN6";
         tlv_handl.tx_frame_handler = create_dsc_tlv_tun6;
         tlv_handl.rx_frame_handler = process_dsc_tlv_tun6;
         tlv_handl.msg_format = tun6_adv_format;
@@ -3455,7 +3455,7 @@ int32_t hna_init( void )
         memset(&tlv_handl, 0, sizeof (tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun4in6ingress);
         tlv_handl.fixed_msg_size = 1;
-        tlv_handl.name = "TUN4IN6_INGRESS_EXTENSION";
+        tlv_handl.name = "TUN4IN6_INGRESS";
         tlv_handl.tx_frame_handler = create_dsc_tlv_tunXin6ingress;
         tlv_handl.rx_frame_handler = process_dsc_tlv_tunXin6ingress;
         tlv_handl.msg_format = tun4in6_ingress_adv_format;
@@ -3464,7 +3464,7 @@ int32_t hna_init( void )
         memset(&tlv_handl, 0, sizeof (tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun6in6ingress);
         tlv_handl.fixed_msg_size = 1;
-        tlv_handl.name = "TUN6IN6_INGRESS_EXTENSION";
+        tlv_handl.name = "TUN6IN6_INGRESS";
         tlv_handl.tx_frame_handler = create_dsc_tlv_tunXin6ingress;
         tlv_handl.rx_frame_handler = process_dsc_tlv_tunXin6ingress;
         tlv_handl.msg_format = tun6in6_ingress_adv_format;
@@ -3474,7 +3474,7 @@ int32_t hna_init( void )
         memset(&tlv_handl, 0, sizeof (tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun4in6src);
         tlv_handl.fixed_msg_size = 1;
-        tlv_handl.name = "TUN4IN6_SRC_EXTENSION";
+        tlv_handl.name = "TUN4IN6_SRC";
         tlv_handl.tx_frame_handler = create_dsc_tlv_tunXin6src;
         tlv_handl.rx_frame_handler = process_dsc_tlv_tunXin6src;
         tlv_handl.msg_format = tun4in6_src_adv_format;
@@ -3483,7 +3483,7 @@ int32_t hna_init( void )
         memset(&tlv_handl, 0, sizeof (tlv_handl));
         tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun6in6src);
         tlv_handl.fixed_msg_size = 1;
-        tlv_handl.name = "TUN6IN6_SRC_EXTENSION";
+        tlv_handl.name = "TUN6IN6_SRC";
         tlv_handl.tx_frame_handler = create_dsc_tlv_tunXin6src;
         tlv_handl.rx_frame_handler = process_dsc_tlv_tunXin6src;
         tlv_handl.msg_format = tun6in6_src_adv_format;
@@ -3495,7 +3495,7 @@ int32_t hna_init( void )
         tlv_handl.fixed_msg_size = 1;
 	tlv_handl.dextCompression = &tun6_fzip;
 	tlv_handl.dextReferencing = &tun6_fref;
-        tlv_handl.name = "TUN4IN6_NET_EXTENSION";
+        tlv_handl.name = "TUN4IN6_NET";
         tlv_handl.tx_frame_handler = create_dsc_tlv_tunXin6net;
         tlv_handl.rx_frame_handler = process_dsc_tlv_tunXin6net;
         tlv_handl.msg_format = tun4in6_adv_format;
@@ -3506,7 +3506,7 @@ int32_t hna_init( void )
         tlv_handl.fixed_msg_size = 1;
 	tlv_handl.dextCompression = &tun6_fzip;
 	tlv_handl.dextReferencing = &tun6_fref;
-        tlv_handl.name = "TUN6IN6_NET_EXTENSION";
+        tlv_handl.name = "TUN6IN6_NET";
         tlv_handl.tx_frame_handler = create_dsc_tlv_tunXin6net;
         tlv_handl.rx_frame_handler = process_dsc_tlv_tunXin6net;
         tlv_handl.msg_format = tun6in6_adv_format;

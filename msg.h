@@ -59,7 +59,7 @@
 #define DEF_VRT_DESC_SIZE      (16384) //any value less-equal then MAX_VRT_DESC_SIZE
 //#define MAX_VRT_DESC_SIZE      (INT32_MAX)
 // this should be the max possible with a reference depth of 1 :
-#define MAX_VRT_DESC_SIZE      (((MAX_DESC_SIZE - sizeof(struct dsc_msg_description)) - \
+#define MAX_VRT_DESC_SIZE      (((MAX_DESC_SIZE - sizeof(struct dsc_msg_version)) - \
                                  (5 * (sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash)) )) / \
 			        sizeof(struct desc_msg_rhash)) \
 			       * \
@@ -596,13 +596,13 @@ struct msg_ref_req {
 #define BMX_DSC_TLV_RHASH           0x00
 #define BMX_DSC_TLV_PUBKEY              0x01
 #define BMX_DSC_TLV_SIGNATURE           0x02
-#define BMX_DSC_TLV_DESCRIPTION         0x03
+#define BMX_DSC_TLV_VERSION         0x03
 #define BMX_DSC_TLV_SHA                 0x04
 
 #define BMX_DSC_TLV_METRIC              0x07
 #define BMX_DSC_TLV_NAME                0x08
 
-#define BMX_DSC_TLV_UHNA6               0x09
+#define BMX_DSC_TLV_HNA6               0x09
 
 #define BMX_DSC_TLV_TUN6_MIN            0x10
 #define BMX_DSC_TLV_TUN6            0x11
@@ -627,7 +627,7 @@ struct msg_ref_req {
 #define hdr_description_request hdr_dhash_request
 
 
-struct dsc_msg_description {
+struct dsc_msg_version {
 
 	uint8_t comp_version;
 	uint8_t capabilities;
@@ -642,7 +642,7 @@ struct dsc_msg_description {
 
 
 
-#define DESCRIPTION_MSG_FORMAT { \
+#define VERSION_MSG_FORMAT { \
 {FIELD_TYPE_UINT,             -1, 8,                       1, FIELD_RELEVANCE_LOW,  "comp_version" }, \
 {FIELD_TYPE_HEX,              -1, 8,                       1, FIELD_RELEVANCE_MEDI, "capabilities" }, \
 {FIELD_TYPE_UINT,             -1, (8*sizeof(DESC_SQN_T)),  0, FIELD_RELEVANCE_MEDI, "descSqn" }, \

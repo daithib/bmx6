@@ -1632,7 +1632,7 @@ int32_t init_metrics( void )
         memset( &metric_handl, 0, sizeof(metric_handl));
         metric_handl.fixed_msg_size = 0;
         metric_handl.min_msg_size = sizeof (struct mandatory_tlv_metricalgo);
-        metric_handl.name = "METRIC_EXTENSION";
+        metric_handl.name = "METRIC";
         metric_handl.tx_frame_handler = create_description_tlv_metricalgo;
         metric_handl.rx_frame_handler = process_description_tlv_metricalgo;
         metric_handl.msg_format = metric_format;

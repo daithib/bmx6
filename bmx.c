@@ -998,7 +998,7 @@ static int32_t orig_status_creator(struct status_handl *handl, void *data)
                 status[i].viaDev = on->curr_rt_lndev && on->curr_rt_lndev->key.dev ? on->curr_rt_lndev->key.dev->name_phy_cfg.str : DBG_NIL;
                 status[i].metric = (on->curr_rt_local ? (on->curr_rt_local->mr.umetric) : (on == self ? UMETRIC_MAX : 0));
                 status[i].myIid4x = on->dhn->myIID4orig;
-                status[i].descSqn = ntohl(((struct dsc_msg_description*)dext_dptr(on->dhn->dext, BMX_DSC_TLV_DESCRIPTION))->descSqn);
+                status[i].descSqn = ntohl(((struct dsc_msg_version*)dext_dptr(on->dhn->dext, BMX_DSC_TLV_VERSION))->descSqn);
                 status[i].ogmSqn = on->ogmSqn_next;
                 status[i].ogmSqnDiff = (on->ogmSqn_maxRcvd - on->ogmSqn_next);
                 status[i].lastDesc = (bmx_time - on->updated_timestamp) / 1000;
