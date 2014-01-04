@@ -2061,14 +2061,28 @@ int32_t process_dsc_tlv_names(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 	IDM_T TODO;
-	dbgf_sys(DBGT_INFO, "");
-	/*
-	if (validate_name_string(desc->globalId.name, GLOBAL_ID_NAME_LEN, NULL) == FAILURE) {
+	char name[GLOBAL_ID_NAME_LEN];
 
-                dbg_sys(DBGT_ERR, "illegal hostname=%s ", cryptShaAsString(&desc->globalId));
-		goto validate_desc_structure_failure;
-        }
-	 */
+	dbgf_sys(DBGT_INFO, "op=%s", tlv_op_str(it->op) );
+
+	if (it->frame_data_length>=GLOBAL_ID_NAME_LEN)
+		return TLV_RX_DATA_FAILURE;
+
+	memcpy(name, it->frame_data, it->frame_data_length);
+	name[it->frame_data_length]=0;
+
+	if (validate_name_string(name, it->frame_data_length+1, NULL) == FAILURE)
+		return TLV_RX_DATA_FAILURE;
+
+	if ((it->op==TLV_OP_NEW || it->op == TLV_OP_DEL) && it->onOld->hostname) {
+		debugFree(it->onOld->hostname, -300000);
+		it->onOld->hostname = NULL;
+	}
+
+	if (it->op == TLV_OP_NEW) {
+		it->onOld->hostname = debugMallocReset(it->frame_data_length+1, -300000);
+		strcpy(it->onOld->hostname, name);
+	}
 
 	return TLV_RX_DATA_PROCESSED;
 }

@@ -427,6 +427,8 @@ struct orig_node {
 
 
 	struct host_metricalgo *path_metricalgo;
+        
+        char *hostname;
 
 	// calculated by update_path_metric()
 

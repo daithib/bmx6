@@ -992,7 +992,7 @@ static int32_t orig_status_creator(struct status_handl *handl, void *data)
 
 		assertion(-500000, (on->dhn && on->dhn->desc_frame && on->dhn->dext));
 
-                status[i].name = NULL;
+                status[i].name = on->hostname;
                 status[i].globalId = &on->nodeId;
                 status[i].blocked = on->blocked;
                 status[i].primaryIp = on->primary_ip;
