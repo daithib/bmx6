@@ -3458,6 +3458,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 	int32_t f_len = 0, f_data_len = 0;
 	uint8_t *f_data = NULL;
 	int32_t result = TLV_RX_DATA_FAILURE;
+	uint8_t is_virtual_desc = (it->db == description_tlv_db && it->dhnNew);
 
         dbgf_track(DBGT_INFO, "%s - db=%s f_type=%d f_pos=%d f_len=%d",
 	        it->caller, it->db->name, it->frame_type, it->frames_pos, it->frames_length);
@@ -3473,9 +3474,9 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 dbgf_all(DBGT_INFO, "%s - frames_pos=%d frames_length=%d : DONE", it->caller, it->frames_pos, it->frames_length);
                 return TLV_RX_DATA_DONE;
         
-        } else if (it->frames_pos + ((int) (it->dhnNew ? sizeof (struct tlv_hdr_virtual) : sizeof(struct tlv_hdr))) < it->frames_length) {
+        } else if (it->frames_pos + ((int) (is_virtual_desc ? sizeof (struct tlv_hdr_virtual) : sizeof(struct tlv_hdr))) < it->frames_length) {
 
-		if (it->dhnNew) {
+		if (is_virtual_desc) {
 			assertion(-500000, (it->dhnNew->dext));
 			struct tlv_hdr_virtual *tlv = (struct tlv_hdr_virtual *) (it->frames_in + it->frames_pos);
 			f_type = tlv->type;
@@ -3493,7 +3494,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 			f_pos_next = it->frames_pos + f_len;
                 }
 
-                assertion(-501590, IMPLIES(it->dhnNew, f_type != BMX_DSC_TLV_RHASH));
+                assertion(-501590, IMPLIES(is_virtual_desc, f_type != BMX_DSC_TLV_RHASH));
 
 		if (f_pos_next > it->frames_length || f_data_len <= 0 ) {
 			goto_error(rx_frame_iterate_error, "invalid frames_length");
