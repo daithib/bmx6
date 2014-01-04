@@ -399,7 +399,10 @@ int64_t field_get_value(const struct field_format *format, uint16_t min_msg_size
                         bit_set((uint8_t*)&result, 16, (16-bits)+bit, val);
                 }
 
-                return ntohs(result);
+		if (host_order)
+			return result;
+		else
+			return ntohs(result);
         }
 
         return FAILURE;
@@ -559,9 +562,9 @@ uint32_t field_iterate(struct field_iterator *it)
 
                 assertion(-501172, IMPLIES(field_type == FIELD_TYPE_STRING_SIZE, !it->var_bits));
 
-                assertion(-501203, IMPLIES(field_type == FIELD_TYPE_UINT, (field_bits <= 32)));
-                assertion(-501204, IMPLIES(field_type == FIELD_TYPE_HEX, (field_bits <= 32)));
-                assertion(-501205, IMPLIES(field_type == FIELD_TYPE_STRING_SIZE, (field_bits <= 32)));
+                assertion(-501203, IMPLIES(field_type == FIELD_TYPE_UINT, (field_bits <= 16 || field_bits == 32)));
+                assertion(-501204, IMPLIES(field_type == FIELD_TYPE_HEX, (field_bits <= 16 || field_bits == 32)));
+                assertion(-501205, IMPLIES(field_type == FIELD_TYPE_STRING_SIZE, (field_bits <= 16 || field_bits == 32)));
 
 //                assertion(-501186, IMPLIES(it->fixed_msg_size && it->data_size, it->data_size % it->fixed_msg_size == 0));
 //                assertion(-501187, IMPLIES(it->fixed_msg_size, field_type != FIELD_TYPE_STRING_SIZE || !format->field_bits));
@@ -575,9 +578,9 @@ uint32_t field_iterate(struct field_iterator *it)
                 assertion(-501175, IMPLIES(std_bits > 0, (field_bits == (uint32_t)std_bits)));
                 assertion(-501176, IMPLIES(std_bits < 0, !(field_bits % (-std_bits))));
 
-                assertion(-501206, IMPLIES(field_bits >= 8, !(field_bits % 8)));
-                assertion(-501177, IMPLIES((field_bits % 8), field_bits < 8));
-                assertion(-501178, IMPLIES(!(field_bits % 8), !(it->field_bit_pos % 8)));
+//                assertion(-501206, IMPLIES(field_bits >= 8, !(field_bits % 8)));
+//                assertion(-501177, IMPLIES((field_bits % 8), field_bits < 8));
+//                assertion(-501178, IMPLIES(!(field_bits % 8), !(it->field_bit_pos % 8)));
 
 //                assertion(-501182, (it->min_msg_size * 8 >= it->field_bit_pos + field_bits));
 
@@ -585,8 +588,8 @@ uint32_t field_iterate(struct field_iterator *it)
 //                assertion(-501184, IMPLIES(it->data_size, field_bits));
                 assertion(-501185, IMPLIES(it->data_size, it->field_bit_pos + field_bits  <= it->data_size * 8));
 
-                assertion(-501190, IMPLIES(!format->field_host_order, (field_bits == 16 || field_bits == 32)));
-                assertion(-501191, IMPLIES(!format->field_host_order, (field_type == FIELD_TYPE_UINT || field_type == FIELD_TYPE_HEX || field_type == FIELD_TYPE_STRING_SIZE)));
+//                assertion(-501190, IMPLIES(!format->field_host_order, (field_bits == 16 || field_bits == 32)));
+//                assertion(-501191, IMPLIES(!format->field_host_order, (field_type == FIELD_TYPE_UINT || field_type == FIELD_TYPE_HEX || field_type == FIELD_TYPE_STRING_SIZE)));
 
                 assertion(-501192, IMPLIES((field_type == FIELD_TYPE_UINT || field_type == FIELD_TYPE_HEX || field_type == FIELD_TYPE_STRING_SIZE), field_bits <= 32));
 

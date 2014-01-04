@@ -328,8 +328,8 @@ struct tlv_hdr { // 2 bytes
 
 
 #define TLV_FORMAT { \
-{FIELD_TYPE_UINT,          -1,  5,  1, FIELD_RELEVANCE_HIGH, "type"},  \
-{FIELD_TYPE_UINT,          -1, 11,  1, FIELD_RELEVANCE_HIGH, "length"},\
+{FIELD_TYPE_UINT,          -1,  5,  0, FIELD_RELEVANCE_HIGH, "type"},  \
+{FIELD_TYPE_UINT,          -1, 11,  0, FIELD_RELEVANCE_HIGH, "length"},\
 {FIELD_TYPE_STRING_BINARY, -1,  0,  1, FIELD_RELEVANCE_HIGH, "data" }, \
 FIELD_FORMAT_END }
 
