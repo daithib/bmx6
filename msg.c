@@ -247,7 +247,7 @@ struct frame_db *init_frame_db(uint8_t handlSz, char *name) {
 
 	struct frame_db *db = debugMallocReset(sizeof(struct frame_db) + (handlSz * sizeof(struct frame_handl)), -300622);
 
-	db->handl_max = handlSz;
+	db->handl_max = handlSz -1;
 	db->name = name;
 
 	return db;
@@ -263,7 +263,7 @@ void register_frame_handler(struct frame_db *db, int pos, struct frame_handl *ha
 {
         TRACE_FUNCTION_CALL;
         
-        assertion(-500659, (pos < db->handl_max));
+        assertion(-500659, (pos <= db->handl_max));
         assertion(-500660, (!db->handls[pos].name)); // the pos MUST NOT be used yet
         assertion(-500661, (handl && handl->name));
         assertion(-500806, (XOR(handl->rx_frame_handler, handl->rx_msg_handler) && XOR(handl->tx_frame_handler, handl->tx_msg_handler)));
