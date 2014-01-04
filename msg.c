@@ -3832,9 +3832,9 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
         ASSERTION(-501003, (is_zero((it->frame_cache_array + it->frame_cache_msgs_size + handl->data_header_size), tx_iterator_cache_data_space_max(it))));
         assertion(-501019, (fdata_in)); // there must be some data to send!!
 
-	if (it->dext) {
+	if (it->db==description_tlv_db && it->dext) {
 		// this is the dext creation of my description...
-		assertion(-501639, (it->db==description_tlv_db));
+//		assertion(-501639, (it->db==description_tlv_db));
 
 		it->dext->dtd[it->frame_type].len = fdata_in;
 		it->dext->dtd[it->frame_type].pos = it->dext->dlen + sizeof(struct tlv_hdr_virtual);
@@ -3852,8 +3852,8 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		assertion(-501641, (it->dext->dlen <= (uint32_t)vrt_desc_size_out));
 	}
 
-	if (it->dext && do_fref) {
-		assertion(-501642, (it->db==description_tlv_db));
+	if (it->db==description_tlv_db && it->dext && do_fref) {
+//		assertion(-501642, (it->db==description_tlv_db));
 
 		// calculate description extension frames
 		assertion(-501643, TEST_STRUCT(struct tlv_hdr)); // of type:
