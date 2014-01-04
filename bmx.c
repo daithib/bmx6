@@ -1120,7 +1120,7 @@ void init_self(void)
 	msg->type = my_PubKey->rawKeyType;
 	memcpy(msg->key, my_PubKey->rawKey, my_PubKey->rawKeyLen);
 	id = *ref_node_key((uint8_t*)msg, sizeof(struct dsc_msg_pubkey) + my_PubKey->rawKeyLen, 0, 0, 0);
-	debugFree(msg, -300000);
+	debugFree(msg, -300600);
 
         self = init_orig_node(&id);
 

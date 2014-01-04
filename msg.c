@@ -245,7 +245,7 @@ struct tlv_hdr tlv_set_net(int16_t type, int16_t length)
 STATIC_FUNC
 struct frame_db *init_frame_db(uint8_t handlSz, char *name) {
 
-	struct frame_db *db = debugMallocReset(sizeof(struct frame_db) + (handlSz * sizeof(struct frame_handl)), -300000);
+	struct frame_db *db = debugMallocReset(sizeof(struct frame_db) + (handlSz * sizeof(struct frame_handl)), -300622);
 
 	db->handl_max = handlSz;
 	db->name = name;
@@ -255,7 +255,7 @@ struct frame_db *init_frame_db(uint8_t handlSz, char *name) {
 
 STATIC_FUNC
 void free_frame_db(struct frame_db **db) {
-	debugFree(*db, -300000);
+	debugFree(*db, -300623);
 	db = NULL;
 }
 
@@ -1216,7 +1216,7 @@ void ref_node_del (struct ref_node *refn)
 	assertion(-501667, !refn->dext_tree.items);
 	assertion(-501668, ref_tree.items);
 	avl_remove(&ref_tree, &refn->rhash, -300560);
-	debugFree(refn->f_body, -300000);
+	debugFree(refn->f_body, -300624);
 	debugFree(refn, -300562);
 }
 
@@ -1289,7 +1289,7 @@ struct ref_node * ref_node_add(uint8_t *f_body, uint32_t f_body_len, uint8_t com
 		AVL_INIT_TREE(refn->dext_tree, struct dext_tree_node, dext_key);
 
 		refn->f_body_len = f_body_len;
-		refn->f_body = debugMalloc(f_body_len, -300000);
+		refn->f_body = debugMalloc(f_body_len, -300625);
 		memcpy(refn->f_body, f_body, f_body_len);
 		refn->last_usage = bmx_time;
 		refn->rhash = *rhash;
@@ -1880,7 +1880,7 @@ process_desc0_error:
 
         if (dhnNew) {
 		dext_free(&dhnNew->dext);
-		debugFree(dhnNew, -300000);
+		debugFree(dhnNew, -300626);
 	}
 
 	dbgf_sys(DBGT_ERR, "%s global_id=%s rcvd via_dev=%s via_ip=%s", tlv_rx_result_str(result),
@@ -4424,7 +4424,7 @@ void update_my_description_adv(void)
         // add all tlv options:
         struct tx_frame_iterator tx = {
                 .caller = __FUNCTION__, .db = description_tlv_db,
-		.frames_out_ptr = debugMallocReset(desc_size_out, -300000),
+		.frames_out_ptr = debugMallocReset(desc_size_out, -300627),
                 .frames_out_max = desc_size_out,
                 .frames_out_pref = desc_size_out,
 		.frame_cache_array = frame_cache_array,

@@ -65,7 +65,7 @@ void * clone_to_nbo(void *in, uint32_t len) {
 	if ( htonl(47) == 47 ) {
 		out = in;
 	} else {
-		out = debugMallocReset(len, -300000);
+		out = debugMallocReset(len, -300601);
 		for (i=0; i<len; i++)
 			out[i] = ((uint8_t*)in)[len-i-1];
 	}
@@ -90,7 +90,7 @@ uint8_t * mp_int_get_raw( mp_int *in, uint16_t *rawLen) {
 	assertion(-500000, (u == w));
 
 	mp_digit *nbo = clone_to_nbo(in->dp, (u*s));
-	mp_digit *tmp = debugMallocReset(u*s, -300000);
+	mp_digit *tmp = debugMallocReset(u*s, -300602);
 
 	int i = u-1; // i:= u-1 .. 0
 	int r = 0;   // r:= 0 .. u-1
@@ -111,11 +111,11 @@ uint8_t * mp_int_get_raw( mp_int *in, uint16_t *rawLen) {
 	}
 
 	if (nbo != in->dp)
-		debugFree(nbo, -300000);
+		debugFree(nbo, -300603);
 
 	uint8_t *begin = ((uint8_t*)tmp) + zeros;
 	
-	uint8_t *raw = debugMalloc(*rawLen, -300000);
+	uint8_t *raw = debugMalloc(*rawLen, -300604);
 	memcpy(raw, begin, *rawLen);
 	
 	dbgf_sys(DBGT_INFO, "raw:\n%s", memAsHexStringSep( raw, *rawLen, 16, "\n"));
@@ -124,7 +124,7 @@ uint8_t * mp_int_get_raw( mp_int *in, uint16_t *rawLen) {
 	assertion(-500000, (!is_zero( begin, 4))); // strange key with 4 leading octets!
 	assertion(-500000, (is_zero(tmp, zeros)));
 
-	debugFree(tmp, -300000);
+	debugFree(tmp, -300605);
 
 
 	return raw;
@@ -137,10 +137,10 @@ int mp_int_put_raw( mp_int *out, uint8_t *raw, uint32_t rawLen) {
 	int u = ((rawLen*8) / ((s*8)-4)) + (((rawLen*8) % ((s*8)-4)) ? 1 : 0);
 	int zeros = (s*u)-(rawLen);
 
-	mp_digit *in  = debugMallocReset(u*s, -300000);
+	mp_digit *in  = debugMallocReset(u*s, -300606);
 	memcpy( (((uint8_t*)in)+zeros), raw, rawLen );
 
-	mp_digit *tmp = debugMallocReset(u*s, -300000);
+	mp_digit *tmp = debugMallocReset(u*s, -300607);
 
 	int i = u-1; // i:= u-1 .. 0
 	int r = 0;   // r:= 0 .. u-1
@@ -165,7 +165,7 @@ int mp_int_put_raw( mp_int *out, uint8_t *raw, uint32_t rawLen) {
 		r+=2;
 	}
 
-	debugFree(in, -300000);
+	debugFree(in, -300608);
 	dbgf_all(DBGT_INFO, "tmp:\n%s", memAsHexStringSep( tmp, (u*s), 16, "\n"));
 
 	out->dp = clone_to_nbo(tmp, (u*s));
@@ -173,7 +173,7 @@ int mp_int_put_raw( mp_int *out, uint8_t *raw, uint32_t rawLen) {
 	dbgf_all(DBGT_INFO, "out:\n%s", memAsHexStringSep( out->dp, (u*s), 16, "\n"));
 
 	if (out->dp != tmp)
-		debugFree(tmp, -300000);
+		debugFree(tmp, -300609);
 
 	return u;
 }
@@ -196,18 +196,18 @@ void cryptKeyFree( CRYPTKEY_T **cryptKey ) {
 		if ((*cryptKey)->nativeBackendKey) {
 			FreeRsaKey(key);
 		} else {
-			debugFree(key->n.dp, -300000);
-			debugFree(key->e.dp, -300000);
+			debugFree(key->n.dp, -300610);
+			debugFree(key->e.dp, -300611);
 		}
 
-		debugFree((*cryptKey)->backendKey, -300000);
+		debugFree((*cryptKey)->backendKey, -300612);
 	}
 
 	if ((*cryptKey)->rawKey) {
-		debugFree((*cryptKey)->rawKey, -300000);
+		debugFree((*cryptKey)->rawKey, -300613);
 	}
 
-	debugFree( (*cryptKey), -300000);
+	debugFree( (*cryptKey), -300614);
 
 	cryptKey = NULL;
 }
@@ -215,17 +215,17 @@ void cryptKeyFree( CRYPTKEY_T **cryptKey ) {
 
 CRYPTKEY_T *cryptPubKeyFromRaw( uint8_t *rawKey, uint16_t rawKeyLen ) {
 
-	CRYPTKEY_T *cryptKey = debugMallocReset(sizeof(CRYPTKEY_T), -300000);
+	CRYPTKEY_T *cryptKey = debugMallocReset(sizeof(CRYPTKEY_T), -300615);
 
 	assertion(-500000, (rawKey && cryptKeyTypeByLen(rawKeyLen) != FAILURE));
 
 	cryptKey->nativeBackendKey = 0;
-	cryptKey->backendKey = debugMalloc(sizeof(RsaKey), -300000);
+	cryptKey->backendKey = debugMalloc(sizeof(RsaKey), -300616);
 	RsaKey *key = cryptKey->backendKey;
 
 	key->type = RSA_PUBLIC;
 
-	key->e.dp = debugMallocReset(sizeof (mp_digit) * 4, -300000);
+	key->e.dp = debugMallocReset(sizeof (mp_digit) * 4, -300617);
 	key->e.dp[0] = CRYPT_KEY_E_VAL;
 	key->e.alloc = 4;
 	key->e.used  = 1;
@@ -238,7 +238,7 @@ CRYPTKEY_T *cryptPubKeyFromRaw( uint8_t *rawKey, uint16_t rawKeyLen ) {
 
 	cryptKey->rawKeyLen = rawKeyLen;
 	cryptKey->rawKeyType = cryptKeyTypeByLen(rawKeyLen);
-	cryptKey->rawKey = debugMalloc(rawKeyLen,-300000);
+	cryptKey->rawKey = debugMalloc(rawKeyLen,-300618);
 	memcpy(cryptKey->rawKey, rawKey, rawKeyLen);
 
 	return cryptKey;
@@ -304,9 +304,9 @@ CRYPTKEY_T *cryptKeyFromDer( char *tmp_path ) {
 
 	fclose(keyFile);
 
-	CRYPTKEY_T *ckey = debugMallocReset(sizeof(CRYPTKEY_T), -300000);
+	CRYPTKEY_T *ckey = debugMallocReset(sizeof(CRYPTKEY_T), -300619);
 
-	ckey->backendKey = debugMalloc(sizeof(RsaKey), -300000);
+	ckey->backendKey = debugMalloc(sizeof(RsaKey), -300620);
 	ckey->nativeBackendKey = 1;
 	InitRsaKey((RsaKey*)ckey->backendKey, 0);
 
@@ -325,7 +325,7 @@ CRYPTKEY_T *cryptKeyFromDer( char *tmp_path ) {
 
 int cryptKeyMakeDer( int32_t keyBitSize, char *tmp_path ) {
 
-	RsaKey *key = debugMalloc(sizeof(RsaKey), -300000);
+	RsaKey *key = debugMalloc(sizeof(RsaKey), -300621);
 	FILE* keyFile;
 	uint8_t der[CRYPT_DER_BUF_SZ];
 	int derSz = CRYPT_DER_BUF_SZ;
