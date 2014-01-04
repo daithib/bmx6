@@ -4530,7 +4530,7 @@ int32_t opt_show_descriptions(uint8_t cmd, uint8_t _save, struct opt_type *opt,
                         if (TODOname && dext_dptr(dhn->dext, BMX_DSC_TLV_NAMES))
                                 continue;
 
-                        dbg_printf(cn, "\nnodeId=%s descSha=%s blocked=%d desc_frame_size=%d dext_len=%d:\n",
+                        dbg_printf(cn, "\nnodeId=%s descSha=%s blocked=%d desc_frame_size=%d dext_len=%d:",
                                 cryptShaAsString(&on->nodeId), cryptShaAsString(&dhn->dhash), on->blocked,
                                 dhn->desc_frame_len, dhn->dext->dlen );
 
