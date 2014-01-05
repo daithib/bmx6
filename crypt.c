@@ -47,9 +47,11 @@ CRYPTKEY_T *my_PrivKey = NULL;
 #endif
 
 //#include <cyassl/ctaocrypt/settings.h>
+//#include <cyassl/ctaocrypt/sha.h>
 //#include <cyassl/ctaocrypt/rsa.h>
 //#include <cyassl/ctaocrypt/asn_public.h>
 #include <cyassl/ctaocrypt/asn.h>
+//#include <cyassl/asn.h>
 //#include <cyassl/ctaocrypt/ecc.h>
 //#include <cyassl/ssl.h>
 
