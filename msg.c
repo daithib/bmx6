@@ -2055,7 +2055,7 @@ int32_t create_dsc_tlv_names(struct tx_frame_iterator *it)
 	if (self->hostname)
 		debugFree(self->hostname, -300000);
 
-	self->hostname = debugMallocReset(nameLen, -300000);
+	self->hostname = debugMalloc(nameLen+1, -300000);
 	strcpy(self->hostname, my_Hostname);
 	
 	return nameLen;
@@ -2085,7 +2085,7 @@ int32_t process_dsc_tlv_names(struct rx_frame_iterator *it)
 	}
 
 	if (it->op == TLV_OP_NEW) {
-		it->onOld->hostname = debugMallocReset(it->frame_data_length+1, -300000);
+		it->onOld->hostname = debugMalloc(it->frame_data_length+1, -300000);
 		strcpy(it->onOld->hostname, name);
 	}
 
