@@ -501,6 +501,10 @@ char *field_dbg_value(const struct field_format *format, uint16_t min_msg_size, 
 
                 val = *pp ? cryptShaAsString(*((SHA1_T**)pp)) : DBG_NIL;
 
+        } else if (field_type == FIELD_TYPE_POINTER_SHORT_ID) {
+
+                val = *pp ? cryptShaAsShortStr(*((SHA1_T**)pp)) : DBG_NIL;
+
         } else if (field_type == FIELD_TYPE_POINTER_UMETRIC) {
 
                 val = *pp ? umetric_to_human(**((UMETRIC_T**) pp)) : DBG_NIL;
@@ -775,11 +779,12 @@ void register_status_handl(uint16_t min_msg_size, IDM_T multiline, const struct 
 
 
 struct bmx_status {
+        GLOBAL_ID_T *shortId;
+        GLOBAL_ID_T *globalId;
+        char* name;
         char version[(sizeof(BMX_BRANCH)-1) + (sizeof("-")-1) + (sizeof(BRANCH_VERSION)-1) + 1];
         uint16_t compat;
         char revision[9];
-        char* name;
-        GLOBAL_ID_T *globalId;
         IPX_T primaryIp;
         struct net_key *tun6Address;
         struct net_key *tun4Address;
@@ -790,11 +795,12 @@ struct bmx_status {
 };
 
 static const struct field_format bmx_status_format[] = {
+        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_SHORT_ID,  bmx_status, shortId,       1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, bmx_status, globalId,      1, FIELD_RELEVANCE_MEDI),
+        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      bmx_status, name,          1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       bmx_status, version,       1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              bmx_status, compat,        1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       bmx_status, revision,      1, FIELD_RELEVANCE_HIGH),
-        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      bmx_status, name,          1, FIELD_RELEVANCE_HIGH),
-        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, bmx_status, globalId,      1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_IPX,               bmx_status, primaryIp,     1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_NETP,              bmx_status, tun6Address,   1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_NETP,              bmx_status, tun4Address,   1, FIELD_RELEVANCE_HIGH),
@@ -809,11 +815,12 @@ static int32_t bmx_status_creator(struct status_handl *handl, void *data)
 {
 	struct tun_in_node *tin = avl_first_item(&tun_in_tree);
         struct bmx_status *status = (struct bmx_status *) (handl->data = debugRealloc(handl->data, sizeof (struct bmx_status), -300365));
+        status->globalId = &self->nodeId;
+        status->shortId = &self->nodeId;
+        status->name = self->hostname;
         sprintf(status->version, "%s-%s", BMX_BRANCH, BRANCH_VERSION);
         status->compat = my_compatibility;
 	snprintf(status->revision, 8, "%s", GIT_REV);
-        status->name = NULL;
-        status->globalId = &self->nodeId;
         status->primaryIp = self->primary_ip;
         status->tun4Address = tin ? &tin->tunAddr46[1] : NULL;
         status->tun6Address = tin ? &tin->tunAddr46[0] : NULL;
@@ -830,8 +837,9 @@ static int32_t bmx_status_creator(struct status_handl *handl, void *data)
 
 
 struct link_status {
-        char* name;
+        GLOBAL_ID_T *shortId;
         GLOBAL_ID_T *globalId;
+        char* name;
         IPX_T llocalIp;
         IFNAME_T viaDev;
         uint8_t rxRate;
@@ -857,8 +865,9 @@ struct link_status {
 };
 
 static const struct field_format link_status_format[] = {
+        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_SHORT_ID,  link_status, shortId,          1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, link_status, globalId,         1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      link_status, name,             1, FIELD_RELEVANCE_HIGH),
-        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, link_status, globalId,         1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_IPX,               link_status, llocalIp,         1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       link_status, viaDev,           1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, rxRate,           1, FIELD_RELEVANCE_HIGH),
@@ -906,8 +915,9 @@ static int32_t link_status_creator(struct status_handl *handl, void *data)
 
                         while ((lndev = list_iterate(&link->lndev_list, lndev))) {
 
-                                status[i].name = on->hostname;
                                 status[i].globalId = &on->nodeId;
+                                status[i].shortId = &on->nodeId;
+                                status[i].name = on->hostname;
                                 status[i].llocalIp = link->link_ip;
                                 status[i].viaDev = lndev->key.dev->label_cfg;
                                 status[i].rxRate = ((lndev->timeaware_rx_probe * 100) / UMETRIC_MAX);
@@ -945,8 +955,9 @@ static int32_t link_status_creator(struct status_handl *handl, void *data)
 
 
 struct orig_status {
-        char* name;
+        GLOBAL_ID_T *shortId;
         GLOBAL_ID_T *globalId;
+        char* name;
         uint8_t blocked;
         IPX_T primaryIp;
         uint16_t routes;
@@ -962,8 +973,9 @@ struct orig_status {
 };
 
 static const struct field_format orig_status_format[] = {
-        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      orig_status, name,          1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_SHORT_ID,  orig_status, shortId,       1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, orig_status, globalId,      1, FIELD_RELEVANCE_MEDI),
+        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      orig_status, name,          1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              orig_status, blocked,       1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_IPX,               orig_status, primaryIp,     1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              orig_status, routes,        1, FIELD_RELEVANCE_HIGH),
@@ -992,8 +1004,9 @@ static int32_t orig_status_creator(struct status_handl *handl, void *data)
 
 		assertion(-500000, (on->dhn && on->dhn->desc_frame && on->dhn->dext));
 
-                status[i].name = on->hostname;
                 status[i].globalId = &on->nodeId;
+                status[i].shortId = &on->nodeId;
+                status[i].name = on->hostname;
                 status[i].blocked = on->blocked;
                 status[i].primaryIp = on->primary_ip;
                 status[i].routes = on->rt_tree.items;

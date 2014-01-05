@@ -80,6 +80,7 @@ void cryptShaUpdate( void *in, int32_t len);
 void cryptShaFinal( CRYPTSHA1_T *sha);
 
 char *cryptShaAsString( CRYPTSHA1_T *sha);
+char *cryptShaAsShortStr( CRYPTSHA1_T *sha);
 
 int cryptKeyTypeByLen(int len);
 int cryptKeyLenByType(int type);

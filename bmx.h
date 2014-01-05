@@ -457,6 +457,7 @@ enum {
 	FIELD_TYPE_STRING_BINARY,
 	FIELD_TYPE_POINTER_CHAR,
         FIELD_TYPE_POINTER_GLOBAL_ID,
+        FIELD_TYPE_POINTER_SHORT_ID,
         FIELD_TYPE_GLOBAL_ID,
         FIELD_TYPE_UMETRIC,
         FIELD_TYPE_POINTER_UMETRIC,
@@ -472,7 +473,8 @@ enum {
 	FIELD_TYPE_END
 };
 
-#define FIELD_STANDARD_SIZES {-1,-1,-1,-8,-8,(8*sizeof(char*)),(8*sizeof(GLOBAL_ID_T*)),(8*sizeof(GLOBAL_ID_T)), \
+#define FIELD_STANDARD_SIZES {-1,-1,-1,-8,-8,(8*sizeof(char*)), \
+                              (8*sizeof(GLOBAL_ID_T*)),(8*sizeof(GLOBAL_ID_T*)),(8*sizeof(GLOBAL_ID_T)), \
                               (8*sizeof(UMETRIC_T)),(8*sizeof(UMETRIC_T*)),(8*sizeof(FMETRIC_U8_T)), \
                               (8*sizeof(IP4_T)), (8*sizeof(IPX_T)), (8*sizeof(IPX_T)), (8*sizeof(IP6_T)), \
                               (8*sizeof(IP6_T*)), (8*sizeof(struct net_key*)), (8*sizeof(MAC_T))}

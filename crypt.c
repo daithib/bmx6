@@ -477,7 +477,7 @@ void cryptShaFinal( CRYPTSHA1_T *sha) {
 
 char *cryptShaAsString( CRYPTSHA1_T *sha)
 {
-#define SHA1ASSTR_BUFF_SIZE 41
+#define SHA1ASSTR_BUFF_SIZE ((2*sizeof(CRYPTSHA1_T))+1)
 #define SHA1ASSTR_BUFFERS 4
 	static uint8_t c=0;
         static char out[SHA1ASSTR_BUFFERS][SHA1ASSTR_BUFF_SIZE];
@@ -490,6 +490,23 @@ char *cryptShaAsString( CRYPTSHA1_T *sha)
 
 	for (i=0; i<=4; i++)
 		sprintf(&(out[c][i*8]), "%.8X", ntohl(sha->h.u32[i]));
+
+        return out[c];
+}
+
+char *cryptShaAsShortStr( CRYPTSHA1_T *sha)
+{
+#define SHA1ASSHORT_BUFF_SIZE ((2*sizeof(uint32_t))+1)
+#define SHA1ASSHORT_BUFFERS 4
+	static uint8_t c=0;
+        static char out[SHA1ASSHORT_BUFFERS][SHA1ASSHORT_BUFF_SIZE];
+
+        if (!sha)
+                return NULL;
+
+        c = (c+1) % SHA1ASSHORT_BUFFERS;
+
+	sprintf(out[c], "%.8X", ntohl(sha->h.u32[0]));
 
         return out[c];
 }

@@ -2254,8 +2254,9 @@ int process_dsc_tlv_tunXin6net(struct rx_frame_iterator *it)
 
 
 struct tun_out_status {
+        GLOBAL_ID_T *shortId;
+        GLOBAL_ID_T *globalId;
         char* name;
-        GLOBAL_ID_T *id;
         char type[BMX6_ROUTE_MAX+1];
         char src[IPX_PREFIX_STR_LEN];
         char net[IPX_PREFIX_STR_LEN];
@@ -2272,8 +2273,8 @@ struct tun_out_status {
         char *tunIn;
         char *tunName;
         char tunRoute[IPX_PREFIX_STR_LEN];
-        char* remoteName;
         GLOBAL_ID_T *remoteId;
+        char* remoteName;
 	uint32_t tunId;
         char* advType;
         char advNet[IPX_PREFIX_STR_LEN];
@@ -2285,12 +2286,12 @@ struct tun_out_status {
         UMETRIC_T *tunMtc;
         IPX_T *localTunIp;
         IPX_T *remoteTunIp;
-//        uint16_t up;
 };
 
 static const struct field_format tun_out_status_format[] = {
+        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_SHORT_ID,  tun_out_status, shortId,     1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, tun_out_status, globalId,    1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      tun_out_status, name,        1, FIELD_RELEVANCE_HIGH),
-        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, tun_out_status, id,          1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       tun_out_status, type,        1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       tun_out_status, src,         1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       tun_out_status, net,         1, FIELD_RELEVANCE_HIGH),
@@ -2307,8 +2308,8 @@ static const struct field_format tun_out_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      tun_out_status, tunIn,       1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      tun_out_status, tunName,     1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       tun_out_status, tunRoute,    1, FIELD_RELEVANCE_HIGH),
-        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      tun_out_status, remoteName,  1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, tun_out_status, remoteId,    1, FIELD_RELEVANCE_LOW),
+        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      tun_out_status, remoteName,  1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              tun_out_status, tunId,       1, FIELD_RELEVANCE_LOW),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      tun_out_status, advType,     1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       tun_out_status, advNet,      1, FIELD_RELEVANCE_HIGH),
@@ -2360,11 +2361,12 @@ static int32_t tun_out_status_creator(struct status_handl *handl, void *data)
                                 continue;
 
                         if(tsn) {
+                                status->globalId = &tsn->global_id;
+                                status->shortId = &tsn->global_id;
                                 status->name = tsn->nameKey;
                                 strcpy(status->type, bmx6RouteBits2String(tsn->bmx6RouteBits));
                                 strcpy(status->net, netAsStr(&(tsn->net)));
                                 strcpy(status->src, tsn->srcRtNet.mask ? netAsStr(&(tsn->srcRtNet)) : DBG_NIL);
-                                status->id = &(tsn->global_id);
                                 status->min = tsn->netPrefixMin == TYP_TUN_OUT_PREFIX_NET ? tsn->net.mask : tsn->netPrefixMin;
                                 status->max = tsn->netPrefixMax == TYP_TUN_OUT_PREFIX_NET ? tsn->net.mask : tsn->netPrefixMax;
                                 status->aOLP = tsn->allowLargerPrefixRoutesWithWorseTunMetric;
