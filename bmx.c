@@ -858,7 +858,7 @@ struct link_status {
 
 static const struct field_format link_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      link_status, name,             1, FIELD_RELEVANCE_HIGH),
-        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, link_status, globalId,         1, FIELD_RELEVANCE_MEDI),
+        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, link_status, globalId,         1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_IPX,               link_status, llocalIp,         1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       link_status, viaDev,           1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, rxRate,           1, FIELD_RELEVANCE_HIGH),
@@ -906,7 +906,7 @@ static int32_t link_status_creator(struct status_handl *handl, void *data)
 
                         while ((lndev = list_iterate(&link->lndev_list, lndev))) {
 
-                                status[i].name = NULL;
+                                status[i].name = on->hostname;
                                 status[i].globalId = &on->nodeId;
                                 status[i].llocalIp = link->link_ip;
                                 status[i].viaDev = lndev->key.dev->label_cfg;
