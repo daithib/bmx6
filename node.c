@@ -37,6 +37,7 @@
 #include "control.h"
 #include "bmx.h"
 #include "crypt.h"
+#include "sec.h"
 #include "avl.h"
 #include "node.h"
 #include "metrics.h"
@@ -1075,6 +1076,7 @@ char *nodeIdAsStringFromDescAdv( uint8_t *desc_adv )
 	return cryptShaAsString(nodeIdFromDescAdv(desc_adv));
 }
 
+
 struct orig_node *init_orig_node(GLOBAL_ID_T *id)
 {
         TRACE_FUNCTION_CALL;
@@ -1088,6 +1090,26 @@ struct orig_node *init_orig_node(GLOBAL_ID_T *id)
         cb_plugin_hooks(PLUGIN_CB_STATUS, NULL);
 
         return on;
+}
+
+
+void init_self(void)
+{
+        GLOBAL_ID_T id;
+	memset(&id, 0, sizeof(id));
+
+	assertion(-500000, (my_PubKey));
+	assertion(-500000, (sizeof(SHA1_T)==sizeof(id)));
+
+	struct dsc_msg_pubkey *msg = debugMallocReset(sizeof(struct dsc_msg_pubkey) + my_PubKey->rawKeyLen, -300631);
+	msg->type = my_PubKey->rawKeyType;
+	memcpy(msg->key, my_PubKey->rawKey, my_PubKey->rawKeyLen);
+	id = *ref_node_key((uint8_t*)msg, sizeof(struct dsc_msg_pubkey) + my_PubKey->rawKeyLen, 0, 0, 0);
+	debugFree(msg, -300600);
+
+        self = init_orig_node(&id);
+
+        self->ogmSqn_rangeMin = ((OGM_SQN_MASK) & rand_num(OGM_SQN_MAX));
 }
 
 

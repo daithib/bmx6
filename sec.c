@@ -383,11 +383,11 @@ STATIC_FUNC
 int32_t opt_key_path(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
 {
 
-	static uint8_t checked = NO;
+	static uint8_t done = NO;
 	static char key_path[MAX_PATH_SIZE] = DEF_KEY_PATH;
 	char tmp_path[MAX_PATH_SIZE] = "";
 
-	if ( (cmd == OPT_CHECK || cmd == OPT_SET_POST) && initializing && !checked ) {
+	if ( (cmd == OPT_CHECK || cmd == OPT_SET_POST) && initializing && !done ) {
 
 		if (cmd == OPT_CHECK) {
 			if ( wordlen( patch->val )+1 >= MAX_PATH_SIZE  ||  patch->val[0] != '/' )
@@ -422,12 +422,11 @@ int32_t opt_key_path(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
 			return FAILURE;
 		}
 
-
-
 		strcpy(key_path, tmp_path);
 
-		checked = YES;
+		init_self();
 
+		done = YES;
         }
 
 	return SUCCESS;

@@ -1104,29 +1104,6 @@ int32_t opt_update_description(uint8_t cmd, uint8_t _save, struct opt_type *opt,
 }
 
 
-STATIC_FUNC
-void init_self(void)
-{
-        GLOBAL_ID_T id;
-	memset(&id, 0, sizeof(id));
-
-	assertion(-500000, (strlen(my_Hostname)));
-	assertion(-500000, (my_PubKey));
-
-	//strcpy(id.name, my_Hostname);
-
-	assertion(-500000, (sizeof(SHA1_T)==sizeof(id)));
-	struct dsc_msg_pubkey *msg = debugMallocReset(sizeof(struct dsc_msg_pubkey) + my_PubKey->rawKeyLen, -300631);
-	msg->type = my_PubKey->rawKeyType;
-	memcpy(msg->key, my_PubKey->rawKey, my_PubKey->rawKeyLen);
-	id = *ref_node_key((uint8_t*)msg, sizeof(struct dsc_msg_pubkey) + my_PubKey->rawKeyLen, 0, 0, 0);
-	debugFree(msg, -300600);
-
-        self = init_orig_node(&id);
-
-        self->ogmSqn_rangeMin = ((OGM_SQN_MASK) & rand_num(OGM_SQN_MAX));
-}
-
 
 STATIC_FUNC
 int32_t opt_hostname(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
@@ -1146,8 +1123,6 @@ int32_t opt_hostname(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
 			dbg_sys(DBGT_ERR, "illegal hostname %s", my_Hostname);
 			return FAILURE;
 		}
-
-		init_self();
 	}
 
 	return SUCCESS;

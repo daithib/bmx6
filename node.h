@@ -554,8 +554,8 @@ void invalidate_dhash( struct dhash_node *dhn, DHASH_T *dhash );
 void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired);
 void block_orig_node(IDM_T block, struct orig_node *on);
 void free_orig_node(struct orig_node *on);
-struct orig_node * init_orig_node(GLOBAL_ID_T *id);
-
+struct orig_node *init_orig_node(GLOBAL_ID_T *id);
+void init_self(void);
 
 SHA1_T *nodeIdFromDescAdv( uint8_t *desc_adv );
 char *nodeIdAsStringFromDescAdv( uint8_t *desc_adv );
