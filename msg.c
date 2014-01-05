@@ -2042,7 +2042,6 @@ int32_t create_dsc_tlv_names(struct tx_frame_iterator *it)
 	IDM_T TODO;
 	dbgf_sys(DBGT_INFO, "%s", my_Hostname);
 
-	uint8_t *name = tx_iterator_cache_msg_ptr(it);
 	int32_t nameLen = strlen(my_Hostname);
 
 	if (nameLen > tx_iterator_cache_data_space_pref(it))
@@ -2051,8 +2050,14 @@ int32_t create_dsc_tlv_names(struct tx_frame_iterator *it)
 	if (nameLen<=0)
 		return TLV_TX_DATA_IGNORED;
 
-	memcpy(name, my_Hostname, nameLen);
+	memcpy(tx_iterator_cache_msg_ptr(it), my_Hostname, nameLen);
 
+	if (self->hostname)
+		debugFree(self->hostname, -300000);
+
+	self->hostname = debugMallocReset(nameLen, -300000);
+	strcpy(self->hostname, my_Hostname);
+	
 	return nameLen;
 }
 
@@ -4453,7 +4458,7 @@ void update_my_description_adv(void)
 	struct dhash_node *dhn = get_dhash_node( tx.frames_out_ptr, tx.frames_out_pos, tx.dext, &dhash);
 
 	update_neigh_dhash( self, dhn );
-
+/*
 	dbgf_sys(DBGT_INFO, "adding my desc_frame_size=%d dhash=%s desc_frame_data=%s dext_len=%d dext_data=%s",
 		tx.frames_out_pos, cryptShaAsString(&dhash), memAsHexString(tx.frames_out_ptr, tx.frames_out_pos),
 		dhn->dext->dlen, memAsHexString(dhn->dext->data, dhn->dext->dlen));
@@ -4478,9 +4483,7 @@ void update_my_description_adv(void)
 		dbgf_track(DBGT_INFO, "%s: ", rx2.handl->name);
 		fields_dbg_lines(NULL, 0, rx2.frame_msgs_length, rx2.msg,	rx2.handl->min_msg_size, rx2.handl->msg_format);
 	}
-
-
-
+*/
 
 
         myIID4me = self->dhn->myIID4orig;
