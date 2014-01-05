@@ -2039,8 +2039,7 @@ STATIC_FUNC
 int32_t create_dsc_tlv_names(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-	IDM_T TODO;
-	dbgf_sys(DBGT_INFO, "%s", my_Hostname);
+	dbgf_all(DBGT_INFO, "%s", my_Hostname);
 
 	int32_t nameLen = strlen(my_Hostname);
 
@@ -2052,12 +2051,7 @@ int32_t create_dsc_tlv_names(struct tx_frame_iterator *it)
 
 	memcpy(tx_iterator_cache_msg_ptr(it), my_Hostname, nameLen);
 
-	if (self->hostname)
-		debugFree(self->hostname, -300632);
-
-	self->hostname = debugMalloc(nameLen+1, -300633);
-	strcpy(self->hostname, my_Hostname);
-	
+	self->hostname = my_Hostname;
 	return nameLen;
 }
 
@@ -2065,12 +2059,11 @@ STATIC_FUNC
 int32_t process_dsc_tlv_names(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-	IDM_T TODO;
-	char name[GLOBAL_ID_NAME_LEN];
+	char name[MAX_HOSTNAME_LEN];
 
-	dbgf_sys(DBGT_INFO, "op=%s", tlv_op_str(it->op) );
+	dbgf_all(DBGT_INFO, "op=%s", tlv_op_str(it->op) );
 
-	if (it->frame_data_length>=GLOBAL_ID_NAME_LEN)
+	if (it->frame_data_length>=MAX_HOSTNAME_LEN)
 		return TLV_RX_DATA_FAILURE;
 
 	memcpy(name, it->frame_data, it->frame_data_length);

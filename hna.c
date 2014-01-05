@@ -2617,7 +2617,7 @@ int32_t opt_tun_search(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct 
 
                                 if (c->val) {
 
-                                        if (strlen(c->val) > GLOBAL_ID_NAME_LEN ||
+                                        if (strlen(c->val) > MAX_HOSTNAME_LEN ||
                                                 validate_name_string(c->val, strlen(c->val) + 1, NULL) != SUCCESS)
                                                 return FAILURE;
 

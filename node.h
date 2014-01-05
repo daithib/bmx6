@@ -231,11 +231,6 @@ typedef CRYPTSHA1_T RHASH_T;
 #define ARG_OGM_PURGE_TO  "purgeTimeout"
 
 
-#define GLOBAL_ID_NAME_LEN 32
-#define GLOBAL_ID_PKID_LEN CRYPT_SHA1_LEN
-
-
-
 typedef CRYPTSHA1_T GLOBAL_ID_T;
 
 

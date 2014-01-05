@@ -58,7 +58,7 @@ int32_t my_pettiness = DEF_PETTINESS;
 
 uint32_t my_descSqn = 0;
 
-char my_Hostname[GLOBAL_ID_NAME_LEN] = "";
+char my_Hostname[MAX_HOSTNAME_LEN] = "";
 
 
 int32_t dad_to = DEF_DAD_TO;
@@ -1137,12 +1137,12 @@ int32_t opt_hostname(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
 
 		checked = YES;
 
-		if (gethostname(my_Hostname, GLOBAL_ID_NAME_LEN))
+		if (gethostname(my_Hostname, MAX_HOSTNAME_LEN))
 			return FAILURE;
 
-		my_Hostname[GLOBAL_ID_NAME_LEN - 1] = 0;
+		my_Hostname[MAX_HOSTNAME_LEN - 1] = 0;
 
-		if (validate_name_string(my_Hostname, GLOBAL_ID_NAME_LEN, NULL) == FAILURE) {
+		if (validate_name_string(my_Hostname, MAX_HOSTNAME_LEN, NULL) == FAILURE) {
 			dbg_sys(DBGT_ERR, "illegal hostname %s", my_Hostname);
 			return FAILURE;
 		}

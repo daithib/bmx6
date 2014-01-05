@@ -61,6 +61,7 @@ extern int32_t my_compatibility;
 
 extern int32_t my_pettiness;
 
+#define MAX_HOSTNAME_LEN 32
 extern char my_Hostname[];
 
 #ifndef GIT_REV

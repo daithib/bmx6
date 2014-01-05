@@ -411,7 +411,7 @@ struct tun_search_node {
         uint32_t iprule;
 
         GLOBAL_ID_T global_id;
-        char   nodeName[GLOBAL_ID_NAME_LEN];
+        char   nodeName[MAX_HOSTNAME_LEN];
         struct net_key srcRtNet;
 //	IFNAME_T tunName;
 
