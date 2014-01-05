@@ -46,14 +46,19 @@ CRYPTKEY_T *my_PrivKey = NULL;
 #define CYASSL_KEY_GEN
 #endif
 
+#ifdef NO_CTAOCRYPT_DIR
+#include <cyassl/sha.h>
+#include <cyassl/rsa.h>
+#include <cyassl/asn.h>
+#else
 //#include <cyassl/ctaocrypt/settings.h>
-//#include <cyassl/ctaocrypt/sha.h>
-//#include <cyassl/ctaocrypt/rsa.h>
+#include <cyassl/ctaocrypt/sha.h>
+#include <cyassl/ctaocrypt/rsa.h>
 //#include <cyassl/ctaocrypt/asn_public.h>
 #include <cyassl/ctaocrypt/asn.h>
-//#include <cyassl/asn.h>
 //#include <cyassl/ctaocrypt/ecc.h>
 //#include <cyassl/ssl.h>
+#endif
 
 RNG cryptRng;
 Sha cryptSha;

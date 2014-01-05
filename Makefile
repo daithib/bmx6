@@ -57,6 +57,7 @@
 # CFLAGS += -DTEST_DEBUG
 # CFLAGS += -DWITH_UNUSED	  # (includes yet unused stuff and buggy stuff)
 # CFLAGS += -DPROFILING           # (no static functions -> better profiling and cores)
+# CFLAGS += -DNO_CTAOCRYPT_DIR    # for backward compatibility with old cyassl versions
 
 #EXTRA_CFLAGS +=
 #EXTRA_LDFLAGS +=
