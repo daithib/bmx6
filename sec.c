@@ -303,6 +303,7 @@ finish: {
 }
 }
 
+#ifndef NO_KEY_GEN
 int32_t rsa_create( char *tmp_path, uint16_t keyBitSize ) {
 
 	FILE* keyFile;
@@ -320,6 +321,7 @@ int32_t rsa_create( char *tmp_path, uint16_t keyBitSize ) {
 
 	return SUCCESS;
 }
+#endif
 
 int32_t rsa_load( char *tmp_path ) {
 
@@ -408,13 +410,14 @@ int32_t opt_key_path(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
 			*slash = '/';
 		}
 
+#ifndef NO_KEY_GEN
 		if ( check_file( tmp_path, YES/*regular*/,YES/*read*/, NO/*writable*/, NO/*executable*/ ) == FAILURE ) {
 			if (rsa_create(tmp_path, 1024) != SUCCESS) {
 				dbgf_sys(DBGT_ERR, "key=%s does not exist and can not be created!", tmp_path);
 				return FAILURE;
 			}
 		}
-
+#endif
 		if (rsa_load( tmp_path ) == SUCCESS ) {
 			dbgf_sys(DBGT_INFO, "Successfully initialized %d bit RSA key=%s !", (my_PubKey->rawKeyLen * 8), tmp_path);
 		} else {

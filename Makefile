@@ -34,6 +34,10 @@
 # CFLAGS += -DAVL_5XLINKED -DAVL_DEBUG -DAVL_TEST
 
 # optional defines (you may disable these features if you dont need them)
+# CFLAGS += -DNO_KEY_GEN  # use openssl instead, like:
+                          # openssl genrsa -out /etc/bmx6/rsa.pem 1024
+                          # openssl rsa -in /etc/bmx6/rsa.pem -inform PEM -out /etc/bmx6/rsa.der -outform DER
+
 # CFLAGS += -DNO_DEBUG_TRACK
 # CFLAGS += -DNO_DEBUG_SYS
 # CFLAGS += -DLESS_OPTIONS

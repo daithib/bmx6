@@ -42,10 +42,9 @@ CRYPTKEY_T *my_PrivKey = NULL;
 
 #define XKEY_DP_SZ sizeof( mp_digit)
 
-
+#ifndef NO_KEY_GEN
 #define CYASSL_KEY_GEN
-#define CYASSL_TEST_CERT
-#define CYASSL_CERT_GEN
+#endif
 
 #include <cyassl/ctaocrypt/settings.h>
 #include <cyassl/ctaocrypt/rsa.h>
@@ -323,6 +322,7 @@ CRYPTKEY_T *cryptKeyFromDer( char *tmp_path ) {
 
 }
 
+#ifndef NO_KEY_GEN
 int cryptKeyMakeDer( int32_t keyBitSize, char *tmp_path ) {
 
 	RsaKey *key = debugMalloc(sizeof(RsaKey), -300621);
@@ -347,7 +347,11 @@ int cryptKeyMakeDer( int32_t keyBitSize, char *tmp_path ) {
 		dbgf_sys(DBGT_ERR, "Failed translating rsa key to der! derSz=%d", derSz)
 		return FAILURE;
 	}
-
+	
+	// alternatively create private der encoded key with openssl:
+	// openssl genrsa -out /etc/bmx6/rsa.pem 1024
+	// openssl rsa -in /etc/bmx6/rsa.pem -inform PEM -out /etc/bmx6/rsa.der -outform DER
+	//
 	// read this with:
 	//    dumpasn1 key.der
 	//    note that all first INTEGER bytes are not zero (unlike with openssl certificates), but after conversion they are.
@@ -368,7 +372,7 @@ int cryptKeyMakeDer( int32_t keyBitSize, char *tmp_path ) {
 	fclose(keyFile);
 	return SUCCESS;
 }
-
+#endif
 
 int cryptEncrypt( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *pubKey) {
 
@@ -467,8 +471,6 @@ void cryptShaFinal( CRYPTSHA1_T *sha) {
 
 /******************* accessing polarssl: *************************************/
 #elif BMX6_CRYPTLIB == POLARSSL
-
-
 
 /*****************************************************************************/
 #else

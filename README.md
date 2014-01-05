@@ -49,8 +49,14 @@ Tested with debian and cyassl-2.8.0:
 wget  http://www.yassl.com/cyassl-2.8.0.zip
 unzip cyassl-2.8.0.zip
 cd cyassl-2.8.0
-./configure --enable-fastmath=no --enable-ecc=yes --enable-keygen=yes --enable-certgen=yes --enable-testcert=yes
-#--enable-opensslextra=yes
+./configure --enable-fastmath=no --enable-ecc=yes --enable-keygen=yes
+# optionally, drop: --enable-ecc=yes --enable-keygen=yes
+# disable bmx6 private-key generation as:
+# make EXTRA_CFLAGS="-DNO_KEY_GEN" and 
+# and provide your own keys (eg. with openssl):
+# openssl genrsa -out /etc/bmx6/rsa.pem 1024
+# openssl rsa -in /etc/bmx6/rsa.pem -inform PEM -out /etc/bmx6/rsa.der -outform DER
+
 make
 sudo make install
 sudo ldconfig

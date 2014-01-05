@@ -62,7 +62,10 @@ typedef struct CRYPTKEY_T {
 
 extern const CRYPTKEY_T CYRYPTKEY_ZERO;
 
+#ifndef NO_KEY_GEN
 int cryptKeyMakeDer( int32_t keyBitSize, char *tmp_path );
+#endif
+
 CRYPTKEY_T *cryptKeyFromDer( char *tmp_path );
 CRYPTKEY_T *cryptPubKeyFromRaw( uint8_t *rawKey, uint16_t rawKeyLen );
 void cryptKeyFree( CRYPTKEY_T **key );
