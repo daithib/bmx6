@@ -1116,7 +1116,7 @@ void init_self(void)
 	//strcpy(id.name, my_Hostname);
 
 	assertion(-500000, (sizeof(SHA1_T)==sizeof(id)));
-	struct dsc_msg_pubkey *msg = debugMallocReset(sizeof(struct dsc_msg_pubkey) + my_PubKey->rawKeyLen, -300000);
+	struct dsc_msg_pubkey *msg = debugMallocReset(sizeof(struct dsc_msg_pubkey) + my_PubKey->rawKeyLen, -300631);
 	msg->type = my_PubKey->rawKeyType;
 	memcpy(msg->key, my_PubKey->rawKey, my_PubKey->rawKeyLen);
 	id = *ref_node_key((uint8_t*)msg, sizeof(struct dsc_msg_pubkey) + my_PubKey->rawKeyLen, 0, 0, 0);
