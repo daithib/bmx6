@@ -68,8 +68,8 @@ void * clone_to_nbo(void *in, uint32_t len) {
 
 	uint32_t i;
 
-	if ( htonl(47) == 47 )
-		return in;
+//	if ( htonl(47) == 47 )
+//		return in;
 
 	uint8_t *out = debugMallocReset(len, -300601);
 
