@@ -93,7 +93,7 @@ uint8_t * mp_int_get_raw( mp_int *in, uint16_t *rawLen) {
 	dbgf_sys(DBGT_INFO, "s=%d u=%d rawLen=%d w=%d zeros=%d", s, u, *rawLen, w, zeros );
 	dbgf_sys(DBGT_INFO, " in:\n%s", memAsHexStringSep( in->dp, (u*s), 16, "\n"));
 
-	assertion(-500000, (u == w));
+	assertion(-502018, (u == w));
 
 	mp_digit *nbo = clone_to_nbo(in->dp, (u*s));
 	mp_digit *tmp = debugMallocReset(u*s, -300602);
@@ -110,7 +110,7 @@ uint8_t * mp_int_get_raw( mp_int *in, uint16_t *rawLen) {
 			if (i>=1)
 				*((uint32_t*)(((uint8_t*)&(tmp[i-1]))+1+(r/2))) = htobe32( (be32toh(nbo[i-1])<<4) | (be32toh(nbo[i])>>((s-1)*8)));
 		} else {
-			cleanup_all(-500000);
+			cleanup_all(-502019);
 		}
 		i-=2;
 		r+=2;
@@ -126,9 +126,9 @@ uint8_t * mp_int_get_raw( mp_int *in, uint16_t *rawLen) {
 	
 	dbgf_sys(DBGT_INFO, "raw:\n%s", memAsHexStringSep( raw, *rawLen, 16, "\n"));
 
-	assertion(-500000, (*rawLen >= (CRYPT_KEY_N_MIN/8))); // too small key!?
-	assertion(-500000, (!is_zero( begin, 4))); // strange key with 4 leading octets!
-	assertion(-500000, (is_zero(tmp, zeros)));
+	assertion(-502020, (*rawLen >= (CRYPT_KEY_N_MIN/8))); // too small key!?
+	assertion(-502021, (!is_zero( begin, 4))); // strange key with 4 leading octets!
+	assertion(-502022, (is_zero(tmp, zeros)));
 
 	debugFree(tmp, -300605);
 
@@ -165,7 +165,7 @@ int mp_int_put_raw( mp_int *out, uint8_t *raw, uint32_t rawLen) {
 				tmp[i-1] = htobe32( (be32toh(*((uint32_t*)(((uint8_t*)&(in[i-1]))+1+(r/2)))))>>4);
 			
 		} else {
-			cleanup_all(-500000);
+			cleanup_all(-502023);
 		}
 		i-=2;
 		r+=2;
@@ -223,7 +223,7 @@ CRYPTKEY_T *cryptPubKeyFromRaw( uint8_t *rawKey, uint16_t rawKeyLen ) {
 
 	CRYPTKEY_T *cryptKey = debugMallocReset(sizeof(CRYPTKEY_T), -300615);
 
-	assertion(-500000, (rawKey && cryptKeyTypeByLen(rawKeyLen) != FAILURE));
+	assertion(-502024, (rawKey && cryptKeyTypeByLen(rawKeyLen) != FAILURE));
 
 	cryptKey->nativeBackendKey = 0;
 	cryptKey->backendKey = debugMalloc(sizeof(RsaKey), -300616);
@@ -253,7 +253,7 @@ CRYPTKEY_T *cryptPubKeyFromRaw( uint8_t *rawKey, uint16_t rawKeyLen ) {
 STATIC_FUNC
 void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
 
-	assertion(-500000, (cryptKey->backendKey && !cryptKey->rawKey));
+	assertion(-502025, (cryptKey->backendKey && !cryptKey->rawKey));
 
 	RsaKey *key = cryptKey->backendKey;
 	int keyNLen = (key->n.used * XKEY_DP_SZ);
@@ -269,8 +269,8 @@ void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
 
 	dbgf_sys(DBGT_INFO, "E=%d", (uint32_t)key->e.dp[0]);
 
-	assertion(-500000, (key->type == RSA_PUBLIC || key->type == RSA_PRIVATE));
-	assertion(-500000, (key->e.dp[0] == CRYPT_KEY_E_VAL));
+	assertion(-502026, (key->type == RSA_PUBLIC || key->type == RSA_PRIVATE));
+	assertion(-502027, (key->e.dp[0] == CRYPT_KEY_E_VAL));
 
 	cryptKey->rawKey = mp_int_get_raw(&key->n, &cryptKey->rawKeyLen);
 	cryptKey->rawKeyType = cryptKeyTypeByLen(cryptKey->rawKeyLen);
@@ -278,7 +278,7 @@ void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
 
 #ifndef NO_ASSERTIONS
 	CRYPTKEY_T *test = cryptPubKeyFromRaw(cryptKey->rawKey, cryptKey->rawKeyLen);
-	assertion(-500000, !memcmp(((RsaKey*)(cryptKey->backendKey))->n.dp, ((RsaKey*)(test->backendKey))->n.dp, (((RsaKey*)(cryptKey->backendKey))->n.used * XKEY_DP_SZ)));
+	assertion(-502028, !memcmp(((RsaKey*)(cryptKey->backendKey))->n.dp, ((RsaKey*)(test->backendKey))->n.dp, (((RsaKey*)(cryptKey->backendKey))->n.used * XKEY_DP_SZ)));
 	cryptKeyFree(&test);
 #endif
 }
@@ -294,7 +294,7 @@ CRYPTKEY_T *cryptKeyFromDer( char *tmp_path ) {
 	int    ret;
 	word32 idx = 0;
 	
-	assertion(-500000, (!my_PrivKey));
+	assertion(-502029, (!my_PrivKey));
 
 	if (!(keyFile = fopen(tmp_path, "rb"))) {
 		dbgf_sys(DBGT_ERR, "can not open %s: %s", tmp_path, strerror(errno));
@@ -445,9 +445,9 @@ void cryptShaFree( void ) {
 
 void cryptShaAtomic( void *in, int32_t len, CRYPTSHA1_T *sha) {
 
-	assertion(-500000, (shaClean==YES));
-	assertion(-500000, (sha));
-	assertion(-500000, (in && len>0 && !memcmp(in, in, len)));
+	assertion(-502030, (shaClean==YES));
+	assertion(-502031, (sha));
+	assertion(-502032, (in && len>0 && !memcmp(in, in, len)));
 
 	ShaUpdate(&cryptSha, (byte*) in, len);
 	ShaFinal(&cryptSha, (byte*) sha);
@@ -455,23 +455,23 @@ void cryptShaAtomic( void *in, int32_t len, CRYPTSHA1_T *sha) {
 
 void cryptShaNew( void *in, int32_t len) {
 
-	assertion(-500000, (shaClean==YES));
-	assertion(-500000, (in && len>0 && !memcmp(in, in, len)));
+	assertion(-502033, (shaClean==YES));
+	assertion(-502034, (in && len>0 && !memcmp(in, in, len)));
 	shaClean = NO;
 	ShaUpdate(&cryptSha, (byte*) in, len);
 }
 
 void cryptShaUpdate( void *in, int32_t len) {
 
-	assertion(-500000, (shaClean==NO));
-	assertion(-500000, (in && len>0 && !memcmp(in, in, len)));
+	assertion(-502035, (shaClean==NO));
+	assertion(-502036, (in && len>0 && !memcmp(in, in, len)));
 	ShaUpdate(&cryptSha, (byte*)in, len);
 }
 
 void cryptShaFinal( CRYPTSHA1_T *sha) {
 
-	assertion(-500000, (shaClean==NO));
-	assertion(-500000, (sha));
+	assertion(-502037, (shaClean==NO));
+	assertion(-502038, (sha));
 	ShaFinal(&cryptSha, (byte*) sha);
 	shaClean = YES;
 }

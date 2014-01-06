@@ -2356,7 +2356,7 @@ void dev_if_fix(void)
 {
 	TRACE_FUNCTION_CALL;
 
-	assertion(-500000, (self && is_ip_set(&self->primary_ip)));
+	assertion(-502042, (self && is_ip_set(&self->primary_ip)));
 
         struct if_link_node *iln = avl_first_item(&if_link_tree);
         struct avl_node *lan;
@@ -2966,8 +2966,8 @@ int32_t opt_auto_prefix(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct
 
         } else if (cmd == OPT_SET_POST && initializing ) {
 
-		assertion(-500000, (self));
-		assertion(-500000, (!is_zero(&self->nodeId, sizeof(self->nodeId))));
+		assertion(-502043, (self));
+		assertion(-502044, (!is_zero(&self->nodeId, sizeof(self->nodeId))));
 		self->primary_ip = autoconf_prefix_cfg.ip;
 		memcpy(&self->primary_ip.s6_addr[(autoconf_prefix_cfg.mask/8)], &self->nodeId, ((128-autoconf_prefix_cfg.mask)/8));
 

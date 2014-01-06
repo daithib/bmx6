@@ -194,7 +194,7 @@ STATIC_FUNC
 int _create_tlv_hna(uint8_t* data, uint16_t max_size, uint16_t pos, struct net_key *net, uint8_t flags)
 {
         TRACE_FUNCTION_CALL;
-	assertion(-500000, (net->af==AF_INET6));
+	assertion(-502039, (net->af==AF_INET6));
         uint16_t i;
 
 
@@ -352,7 +352,7 @@ void reconfigure_tun_ins(void)
 		}
 
 		configure_tunnel_in(ADD, tin, m++);
-		assertion(-500000, (m<=MAX_TUN_REMOTE_IPS));
+		assertion(-502040, (m<=MAX_TUN_REMOTE_IPS));
 		assertion(-501237, (tin->upIfIdx && tin->tun6Id >= 0));
 	}
 }
@@ -1630,7 +1630,7 @@ int create_dsc_tlv_tun6(struct tx_frame_iterator *it)
         struct avl_node *an = NULL;
         struct dsc_msg_tun6 *adv = (struct dsc_msg_tun6 *) tx_iterator_cache_msg_ptr(it);
 
-        assertion(-500000, is_ip_set(&self->primary_ip));
+        assertion(-502041, is_ip_set(&self->primary_ip));
 
 	while ((tin = avl_iterate_item(&tun_in_tree, &an)) && m < tx_iterator_cache_msg_space_pref(it)) {
 

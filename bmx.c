@@ -389,7 +389,7 @@ int64_t field_get_value(const struct field_format *format, uint16_t min_msg_size
 
         } else if (bits <= 16) {
 
-		assertion(-500000, (bits<=8 || !host_order));
+		assertion(-502013, (bits<=8 || !host_order));
 
                 uint8_t bit = 0;
                 uint16_t result = 0;
@@ -1002,7 +1002,7 @@ static int32_t orig_status_creator(struct status_handl *handl, void *data)
 
         while (data ? (on = data) : (on = avl_iterate_item(&orig_tree, &it))) {
 
-		assertion(-500000, (on->dhn && on->dhn->desc_frame && on->dhn->dext));
+		assertion(-502014, (on->dhn && on->dhn->desc_frame && on->dhn->dext));
 
                 status[i].globalId = &on->nodeId;
                 status[i].shortId = &on->nodeId;
@@ -1150,7 +1150,7 @@ DESC_SQN_T getDescriptionSqn( char* newPath, uint8_t ass )
 	char *goto_error_code = NULL;
 #define DSQNIVAL 10
 
-	assertion(-500000, XOR(newPath, strlen(path) ));
+	assertion(-502014, XOR(newPath, strlen(path) ));
 
 	if (!strlen(path)) {
 
@@ -1208,7 +1208,7 @@ finish: {
 
 	if (goto_error_code) {
 		dbgf_sys(DBGT_ERR, "%s=%s %s! errno=%s", ARG_DSQN_PATH, path, goto_error_code, strerror(errno));
-		assertion(-500000, (ass));
+		assertion(-502015, (ass));
 		return 0;
 	}
 

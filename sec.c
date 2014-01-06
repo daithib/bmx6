@@ -52,7 +52,7 @@ int create_dsc_tlv_pubkey(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	assertion(-500000, (my_PubKey));
+	assertion(-502097, (my_PubKey));
 
         if ((int)(sizeof(struct dsc_msg_pubkey) + my_PubKey->rawKeyLen) > tx_iterator_cache_data_space_pref(it))
 		return TLV_TX_DATA_FULL;
@@ -108,7 +108,7 @@ int create_dsc_tlv_signature(struct tx_frame_iterator *it)
 
 	if (it->frame_type==BMX_DSC_TLV_SIGNATURE) {
 
-		assertion(-500000, (!desc_msg && !dataOffset));
+		assertion(-502098, (!desc_msg && !dataOffset));
 
 		desc_msg = (struct dsc_msg_signature*) (it->frames_out_ptr + it->frames_out_pos + sizeof(struct tlv_hdr));
 
@@ -117,10 +117,10 @@ int create_dsc_tlv_signature(struct tx_frame_iterator *it)
 		return sizeof(struct dsc_msg_signature) + my_PubKey->rawKeyLen;
 
 	} else {
-		assertion(-500000, (it->frame_type == BMX_DSC_TLV_SIGNATURE_DUMMY));
-		assertion(-500000, (desc_msg && dataOffset));
-		assertion(-500000, (it->frames_out_pos > dataOffset));
-		assertion(-500000, (dext_dptr(it->dext, BMX_DSC_TLV_SIGNATURE)));
+		assertion(-502099, (it->frame_type == BMX_DSC_TLV_SIGNATURE_DUMMY));
+		assertion(-502100, (desc_msg && dataOffset));
+		assertion(-502101, (it->frames_out_pos > dataOffset));
+		assertion(-502102, (dext_dptr(it->dext, BMX_DSC_TLV_SIGNATURE)));
 
 		int32_t dataLen = it->frames_out_pos - dataOffset;
 		uint8_t *data = it->frames_out_ptr + dataOffset;
@@ -133,7 +133,7 @@ int create_dsc_tlv_signature(struct tx_frame_iterator *it)
 
 		dext_msg->type = my_PubKey->rawKeyType;
 		cryptSign((uint8_t*)&dataSha, sizeof(dataSha), dext_msg->signature, &keySpace);
-		assertion(-500000, (keySpace == my_PubKey->rawKeyLen));
+		assertion(-502103, (keySpace == my_PubKey->rawKeyLen));
 
 		desc_msg->type = dext_msg->type;
 		memcpy( desc_msg->signature, dext_msg->signature, keySpace);
@@ -156,8 +156,8 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 	if (it->frame_type == BMX_DSC_TLV_SIGNATURE_DUMMY)
 		return TLV_RX_DATA_PROCESSED;
 
-	assertion(-500000, (it->frame_data_length == it->frame_msgs_length && it->frame_data == it->msg));
-	assertion(-500000, (it->dhnNew && it->dhnNew->dext));
+	assertion(-502104, (it->frame_data_length == it->frame_msgs_length && it->frame_data == it->msg));
+	assertion(-502105, (it->dhnNew && it->dhnNew->dext));
 
 	if (it->op != TLV_OP_TEST || !descVerification)
 		return TLV_RX_DATA_PROCESSED;
@@ -229,7 +229,7 @@ int create_dsc_tlv_sha(struct tx_frame_iterator *it)
 	static uint32_t dataOffset = 0;
 
 	if (it->frame_type==BMX_DSC_TLV_SHA) {
-		assertion(-500000, (!desc_msg && !dataOffset));
+		assertion(-502106, (!desc_msg && !dataOffset));
 
 		desc_msg = (struct dsc_msg_sha*) (it->frames_out_ptr + it->frames_out_pos + sizeof(struct tlv_hdr));
 		dataOffset = it->dext->dlen + sizeof(struct tlv_hdr_virtual) + sizeof(struct dsc_msg_sha);
@@ -237,10 +237,10 @@ int create_dsc_tlv_sha(struct tx_frame_iterator *it)
 		return sizeof(struct dsc_msg_sha);
 
 	} else {
-		assertion(-500000, (it->frame_type == BMX_DSC_TLV_SHA_DUMMY));
-		assertion(-500000, (desc_msg && dataOffset));
-		assertion(-500000, (it->dext->dlen > dataOffset));
-		assertion(-500000, (dext_dptr(it->dext, BMX_DSC_TLV_SHA)));
+		assertion(-502107, (it->frame_type == BMX_DSC_TLV_SHA_DUMMY));
+		assertion(-502108, (desc_msg && dataOffset));
+		assertion(-502109, (it->dext->dlen > dataOffset));
+		assertion(-502110, (dext_dptr(it->dext, BMX_DSC_TLV_SHA)));
 
 		// fix my dext:
 		struct dsc_msg_sha *dext_msg = dext_dptr(it->dext, BMX_DSC_TLV_SHA);

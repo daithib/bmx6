@@ -550,7 +550,7 @@ void invalidate_dhash( struct dhash_node *dhn, DHASH_T *dhash )
 {
         TRACE_FUNCTION_CALL;
 
-	assertion( -500000, XOR(dhn, dhash));
+	assertion( -502087, XOR(dhn, dhash));
 
 	if (!dhn) {
 		dhn = debugMallocReset(sizeof(DHASH_T), -300628);
@@ -569,7 +569,7 @@ void invalidate_dhash( struct dhash_node *dhn, DHASH_T *dhash )
 
         assertion( -500698, (!dhn->on));
         assertion( -500699, (!dhn->neigh));
-	assertion( -500000, !avl_find(&dhash_tree, &dhn->dhash));
+	assertion( -502088, !avl_find(&dhash_tree, &dhn->dhash));
 
         avl_insert(&dhash_invalid_tree, dhn, -300168);
         plist_add_tail(&dhash_invalid_plist, dhn);
@@ -752,7 +752,7 @@ void update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
 		if (local->neigh)
 			free_neigh_node(local->neigh);
 
-		cleanup_all(-500000);
+		cleanup_all(-502089);
 	}
 
         assertion(-500954, (dhn->neigh));
@@ -992,7 +992,7 @@ void free_orig_node(struct orig_node *on)
         purge_orig_router(on, NULL, NO);
 
         if (on->added) {
-		assertion(-500000, (on->dhn && on->dhn->desc_frame));
+		assertion(-502090, (on->dhn && on->dhn->desc_frame));
                 process_description_tlvs(NULL, on, on->dhn, TLV_OP_DEL, FRAME_TYPE_PROCESS_ALL);
         }
 
@@ -1064,9 +1064,9 @@ SHA1_T *nodeIdFromDescAdv( uint8_t *desc_adv )
 	struct tlv_hdr tlvHdr = { .u.u16 = ntohs(((struct tlv_hdr*)desc_adv)->u.u16) };
 	struct desc_hdr_rhash *rhashHdr = ((struct desc_hdr_rhash*)(desc_adv + sizeof(struct tlv_hdr)));
 
-	assertion( -500000, (tlvHdr.u.tlv.type == BMX_DSC_TLV_RHASH ));
-	assertion( -500000, (tlvHdr.u.tlv.length == sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) ));
-	assertion( -500000, (!rhashHdr->compression && !rhashHdr->reserved && rhashHdr->expanded_type == BMX_DSC_TLV_PUBKEY));
+	assertion( -502091, (tlvHdr.u.tlv.type == BMX_DSC_TLV_RHASH ));
+	assertion( -502092, (tlvHdr.u.tlv.length == sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) ));
+	assertion( -502093, (!rhashHdr->compression && !rhashHdr->reserved && rhashHdr->expanded_type == BMX_DSC_TLV_PUBKEY));
 
 	return &rhashHdr->msg->rframe_hash;
 }
@@ -1098,8 +1098,8 @@ void init_self(void)
         GLOBAL_ID_T id;
 	memset(&id, 0, sizeof(id));
 
-	assertion(-500000, (my_PubKey));
-	assertion(-500000, (sizeof(SHA1_T)==sizeof(id)));
+	assertion(-502094, (my_PubKey));
+	assertion(-502095, (sizeof(SHA1_T)==sizeof(id)));
 
 	struct dsc_msg_pubkey *msg = debugMallocReset(sizeof(struct dsc_msg_pubkey) + my_PubKey->rawKeyLen, -300631);
 	msg->type = my_PubKey->rawKeyType;
@@ -1349,7 +1349,7 @@ void node_tasks(void) {
 
 		int32_t result = process_description_tlvs(NULL, on, on->dhn, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL);
 
-		assertion(-500000, (result==TLV_RX_DATA_DONE || result==TLV_RX_DATA_BLOCKED));
+		assertion(-502096, (result==TLV_RX_DATA_DONE || result==TLV_RX_DATA_BLOCKED));
 
 		if (result == TLV_RX_DATA_DONE) {
 

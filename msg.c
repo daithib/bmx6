@@ -229,8 +229,8 @@ struct frame_db *description_names_db = NULL;
 
 struct tlv_hdr tlv_set_net(int16_t type, int16_t length)
 {
-	assertion(-500000, (type >= 0 && type <= FRAME_TYPE_MASK));
-	assertion(-500000, (length > 0 && length < (int)(MAX_UDPD_SIZE - sizeof(struct packet_header))));
+	assertion(-502044, (type >= 0 && type <= FRAME_TYPE_MASK));
+	assertion(-502045, (length > 0 && length < (int)(MAX_UDPD_SIZE - sizeof(struct packet_header))));
 
 	struct tlv_hdr tlv = {.u.tlv = {.type = type, .length = length } };
 	tlv.u.u16 = htons(tlv.u.u16);
@@ -267,7 +267,7 @@ void register_frame_handler(struct frame_db *db, int pos, struct frame_handl *ha
         assertion(-500660, (!db->handls[pos].name)); // the pos MUST NOT be used yet
         assertion(-500661, (handl && handl->name));
         assertion(-500806, (XOR(handl->rx_frame_handler, handl->rx_msg_handler) && XOR(handl->tx_frame_handler, handl->tx_msg_handler)));
-	assertion(-500000, IMPLIES(handl->rx_msg_handler, handl->fixed_msg_size));
+	assertion(-502046, IMPLIES(handl->rx_msg_handler, handl->fixed_msg_size));
         assertion(-500975, (handl->tx_task_interval_min <= CONTENT_MIN_TX_INTERVAL_MAX));
 
         assertion(-501213, IMPLIES(handl->msg_format && handl->min_msg_size, handl->min_msg_size ==
@@ -394,7 +394,7 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *onOld, 
         assertion(-500590, IMPLIES(onOld == self, (op == TLV_OP_DEBUG ||
                 (op >= TLV_OP_CUSTOM_MIN && op <= TLV_OP_CUSTOM_MAX) || (op >= TLV_OP_PLUGIN_MIN && op <= TLV_OP_PLUGIN_MAX))));
         assertion(-500807, (dhnNew && dhnNew->desc_frame && dhnNew->dext));
-	assertion(-500000, IMPLIES(op == TLV_OP_DEL || op == TLV_OP_NEW,onOld));
+	assertion(-502047, IMPLIES(op == TLV_OP_DEL || op == TLV_OP_NEW,onOld));
         assertion(-501354, IMPLIES(op == TLV_OP_DEL, onOld->added));
 
         int32_t result;
@@ -427,7 +427,7 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *onOld, 
 			blocked = YES;
 	}
 
-	assertion( -500000, (result==TLV_RX_DATA_DONE || result==TLV_RX_DATA_REJECTED || result==TLV_RX_DATA_FAILURE));
+	assertion( -502048, (result==TLV_RX_DATA_DONE || result==TLV_RX_DATA_REJECTED || result==TLV_RX_DATA_FAILURE));
 
         if ((op >= TLV_OP_CUSTOM_MIN && op <= TLV_OP_CUSTOM_MAX) || (op >= TLV_OP_PLUGIN_MIN && op <= TLV_OP_PLUGIN_MAX))
                 return result;
@@ -1421,8 +1421,8 @@ int32_t tx_frame_ref_adv(struct tx_frame_iterator *it)
 		dbgf_sys(DBGT_INFO, "frame_msgs_length=%d f_body_len=%d space_pref=%d space_max=%d",
 			it->ttn->frame_msgs_length, refn->f_body_len, tx_iterator_cache_data_space_pref(it), tx_iterator_cache_data_space_max(it));
 
-		assertion(-500000, ((int) it->ttn->frame_msgs_length <= tx_iterator_cache_data_space_max(it)));
-		assertion(-500000, ((int) it->ttn->frame_msgs_length == refn->f_body_len));
+		assertion(-502049, ((int) it->ttn->frame_msgs_length <= tx_iterator_cache_data_space_max(it)));
+		assertion(-502050, ((int) it->ttn->frame_msgs_length == refn->f_body_len));
 
 		struct frame_hdr_rhash_adv *hdr = ((struct frame_hdr_rhash_adv*) tx_iterator_cache_hdr_ptr(it));
 
@@ -1820,23 +1820,23 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 		return (struct dhash_node *) UNRESOLVED_PTR;
 
 	} else if (dext) {
-		cleanup_all(-500000);
+		cleanup_all(-502051);
 	}
 
 	// only if dext is fully resolvable then allocate it, so this should always succeed!!!
 	dext = dext_init();
 
 	if ( dext != dext_resolve(pb, cache, dext) )
-		cleanup_all(-500000);
+		cleanup_all(-502052);
 
 
 	dhnNew = get_dhash_node(cache->desc_frame, cache->desc_frame_len, dext, dhash);
 	on = avl_find_item(&orig_tree, nodeIdFromDescAdv(cache->desc_frame));
-	assertion(-500000, IMPLIES(on, on->dhn && on->dhn->desc_frame && on->dhn->dext));
+	assertion(-502053, IMPLIES(on, on->dhn && on->dhn->desc_frame && on->dhn->dext));
 
 	result = process_description_tlvs(pb, on, dhnNew, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL);
 
-	assertion( -500000, (result==TLV_RX_DATA_BLOCKED || result==TLV_RX_DATA_DONE || result==TLV_RX_DATA_REJECTED || result==TLV_RX_DATA_FAILURE));
+	assertion( -502054, (result==TLV_RX_DATA_BLOCKED || result==TLV_RX_DATA_DONE || result==TLV_RX_DATA_REJECTED || result==TLV_RX_DATA_FAILURE));
 
 	if (result==TLV_RX_DATA_FAILURE || result==TLV_RX_DATA_REJECTED)
 		goto process_desc0_error;
@@ -1859,25 +1859,25 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
         } else if (result == TLV_RX_DATA_BLOCKED ) {
 
                 if (on->added) {
-			assertion(-500000, (on->dhn && on->dhn->desc_frame && on->dhn->dext));
+			assertion(-502055, (on->dhn && on->dhn->desc_frame && on->dhn->dext));
                         result = process_description_tlvs(pb, on, on->dhn, TLV_OP_DEL, FRAME_TYPE_PROCESS_ALL);
                         assertion(-501364, (result == TLV_RX_DATA_DONE));
                 }
 
 		block_orig_node(YES, on);
 
-		assertion(-500000, (on->blocked && !on->added));
+		assertion(-502056, (on->blocked && !on->added));
         }
 
         del_cached_description(&dhnNew->dhash);
 
         update_neigh_dhash(on, dhnNew);
 
-	assertion(-500000, (on->dhn == dhnNew));
+	assertion(-502057, (on->dhn == dhnNew));
         assertion(-500970, (dhnNew->on == on));
         assertion(-500309, (dhnNew == avl_find_item(&dhash_tree, &on->dhn->dhash)));
         assertion(-500310, (on == avl_find_item(&orig_tree, nodeIdFromDescAdv(on->dhn->desc_frame))));
-	assertion(-500000, (dhnNew->desc_frame));
+	assertion(-502058, (dhnNew->desc_frame));
 
 	cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_CREATED, on);
 
@@ -2007,7 +2007,7 @@ int32_t process_dsc_tlv_version(struct rx_frame_iterator *it)
 
 		struct dsc_msg_version *old = dext_dptr(it->onOld->dhn->dext, BMX_DSC_TLV_VERSION);
 
-		assertion(-500000, (old));
+		assertion(-502059, (old));
 		
 		if (ntohl(old->descSqn) >= ntohl(new->descSqn) ) {
 
@@ -2122,8 +2122,8 @@ int32_t tx_frame_description_adv(struct tx_frame_iterator *it)
                         dhn->desc_frame_len, ttn->frame_msgs_length, it->frames_out_pos, it->frame_cache_msgs_size,
                         tx_iterator_cache_data_space_pref(it), tx_iterator_cache_data_space_max(it));
 
-		assertion(-500000, (ttn->frame_msgs_length == dhn->desc_frame_len));
-		assertion(-500000, (dhn->desc_frame_len <= tx_iterator_cache_data_space_max(it)));
+		assertion(-502060, (ttn->frame_msgs_length == dhn->desc_frame_len));
+		assertion(-502061, (dhn->desc_frame_len <= tx_iterator_cache_data_space_max(it)));
         }
 
         memcpy((char*) adv, dhn->desc_frame, dhn->desc_frame_len);
@@ -3123,7 +3123,7 @@ struct dhash_node *process_dhash_description_neighIID4x
 
         assertion(-500688, (dhash));
         assertion(-500689, (!(is_transmitters_iid && !memcmp(dhash, &(self->dhn->dhash), sizeof(*dhash))))); // cant be transmitters' and myselfs'
-        assertion(-500000, (!avl_find(&dhash_invalid_tree, dhash)));
+        assertion(-502062, (!avl_find(&dhash_invalid_tree, dhash)));
 
 	if (avl_find(&dhash_invalid_tree, dhash)) {
 
@@ -3413,11 +3413,11 @@ int32_t rx_msg_hello_adv(struct rx_frame_iterator *it)
 
 IDM_T desc_frame_changed(  struct rx_frame_iterator *it, uint8_t type )
 {
-	assertion(-500000, (it->dhnNew));
-	assertion(-500000, (it->dhnNew->dext));
-	assertion(-500000, (it->onOld));
-	assertion(-500000, (it->onOld->dhn));
-	assertion(-500000, (it->onOld->dhn->dext));
+	assertion(-502063, (it->dhnNew));
+	assertion(-502064, (it->dhnNew->dext));
+	assertion(-502065, (it->onOld));
+	assertion(-502066, (it->onOld->dhn));
+	assertion(-502067, (it->onOld->dhn->dext));
 	
 	struct desc_extension *dOld = it->onOld->dhn->dext;
 	struct desc_extension *dNew = it->dhnNew->dext;
@@ -3441,9 +3441,9 @@ void process_description_tlvs_del( struct orig_node *on, uint8_t ft_start, uint8
 
 	int8_t t;
 
-	assertion(-500000, (on));
-	assertion(-500000, (on->dhn));
-	assertion(-500000, (on->dhn->dext));
+	assertion(-502068, (on));
+	assertion(-502069, (on->dhn));
+	assertion(-502070, (on->dhn->dext));
 	
 	for (t = ft_start; t <= ft_end; t++) {
 
@@ -3489,7 +3489,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
         } else if (it->frames_pos + ((int) (is_virtual_desc ? sizeof (struct tlv_hdr_virtual) : sizeof(struct tlv_hdr))) < it->frames_length) {
 
 		if (is_virtual_desc) {
-			assertion(-500000, (it->dhnNew->dext));
+			assertion(-502071, (it->dhnNew->dext));
 			struct tlv_hdr_virtual *tlv = (struct tlv_hdr_virtual *) (it->frames_in + it->frames_pos);
 			f_type = tlv->type;
 			f_len = ntohl(tlv->length);
@@ -3615,7 +3615,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                         if (it->msg == it->frame_data + it->frame_data_length) {
 				return TLV_RX_DATA_PROCESSED;
 			} else {
-				assertion(-500000, (result == TLV_RX_DATA_BLOCKED || result == TLV_RX_DATA_FAILURE || result == TLV_RX_DATA_REJECTED));
+				assertion(-502072, (result == TLV_RX_DATA_BLOCKED || result == TLV_RX_DATA_FAILURE || result == TLV_RX_DATA_REJECTED));
 				goto_error(rx_frame_iterate_error, "failed rx_msg_handler");
                         }
 
@@ -3627,7 +3627,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 			if ( result == it->frame_msgs_length || result == TLV_RX_DATA_PROCESSED) {
 				return TLV_RX_DATA_PROCESSED;
 			} else {
-				assertion(-500000, (result == TLV_RX_DATA_BLOCKED || result == TLV_RX_DATA_FAILURE || result == TLV_RX_DATA_REJECTED));
+				assertion(-502073, (result == TLV_RX_DATA_BLOCKED || result == TLV_RX_DATA_FAILURE || result == TLV_RX_DATA_REJECTED));
 				goto_error(rx_frame_iterate_error, "failed rx_frame_handler");
                         }
                 }
@@ -3644,7 +3644,7 @@ rx_frame_iterate_error: {
 		it->frame_type, f_type, (f_handl ? f_handl->name : NULL), it->frame_type_expanded,
 		it->frames_pos, it->frames_length, f_pos_next, f_data_len, f_len, it->frame_msgs_length);
 
-	EXITERROR(-500000, result != TLV_RX_DATA_FAILURE);
+	EXITERROR(-502074, result != TLV_RX_DATA_FAILURE);
         return result;
 }
 }
@@ -3965,8 +3965,8 @@ int32_t tx_frame_iterate(IDM_T iterate_msg, struct tx_frame_iterator *it)
 
         int32_t result;// = TLV_DATA_DONE;
         assertion(-500776, (it->frame_cache_array));
-	assertion(-500000, IMPLIES(handl->tx_frame_handler, !iterate_msg));
-	assertion(-500000, XOR(handl->tx_frame_handler, handl->tx_msg_handler));
+	assertion(-502075, IMPLIES(handl->tx_frame_handler, !iterate_msg));
+	assertion(-502076, XOR(handl->tx_frame_handler, handl->tx_msg_handler));
         assertion(-501004, (IMPLIES(it->frame_cache_msgs_size, handl->tx_msg_handler)));
 
         ASSERTION(-500777, (IMPLIES((it->frame_cache_msgs_size && handl->tx_msg_handler),
@@ -4055,7 +4055,7 @@ STATIC_FUNC
 int32_t tx_tlv_msg(struct tx_frame_iterator *in)
 {
         TRACE_FUNCTION_CALL;
-	assertion(-500000, (in->handl->next_db));
+	assertion(-502079, (in->handl->next_db));
 
 	uint8_t cache_data_array[PKT_FRAMES_SIZE_MAX - sizeof(struct tlv_hdr)] = {0};
 
@@ -4070,13 +4070,13 @@ int32_t tx_tlv_msg(struct tx_frame_iterator *in)
 
         for (; out.frame_type <= out.db->handl_max; out.frame_type++) {
 		
-		assertion(-500000, IMPLIES((out.db->handls[out.frame_type]).name, (out.db->handls[out.frame_type]).tx_frame_handler));
+		assertion(-502080, IMPLIES((out.db->handls[out.frame_type]).name, (out.db->handls[out.frame_type]).tx_frame_handler));
 		int32_t result;
 		result = tx_frame_iterate(NO/*iterate_msg*/, &out);
 		assertion_dbg(-500798, result>=TLV_TX_DATA_DONE, "frame_type=%d result=%s", out.frame_type, tlv_tx_result_str(result));
 	}
 
-	assertion(-500000, (out.frames_out_pos>=0));
+	assertion(-502081, (out.frames_out_pos>=0));
 
 	if (out.frames_out_pos)
 		return out.frames_out_pos;
@@ -4420,7 +4420,7 @@ void update_my_description_adv(void)
 {
         TRACE_FUNCTION_CALL;
 
-	assertion(-500000, (!terminating));
+	assertion(-502082, (!terminating));
 
 	uint8_t *frame_cache_array = debugMallocReset(vrt_frame_data_size_out, -300586);
 
@@ -4441,7 +4441,7 @@ void update_my_description_adv(void)
         for (; tx.frame_type <= tx.db->handl_max; tx.frame_type++) {
        
 		int32_t result;
-		assertion(-500000, IMPLIES((tx.db->handls[tx.frame_type]).name, (tx.db->handls[tx.frame_type]).tx_frame_handler));
+		assertion(-502083, IMPLIES((tx.db->handls[tx.frame_type]).name, (tx.db->handls[tx.frame_type]).tx_frame_handler));
 		result = tx_frame_iterate(NO/*iterate_msg*/, &tx);
 		assertion_dbg(-500798, result>=TLV_TX_DATA_DONE, "frame_type=%d result=%s", tx.frame_type, tlv_tx_result_str(result));
 	}
@@ -4863,10 +4863,10 @@ void init_msg( void )
         assertion(-500347, (sizeof (DHASH_T) == CRYPT_SHA1_LEN));
         assertion(-501146, (OGM_DEST_ARRAY_BIT_SIZE == ((OGM_DEST_ARRAY_BIT_SIZE / 8)*8)));
 
-	assertion(-500000, (sizeof(struct desc_msg_rhash) == sizeof(struct frame_msg_rhash_adv)));
-	assertion(-500000, (sizeof(struct desc_hdr_rhash) == sizeof(struct frame_hdr_rhash_adv)));
+	assertion(-502084, (sizeof(struct desc_msg_rhash) == sizeof(struct frame_msg_rhash_adv)));
+	assertion(-502085, (sizeof(struct desc_hdr_rhash) == sizeof(struct frame_hdr_rhash_adv)));
 
-	assertion(-500000, ( (tlv_set_net(0x1B, 0x492)).u.u16 == htons(0xDC92) ) );
+	assertion(-502086, ( (tlv_set_net(0x1B, 0x492)).u.u16 == htons(0xDC92) ) );
 
 
         ogm_aggreg_sqn_max = ((AGGREG_SQN_MASK) & rand_num(AGGREG_SQN_MAX));
