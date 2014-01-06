@@ -4858,6 +4858,8 @@ void init_msg( void )
 	assertion(-501567, (FRAME_TYPE_MASK >= FRAME_TYPE_MAX_KNOWN));
 	assertion(-501568, (FRAME_TYPE_MASK >= BMX_DSC_TLV_MAX_KNOWN));
 
+        assertion(-500998, (sizeof(struct tlv_hdr) == 2));
+
         assertion(-500347, (sizeof (DHASH_T) == CRYPT_SHA1_LEN));
         assertion(-501146, (OGM_DEST_ARRAY_BIT_SIZE == ((OGM_DEST_ARRAY_BIT_SIZE / 8)*8)));
 

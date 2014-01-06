@@ -1280,18 +1280,6 @@ static struct opt_type bmx_options[]=
 };
 
 
-STATIC_FUNC
-void init_bmx(void)
-{
-        register_options_array(bmx_options, sizeof ( bmx_options), CODE_CATEGORY_NAME);
-
-        register_status_handl(sizeof (struct bmx_status), 0, bmx_status_format, ARG_STATUS, bmx_status_creator);
-        register_status_handl(sizeof (struct link_status), 1, link_status_format, ARG_LINKS, link_status_creator);
-        //register_status_handl(sizeof (struct local_status), local_status_format, ARG_LOCALS, locals_status_creator);
-        register_status_handl(sizeof (struct orig_status), 1, orig_status_format, ARG_ORIGINATORS, orig_status_creator);
-}
-
-
 
 STATIC_FUNC
 void bmx(void)
@@ -1384,8 +1372,6 @@ void bmx(void)
 
 int main(int argc, char *argv[])
 {
-        // make sure we are using compatible description0 sizes:
-        assertion(-500998, (sizeof(struct tlv_hdr) == 2));
 
 	gettimeofday( &start_time_tv, NULL );
         curr_tv = start_time_tv;
@@ -1413,7 +1399,6 @@ int main(int argc, char *argv[])
 	init_control();
         init_avl();
 	init_crypt();
-	init_bmx();
         init_ip();
 	init_msg();
 	init_sec();
@@ -1432,6 +1417,14 @@ int main(int argc, char *argv[])
         } else {
                 assertion(-500809, (0));
         }
+
+
+        register_options_array(bmx_options, sizeof ( bmx_options), CODE_CATEGORY_NAME);
+
+        register_status_handl(sizeof (struct bmx_status), 0, bmx_status_format, ARG_STATUS, bmx_status_creator);
+        register_status_handl(sizeof (struct link_status), 1, link_status_format, ARG_LINKS, link_status_creator);
+        //register_status_handl(sizeof (struct local_status), local_status_format, ARG_LOCALS, locals_status_creator);
+        register_status_handl(sizeof (struct orig_status), 1, orig_status_format, ARG_ORIGINATORS, orig_status_creator);
 
 	apply_init_args( argc, argv );
 
