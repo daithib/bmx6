@@ -519,28 +519,38 @@ void cryptKeyFree( CRYPTKEY_T **cryptKey ) {
 
 CRYPTKEY_T *cryptPubKeyFromRaw( uint8_t *rawKey, uint16_t rawKeyLen ) {
 
-	CRYPTKEY_T *cryptKey = debugMallocReset(sizeof(CRYPTKEY_T), -300615);
-
 	assertion(-502024, (rawKey && cryptKeyTypeByLen(rawKeyLen) != FAILURE));
 
+	uint32_t e = ntohl(CRYPT_KEY_E_VAL);
+	int ret;
+	CRYPTKEY_T *cryptKey = debugMallocReset(sizeof(CRYPTKEY_T), -300615);
+
 	cryptKey->nativeBackendKey = 0;
-/*
-	cryptKey->backendKey = debugMalloc(sizeof(RsaKey), -300616);
-	RsaKey *key = cryptKey->backendKey;
+	cryptKey->backendKey = debugMalloc(sizeof(pk_context), -300620);
 
-	key->type = RSA_PUBLIC;
+	pk_context *pk = (pk_context*)cryptKey->backendKey;
 
-	key->e.dp = debugMallocReset(sizeof (mp_digit) * 4, -300617);
-	key->e.dp[0] = CRYPT_KEY_E_VAL;
-	key->e.alloc = 4;
-	key->e.used  = 1;
-	key->e.sign  = MP_ZPOS;
+	pk_init(pk);
 
-	int used = mp_int_put_raw( &key->n, rawKey, rawKeyLen );
-	key->n.alloc = used;
-	key->n.used  = used;
-	key->n.sign  = MP_ZPOS;
-*/
+	if ((ret = pk_init_ctx(pk, pk_info_from_type(POLARSSL_PK_RSA))) != 0) {
+		cryptKeyFree(&cryptKey);
+		cleanup_all(-500000);
+	}
+
+
+	rsa_context *rsa = pk_rsa( *pk );
+
+
+	if (
+		(ret=mpi_read_binary(&rsa->N, rawKey, rawKeyLen)) ||
+		(ret=mpi_read_binary(&rsa->E, (uint8_t*)&e, sizeof(e))) ||
+		(ret = rsa_check_pubkey( rsa )) ) {
+		cryptKeyFree(&cryptKey);
+		cleanup_all(-500000);
+	}
+
+	rsa->len = rawKeyLen;
+
 	cryptKey->rawKeyLen = rawKeyLen;
 	cryptKey->rawKeyType = cryptKeyTypeByLen(rawKeyLen);
 	cryptKey->rawKey = debugMalloc(rawKeyLen,-300618);
@@ -576,7 +586,8 @@ void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
 
 	assertion(-500000, (cryptKeyTypeByLen(rawLen) != FAILURE));
 
-	dbgf_sys(DBGT_INFO, "rawBuff:\n%s", memAsHexStringSep(rawStart, rawLen, 16, "\n"));
+	dbgf_sys(DBGT_INFO, "mpi_size=%d rawLen=%d rawBuff:\n%s",
+		mpi_size( &rsa->N ), rawLen, memAsHexStringSep(rawStart, rawLen, 16, "\n"));
 
 	cryptKey->rawKey = debugMalloc(rawLen, -300000);
 	memcpy(cryptKey->rawKey, rawStart, rawLen);
