@@ -65,18 +65,18 @@ Sha cryptSha;
 
 STATIC_FUNC
 void * clone_to_nbo(void *in, uint32_t len) {
-	uint8_t *out;
+
 	uint32_t i;
 
-	if ( htonl(47) == 47 ) {
-		out = in;
-	} else {
-		out = debugMallocReset(len, -300601);
-		for (i=0; i<len; i++)
-			out[i] = ((uint8_t*)in)[len-i-1];
-	}
+	if ( htonl(47) == 47 )
+		return in;
 
-	return (void*)out;
+	uint8_t *out = debugMallocReset(len, -300601);
+
+	for (i=0; i<len; i++)
+		out[i] = ((uint8_t*)in)[len-i-1];
+
+	return out;
 }
 
 
@@ -89,14 +89,13 @@ uint8_t * mp_int_get_raw( mp_int *in, uint16_t *rawLen) {
 	int w = ((*rawLen*8) / ((s*8)-4)) + (((*rawLen*8) % ((s*8)-4)) ? 1 : 0);
 	int zeros = (s*u)-(*rawLen);
 
-
-	dbgf_sys(DBGT_INFO, "s=%d u=%d rawLen=%d w=%d zeros=%d", s, u, *rawLen, w, zeros );
-	dbgf_sys(DBGT_INFO, " in:\n%s", memAsHexStringSep( in->dp, (u*s), 16, "\n"));
-
 	assertion(-502018, (u == w));
 
 	mp_digit *nbo = clone_to_nbo(in->dp, (u*s));
 	mp_digit *tmp = debugMallocReset(u*s, -300602);
+
+	dbgf_sys(DBGT_INFO, "s=%d u=%d (nbo==in->dp)=%d rawLen=%d w=%d zeros=%d", s, u, (nbo==in->dp), *rawLen, w, zeros );
+	dbgf_sys(DBGT_INFO, " in:\n%s", memAsHexStringSep( in->dp, (u*s), 16, "\n"));
 
 	int i = u-1; // i:= u-1 .. 0
 	int r = 0;   // r:= 0 .. u-1
