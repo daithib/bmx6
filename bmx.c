@@ -1368,11 +1368,20 @@ void bmx(void)
 	}
 }
 
-
-
 int main(int argc, char *argv[])
 {
+#ifdef CORE_LIMIT
+#include <sys/time.h>
+#include <sys/resource.h>
 
+	struct rlimit rlim = {.rlim_cur = (CORE_LIMIT * 1024), .rlim_max = (CORE_LIMIT * 1024) };
+
+	if (setrlimit(RLIMIT_CORE, &rlim) != 0) {
+		printf("setrlimit RLIMIT_CORE=%d failed: %s\n", (CORE_LIMIT * 1024), strerror(errno));
+	} else {
+		printf("setrlimit RLIMIT_CORE=%d\n", (CORE_LIMIT * 1024));
+	}
+#endif
 	gettimeofday( &start_time_tv, NULL );
         curr_tv = start_time_tv;
 

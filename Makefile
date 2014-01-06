@@ -58,6 +58,7 @@
 # CFLAGS += -DWITH_UNUSED	  # (includes yet unused stuff and buggy stuff)
 # CFLAGS += -DPROFILING           # (no static functions -> better profiling and cores)
 # CFLAGS += -DNO_CTAOCRYPT_DIR    # for backward compatibility with old cyassl versions
+# CFLAGS += -DCORE_LIMIT=20000    # equals ulimit -c 20000
 
 #EXTRA_CFLAGS +=
 #EXTRA_LDFLAGS +=
@@ -76,7 +77,7 @@
 #for normal machines (adding features and facilitating debugging):
 #EXTRA_CFLAGS="-DDEBUG_ALL -DTRAFFIC_DUMP -DDEBUG_DUMP -DEBUG_MALLOC -DMEMORY_USAGE"
 
-CFLAGS += $(shell echo "$(EXTRA_CFLAGS)" | grep -q "DMOST" && echo "-pg -DEXTREME_PARANOIA -DEXIT_ON_ERROR -DPROFILING -DDEBUG_ALL -DTRAFFIC_DUMP -DDEBUG_DUMP -DDEBUG_MALLOC -DMEMORY_USAGE " )
+CFLAGS += $(shell echo "$(EXTRA_CFLAGS)" | grep -q "DMOST" && echo "-pg -DCORE_LIMIT=20000 -DEXTREME_PARANOIA -DEXIT_ON_ERROR -DPROFILING -DDEBUG_ALL -DTRAFFIC_DUMP -DDEBUG_DUMP -DDEBUG_MALLOC -DMEMORY_USAGE " )
 
 LDFLAGS += -g3
 
