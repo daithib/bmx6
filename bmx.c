@@ -1389,13 +1389,6 @@ int main(int argc, char *argv[])
 
 	My_pid = getpid();
 
-        unsigned int random;
-
-        cryptRand( &random, sizeof (random));
-
-	srand( random );
-
-
 	signal( SIGINT, handler );
 	signal( SIGTERM, handler );
 	signal( SIGPIPE, SIG_IGN );
@@ -1408,6 +1401,11 @@ int main(int argc, char *argv[])
 	init_control();
         init_avl();
 	init_crypt();
+
+        unsigned int random;
+        cryptRand( &random, sizeof (random));
+	srand( random );
+
         init_ip();
 	init_msg();
 	init_sec();

@@ -84,7 +84,8 @@ LDFLAGS += -g3
 LDFLAGS += $(shell echo "$(CFLAGS) $(EXTRA_CFLAGS)" | grep -q "DNO_DYNPLUGIN" || echo "-Wl,-export-dynamic -ldl" )
 LDFLAGS += $(shell echo "$(CFLAGS) $(EXTRA_CFLAGS)" | grep -q "DPROFILING" && echo "-pg -lc" )
 
-LDFLAGS += -lz -lm -lcyassl
+LDFLAGS += -lz -lm -lpolarssl
+#-lcyassl
 
 
 SBINDIR =       $(INSTALL_PREFIX)/usr/sbin

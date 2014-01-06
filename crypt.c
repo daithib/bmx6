@@ -38,7 +38,7 @@ static uint8_t shaClean = NO;
 CRYPTKEY_T *my_PrivKey = NULL;
 
 /******************* accessing cyassl: ***************************************/
-#if BMX6_CRYPTLIB == CYASSL
+#ifdef CRYPT_CYASSL
 
 #define XKEY_DP_SZ sizeof( mp_digit)
 
@@ -68,8 +68,8 @@ void * clone_to_nbo(void *in, uint32_t len) {
 
 	uint32_t i;
 
-//	if ( htonl(47) == 47 )
-//		return in;
+	if ( htonl(47) == 47 )
+		return in;
 
 	uint8_t *out = debugMallocReset(len, -300601);
 
@@ -474,9 +474,329 @@ void cryptShaFinal( CRYPTSHA1_T *sha) {
 	ShaFinal(&cryptSha, (byte*) sha);
 	shaClean = YES;
 }
+#endif
 
+#ifdef CRYPT_POLARSSL
 /******************* accessing polarssl: *************************************/
-#elif BMX6_CRYPTLIB == POLARSSL
+
+#include "polarssl/config.h"
+#include "polarssl/sha1.h"
+
+#include "polarssl/entropy.h"
+#include "polarssl/entropy_poll.h"
+
+#include "polarssl/error.h"
+#include "polarssl/pk.h"
+#include "polarssl/ecdsa.h"
+#include "polarssl/rsa.h"
+#include "polarssl/ctr_drbg.h"
+
+static entropy_context entropy_ctx;
+static ctr_drbg_context ctr_drbg;
+
+static sha1_context sha_ctx;
+
+
+void cryptKeyFree( CRYPTKEY_T **cryptKey ) {
+
+	if (!*cryptKey)
+		return;
+
+	if ((*cryptKey)->backendKey) {
+		pk_free((pk_context*)((*cryptKey)->backendKey));
+		debugFree((*cryptKey)->backendKey, -300612);
+	}
+
+	if ((*cryptKey)->rawKey) {
+		debugFree((*cryptKey)->rawKey, -300613);
+	}
+
+	debugFree( (*cryptKey), -300614);
+
+	cryptKey = NULL;
+}
+
+
+CRYPTKEY_T *cryptPubKeyFromRaw( uint8_t *rawKey, uint16_t rawKeyLen ) {
+
+	CRYPTKEY_T *cryptKey = debugMallocReset(sizeof(CRYPTKEY_T), -300615);
+
+	assertion(-502024, (rawKey && cryptKeyTypeByLen(rawKeyLen) != FAILURE));
+
+	cryptKey->nativeBackendKey = 0;
+/*
+	cryptKey->backendKey = debugMalloc(sizeof(RsaKey), -300616);
+	RsaKey *key = cryptKey->backendKey;
+
+	key->type = RSA_PUBLIC;
+
+	key->e.dp = debugMallocReset(sizeof (mp_digit) * 4, -300617);
+	key->e.dp[0] = CRYPT_KEY_E_VAL;
+	key->e.alloc = 4;
+	key->e.used  = 1;
+	key->e.sign  = MP_ZPOS;
+
+	int used = mp_int_put_raw( &key->n, rawKey, rawKeyLen );
+	key->n.alloc = used;
+	key->n.used  = used;
+	key->n.sign  = MP_ZPOS;
+*/
+	cryptKey->rawKeyLen = rawKeyLen;
+	cryptKey->rawKeyType = cryptKeyTypeByLen(rawKeyLen);
+	cryptKey->rawKey = debugMalloc(rawKeyLen,-300618);
+	memcpy(cryptKey->rawKey, rawKey, rawKeyLen);
+
+	return cryptKey;
+}
+
+STATIC_FUNC
+void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
+
+	assertion(-502025, (cryptKey->backendKey && !cryptKey->rawKey));
+	int ret;
+	pk_context *key = cryptKey->backendKey;
+
+	assertion( -500000, ( pk_get_type( key ) == POLARSSL_PK_RSA ));
+
+        rsa_context *rsa = pk_rsa( *key );
+
+	uint8_t rawBuff[512];
+	uint8_t *rawStart;
+
+	memset(rawBuff, 0, sizeof(rawBuff));
+
+	if ((ret=mpi_write_binary(&rsa->N, rawBuff, sizeof(rawBuff) ))) {
+		dbgf_sys(DBGT_ERR, "failed mpi_write_binary ret=%d", ret);
+		cleanup_all(-500000);
+	}
+
+	for (rawStart = rawBuff; (!(*rawStart) && rawStart < (rawBuff + sizeof(rawBuff))); rawStart++);
+
+	uint32_t rawLen = ((rawBuff + sizeof(rawBuff)) - rawStart);
+
+	assertion(-500000, (cryptKeyTypeByLen(rawLen) != FAILURE));
+
+	dbgf_sys(DBGT_INFO, "rawBuff:\n%s", memAsHexStringSep(rawStart, rawLen, 16, "\n"));
+
+	cryptKey->rawKey = debugMalloc(rawLen, -300000);
+	memcpy(cryptKey->rawKey, rawStart, rawLen);
+	cryptKey->rawKeyLen = rawLen;
+	cryptKey->rawKeyType = cryptKeyTypeByLen(rawLen);
+}
+
+
+
+
+CRYPTKEY_T *cryptKeyFromDer( char *tmp_path ) {
+
+	int ret;
+
+	assertion(-502029, (!my_PrivKey));
+
+	CRYPTKEY_T *ckey = debugMallocReset(sizeof(CRYPTKEY_T), -300619);
+
+	ckey->backendKey = debugMalloc(sizeof(pk_context), -300620);
+	ckey->nativeBackendKey = 1;
+	pk_init((pk_context*)ckey->backendKey);
+
+	if( ( ret = pk_parse_keyfile( (pk_context*)ckey->backendKey, tmp_path, "")) != 0) {
+		dbgf_sys(DBGT_ERR, "failed opening private key, ret=%d");
+		cryptKeyFree(&ckey);
+		return NULL;
+	}
+
+	cryptKeyAddRaw(ckey);
+
+	my_PrivKey = ckey;
+
+	return cryptPubKeyFromRaw( my_PrivKey->rawKey, my_PrivKey->rawKeyLen );
+}
+
+#ifndef NO_KEY_GEN
+int cryptKeyMakeDer( int32_t keyBitSize, char *path ) {
+
+	FILE* keyFile = NULL;
+	unsigned char derBuf[CRYPT_DER_BUF_SZ];
+	int derSz = 0;
+	int ret = 0;
+	pk_context key;
+	char *goto_error_code = NULL;
+
+	pk_init( &key );
+	pk_init_ctx( &key, pk_info_from_type( POLARSSL_PK_RSA ) );
+
+        if ((ret = rsa_gen_key( pk_rsa( key ), ctr_drbg_random, &ctr_drbg, keyBitSize, CRYPT_KEY_E_VAL )))
+		goto_error(finish, "Failed making rsa key! ret=%d");
+
+	memset(derBuf, 0, CRYPT_DER_BUF_SZ);
+
+	if ((derSz = pk_write_key_der(&key, derBuf, sizeof(derBuf))) < 0)
+		goto_error(finish, "Failed translating rsa key to der! derSz=%d");
+
+	unsigned char *derStart = derBuf + sizeof(derBuf) - derSz - 1;
+
+	// alternatively create private der encoded key with openssl:
+	// openssl genrsa -out /etc/bmx6/rsa.pem 1024
+	// openssl rsa -in /etc/bmx6/rsa.pem -inform PEM -out /etc/bmx6/rsa.der -outform DER
+	//
+	// read this with:
+	//    dumpasn1 key.der
+	//    note that all first INTEGER bytes are not zero (unlike with openssl certificates), but after conversion they are.
+	// convert to pem with openssl:
+	//    openssl rsa -in rsa-test/key.der -inform DER -out rsa-test/openssl.pem -outform PEM
+	// extract public key with openssl:
+	//    openssl rsa -in rsa-test/key.der -inform DER -pubout -out rsa-test/openssl.der.pub -outform DER
+
+	if (!(keyFile = fopen(path, "wb")) || ((int)fwrite(derStart, 1, derSz, keyFile)) != derSz )
+		goto_error(finish, "Failed writing");
+
+finish: {
+	memset(derBuf, 0, CRYPT_DER_BUF_SZ);
+
+	pk_free( &key );
+
+	if (keyFile)
+		fclose(keyFile);
+
+	if (goto_error_code) {
+		dbgf_sys(DBGT_ERR, "%s ret=%d derSz=%d path=%s", goto_error_code, ret, derSz, path);
+		return FAILURE;
+	}
+	
+	return SUCCESS;
+}
+}
+#endif
+
+int cryptEncrypt( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *pubKey) {
+/*
+	RsaKey *key = pubKey->backendKey;
+
+	if ((*outLen = RsaPublicEncrypt(in, inLen, out, *outLen, key, &cryptRng)) < 0)
+		return FAILURE;
+	else
+		return SUCCESS;
+*/
+}
+
+int cryptDecrypt(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen) {
+/*
+	if ((*outLen = RsaPrivateDecrypt(in, inLen, out, *outLen, (RsaKey *)my_PrivKey->backendKey)) < 0)
+		return FAILURE;
+	else
+		return SUCCESS;
+*/
+}
+
+int cryptSign( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen) {
+/*
+	if ((*outLen = RsaSSL_Sign(in, inLen, out, *outLen, (RsaKey *)my_PrivKey->backendKey, &cryptRng)) < 0)
+		return FAILURE;
+	else
+		return SUCCESS;
+*/
+}
+
+int cryptVerify(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *pubKey) {
+/*
+	RsaKey *key = pubKey->backendKey;
+
+	if ((*outLen = RsaSSL_Verify(in, inLen, out, *outLen, key)) < 0)
+		return FAILURE;
+	else
+		return SUCCESS;
+*/
+}
+
+
+
+void cryptRand( void *out, int32_t outLen) {
+
+	if (entropy_func( &entropy_ctx, out, outLen) != 0)
+		cleanup_all(-500000);
+}
+
+STATIC_FUNC
+void cryptRngInit( void ) {
+
+	int ret;
+
+	fflush( stdout );
+	entropy_init( &entropy_ctx );
+
+	if( (ret = ctr_drbg_init( &ctr_drbg, entropy_func, &entropy_ctx, NULL, 0)) != 0 )
+		cleanup_all(-500000);
+
+	int test=0;
+
+	cryptRand( &test, sizeof(test));
+	assertion( -500525, (test));
+}
+
+STATIC_FUNC
+void cryptRngFree( void ) {
+    entropy_free( &entropy_ctx );
+}
+
+
+
+STATIC_FUNC
+void cryptShaInit( void ) {
+/*
+	InitSha(&cryptSha);
+*/
+	shaClean = YES;
+}
+
+STATIC_FUNC
+void cryptShaFree( void ) {
+}
+
+void cryptShaAtomic( void *in, int32_t len, CRYPTSHA1_T *sha) {
+
+	assertion(-502030, (shaClean==YES));
+	assertion(-502031, (sha));
+	assertion(-502032, (in && len>0 && !memcmp(in, in, len)));
+
+//	sha1( in, len, sha);
+
+	sha1_starts( &sha_ctx );
+	sha1_update( &sha_ctx, in, len );
+	sha1_finish( &sha_ctx, (unsigned char*)sha );
+
+	memset( &sha_ctx, 0, sizeof( sha1_context ) );
+
+}
+
+void cryptShaNew( void *in, int32_t len) {
+
+	assertion(-502033, (shaClean==YES));
+	assertion(-502034, (in && len>0 && !memcmp(in, in, len)));
+	shaClean = NO;
+
+	sha1_starts( &sha_ctx );
+	sha1_update( &sha_ctx, in, len );
+}
+
+void cryptShaUpdate( void *in, int32_t len) {
+
+	assertion(-502035, (shaClean==NO));
+	assertion(-502036, (in && len>0 && !memcmp(in, in, len)));
+
+	sha1_update( &sha_ctx, in, len );
+}
+
+void cryptShaFinal( CRYPTSHA1_T *sha) {
+
+	assertion(-502037, (shaClean==NO));
+	assertion(-502038, (sha));
+
+	sha1_finish( &sha_ctx, (unsigned char*)sha );
+	memset( &sha_ctx, 0, sizeof( sha1_context ) );
+	shaClean = YES;
+}
+
+
 
 /*****************************************************************************/
 #else
