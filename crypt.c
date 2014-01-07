@@ -483,13 +483,17 @@ void cryptShaFinal( CRYPTSHA1_T *sha) {
 #include "polarssl/sha1.h"
 
 #include "polarssl/entropy.h"
-#include "polarssl/entropy_poll.h"
+//#include "polarssl/entropy_poll.h"
 
 #include "polarssl/error.h"
-#include "polarssl/pk.h"
-#include "polarssl/ecdsa.h"
+#include "polarssl/md.h"
 #include "polarssl/rsa.h"
 #include "polarssl/ctr_drbg.h"
+
+#include "polarssl/x509.h"
+#include "polarssl/base64.h"
+#include "polarssl/x509write.h"
+
 
 static entropy_context entropy_ctx;
 static ctr_drbg_context ctr_drbg;
@@ -503,7 +507,7 @@ void cryptKeyFree( CRYPTKEY_T **cryptKey ) {
 		return;
 
 	if ((*cryptKey)->backendKey) {
-		pk_free((pk_context*)((*cryptKey)->backendKey));
+		rsa_free((rsa_context*)((*cryptKey)->backendKey));
 		debugFree((*cryptKey)->backendKey, -300612);
 	}
 
@@ -522,29 +526,21 @@ CRYPTKEY_T *cryptPubKeyFromRaw( uint8_t *rawKey, uint16_t rawKeyLen ) {
 	assertion(-502024, (rawKey && cryptKeyTypeByLen(rawKeyLen) != FAILURE));
 
 	uint32_t e = ntohl(CRYPT_KEY_E_VAL);
-	int ret;
+
 	CRYPTKEY_T *cryptKey = debugMallocReset(sizeof(CRYPTKEY_T), -300615);
 
 	cryptKey->nativeBackendKey = 0;
-	cryptKey->backendKey = debugMalloc(sizeof(pk_context), -300620);
+	cryptKey->backendKey = debugMalloc(sizeof(rsa_context), -300620);
 
-	pk_context *pk = (pk_context*)cryptKey->backendKey;
+	rsa_context *rsa = (rsa_context*)cryptKey->backendKey;
 
-	pk_init(pk);
-
-	if ((ret = pk_init_ctx(pk, pk_info_from_type(POLARSSL_PK_RSA)))) {
-		cryptKeyFree(&cryptKey);
-		cleanup_all(-500000);
-	}
-
-
-	rsa_context *rsa = pk_rsa( *pk );
+	rsa_init(rsa, RSA_PKCS_V15, 0);
 
 
 	if (
-		(ret=mpi_read_binary(&rsa->N, rawKey, rawKeyLen)) ||
-		(ret=mpi_read_binary(&rsa->E, (uint8_t*)&e, sizeof(e))) ||
-		(ret = rsa_check_pubkey( rsa )) ) {
+		(mpi_read_binary(&rsa->N, rawKey, rawKeyLen)) ||
+		(mpi_read_binary(&rsa->E, (uint8_t*)&e, sizeof(e))) ||
+		(rsa_check_pubkey( rsa )) ) {
 		cryptKeyFree(&cryptKey);
 		cleanup_all(-500000);
 	}
@@ -564,11 +560,7 @@ void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
 
 	assertion(-502025, (cryptKey->backendKey && !cryptKey->rawKey));
 	int ret;
-	pk_context *key = cryptKey->backendKey;
-
-	assertion( -500000, ( pk_get_type( key ) == POLARSSL_PK_RSA ));
-
-        rsa_context *rsa = pk_rsa( *key );
+	rsa_context *rsa = cryptKey->backendKey;
 
 	uint8_t rawBuff[512];
 	uint8_t *rawStart;
@@ -597,20 +589,23 @@ void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
 
 
 
-
 CRYPTKEY_T *cryptKeyFromDer( char *tmp_path ) {
-
-	int ret;
 
 	assertion(-502029, (!my_PrivKey));
 
 	CRYPTKEY_T *ckey = debugMallocReset(sizeof(CRYPTKEY_T), -300619);
 
-	ckey->backendKey = debugMalloc(sizeof(pk_context), -300620);
+	ckey->backendKey = debugMallocReset(sizeof(rsa_context), -300620);
 	ckey->nativeBackendKey = 1;
-	pk_init((pk_context*)ckey->backendKey);
 
-	if( ( ret = pk_parse_keyfile( (pk_context*)ckey->backendKey, tmp_path, "")) != 0) {
+	rsa_context *rsa = ckey->backendKey;
+
+//	rsa_init(rsa, RSA_PKCS_V15, 0);
+
+	if( 
+		(x509parse_keyfile(rsa, tmp_path, "")) ||
+		(rsa_check_privkey(rsa))
+		) {
 		dbgf_sys(DBGT_ERR, "failed opening private key, ret=%d");
 		cryptKeyFree(&ckey);
 		return NULL;
@@ -624,24 +619,24 @@ CRYPTKEY_T *cryptKeyFromDer( char *tmp_path ) {
 }
 
 #ifndef NO_KEY_GEN
+
 int cryptKeyMakeDer( int32_t keyBitSize, char *path ) {
 
 	FILE* keyFile = NULL;
 	unsigned char derBuf[CRYPT_DER_BUF_SZ];
 	int derSz = 0;
 	int ret = 0;
-	pk_context key;
+	rsa_context key;
 	char *goto_error_code = NULL;
 
-	pk_init( &key );
-	pk_init_ctx( &key, pk_info_from_type( POLARSSL_PK_RSA ) );
+	rsa_init(&key, RSA_PKCS_V15, 0);
 
-        if ((ret = rsa_gen_key( pk_rsa( key ), ctr_drbg_random, &ctr_drbg, keyBitSize, CRYPT_KEY_E_VAL )))
+        if ((ret = rsa_gen_key( &key, ctr_drbg_random, &ctr_drbg, keyBitSize, CRYPT_KEY_E_VAL )))
 		goto_error(finish, "Failed making rsa key! ret=%d");
 
 	memset(derBuf, 0, CRYPT_DER_BUF_SZ);
 
-	if ((derSz = pk_write_key_der(&key, derBuf, sizeof(derBuf))) < 0)
+	if ((derSz = x509_write_key_der(derBuf, sizeof(derBuf), &key)) < 0)
 		goto_error(finish, "Failed translating rsa key to der! derSz=%d");
 
 	unsigned char *derStart = derBuf + sizeof(derBuf) - derSz - 1;
@@ -664,7 +659,7 @@ int cryptKeyMakeDer( int32_t keyBitSize, char *path ) {
 finish: {
 	memset(derBuf, 0, CRYPT_DER_BUF_SZ);
 
-	pk_free( &key );
+	rsa_free( &key );
 
 	if (keyFile)
 		fclose(keyFile);
@@ -681,40 +676,54 @@ finish: {
 
 int cryptEncrypt( uint8_t *in, size_t inLen, uint8_t *out, size_t *outLen, CRYPTKEY_T *pubKey) {
 
-	pk_context *pk = pubKey->backendKey;
+	rsa_context *pk = pubKey->backendKey;
 
-	if (pk_encrypt(pk, in, inLen, out, outLen, *outLen, ctr_drbg_random, &ctr_drbg))
+	assertion(-500000, (*outLen >= pubKey->rawKeyLen));
+
+	if (rsa_pkcs1_encrypt(pk, ctr_drbg_random, &ctr_drbg, RSA_PUBLIC, inLen, in, out))
 		return FAILURE;
-	else
-		return SUCCESS;
+
+	*outLen = pubKey->rawKeyLen;
+
+	return SUCCESS;
 
 }
 
 int cryptDecrypt(uint8_t *in, size_t inLen, uint8_t *out, size_t *outLen) {
 
-	pk_context *pk = my_PrivKey->backendKey;
+	rsa_context *pk = my_PrivKey->backendKey;
 
-	if (pk_decrypt(pk, in, inLen, out, outLen, *outLen, ctr_drbg_random, &ctr_drbg))
+	assertion(-500000, (inLen >= my_PrivKey->rawKeyLen));
+
+	if (rsa_pkcs1_decrypt(pk, RSA_PRIVATE, &inLen, in, out, *outLen))
 		return FAILURE;
-	else
-		return SUCCESS;
+
+	*outLen = inLen;
+
+	return SUCCESS;
 }
 
 int cryptSign( CRYPTSHA1_T *inSha, uint8_t *out, size_t *outLen) {
 
-	pk_context *pk = my_PrivKey->backendKey;
+	rsa_context *pk = my_PrivKey->backendKey;
 
-	if (pk_sign(pk, POLARSSL_MD_SHA1, (uint8_t*)inSha, sizeof(CRYPTSHA1_T), out, outLen, ctr_drbg_random, &ctr_drbg))
+	assertion( -500000, (*outLen >= my_PrivKey->rawKeyLen));
+
+	if (rsa_pkcs1_sign(pk, ctr_drbg_random, &ctr_drbg, RSA_PRIVATE, SIG_RSA_SHA1, sizeof(CRYPTSHA1_T), (uint8_t*)inSha, out))
 		return FAILURE;
-	else
-		return SUCCESS;
+
+	*outLen = my_PrivKey->rawKeyLen;
+
+	return SUCCESS;
 }
 
 int cryptVerify(uint8_t *sign, size_t signLen, CRYPTSHA1_T *plainSha, CRYPTKEY_T *pubKey) {
 
-	pk_context *pk = pubKey->backendKey;
+	rsa_context *pk = pubKey->backendKey;
 
-	if (pk_verify(pk, POLARSSL_MD_SHA1, (uint8_t*)plainSha, sizeof(CRYPTSHA1_T), sign, signLen))
+	assertion(-500000, (signLen == pubKey->rawKeyLen));
+
+	if (rsa_pkcs1_verify(pk, RSA_PUBLIC, SIG_RSA_SHA1, sizeof(CRYPTSHA1_T), (uint8_t*)plainSha, sign))
 		return FAILURE;
 	else
 		return SUCCESS;
@@ -747,7 +756,7 @@ void cryptRngInit( void ) {
 
 STATIC_FUNC
 void cryptRngFree( void ) {
-    entropy_free( &entropy_ctx );
+//    entropy_free( &entropy_ctx );
 }
 
 
