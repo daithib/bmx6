@@ -127,12 +127,12 @@ int create_dsc_tlv_signature(struct tx_frame_iterator *it)
 
 		CRYPTSHA1_T dataSha;
 		cryptShaAtomic(data, dataLen, &dataSha);
-		int32_t keySpace = my_PubKey->rawKeyLen;
+		size_t keySpace = my_PubKey->rawKeyLen;
 
 		struct dsc_msg_signature *dext_msg = dext_dptr(it->dext, BMX_DSC_TLV_SIGNATURE);
 
 		dext_msg->type = my_PubKey->rawKeyType;
-		cryptSign((uint8_t*)&dataSha, sizeof(dataSha), dext_msg->signature, &keySpace);
+		cryptSign(&dataSha, dext_msg->signature, &keySpace);
 		assertion(-502103, (keySpace == my_PubKey->rawKeyLen));
 
 		desc_msg->type = dext_msg->type;
@@ -188,26 +188,21 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 
 	pkey_crypt = cryptPubKeyFromRaw(pkey_msg->key, sign_len);
 	
-	CRYPTSHA1_T plain_sha = {.h.u32={0} };
-	int32_t plain_len = sizeof(plain_sha);
-
-	if (cryptVerify(msg->signature, sign_len, (uint8_t*)&plain_sha, &plain_len, pkey_crypt) != SUCCESS )
+	if (cryptVerify(msg->signature, sign_len, &desc_sha, pkey_crypt) != SUCCESS )
 		goto_error( finish, "5");
 	
-	if (plain_len != sizeof(desc_sha) || memcmp(&plain_sha, &desc_sha, sizeof(desc_sha)))
-		goto_error( finish, "6");
 	
 finish: {
 	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
 		"%s %s verifying  desc_len=%d desc_sha=%s \n"
 		"sign_len=%d signature=%s\n"
-		"pkey_type=%s pkey_type_len=%d pkey=%s \n"
-		"plain_len=%d==%d plain_sha=%s problem?=%s",
+		"pkey_type=%s pkey_len=%d pkey=%s \n"
+		"problem?=%s",
 		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", dataLen, cryptShaAsString(&desc_sha),
 		sign_len, memAsHexString(msg->signature, sign_len),
 		pkey_msg ? cryptKeyTypeAsString(pkey_msg->type) : "---", pkey_msg ? cryptKeyLenByType(pkey_msg->type) : 0,
 		pkey_crypt ? memAsHexString(pkey_crypt->rawKey, pkey_crypt->rawKeyLen) : "---",
-		plain_len, sizeof(plain_sha), cryptShaAsString(&plain_sha), goto_error_code);
+		goto_error_code);
 	
 	cryptKeyFree(&pkey_crypt);
 	
@@ -335,14 +330,13 @@ int32_t rsa_load( char *tmp_path ) {
 	}
 
 	uint8_t in[] = "Everyone gets Friday off.";
-	int32_t inLen = strlen((char*)in);
+	size_t inLen = strlen((char*)in);
+	CRYPTSHA1_T inSha;
 	uint8_t enc[256];
-	int32_t encLen;
+	size_t encLen = sizeof(enc);
 	uint8_t plain[256];
-	int32_t plainLen;
+	size_t plainLen = sizeof(plain);
 
-	encLen = sizeof(enc);
-	plainLen = sizeof(plain);
 	memset(plain, 0, sizeof(plain));
 
 	if (cryptEncrypt(in, inLen, enc, &encLen, my_PubKey) != SUCCESS) {
@@ -359,21 +353,17 @@ int32_t rsa_load( char *tmp_path ) {
 	}
 
 
-
+	cryptShaAtomic(in, inLen, &inSha);
 	encLen = sizeof(enc);
-	plainLen = sizeof(plain);
-	memset(plain, 0, sizeof(plain));
 
-	if (cryptSign(in, inLen, enc, &encLen) != SUCCESS) {
+	if (cryptSign(&inSha, enc, &encLen) != SUCCESS) {
 		dbgf_sys(DBGT_ERR, "Failed Sign inLen=%d outLen=%d inData=%s outData=%s",
 			inLen, encLen, memAsHexString((char*)in, inLen), memAsHexString((char*)enc, encLen));
 		return FAILURE;
 	}
 
-	if (cryptVerify(enc, encLen, plain, &plainLen, my_PubKey) != SUCCESS ||
-		inLen != plainLen || memcmp(plain, in, inLen)) {
-		dbgf_sys(DBGT_ERR, "Failed Verify inLen=%d outLen=%d inData=%s outData=%s",
-			encLen, plainLen, memAsHexString((char*)enc, encLen), memAsHexString((char*)plain, plainLen));
+	if (cryptVerify(enc, encLen, &inSha, my_PubKey) != SUCCESS) {
+		dbgf_sys(DBGT_ERR, "Failed Verify inSha=%s", cryptShaAsString(&inSha));
 		return FAILURE;
 	}
 

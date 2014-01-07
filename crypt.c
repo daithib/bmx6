@@ -532,7 +532,7 @@ CRYPTKEY_T *cryptPubKeyFromRaw( uint8_t *rawKey, uint16_t rawKeyLen ) {
 
 	pk_init(pk);
 
-	if ((ret = pk_init_ctx(pk, pk_info_from_type(POLARSSL_PK_RSA))) != 0) {
+	if ((ret = pk_init_ctx(pk, pk_info_from_type(POLARSSL_PK_RSA)))) {
 		cryptKeyFree(&cryptKey);
 		cleanup_all(-500000);
 	}
@@ -679,44 +679,45 @@ finish: {
 }
 #endif
 
-int cryptEncrypt( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *pubKey) {
-/*
-	RsaKey *key = pubKey->backendKey;
+int cryptEncrypt( uint8_t *in, size_t inLen, uint8_t *out, size_t *outLen, CRYPTKEY_T *pubKey) {
 
-	if ((*outLen = RsaPublicEncrypt(in, inLen, out, *outLen, key, &cryptRng)) < 0)
+	pk_context *pk = pubKey->backendKey;
+
+	if (pk_encrypt(pk, in, inLen, out, outLen, *outLen, ctr_drbg_random, &ctr_drbg))
 		return FAILURE;
 	else
 		return SUCCESS;
-*/
+
 }
 
-int cryptDecrypt(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen) {
-/*
-	if ((*outLen = RsaPrivateDecrypt(in, inLen, out, *outLen, (RsaKey *)my_PrivKey->backendKey)) < 0)
+int cryptDecrypt(uint8_t *in, size_t inLen, uint8_t *out, size_t *outLen) {
+
+	pk_context *pk = my_PrivKey->backendKey;
+
+	if (pk_decrypt(pk, in, inLen, out, outLen, *outLen, ctr_drbg_random, &ctr_drbg))
 		return FAILURE;
 	else
 		return SUCCESS;
-*/
 }
 
-int cryptSign( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen) {
-/*
-	if ((*outLen = RsaSSL_Sign(in, inLen, out, *outLen, (RsaKey *)my_PrivKey->backendKey, &cryptRng)) < 0)
+int cryptSign( CRYPTSHA1_T *inSha, uint8_t *out, size_t *outLen) {
+
+	pk_context *pk = my_PrivKey->backendKey;
+
+	if (pk_sign(pk, POLARSSL_MD_SHA1, (uint8_t*)inSha, sizeof(CRYPTSHA1_T), out, outLen, ctr_drbg_random, &ctr_drbg))
 		return FAILURE;
 	else
 		return SUCCESS;
-*/
 }
 
-int cryptVerify(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *pubKey) {
-/*
-	RsaKey *key = pubKey->backendKey;
+int cryptVerify(uint8_t *sign, size_t signLen, CRYPTSHA1_T *plainSha, CRYPTKEY_T *pubKey) {
 
-	if ((*outLen = RsaSSL_Verify(in, inLen, out, *outLen, key)) < 0)
+	pk_context *pk = pubKey->backendKey;
+
+	if (pk_verify(pk, POLARSSL_MD_SHA1, (uint8_t*)plainSha, sizeof(CRYPTSHA1_T), sign, signLen))
 		return FAILURE;
 	else
 		return SUCCESS;
-*/
 }
 
 

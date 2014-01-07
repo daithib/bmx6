@@ -77,10 +77,10 @@ CRYPTKEY_T *cryptKeyFromDer( char *tmp_path );
 CRYPTKEY_T *cryptPubKeyFromRaw( uint8_t *rawKey, uint16_t rawKeyLen );
 void cryptKeyFree( CRYPTKEY_T **key );
 
-int cryptEncrypt( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *pubKey);
-int cryptDecrypt(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen);
-int cryptSign( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen);
-int cryptVerify(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *pubKey);
+int cryptEncrypt( uint8_t *in, size_t inLen, uint8_t *out, size_t *outLen, CRYPTKEY_T *pubKey);
+int cryptDecrypt(uint8_t *in, size_t inLen, uint8_t *out, size_t *outLen);
+int cryptSign( CRYPTSHA1_T *inSha, uint8_t *out, size_t *outLen);
+int cryptVerify(uint8_t *sign, size_t signLen, CRYPTSHA1_T *sha, CRYPTKEY_T *pubKey);
 
 void cryptRand( void *out, int32_t outLen);
 
