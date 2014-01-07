@@ -548,7 +548,7 @@ IDM_T tx_task_obsolete(struct tx_task_node *tx_task)
 
 //                tx_task->send_ts = bmx_time;
 
-                self->dhn->referred_by_me_timestamp = bmx_time;
+//		self->dhn->referred_by_me_timestamp = bmx_time;
 
                 if (dhn)
                         dhn->referred_by_me_timestamp = bmx_time;
@@ -4361,6 +4361,8 @@ void tx_packets( void *unused ) {
         // during current call of task_next() in bmx() main loop
         if (my_description_changed)
                 update_my_description_adv();
+
+	self->dhn->referred_by_me_timestamp = bmx_time;
 
         schedule_or_purge_ogm_aggregations(NO);
         // this might schedule a new tx_packet because schedule_tx_packet() believes
