@@ -1294,6 +1294,8 @@ void bmx(void)
 	frequent_timeout = seldom_timeout = bmx_time;
 	
         update_my_description_adv();
+	
+	task_register(rand_num(bmx_time ? 0 : DEF_TX_DELAY), tx_packets, NULL, -300350);
 
         for (an = NULL; (dev = avl_iterate_item(&dev_ip_tree, &an));) {
 

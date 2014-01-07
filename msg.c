@@ -4350,7 +4350,6 @@ void tx_packets( void *unused ) {
         struct avl_node *an;
         struct dev_node *dev;
 
-        TIME_T dev_interval = (my_tx_interval / 10) / dev_ip_tree.items;
         TIME_T dev_next = 0;
         int8_t linklayer;
 
@@ -4393,7 +4392,7 @@ void tx_packets( void *unused ) {
                                 dev->tx_task = tx_packet;
                                 task_register(dev_next, tx_packet, dev, -300354);
 
-                                dev_next += dev_interval;
+                                dev_next += (my_tx_interval / 10) / dev_ip_tree.items;
                         }
                 }
         }

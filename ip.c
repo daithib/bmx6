@@ -1881,10 +1881,6 @@ void dev_deactivate( struct dev_node *dev )
                 dev->tx_task = NULL;
         }
 
-        if (!dev_ip_tree.items)
-                task_remove(tx_packets, NULL); //TODO: remove_task() should be reentrant save if called by task_next()!!
-
-
 
 	change_selects();
 
@@ -2143,9 +2139,6 @@ void dev_activate( struct dev_node *dev )
 
         AVL_INIT_TREE(dev->tx_task_interval_tree, struct tx_task_node, task);
 */
-
-        if (dev_ip_tree.items == 1)
-                task_register(rand_num(bmx_time ? 0 : DEF_TX_DELAY), tx_packets, NULL, -300350);
 
 
 //        if (dev->announce)
