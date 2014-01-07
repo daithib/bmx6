@@ -491,8 +491,8 @@ void cryptShaFinal( CRYPTSHA1_T *sha) {
 #include "polarssl/ctr_drbg.h"
 
 #include "polarssl/x509.h"
-#include "polarssl/base64.h"
-#include "polarssl/x509write.h"
+//#include "polarssl/base64.h"
+//#include "polarssl/x509write.h"
 
 
 static entropy_context entropy_ctx;
