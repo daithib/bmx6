@@ -23,7 +23,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdint.h>
-
+#include <time.h>
 
 #include "list.h"
 #include "control.h"
@@ -187,10 +187,18 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 	cryptShaAtomic(data, dataLen, &desc_sha);
 
 	pkey_crypt = cryptPubKeyFromRaw(pkey_msg->key, sign_len);
-	
+
+	TIME_T clock_before = (TIME_T)clock();
+
 	if (cryptVerify(msg->signature, sign_len, &desc_sha, pkey_crypt) != SUCCESS )
 		goto_error( finish, "5");
 	
+	TIME_T clock_after = (TIME_T)clock();
+	static TIME_T clock_total;
+	TIME_T clock_diff = (clock_after - clock_before);
+	clock_total += clock_diff
+	dbgf_sys(DBGT_INFO, "verified %s description signature in time=%d  total=%d",
+		cryptKeyTypeAsString(pkey_crypt->rawKeyType), clock_diff, clock_total);
 	
 finish: {
 	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
