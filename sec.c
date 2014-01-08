@@ -162,7 +162,7 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 	if (it->op != TLV_OP_TEST || !descVerification)
 		return TLV_RX_DATA_PROCESSED;
 
-	TIME_T clock_before = (TIME_T)clock();
+	clock_t clock_before = (TIME_T)clock();
 	char *goto_error_code = NULL;
 	int32_t sign_len = it->frame_data_length - sizeof(struct dsc_msg_signature);
 	struct dsc_msg_signature *msg = (struct dsc_msg_signature*)(it->frame_data);
@@ -192,12 +192,12 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 	if (cryptVerify(msg->signature, sign_len, &desc_sha, pkey_crypt) != SUCCESS )
 		goto_error( finish, "5");
 	
-	TIME_T clock_after = (TIME_T)clock();
-	static TIME_T clock_total;
-	TIME_T clock_diff = (clock_after - clock_before);
+	clock_t clock_after = (TIME_T)clock();
+	static clock_t clock_total;
+	clock_t clock_diff = (clock_after - clock_before);
 	clock_total += clock_diff
-	dbgf_sys(DBGT_INFO, "verified %s description signature in time=%d  total=%d",
-		cryptKeyTypeAsString(pkey_crypt->rawKeyType), clock_diff, clock_total);
+	dbgf_sys(DBGT_INFO, "verified %s description signature in time=%d verified_total=%d total=%d",
+		cryptKeyTypeAsString(pkey_crypt->rawKeyType), clock_diff, clock_total, clock_after);
 	
 finish: {
 	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
