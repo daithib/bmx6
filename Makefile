@@ -16,7 +16,10 @@
 
 
   GIT_REV = $(shell ( [ "$(REVISION_VERSION)" ] && echo "$(REVISION_VERSION)" ) || ( [ -d .git ] && git --no-pager log -n 1 --oneline|cut -d " " -f 1 ) ||  echo 0)
-  CFLAGS += -pedantic -Wall -W -Wno-unused-parameter -Os -g3 -std=gnu99 -DHAVE_CONFIG_H -DGIT_REV=\"$(GIT_REV)\"
+  CFLAGS += -pedantic -Wall -W -Wno-unused-parameter -Os -g3 -std=gnu99
+  CFLAGS += -DHAVE_CONFIG_H
+  CFLAGS += -DCRYPTLIB=POLARSSL_1_2_5 # POLARSSL_1_2_5 POLARSSL_1_2_9 POLARSSL_1_3_3 CYASSL_2_8_0
+  CFLAGS += -DGIT_REV=\"$(GIT_REV)\"
 #-DHAVE_CONFIG_H
 
 # optinal defines:
@@ -84,8 +87,10 @@ LDFLAGS += -g3
 LDFLAGS += $(shell echo "$(CFLAGS) $(EXTRA_CFLAGS)" | grep -q "DNO_DYNPLUGIN" || echo "-Wl,-export-dynamic -ldl" )
 LDFLAGS += $(shell echo "$(CFLAGS) $(EXTRA_CFLAGS)" | grep -q "DPROFILING" && echo "-pg -lc" )
 
-LDFLAGS += -lz -lm -lpolarssl
-#-lcyassl
+LDFLAGS += -lz -lm 
+LDFLAGS += $(shell echo "$(CFLAGS) $(EXTRA_CFLAGS)" | grep -q "POLARSSL" && echo "-lpolarssl" )
+LDFLAGS += $(shell echo "$(CFLAGS) $(EXTRA_CFLAGS)" | grep -q "CYASSL"   && echo "-lcyassl" )
+
 
 
 SBINDIR =       $(INSTALL_PREFIX)/usr/sbin

@@ -298,26 +298,6 @@ finish: {
 }
 }
 
-#ifndef NO_KEY_GEN
-int32_t rsa_create( char *tmp_path, uint16_t keyBitSize ) {
-
-	FILE* keyFile;
-
-	if (!(keyFile = fopen(tmp_path, "rb"))) {
-
-		if (cryptKeyMakeDer(keyBitSize, tmp_path) != SUCCESS) {
-			dbgf_sys(DBGT_ERR, "Failed creating new %d bit key to %s!", keyBitSize, tmp_path);
-			return FAILURE;
-		}
-
-	} else {
-		fclose(keyFile);
-	}
-
-	return SUCCESS;
-}
-#endif
-
 int32_t rsa_load( char *tmp_path ) {
 
 	// test with: ./bmx6 f=0 d=0 --keyDir=$(pwdd)/rsa-test/key.der
@@ -402,8 +382,11 @@ int32_t opt_key_path(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
 
 #ifndef NO_KEY_GEN
 		if ( check_file( tmp_path, YES/*regular*/,YES/*read*/, NO/*writable*/, NO/*executable*/ ) == FAILURE ) {
-			if (rsa_create(tmp_path, 1024) != SUCCESS) {
-				dbgf_sys(DBGT_ERR, "key=%s does not exist and can not be created!", tmp_path);
+
+			dbgf_sys(DBGT_ERR, "key=%s does not exist! Creating...", tmp_path);
+
+			if (cryptKeyMakeDer(1024, tmp_path) != SUCCESS) {
+				dbgf_sys(DBGT_ERR, "Failed creating new %d bit key to %s!", 1024, tmp_path);
 				return FAILURE;
 			}
 		}

@@ -38,7 +38,7 @@ static uint8_t shaClean = NO;
 CRYPTKEY_T *my_PrivKey = NULL;
 
 /******************* accessing cyassl: ***************************************/
-#ifdef CRYPT_CYASSL
+#if CRYPTLIB >= CYASSL_MIN && CRYPTLIB <= CYASSL_MAX
 
 #define XKEY_DP_SZ sizeof( mp_digit)
 
@@ -380,40 +380,51 @@ int cryptKeyMakeDer( int32_t keyBitSize, char *tmp_path ) {
 }
 #endif
 
-int cryptEncrypt( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *pubKey) {
+int cryptEncrypt( uint8_t *in, size_t inLen, uint8_t *out, size_t *outLen, CRYPTKEY_T *pubKey) {
 
 	RsaKey *key = pubKey->backendKey;
 
-	if ((*outLen = RsaPublicEncrypt(in, inLen, out, *outLen, key, &cryptRng)) < 0)
+	int ret;
+
+	if ((ret = RsaPublicEncrypt(in, inLen, out, *outLen, key, &cryptRng)) < 0)
 		return FAILURE;
-	else
-		return SUCCESS;
+
+	*outLen = ret;
+	return SUCCESS;
 }
 
-int cryptDecrypt(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen) {
+int cryptDecrypt(uint8_t *in, size_t inLen, uint8_t *out, size_t *outLen) {
 
-	if ((*outLen = RsaPrivateDecrypt(in, inLen, out, *outLen, (RsaKey *)my_PrivKey->backendKey)) < 0)
+	int ret;
+
+	if ((ret = RsaPrivateDecrypt(in, inLen, out, *outLen, (RsaKey *)my_PrivKey->backendKey)) < 0)
 		return FAILURE;
-	else
-		return SUCCESS;
+
+	*outLen = ret;
+	return SUCCESS;
 }
 
-int cryptSign( uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen) {
+int cryptSign( CRYPTSHA1_T *inSha, uint8_t *out, size_t *outLen) {
 
-	if ((*outLen = RsaSSL_Sign(in, inLen, out, *outLen, (RsaKey *)my_PrivKey->backendKey, &cryptRng)) < 0)
+	int ret;
+
+	if ((ret = RsaSSL_Sign((uint8_t*)inSha, sizeof(CRYPTSHA1_T), out, *outLen, (RsaKey *)my_PrivKey->backendKey, &cryptRng)) < 0)
 		return FAILURE;
-	else
-		return SUCCESS;
+
+	*outLen = ret;
+	return SUCCESS;
 }
 
-int cryptVerify(uint8_t *in, int32_t inLen, uint8_t *out, int32_t *outLen, CRYPTKEY_T *pubKey) {
+int cryptVerify(uint8_t *sign, size_t signLen, CRYPTSHA1_T *sha, CRYPTKEY_T *pubKey) {
 
 	RsaKey *key = pubKey->backendKey;
+	CRYPTSHA1_T signSha;
 
-	if ((*outLen = RsaSSL_Verify(in, inLen, out, *outLen, key)) < 0)
+	if (RsaSSL_Verify(sign, signLen, (uint8_t*)&signSha, sizeof(CRYPTSHA1_T), key) != sizeof(CRYPTSHA1_T) ||
+		memcmp(&signSha, sha, sizeof(CRYPTSHA1_T) ))
 		return FAILURE;
-	else
-		return SUCCESS;
+	
+	return SUCCESS;
 }
 
 STATIC_FUNC
@@ -474,9 +485,9 @@ void cryptShaFinal( CRYPTSHA1_T *sha) {
 	ShaFinal(&cryptSha, (byte*) sha);
 	shaClean = YES;
 }
-#endif
 
-#ifdef CRYPT_POLARSSL
+
+#elif CRYPTLIB >= POLARSSL_MIN && CRYPTLIB <= POLARSSL_MAX
 /******************* accessing polarssl: *************************************/
 
 #include "polarssl/config.h"
@@ -491,9 +502,11 @@ void cryptShaFinal( CRYPTSHA1_T *sha) {
 #include "polarssl/ctr_drbg.h"
 
 #include "polarssl/x509.h"
-//#include "polarssl/base64.h"
+#if CRYPTLIB <= POLARSSL_1_2_9
 #include "polarssl/x509write.h"
-
+#elif CRYPTLIB >= POLARSSL_1_3_3
+#include "polarssl/pk.h"
+#endif
 
 static entropy_context entropy_ctx;
 static ctr_drbg_context ctr_drbg;
@@ -589,7 +602,7 @@ void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
 
 
 
-CRYPTKEY_T *cryptKeyFromDer( char *tmp_path ) {
+CRYPTKEY_T *cryptKeyFromDer( char *keyPath ) {
 
 	assertion(-502029, (!my_PrivKey));
 
@@ -599,17 +612,37 @@ CRYPTKEY_T *cryptKeyFromDer( char *tmp_path ) {
 	ckey->nativeBackendKey = 1;
 
 	rsa_context *rsa = ckey->backendKey;
+	int ret = 0;
 
-//	rsa_init(rsa, RSA_PKCS_V15, 0);
-
-	if( 
-		(x509parse_keyfile(rsa, tmp_path, "")) ||
-		(rsa_check_privkey(rsa))
+#if CRYPTLIB <= POLARSSL_1_2_9
+	if(
+		(ret=x509parse_keyfile(rsa, keyPath, "")) ||
+		(ret=rsa_check_privkey(rsa))
 		) {
-		dbgf_sys(DBGT_ERR, "failed opening private key, ret=%d");
+		dbgf_sys(DBGT_ERR, "failed opening private key=%s err=%d", keyPath, ret);
 		cryptKeyFree(&ckey);
 		return NULL;
 	}
+#elif CRYPTLIB >= POLARSSL_1_3_3
+	pk_context pk;
+	pk_init(&pk);
+
+	if (
+		(ret=pk_parse_keyfile( &pk, keyPath, "")) ||
+		(rsa_copy(rsa, pk_rsa(pk))) ||
+		(rsa_check_privkey(rsa))
+		) {
+		dbgf_sys(DBGT_ERR, "failed opening private key=%s err=%d", keyPath, ret);
+		pk_free(&pk);
+		cryptKeyFree(&ckey);
+		return NULL;
+	}
+	pk_free(&pk);
+
+#else
+# error "Please fix CRYPTLIB"
+#endif
+
 
 	cryptKeyAddRaw(ckey);
 
@@ -620,38 +653,54 @@ CRYPTKEY_T *cryptKeyFromDer( char *tmp_path ) {
 
 #ifndef NO_KEY_GEN
 
+// alternatively create private der encoded key with openssl:
+// openssl genrsa -out /etc/bmx6/rsa.pem 1024
+// openssl rsa -in /etc/bmx6/rsa.pem -inform PEM -out /etc/bmx6/rsa.der -outform DER
+//
+// read this with:
+//    dumpasn1 key.der
+//    note that all first INTEGER bytes are not zero (unlike with openssl certificates), but after conversion they are.
+// convert to pem with openssl:
+//    openssl rsa -in rsa-test/key.der -inform DER -out rsa-test/openssl.pem -outform PEM
+// extract public key with openssl:
+//    openssl rsa -in rsa-test/key.der -inform DER -pubout -out rsa-test/openssl.der.pub -outform DER
+
 int cryptKeyMakeDer( int32_t keyBitSize, char *path ) {
 
 	FILE* keyFile = NULL;
 	unsigned char derBuf[CRYPT_DER_BUF_SZ];
 	int derSz = 0;
 	int ret = 0;
-	rsa_context key;
 	char *goto_error_code = NULL;
-
-	rsa_init(&key, RSA_PKCS_V15, 0);
-
-        if ((ret = rsa_gen_key( &key, ctr_drbg_random, &ctr_drbg, keyBitSize, CRYPT_KEY_E_VAL )))
-		goto_error(finish, "Failed making rsa key! ret=%d");
 
 	memset(derBuf, 0, CRYPT_DER_BUF_SZ);
 
-	if ((derSz = x509_write_key_der(derBuf, sizeof(derBuf), &key)) < 0)
+#if CRYPTLIB <= POLARSSL_1_2_9
+	rsa_context rsa;
+	rsa_init(&rsa, RSA_PKCS_V15, 0);
+
+        if ((ret = rsa_gen_key( &rsa, ctr_drbg_random, &ctr_drbg, keyBitSize, CRYPT_KEY_E_VAL )))
+		goto_error(finish, "Failed making rsa key! ret=%d");
+
+	if ((derSz = x509_write_key_der(derBuf, sizeof(derBuf), &rsa)) < 0)
 		goto_error(finish, "Failed translating rsa key to der! derSz=%d");
+#elif CRYPTLIB >= POLARSSL_1_3_3
+	pk_context pk;
+	pk_init( &pk );
+	pk_init_ctx( &pk, pk_info_from_type( POLARSSL_PK_RSA ) );
+
+	if ((ret = rsa_gen_key(pk_rsa(pk), ctr_drbg_random, &ctr_drbg, keyBitSize, CRYPT_KEY_E_VAL)) ||
+		(ret = rsa_check_privkey(pk_rsa(pk))))
+		goto_error(finish, "Failed making rsa key! ret=%d");
+
+	if ((derSz = pk_write_key_der(&pk, derBuf, sizeof(derBuf))) < 0)
+		goto_error(finish, "Failed translating rsa key to der! derSz=%d");
+#else
+# error "Please fix CRYPTLIB"
+#endif
 
 	unsigned char *derStart = derBuf + sizeof(derBuf) - derSz - 1;
 
-	// alternatively create private der encoded key with openssl:
-	// openssl genrsa -out /etc/bmx6/rsa.pem 1024
-	// openssl rsa -in /etc/bmx6/rsa.pem -inform PEM -out /etc/bmx6/rsa.der -outform DER
-	//
-	// read this with:
-	//    dumpasn1 key.der
-	//    note that all first INTEGER bytes are not zero (unlike with openssl certificates), but after conversion they are.
-	// convert to pem with openssl:
-	//    openssl rsa -in rsa-test/key.der -inform DER -out rsa-test/openssl.pem -outform PEM
-	// extract public key with openssl:
-	//    openssl rsa -in rsa-test/key.der -inform DER -pubout -out rsa-test/openssl.der.pub -outform DER
 
 	if (!(keyFile = fopen(path, "wb")) || ((int)fwrite(derStart, 1, derSz, keyFile)) != derSz )
 		goto_error(finish, "Failed writing");
@@ -659,7 +708,13 @@ int cryptKeyMakeDer( int32_t keyBitSize, char *path ) {
 finish: {
 	memset(derBuf, 0, CRYPT_DER_BUF_SZ);
 
-	rsa_free( &key );
+#if CRYPTLIB <= POLARSSL_1_2_9
+	rsa_free( &rsa );
+#elif CRYPTLIB >= POLARSSL_1_3_3
+	pk_free(&pk);
+#else
+# error "Please fix CRYPTLIB"
+#endif
 
 	if (keyFile)
 		fclose(keyFile);
@@ -694,10 +749,15 @@ int cryptDecrypt(uint8_t *in, size_t inLen, uint8_t *out, size_t *outLen) {
 	rsa_context *pk = my_PrivKey->backendKey;
 
 	assertion(-500000, (inLen >= my_PrivKey->rawKeyLen));
-
+#if CRYPTLIB == POLARSSL_1_2_5
 	if (rsa_pkcs1_decrypt(pk, RSA_PRIVATE, &inLen, in, out, *outLen))
 		return FAILURE;
-
+#elif CRYPTLIB >= POLARSSL_1_2_9
+	if (rsa_pkcs1_decrypt(pk, ctr_drbg_random, &ctr_drbg, RSA_PRIVATE, &inLen, in, out, *outLen))
+		return FAILURE;
+#else
+# error "Please fix CRYPTLIB"
+#endif
 	*outLen = inLen;
 
 	return SUCCESS;
@@ -709,8 +769,15 @@ int cryptSign( CRYPTSHA1_T *inSha, uint8_t *out, size_t *outLen) {
 
 	assertion( -500000, (*outLen >= my_PrivKey->rawKeyLen));
 
+#if CRYPTLIB <= POLARSSL_1_2_9
 	if (rsa_pkcs1_sign(pk, ctr_drbg_random, &ctr_drbg, RSA_PRIVATE, SIG_RSA_SHA1, sizeof(CRYPTSHA1_T), (uint8_t*)inSha, out))
 		return FAILURE;
+#elif CRYPTLIB >= POLARSSL_1_3_3
+	if (rsa_pkcs1_sign(pk, ctr_drbg_random, &ctr_drbg, RSA_PRIVATE, POLARSSL_MD_SHA1, sizeof(CRYPTSHA1_T), (uint8_t*)inSha, out))
+		return FAILURE;
+#else
+# error "Please fix CRYPTLIB"
+#endif
 
 	*outLen = my_PrivKey->rawKeyLen;
 
@@ -723,10 +790,22 @@ int cryptVerify(uint8_t *sign, size_t signLen, CRYPTSHA1_T *plainSha, CRYPTKEY_T
 
 	assertion(-500000, (signLen == pubKey->rawKeyLen));
 
+#if CRYPTLIB == POLARSSL_1_2_5
 	if (rsa_pkcs1_verify(pk, RSA_PUBLIC, SIG_RSA_SHA1, sizeof(CRYPTSHA1_T), (uint8_t*)plainSha, sign))
 		return FAILURE;
-	else
-		return SUCCESS;
+#elif CRYPTLIB == POLARSSL_1_2_9
+	if (rsa_pkcs1_verify(pk, ctr_drbg_random, &ctr_drbg, RSA_PUBLIC, SIG_RSA_SHA1, sizeof(CRYPTSHA1_T), (uint8_t*)plainSha, sign))
+		return FAILURE;
+#elif CRYPTLIB >= POLARSSL_1_3_3
+	if (rsa_pkcs1_verify(pk, ctr_drbg_random, &ctr_drbg, RSA_PUBLIC, POLARSSL_MD_SHA1, sizeof(CRYPTSHA1_T), (uint8_t*)plainSha, sign))
+		return FAILURE;
+#elif CRYPTLIB == POLARSSL_1_3_3
+#else
+# error "Please fix CRYPTLIB"
+#endif
+
+
+	return SUCCESS;
 }
 
 
@@ -821,7 +900,7 @@ void cryptShaFinal( CRYPTSHA1_T *sha) {
 
 /*****************************************************************************/
 #else
-# error "Please fix crypto lib"
+# error "Please fix CRYPTLIB"
 #endif
 
 char *cryptShaAsString( CRYPTSHA1_T *sha)
