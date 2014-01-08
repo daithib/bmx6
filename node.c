@@ -827,7 +827,7 @@ void purge_orig_router(struct orig_node *only_orig, struct link_dev_node *only_l
 }
 
 
-STATIC_FUNC
+
 void purge_link_node(struct link_node_key *only_link_key, struct dev_node *only_dev, IDM_T only_expired)
 {
         TRACE_FUNCTION_CALL;
@@ -1020,7 +1020,7 @@ void free_orig_node(struct orig_node *on)
 }
 
 
-void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired)
+void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired, struct orig_node *except_on)
 {
         TRACE_FUNCTION_CALL;
 
@@ -1036,7 +1036,10 @@ void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired)
 
                 if ((dhn = my_iid_repos.arr.node[i]) && dhn->on) {
 
-                        if (!only_dev && (!only_expired ||
+			if (dhn->on == except_on) {
+				continue;
+
+			} else if (!only_dev && (!only_expired ||
                                 ((TIME_T) (bmx_time - dhn->referred_by_me_timestamp)) > (TIME_T) ogm_purge_to)) {
 
                                 dbgf_all(DBGT_INFO, "id=%s referred before: %d > purge_to=%d",
@@ -1335,7 +1338,7 @@ void node_tasks(void) {
 	GLOBAL_ID_T id;
 	memset(&id, 0, sizeof (GLOBAL_ID_T));
 
-	purge_link_route_orig_nodes(NULL, YES);
+	purge_link_route_orig_nodes(NULL, YES, self);
 
 	purge_dhash_invalid_list(NO);
 

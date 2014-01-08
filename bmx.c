@@ -172,7 +172,7 @@ void upd_time(struct timeval *precise_tv)
 		     diff_tv.tv_sec, diff_tv.tv_usec );
 
                 if ( diff_tv.tv_sec > CRITICAL_PURGE_TIME_DRIFT )
-                        purge_link_route_orig_nodes(NULL, NO);
+                        purge_link_route_orig_nodes(NULL, NO, self);
 
 	} else 	if ( timercmp( &curr_tv, &acceptable_min_tv, < ) ) {
 
@@ -183,7 +183,7 @@ void upd_time(struct timeval *precise_tv)
 		     diff_tv.tv_sec, diff_tv.tv_usec );
 
                 if ( diff_tv.tv_sec > CRITICAL_PURGE_TIME_DRIFT )
-                        purge_link_route_orig_nodes(NULL, NO);
+                        purge_link_route_orig_nodes(NULL, NO, self);
 
 	}
 
@@ -311,7 +311,7 @@ void cleanup_all(int32_t status)
 
 		cleanup_schedule();
 
-                purge_link_route_orig_nodes(NULL, NO);
+                purge_link_route_orig_nodes(NULL, NO, NULL);
 
 		cleanup_plugin();
 		cleanup_sec();
@@ -1100,7 +1100,7 @@ int32_t opt_purge_originators(uint8_t cmd, uint8_t _save, struct opt_type *opt, 
         TRACE_FUNCTION_CALL;
 
 	if ( cmd == OPT_APPLY)
-                purge_link_route_orig_nodes(NULL, NO);
+                purge_link_route_orig_nodes(NULL, NO, self);
 
 	return SUCCESS;
 }

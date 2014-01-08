@@ -551,7 +551,7 @@ IDM_T blacklisted_neighbor(struct packet_buff *pb, DHASH_T *dhash);
 struct neigh_node *is_described_neigh( struct link_node *link, IID_T transmittersIID4x );
 void purge_dhash_invalid_list( IDM_T force_purge_all );
 void invalidate_dhash( struct dhash_node *dhn, DHASH_T *dhash );
-void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired);
+void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired, struct orig_node *except_on);
 void block_orig_node(IDM_T block, struct orig_node *on);
 void free_orig_node(struct orig_node *on);
 struct orig_node *init_orig_node(GLOBAL_ID_T *id);
@@ -561,6 +561,7 @@ SHA1_T *nodeIdFromDescAdv( uint8_t *desc_adv );
 char *nodeIdAsStringFromDescAdv( uint8_t *desc_adv );
 
 void purge_local_node(struct local_node *local);
+void purge_link_node(struct link_node_key *only_link_key, struct dev_node *only_dev, IDM_T only_expired);
 
 void update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn);
 void update_neigh_dhash(struct orig_node *on, struct dhash_node *dhn);

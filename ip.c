@@ -1846,7 +1846,7 @@ void dev_deactivate( struct dev_node *dev )
 
 	if ( dev->linklayer != TYP_DEV_LL_LO ) {
 
-                purge_link_route_orig_nodes(dev, NO);
+                purge_link_route_orig_nodes(dev, NO, NULL);
 
                 purge_tx_task_list(dev->tx_task_lists, NULL, NULL);
 
