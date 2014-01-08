@@ -319,9 +319,9 @@ int32_t rsa_load( char *tmp_path ) {
 	uint8_t in[] = "Everyone gets Friday off.";
 	size_t inLen = strlen((char*)in);
 	CRYPTSHA1_T inSha;
-	uint8_t enc[256];
+	uint8_t enc[CRYPT_RSA_MAX_LEN];
 	size_t encLen = sizeof(enc);
-	uint8_t plain[256];
+	uint8_t plain[CRYPT_RSA_MAX_LEN];
 	size_t plainLen = sizeof(plain);
 
 	memset(plain, 0, sizeof(plain));
