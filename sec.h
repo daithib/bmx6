@@ -31,7 +31,7 @@
 #define ARG_DESC_VERIFY "descVerification"
 #define MIN_DESC_VERIFY 0
 #define MAX_DESC_VERIFY 4096
-#define DEF_DESC_VERIFY 2048
+#define DEF_DESC_VERIFY 4096
 #define HLP_DESC_VERIFY "verify RSA description signatures up-to given key length"
 
 #define DESCRIPTION_MSG_PUBKEY_FORMAT { \
