@@ -227,7 +227,7 @@ struct frame_db *description_names_db = NULL;
 
 
 
-struct tlv_hdr tlv_set_net(int16_t type, int16_t length)
+struct tlv_hdr tlvSetBigEndian(int16_t type, int16_t length)
 {
 	assertion(-502044, (type >= 0 && type <= FRAME_TYPE_MASK));
 	assertion(-502045, (length > 0 && length < (int)(MAX_UDPD_SIZE - sizeof(struct packet_header))));
@@ -780,13 +780,13 @@ IID_T create_ogm(struct orig_node *on, IID_T prev_ogm_iid, struct msg_ogm_adv *o
 
         assertion(-500890, ((on->dhn->myIID4orig - prev_ogm_iid) <= OGM_IIDOFFST_MASK));
 
-        OGM_MIX_T mix =
-                ((on->dhn->myIID4orig - prev_ogm_iid) << OGM_IIDOFFST_BIT_POS) +
-                ((fm.val.f.exp_fm16) << OGM_EXPONENT_BIT_POS) +
-                ((fm.val.f.mantissa_fm16) << OGM_MANTISSA_BIT_POS);
+	OGM_T m;
+	m.u.o.iidOffset = on->dhn->myIID4orig - prev_ogm_iid;
+	m.u.o.sqn = on->ogmSqn_next;
+	m.u.o.mtcExponent = fm.val.f.exp_fm16;
+	m.u.o.mtcMantissa = fm.val.f.mantissa_fm16;
 
-        ogm->mix = htons(mix);
-        ogm->u.ogm_sqn = htons(on->ogmSqn_next);
+	ogm->u.u32 = htonl(m.u.u32);
 
         return on->dhn->myIID4orig;
 }
@@ -838,9 +838,12 @@ void create_ogm_aggregation(void)
 
                                 ogm_iid = dhn->myIID4orig;
 
-                                msgs[ogm_msg + ogm_iid_jumps].mix = htons((OGM_IID_RSVD_JUMP) << OGM_IIDOFFST_BIT_POS);
-                                msgs[ogm_msg + ogm_iid_jumps].u.transmitterIIDabsolute = htons(ogm_iid);
+				OGM_T ogm = {.u.u32 = 0};
+				ogm.u.i.iid = ogm_iid;
+				ogm.u.i.iidOffset = OGM_IID_RSVD_JUMP;
 
+				msgs[ogm_msg + ogm_iid_jumps].u.u32 = htonl(ogm.u.u32);
+				
                                 ogm_iid_jumps++;
                         }
 
@@ -1266,7 +1269,7 @@ SHA1_T *ref_node_key(uint8_t *f_body, uint32_t f_body_len, uint8_t compression, 
 
 	struct frame_hdr_rhash_adv rhash_hdr = {.compression=compression, .nested=nested, .reserved=reserved};
 
-	struct tlv_hdr tlv = tlv_set_net(FRAME_TYPE_REF_ADV, (sizeof(tlv) + sizeof(rhash_hdr) + f_body_len));
+	struct tlv_hdr tlv = tlvSetBigEndian(FRAME_TYPE_REF_ADV, (sizeof(tlv) + sizeof(rhash_hdr) + f_body_len));
 
 	cryptShaNew(&tlv, sizeof(tlv));
 	cryptShaUpdate(&rhash_hdr, sizeof(rhash_hdr));
@@ -2877,7 +2880,6 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
         // to find out about the direct metric to him....
 
         uint16_t msgs = (it->frame_msgs_length - ogm_dst_field_size) / sizeof (struct msg_ogm_adv);
-        struct msg_ogm_adv *ogm = (struct msg_ogm_adv*)(it->msg + ogm_dst_field_size);
 
         dbgf_all(DBGT_INFO, " ");
 
@@ -2943,14 +2945,12 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
 
         for (m = 0; m < msgs; m++) {
 
-                uint16_t offset = ((ntohs(ogm[m].mix) >> OGM_IIDOFFST_BIT_POS) & OGM_IIDOFFST_MASK);
+		OGM_T ogm = { .u.u32 = ntohl( ((struct msg_ogm_adv*)(it->msg + ogm_dst_field_size))[m].u.u32 ) };
 
-                if (offset == OGM_IID_RSVD_JUMP) {
+                if (ogm.u.i.iidOffset == OGM_IID_RSVD_JUMP) {
 
-                        uint16_t absolute = ntohs(ogm[m].u.transmitterIIDabsolute);
-
-                        dbgf_all(DBGT_INFO, " IID jump from %d to %d", neighIID4x, absolute);
-                        neighIID4x = absolute;
+                        dbgf_all(DBGT_INFO, " IID jump from %d to %d", neighIID4x, ogm.u.i.iid);
+                        neighIID4x = ogm.u.i.iid;
 
                         if ((m + 1) >= msgs)
                                 return TLV_RX_DATA_FAILURE;
@@ -2959,8 +2959,8 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
 
                 } else {
 
-                        dbgf_all(DBGT_INFO, " IID offset from %d to %d", neighIID4x, neighIID4x + offset);
-                        neighIID4x += offset;
+                        dbgf_all(DBGT_INFO, " IID offset from %d to %d", neighIID4x, neighIID4x + ogm.u.o.iidOffset);
+                        neighIID4x += ogm.u.o.iidOffset;
                 }
 
                 IID_NODE_T *dhn = iid_get_node_by_neighIID4x(neigh, neighIID4x, !only_process_sender_and_refresh_all/*verbose*/);
@@ -2971,16 +2971,13 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
 
                 struct orig_node *on = dhn ? dhn->on : NULL;
 
-                OGM_SQN_T ogm_sqn = ntohs(ogm[m].u.ogm_sqn);
-
-
                 if (on) {
 
-                        if (((OGM_SQN_MASK) & (ogm_sqn - on->ogmSqn_rangeMin)) >= on->ogmSqn_rangeSize) {
+                        if (((OGM_SQN_MASK) & (ogm.u.o.sqn - on->ogmSqn_rangeMin)) >= on->ogmSqn_rangeSize) {
 
                                 dbgf_sys(DBGT_ERR,
                                         "DAD-Alert: EXCEEDED ogm_sqn=%d neighIID4x=%d id=%s via link=%s sqn_min=%d sqn_range=%d",
-                                        ogm_sqn, neighIID4x, cryptShaAsString(&on->nodeId), pb->i.llip_str,
+                                        ogm.u.o.sqn, neighIID4x, cryptShaAsString(&on->nodeId), pb->i.llip_str,
                                         on->ogmSqn_rangeMin, on->ogmSqn_rangeSize);
 
                                 purge_local_node(pb->i.link->local);
@@ -2992,24 +2989,19 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
 
                                 dbgf_all(DBGT_WARN, "%s orig_sqn=%d/%d id=%s via link=%s neighIID4x=%d",
                                         dhn == self->dhn ? "MYSELF" : "BLOCKED",
-                                        ogm_sqn, on->ogmSqn_next, cryptShaAsString(&on->nodeId), pb->i.llip_str, neighIID4x);
+                                        ogm.u.o.sqn, on->ogmSqn_next, cryptShaAsString(&on->nodeId), pb->i.llip_str, neighIID4x);
 
                                 continue;
                         }
 
-
-                        OGM_MIX_T mix = ntohs(ogm[m].mix);
-                        uint8_t exp = ((mix >> OGM_EXPONENT_BIT_POS) & OGM_EXPONENT_MASK);
-                        uint8_t mant = ((mix >> OGM_MANTISSA_BIT_POS) & OGM_MANTISSA_MASK);
-
-                        FMETRIC_U16_T fm = fmetric(mant, exp);
+                        FMETRIC_U16_T fm = fmetric(ogm.u.o.mtcMantissa, ogm.u.o.mtcExponent);
                         IDM_T valid_metric = is_fmetric_valid(fm);
 
                         if (!valid_metric) {
 
                                 dbgf_mute(50, DBGL_SYS, DBGT_ERR,
                                         "INVALID metric! orig_sqn=%d/%d orig=%s via link=%s neighIID4x=%d",
-                                        ogm_sqn, on->ogmSqn_next, cryptShaAsString(&on->nodeId), pb->i.llip_str, neighIID4x);
+                                        ogm.u.o.sqn, on->ogmSqn_next, cryptShaAsString(&on->nodeId), pb->i.llip_str, neighIID4x);
 
                                 return TLV_RX_DATA_FAILURE;
                         }
@@ -3021,12 +3013,12 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
                                 dbgf_mute(50, DBGL_SYS, DBGT_ERR,
                                         "UNUSABLE metric=%ju usable=%ju orig_sqn=%d/%d id=%s via link=%s neighIID4x=%d",
                                         um, on->path_metricalgo->umetric_min,
-                                        ogm_sqn, on->ogmSqn_next, cryptShaAsString(&on->nodeId), pb->i.llip_str, neighIID4x);
+                                        ogm.u.o.sqn, on->ogmSqn_next, cryptShaAsString(&on->nodeId), pb->i.llip_str, neighIID4x);
 
                                 continue;
                         } 
                         
-                        if (update_path_metrics(pb, on, ogm_sqn, &um) != SUCCESS) {
+                        if (update_path_metrics(pb, on, ogm.u.o.sqn, &um) != SUCCESS) {
                                 assertion(-501145, (0));
                                 return TLV_RX_DATA_FAILURE;
                         }
@@ -3035,7 +3027,7 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
 
                         dbgf_track(DBGT_WARN, "%s orig_sqn=%d or neighIID4x=%d id=%s via link=%s sqn_min=%d sqn_range=%d",
                                 !dhn ? "UNKNOWN DHN" : "INVALIDATED",
-                                ogm_sqn, neighIID4x,
+                                ogm.u.o.sqn, neighIID4x,
                                 on ? cryptShaAsString(&on->nodeId) : DBG_NIL,
                                 pb->i.llip_str,
                                 on ? on->ogmSqn_rangeMin : 0,
@@ -3898,7 +3890,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 			do_fzip, use_compression(handl), dextCompression, DEF_FZIP );
 
 		// set frame header size and values:
-		*tlv = tlv_set_net(BMX_DSC_TLV_RHASH, (sizeof (struct tlv_hdr) + rfd_size));
+		*tlv = tlvSetBigEndian(BMX_DSC_TLV_RHASH, (sizeof (struct tlv_hdr) + rfd_size));
 		it->frames_out_pos += sizeof(struct tlv_hdr) + rfd_size; ///TODO
 		assertion(-501651, ( it->frames_out_pos <= (int32_t)(desc_size_out - sizeof(struct dsc_msg_version))));
 
@@ -3934,7 +3926,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 
 	} else {
 		
-		*tlv = tlv_set_net(it->frame_type, (sizeof ( struct tlv_hdr) + fdata_in));
+		*tlv = tlvSetBigEndian(it->frame_type, (sizeof ( struct tlv_hdr) + fdata_in));
 		it->frames_out_pos += sizeof ( struct tlv_hdr) + fdata_in;
 		assertion(-501652, ( it->frames_out_pos <= (int32_t)PKT_FRAMES_SIZE_MAX));
 
@@ -4870,7 +4862,7 @@ void init_msg( void )
 	assertion(-502084, (sizeof(struct desc_msg_rhash) == sizeof(struct frame_msg_rhash_adv)));
 	assertion(-502085, (sizeof(struct desc_hdr_rhash) == sizeof(struct frame_hdr_rhash_adv)));
 
-	assertion(-502086, ( (tlv_set_net(0x1B, 0x492)).u.u16 == htons(0xDC92) ) );
+	assertion(-502086, ( (tlvSetBigEndian(0x1B, 0x492)).u.u16 == htons(0xDC92) ) );
 
 
         ogm_aggreg_sqn_max = ((AGGREG_SQN_MASK) & rand_num(AGGREG_SQN_MAX));

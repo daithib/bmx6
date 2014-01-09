@@ -279,10 +279,9 @@ struct packet_header // 17 bytes
 
 	IID_T      transmitterIID;   // 16 IID of transmitter node
 
-	LINKADV_SQN_T link_adv_sqn;  // 16 used for processing: link_adv, lq_adv, rp_adv, ogm_adv, ogm_ack
-
 	LOCAL_ID_T local_id;         // 32
 
+	LINKADV_SQN_T link_adv_sqn;  // 16 used for processing: link_adv, lq_adv, rp_adv, ogm_adv, ogm_ack
 	DEVADV_IDX_T   dev_idx;      //  8
 
 //	uint8_t    reserved_for_2byte_alignement;  //  8
@@ -425,7 +424,7 @@ enum {
 char *tlv_op_str(uint8_t op);
 
 
-struct tlv_hdr tlv_set_net(int16_t type, int16_t length);
+struct tlv_hdr tlvSetBigEndian(int16_t type, int16_t length);
 
 struct problem_type {
     LOCAL_ID_T local_id;
@@ -679,16 +678,39 @@ FIELD_FORMAT_END }
 #define OGM_IID_RSVD_JUMP  (OGM_IIDOFFST_MASK) // 63 //255 // resulting from ((2^transmitterIIDoffset_bit_range)-1)
 
 
-
 struct msg_ogm_adv // 4 bytes
 {
-	OGM_MIX_T mix; //uint16_t mix of transmitterIIDoffset, metric_mant, metric_exp
-
-	union {
-		OGM_SQN_T ogm_sqn;
-		IID_T transmitterIIDabsolute;
-	} u;
-
+    union {
+        struct {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+            unsigned int sqn         :16;
+            unsigned int mtcMantissa : 5;
+            unsigned int mtcExponent : 5;
+            unsigned int iidOffset   : 6;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+            unsigned int iidOffset   : 6;
+            unsigned int mtcExponent : 5;
+            unsigned int mtcMantissa : 5;
+            unsigned int sqn  :16;
+#else
+# error "Please fix <bits/endian.h>"
+#endif
+        } o;
+        struct {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+            unsigned int iid        : 16;
+            unsigned int reserved   : 10;
+            unsigned int iidOffset  :  6;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+            unsigned int iidOffset  :  6;
+            unsigned int reserved   : 10;
+            unsigned int iid        : 16;
+#else
+# error "Please fix <bits/endian.h>"
+#endif
+        } i;
+        uint32_t u32; 
+    } u;
 } __attribute__((packed));
 
 
