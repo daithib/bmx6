@@ -531,8 +531,7 @@ void _reconfigure_metric_record_position(const char *f, struct metric_record *re
         if (sqn_bit_size)
                 rec->sqn_bit_mask = (~(SQN_MAX << sqn_bit_size));
 
-        assertion(-500738, (rec->sqn_bit_mask == U16_MAX || rec->sqn_bit_mask == U8_MAX ||
-                rec->sqn_bit_mask == HELLO_SQN_MAX));
+	assertion(-500738, (rec->sqn_bit_mask == U16_MAX || rec->sqn_bit_mask == U8_MAX || rec->sqn_bit_mask == HELLO_SQN_MAX));
 
 
         if (rec->clr && /*alg->window_size > 1 &&*/ ((rec->sqn_bit_mask)&(in - rec->clr)) > (alg->lounge_size + 1)) {

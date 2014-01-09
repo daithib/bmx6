@@ -211,10 +211,6 @@ typedef uint16_t OGM_SQN_T;
 #define OGM_SQN_BIT_SIZE (16)
 #define OGM_SQN_MASK     ((1<<OGM_SQN_BIT_SIZE)-1)
 #define OGM_SQN_MAX      OGM_SQN_MASK
-#define OGM_SQN_STEP     1
-
-
-typedef struct msg_ogm_adv OGM_T;
 
 #define OGM_IIDOFFST_BIT_SIZE 6
 #define OGM_IIDOFFST_MASK ((1<<OGM_IIDOFFST_BIT_SIZE)-1)

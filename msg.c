@@ -766,7 +766,7 @@ IID_T create_ogm(struct orig_node *on, IID_T prev_ogm_iid, struct msg_ogm_adv *o
 
         FMETRIC_U16_T fm = umetric_to_fmetric(on->ogmMetric_next);
 
-        if (UXX_GT(OGM_SQN_MASK, on->ogmSqn_next, on->ogmSqn_send + OGM_SQN_STEP)) {
+        if (UXX_GT(OGM_SQN_MASK, on->ogmSqn_next, on->ogmSqn_send + 1)) {
 
                 dbgf_track(DBGT_WARN, "id=%s delayed %d < %d", cryptShaAsString(&on->nodeId), on->ogmSqn_send, on->ogmSqn_next);
         } else {
@@ -780,11 +780,12 @@ IID_T create_ogm(struct orig_node *on, IID_T prev_ogm_iid, struct msg_ogm_adv *o
 
         assertion(-500890, ((on->dhn->myIID4orig - prev_ogm_iid) <= OGM_IIDOFFST_MASK));
 
-	OGM_T m;
-	m.u.o.iidOffset = on->dhn->myIID4orig - prev_ogm_iid;
-	m.u.o.sqn = on->ogmSqn_next;
-	m.u.o.mtcExponent = fm.val.f.exp_fm16;
-	m.u.o.mtcMantissa = fm.val.f.mantissa_fm16;
+	struct msg_ogm_adv m = {.u.o={
+		.iidOffset=(on->dhn->myIID4orig - prev_ogm_iid),
+		.sqn=on->ogmSqn_next,
+		.mtcExponent = fm.val.f.exp_fm16,
+		.mtcMantissa = fm.val.f.mantissa_fm16
+	}};
 
 	ogm->u.u32 = htonl(m.u.u32);
 
@@ -838,9 +839,7 @@ void create_ogm_aggregation(void)
 
                                 ogm_iid = dhn->myIID4orig;
 
-				OGM_T ogm = {.u.u32 = 0};
-				ogm.u.i.iid = ogm_iid;
-				ogm.u.i.iidOffset = OGM_IID_RSVD_JUMP;
+				struct msg_ogm_adv ogm = {.u.j = {.iid=ogm_iid, .iidOffset=OGM_IID_RSVD_JUMP}};
 
 				msgs[ogm_msg + ogm_iid_jumps].u.u32 = htonl(ogm.u.u32);
 				
@@ -1970,15 +1969,13 @@ int32_t create_dsc_tlv_version(struct tx_frame_iterator *it)
         int32_t random_range = first_packet ? rand_num(ogmSqnRange) :
 		ogmSqnRange - (ogmSqnRange / (_DEF_OGM_SQN_DIV*2)) + rand_num(ogmSqnRange / _DEF_OGM_SQN_DIV);
 
-	random_range = XMAX(_MIN_OGM_SQN_RANGE, XMIN(_MAX_OGM_SQN_RANGE, random_range));
-
-        self->ogmSqn_rangeSize = ((OGM_SQN_MASK)&(random_range + OGM_SQN_STEP - 1));
+        self->ogmSqn_rangeSize = ((OGM_SQN_MASK)&(XMAX(_MIN_OGM_SQN_RANGE, XMIN(_MAX_OGM_SQN_RANGE, random_range)) ));
 
         self->ogmSqn_rangeMin = ((OGM_SQN_MASK)&(self->ogmSqn_rangeMin + _MAX_OGM_SQN_RANGE));
 
         self->ogmSqn_maxRcvd = set_ogmSqn_toBeSend_and_aggregated(self, UMETRIC_MAX,
-                (OGM_SQN_MASK)&(self->ogmSqn_rangeMin - (self->ogmSqn_next == self->ogmSqn_send ? OGM_SQN_STEP : 0)),
-                (OGM_SQN_MASK)&(self->ogmSqn_rangeMin - OGM_SQN_STEP));
+                (OGM_SQN_MASK)&(self->ogmSqn_rangeMin - (self->ogmSqn_next == self->ogmSqn_send ? 1 : 0)),
+                (OGM_SQN_MASK)&(self->ogmSqn_rangeMin - 1));
 
         dsc->ogmSqnMin = htons(self->ogmSqn_rangeMin);
         dsc->ogmSqnRange = htons(self->ogmSqn_rangeSize);
@@ -2031,7 +2028,7 @@ int32_t process_dsc_tlv_version(struct rx_frame_iterator *it)
 		on->updated_timestamp = bmx_time;
 		on->ogmSqn_rangeMin = ntohs(new->ogmSqnMin);
 		on->ogmSqn_rangeSize = ntohs(new->ogmSqnRange);
-		on->ogmSqn_maxRcvd = (OGM_SQN_MASK & (on->ogmSqn_rangeMin - OGM_SQN_STEP));
+		on->ogmSqn_maxRcvd = (OGM_SQN_MASK & (on->ogmSqn_rangeMin - 1));
 		set_ogmSqn_toBeSend_and_aggregated(on, on->ogmMetric_next, on->ogmSqn_maxRcvd, on->ogmSqn_maxRcvd);
 	}
 	
@@ -2945,12 +2942,12 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
 
         for (m = 0; m < msgs; m++) {
 
-		OGM_T ogm = { .u.u32 = ntohl( ((struct msg_ogm_adv*)(it->msg + ogm_dst_field_size))[m].u.u32 ) };
+		struct msg_ogm_adv ogm = { .u.u32 = ntohl( ((struct msg_ogm_adv*)(it->msg + ogm_dst_field_size))[m].u.u32 ) };
 
-                if (ogm.u.i.iidOffset == OGM_IID_RSVD_JUMP) {
+                if (ogm.u.j.iidOffset == OGM_IID_RSVD_JUMP) {
 
-                        dbgf_all(DBGT_INFO, " IID jump from %d to %d", neighIID4x, ogm.u.i.iid);
-                        neighIID4x = ogm.u.i.iid;
+                        dbgf_all(DBGT_INFO, " IID jump from %d to %d", neighIID4x, ogm.u.j.iid);
+                        neighIID4x = ogm.u.j.iid;
 
                         if ((m + 1) >= msgs)
                                 return TLV_RX_DATA_FAILURE;
@@ -4396,11 +4393,11 @@ void schedule_my_originator_message( void* unused )
 {
         TRACE_FUNCTION_CALL;
 
-        if (((OGM_SQN_MASK) & (self->ogmSqn_next + OGM_SQN_STEP - self->ogmSqn_rangeMin)) >= self->ogmSqn_rangeSize)
+        if (((OGM_SQN_MASK) & (self->ogmSqn_next + 1 - self->ogmSqn_rangeMin)) >= self->ogmSqn_rangeSize)
                 my_description_changed = YES;
 
 
-        self->ogmSqn_maxRcvd = set_ogmSqn_toBeSend_and_aggregated(self, UMETRIC_MAX, (self->ogmSqn_next + OGM_SQN_STEP), self->ogmSqn_send);
+        self->ogmSqn_maxRcvd = set_ogmSqn_toBeSend_and_aggregated(self, UMETRIC_MAX, (self->ogmSqn_next + 1), self->ogmSqn_send);
 
         dbgf_all(DBGT_INFO, "ogm_sqn %d", self->ogmSqn_next);
 

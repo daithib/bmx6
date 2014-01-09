@@ -683,15 +683,15 @@ struct msg_ogm_adv // 4 bytes
     union {
         struct {
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-            unsigned int sqn         :16;
-            unsigned int mtcMantissa : 5;
-            unsigned int mtcExponent : 5;
-            unsigned int iidOffset   : 6;
+            unsigned int sqn         : 16;
+            unsigned int mtcMantissa :  5;
+            unsigned int mtcExponent :  5;
+            unsigned int iidOffset   :  6;
 #elif __BYTE_ORDER == __BIG_ENDIAN
-            unsigned int iidOffset   : 6;
-            unsigned int mtcExponent : 5;
-            unsigned int mtcMantissa : 5;
-            unsigned int sqn  :16;
+            unsigned int iidOffset   :  6;
+            unsigned int mtcExponent :  5;
+            unsigned int mtcMantissa :  5;
+            unsigned int sqn         : 16;
 #else
 # error "Please fix <bits/endian.h>"
 #endif
@@ -708,7 +708,7 @@ struct msg_ogm_adv // 4 bytes
 #else
 # error "Please fix <bits/endian.h>"
 #endif
-        } i;
+        } j;
         uint32_t u32; 
     } u;
 } __attribute__((packed));
