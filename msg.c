@@ -780,12 +780,11 @@ IID_T create_ogm(struct orig_node *on, IID_T prev_ogm_iid, struct msg_ogm_adv *o
 
         assertion(-500890, ((on->dhn->myIID4orig - prev_ogm_iid) <= OGM_IIDOFFST_MASK));
 
-	struct msg_ogm_adv m = {.u.o={
-		.iidOffset=(on->dhn->myIID4orig - prev_ogm_iid),
-		.sqn=on->ogmSqn_next,
-		.mtcExponent = fm.val.f.exp_fm16,
-		.mtcMantissa = fm.val.f.mantissa_fm16
-	}};
+	struct msg_ogm_adv m;
+	m.u.o.iidOffset=(on->dhn->myIID4orig - prev_ogm_iid);
+	m.u.o.sqn=on->ogmSqn_next;
+	m.u.o.mtcExponent = fm.val.f.exp_fm16;
+	m.u.o.mtcMantissa = fm.val.f.mantissa_fm16;
 
 	ogm->u.u32 = htonl(m.u.u32);
 
@@ -839,7 +838,9 @@ void create_ogm_aggregation(void)
 
                                 ogm_iid = dhn->myIID4orig;
 
-				struct msg_ogm_adv ogm = {.u.j = {.iid=ogm_iid, .iidOffset=OGM_IID_RSVD_JUMP}};
+				struct msg_ogm_adv ogm = {.u.j={.mtcU10=0}};
+				ogm.u.j.iid=ogm_iid;
+				ogm.u.j.iidOffset=OGM_IID_RSVD_JUMP;
 
 				msgs[ogm_msg + ogm_iid_jumps].u.u32 = htonl(ogm.u.u32);
 				
