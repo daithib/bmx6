@@ -4314,12 +4314,13 @@ void tx_packet(void *devp)
                         pb.i.oif = dev;
                         pb.i.length = (it.frames_out_pos + sizeof ( struct packet_header));
 
+			my_packet_sqn++;
+
                         memset(phdr, 0, sizeof (struct packet_header));
 
                         phdr->comp_version = my_compatibility;
                         phdr->transmitterIID = htons(myIID4me);
                         phdr->link_adv_sqn = htons(my_link_adv_sqn);
-                        phdr->pkt_sqn = htonl(++my_packet_sqn); //TODOCV18: remove
                         phdr->local_id = my_local_id;
                         phdr->dev_idx = dev->llip_key.idx;
 
@@ -4874,7 +4875,7 @@ void init_msg( void )
 
         ogm_aggreg_sqn_max = ((AGGREG_SQN_MASK) & rand_num(AGGREG_SQN_MAX));
 
-        my_packet_sqn = (rand_num(PKT_SQN_MAX - 1) + 1); // dont start with zero because my_link_sqn and my_dev_sqn assume this
+        my_packet_sqn = 1; // dont start with zero because my_link_sqn and my_dev_sqn assume this
 
 	register_options_array( msg_options, sizeof( msg_options ), CODE_CATEGORY_NAME );
 

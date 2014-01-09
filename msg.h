@@ -281,8 +281,6 @@ struct packet_header // 17 bytes
 
 	LINKADV_SQN_T link_adv_sqn;  // 16 used for processing: link_adv, lq_adv, rp_adv, ogm_adv, ogm_ack
 
-	//TODOCV17: merge pkt_sqn and local_id into single uint64_t local_id
-	PKT_SQN_T  pkt_sqn;          // 32
 	LOCAL_ID_T local_id;         // 32
 
 	DEVADV_IDX_T   dev_idx;      //  8
