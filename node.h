@@ -484,7 +484,7 @@ struct packet_buff {
 		struct sockaddr_storage addr;
 		struct timeval tv_stamp;
 		struct dev_node *iif;
-		int total_length;
+		int length;
 		uint8_t unicast;
 
 		//filled in by rx_packet()

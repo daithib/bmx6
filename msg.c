@@ -3655,12 +3655,12 @@ IDM_T rx_frames(struct packet_buff *pb)
 {
         TRACE_FUNCTION_CALL;
         int32_t result;
-	struct packet_header *phdr = (struct packet_header *)pb->packet.data;
+
         struct rx_frame_iterator it = {
                 .caller = __FUNCTION__, .onOld = NULL, .op = 0, .pb = pb,
                 .db = packet_frame_db, .process_filter = FRAME_TYPE_PROCESS_ALL,
                 .frame_type = -1, .frames_in = (pb->packet.data + sizeof (struct packet_header)),
-                .frames_length = (ntohs(phdr->pkt_length) - sizeof (struct packet_header)),
+                .frames_length = (pb->i.length - sizeof (struct packet_header)),
 		.dhnNew = NULL
 	};
 
@@ -3722,7 +3722,7 @@ int8_t send_udp_packet(struct packet_buff *pb, struct sockaddr_storage *dst, int
         TRACE_FUNCTION_CALL;
 	int status;
 
-        dbgf_all(DBGT_INFO, "len=%d via dev=%s", pb->i.total_length, pb->i.oif->label_cfg.str);
+        dbgf_all(DBGT_INFO, "len=%d via dev=%s", pb->i.length, pb->i.oif->label_cfg.str);
 
 	if ( send_sock == 0 )
 		return 0;
@@ -3738,7 +3738,7 @@ int8_t send_udp_packet(struct packet_buff *pb, struct sockaddr_storage *dst, int
         status = sendmsg( send_sock, &m, 0 );
          */
 
-        status = sendto(send_sock, pb->packet.data, pb->i.total_length, 0, (struct sockaddr *) dst, sizeof (struct sockaddr_storage));
+        status = sendto(send_sock, pb->packet.data, pb->i.length, 0, (struct sockaddr *) dst, sizeof (struct sockaddr_storage));
 
 	if ( status < 0 ) {
 
@@ -4312,12 +4312,11 @@ void tx_packet(void *devp)
                         assertion(-501340, IMPLIES(it.frames_out_num == 1, it.frames_out_pos <= it.frames_out_max));
 
                         pb.i.oif = dev;
-                        pb.i.total_length = (it.frames_out_pos + sizeof ( struct packet_header));
+                        pb.i.length = (it.frames_out_pos + sizeof ( struct packet_header));
 
                         memset(phdr, 0, sizeof (struct packet_header));
 
                         phdr->comp_version = my_compatibility;
-                        phdr->pkt_length = htons(pb.i.total_length);
                         phdr->transmitterIID = htons(myIID4me);
                         phdr->link_adv_sqn = htons(my_link_adv_sqn);
                         phdr->pkt_sqn = htonl(++my_packet_sqn); //TODOCV18: remove
@@ -4329,7 +4328,7 @@ void tx_packet(void *devp)
                         send_udp_packet(&pb, &dev->tx_netwbrc_addr, dev->unicast_sock);
 
                         dbgf_all(DBGT_INFO, "send packet size=%d  via dev=%s",
-                                pb.i.total_length, dev->label_cfg.str);
+                                pb.i.length, dev->label_cfg.str);
 
                         memset(&pb.i, 0, sizeof (pb.i));
 
@@ -4649,14 +4648,19 @@ void rx_packet( struct packet_buff *pb )
         TRACE_FUNCTION_CALL;
 
         struct dev_node *iif = pb->i.iif;
+	struct packet_header *phdr = NULL;
 
         if (drop_all_packets)
                 return;
 
         assertion(-500841, ((iif->active && iif->if_llocal_addr)));
 
-	struct packet_header *phdr = (struct packet_header *)pb->packet.data;
-        uint16_t pkt_length = ntohs(phdr->pkt_length);
+	if (pb->i.length != (int) (sizeof(struct packet_header)) &&
+		pb->i.length < (int) (sizeof(struct packet_header) + sizeof(struct tlv_hdr)))
+		goto process_packet_error;
+
+	phdr = (struct packet_header *)pb->packet.data;
+
         pb->i.transmittersIID = ntohs(phdr->transmitterIID);
         pb->i.link_sqn = ntohs(phdr->link_adv_sqn);
 
@@ -4676,14 +4680,12 @@ void rx_packet( struct packet_buff *pb )
 
         ip6ToStr(&pb->i.llip, pb->i.llip_str);
 
-        dbgf_all(DBGT_INFO, "via %s %s %s size %d", iif->label_cfg.str, iif->ip_llocal_str, pb->i.llip_str, pkt_length);
+        dbgf_all(DBGT_INFO, "via %s %s %s size %d", iif->label_cfg.str, iif->ip_llocal_str, pb->i.llip_str, pb->i.length);
 
 	// immediately drop invalid packets...
-	// we acceppt longer packets than specified by pos->size to allow padding for equal packet sizes
-        if (    pb->i.total_length < (int) (sizeof (struct packet_header) + sizeof (struct tlv_hdr)) ||
-                pkt_length < (int) (sizeof (struct packet_header) + sizeof (struct tlv_hdr)) ||
+        if (    
                 ((phdr->comp_version < (my_compatibility - 1)) || (phdr->comp_version > (my_compatibility + 1))) ||
-                pkt_length > pb->i.total_length || pkt_length > (PKT_FRAMES_SIZE_MAX + sizeof(struct packet_header)) ||
+                pb->i.length  > (int)(PKT_FRAMES_SIZE_MAX + sizeof(struct packet_header)) ||
                 pb->i.link_key.dev_idx < DEVADV_IDX_MIN || pb->i.link_key.local_id == LOCAL_ID_INVALID ) {
 
                 goto process_packet_error;
@@ -4746,8 +4748,8 @@ void rx_packet( struct packet_buff *pb )
 
 
         dbgf_all(DBGT_INFO, "version=%i, reserved=%X, size=%i IID=%d rcvd udp_len=%d via NB %s %s %s",
-                phdr->comp_version, phdr->capabilities, pkt_length, pb->i.transmittersIID,
-                pb->i.total_length, pb->i.llip_str, iif->label_cfg.str, pb->i.unicast ? "UNICAST" : "BRC");
+                phdr->comp_version, phdr->capabilities, pb->i.length, pb->i.transmittersIID,
+                pb->i.length, pb->i.llip_str, iif->label_cfg.str, pb->i.unicast ? "UNICAST" : "BRC");
 
 
         cb_packet_hooks(pb);
@@ -4766,9 +4768,9 @@ process_packet_error:
 
         dbgf_sys(DBGT_WARN,
                 "Drop (remaining) packet: rcvd problematic packet via NB=%s dev=%s "
-                "(version=%i, local_id=%X dev_idx=0x%X, reserved=0x%X, pkt_size=%i), udp_len=%d my_version=%d, max_udpd_size=%d",
-                pb->i.llip_str, iif->label_cfg.str, phdr->comp_version,
-                ntohl(pb->i.link_key.local_id), pb->i.link_key.dev_idx, phdr->capabilities, pkt_length, pb->i.total_length,
+                "(version=%i local_id=%X dev_idx=0x%X capabilities=%d udp_len=%d my_version=%d max_udpd_size=%d",
+                pb->i.llip_str, iif->label_cfg.str, phdr?phdr->comp_version:-1,
+                ntohl(pb->i.link_key.local_id), pb->i.link_key.dev_idx, phdr?phdr->capabilities:-1, pb->i.length,
                 my_compatibility, MAX_UDPD_SIZE);
 
         blacklist_neighbor(pb);

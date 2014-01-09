@@ -276,7 +276,6 @@ struct packet_header // 17 bytes
 {
 	uint8_t    comp_version;     //  8
 	uint8_t    capabilities;     //  8  reserved
-	uint16_t   pkt_length; 	     // 16 the relevant data size in bytes (including the bmx_header)
 
 	IID_T      transmitterIID;   // 16 IID of transmitter node
 

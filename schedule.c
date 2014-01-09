@@ -351,14 +351,14 @@ loop4Event:
 				pb.i.unicast = NO;
 				
 				errno=0;
-				pb.i.total_length = recvfrom( pb.i.iif->rx_mcast_sock, pb.packet.data,
+				pb.i.length = recvfrom( pb.i.iif->rx_mcast_sock, pb.packet.data,
 				                             sizeof(pb.packet.data) - 1, 0,
 				                             (struct sockaddr *)&pb.i.addr, &addr_len );
 				
-				if ( pb.i.total_length < 0  &&  ( errno == EWOULDBLOCK || errno == EAGAIN ) ) {
+				if ( pb.i.length < 0  &&  ( errno == EWOULDBLOCK || errno == EAGAIN ) ) {
 
                                         dbgf_sys(DBGT_WARN, "sock returned %d errno %d: %s",
-					    pb.i.total_length, errno, strerror(errno) );
+					    pb.i.length, errno, strerror(errno) );
 					
 					continue;
 				}
@@ -377,14 +377,14 @@ loop4Event:
 				pb.i.unicast = NO;
 				
 				errno=0;
-				pb.i.total_length = recvfrom( pb.i.iif->rx_fullbrc_sock, pb.packet.data,
+				pb.i.length = recvfrom( pb.i.iif->rx_fullbrc_sock, pb.packet.data,
 				                             sizeof(pb.packet.data) - 1, 0,
 				                             (struct sockaddr *)&pb.i.addr, &addr_len );
 				
-				if ( pb.i.total_length < 0  &&  ( errno == EWOULDBLOCK || errno == EAGAIN ) ) {
+				if ( pb.i.length < 0  &&  ( errno == EWOULDBLOCK || errno == EAGAIN ) ) {
 
                                         dbgf_sys(DBGT_WARN, "sock returned %d errno %d: %s",
-					     pb.i.total_length, errno, strerror(errno) );
+					     pb.i.length, errno, strerror(errno) );
 					
 					continue;
 				}
@@ -419,11 +419,11 @@ loop4Event:
 				
 				errno=0;
 				
-				pb.i.total_length = recvmsg( pb.i.iif->unicast_sock, &msghdr, MSG_DONTWAIT  );
+				pb.i.length = recvmsg( pb.i.iif->unicast_sock, &msghdr, MSG_DONTWAIT  );
 				
-				if ( pb.i.total_length < 0  &&  ( errno == EWOULDBLOCK || errno == EAGAIN ) ) {
+				if ( pb.i.length < 0  &&  ( errno == EWOULDBLOCK || errno == EAGAIN ) ) {
                                         dbgf_sys(DBGT_WARN, "sock returned %d errno %d: %s",
-					    pb.i.total_length, errno, strerror(errno) );
+					    pb.i.length, errno, strerror(errno) );
 					continue;
 				}
 						

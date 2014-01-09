@@ -121,7 +121,7 @@ void dump(struct packet_buff *pb)
 
         assertion(-500761, (*dev_plugin_data));
 
-        uint16_t plength = ntohs(phdr->pkt_length);
+        uint16_t plength = pb->i.length;
 
         dbgf_dump(DBGT_NONE, "%s srcIP=%-16s dev=%-12s udpPayload=%-d",
                 direction == DUMP_DIRECTION_IN ? "in " : "out", pb->i.llip_str, dev->label_cfg.str, plength);
