@@ -474,14 +474,14 @@ IDM_T blacklisted_neighbor(struct packet_buff *pb, DHASH_T *dhash)
 
 
 
-struct neigh_node *is_described_neigh( struct link_node *link, IID_T transmittersIID4x )
+struct neigh_node *is_described_neigh( struct link_node *link, DHASH_T *transmittersDhash)
 {
         assertion(-500730, (link));
         assertion(-500958, (link->local));
         struct neigh_node *neigh = link->local->neigh;
 
         if (neigh && neigh->dhn && neigh->dhn->on &&
-                neigh->dhn == iid_get_node_by_neighIID4x(neigh, transmittersIID4x, YES/*verbose*/)) {
+		memcmp(&neigh->dhn->dhash, transmittersDhash, sizeof(DHASH_T))== 0) {
 
                 assertion(-500938, (neigh->dhn->neigh == neigh));
 

@@ -1912,7 +1912,7 @@ process_desc0_error:
 
 
 STATIC_FUNC
-int32_t tx_msg_dhash_or_description_request(struct tx_frame_iterator *it)
+int32_t tx_msg_dhash_request(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
@@ -1922,13 +1922,11 @@ int32_t tx_msg_dhash_or_description_request(struct tx_frame_iterator *it)
         struct dhash_node *dhn = (ttn->task.link && ttn->task.link->local->neigh) ?
                 iid_get_node_by_neighIID4x(ttn->task.link->local->neigh, ttn->task.neighIID4x, YES/*verbose*/) : NULL;
 
-
         dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%X dev_idx=0x%X iterations=%d time=%d requesting neighIID4x=%d %s",
                 it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, ntohl(ttn->task.link->key.local_id),
                 ttn->task.link->key.dev_idx, ttn->tx_iterations, ttn->considered_ts, ttn->task.neighIID4x,
                 dhn ? "ALREADY RESOLVED (req cancelled)" : ttn->task.link->local->neigh ? "ABOUT NB HIMSELF" : "ABOUT SOMEBODY");
 
-        assertion(-500853, (sizeof ( struct msg_description_request) == sizeof ( struct msg_dhash_request)));
         assertion(-500855, (tx_iterator_cache_data_space_pref(it) >= ((int) (sizeof (struct msg_dhash_request)))));
         assertion(-500856, (ttn->task.link));
         assertion(-500870, (ttn->tx_iterations > 0 && ttn->considered_ts != bmx_time));
@@ -1940,14 +1938,10 @@ int32_t tx_msg_dhash_or_description_request(struct tx_frame_iterator *it)
                 return TLV_TX_DATA_DONE;
         }
 
-
         if (hdr->msg == msg) {
-
                 assertion(-500854, (is_zero(hdr, sizeof (*hdr))));
                 hdr->destination_local_id = ttn->task.link->key.local_id;
-
         } else {
-
                 assertion(-500871, (hdr->destination_local_id == ttn->task.link->key.local_id));
         }
 
@@ -1958,6 +1952,46 @@ int32_t tx_msg_dhash_or_description_request(struct tx_frame_iterator *it)
         return sizeof (struct msg_dhash_request);
 }
 
+STATIC_FUNC
+int32_t tx_msg_description_request(struct tx_frame_iterator *it)
+{
+        TRACE_FUNCTION_CALL;
+
+        struct tx_task_node *ttn = it->ttn;
+        struct hdr_description_request *hdr = ((struct hdr_description_request*) tx_iterator_cache_hdr_ptr(it));
+        struct msg_description_request *msg = ((struct msg_description_request*) tx_iterator_cache_msg_ptr(it));
+	DHASH_T *dhash = (DHASH_T*)ttn->task.data;
+        struct dhash_node *dhn = avl_find_item(&dhash_tree, dhash);
+
+        assertion(-500855, (tx_iterator_cache_data_space_pref(it) >= ((int) (sizeof (struct msg_description_request)))));
+        assertion(-500856, (ttn->task.link));
+        assertion(-500870, (ttn->tx_iterations > 0 && ttn->considered_ts != bmx_time));
+        assertion(-500858, (IMPLIES((dhn && dhn->on), dhn->desc_frame)));
+
+        dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%X dev_idx=0x%X iterations=%d time=%d requesting dhash=%s %s llneigh=%d",
+                it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, ntohl(ttn->task.link->key.local_id),
+                ttn->task.link->key.dev_idx, ttn->tx_iterations, ttn->considered_ts, cryptShaAsString(dhash),
+                dhn ? "ALREADY RESOLVED (req cancelled)" : "", (ttn->task.link->local->neigh));
+
+        if (dhn) {
+                // description (and hash) already resolved, skip sending..
+                ttn->tx_iterations = 0;
+                return TLV_TX_DATA_DONE;
+        }
+
+        if (hdr->msg == msg) {
+                assertion(-500854, (is_zero(hdr, sizeof (*hdr))));
+                hdr->destination_local_id = ttn->task.link->key.local_id;
+        } else {
+                assertion(-500871, (hdr->destination_local_id == ttn->task.link->key.local_id));
+        }
+
+        dbgf_track(DBGT_INFO, "creating msg=%d", ((int) ((((char*) msg) - ((char*) hdr) - sizeof ( *hdr)) / sizeof (*msg))));
+
+        msg->dhash = *dhash;
+
+        return sizeof (struct msg_description_request);
+}
 
 STATIC_FUNC
 int32_t create_dsc_tlv_version(struct tx_frame_iterator *it)
@@ -2090,46 +2124,22 @@ STATIC_FUNC
 int32_t tx_frame_description_adv(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-        struct tx_task_node * ttn = it->ttn;
-        struct dhash_node *dhn;
+	DHASH_T *dhash = (DHASH_T*)it->ttn->task.data;
+        struct dhash_node *dhn = avl_find_item(&dhash_tree, dhash);
 
-        struct dsc_msg_version *adv = (struct dsc_msg_version *) tx_iterator_cache_msg_ptr(it);
-
-        dbgf_all(DBGT_INFO, "ttn->myIID4x %d", ttn->task.myIID4x);
-
-        assertion( -500555, (ttn->task.myIID4x >= IID_MIN_USED));
-
-        if (ttn->task.myIID4x == myIID4me) {
-
-                dhn = self->dhn;
-
-        } else if ((dhn = iid_get_node_by_myIID4x(ttn->task.myIID4x)) && dhn->on) {
-
-                assertion(-500437, (dhn->desc_frame));
-
-        } else {
-
-                dbgf_sys(DBGT_WARN, "%s myIID4x %d !", dhn ? "INVALID" : "UNKNOWN", ttn->task.myIID4x);
-
-                // an meanwhile invalidated dhn migh have been scheduled when it was still valid, but not an unknown:
-                assertion(-500977, (dhn && !dhn->on));
-
+	if (!dhn || !dhn->on) {
+		dbgf_sys(DBGT_WARN, "%s dhash=%s!", dhn ? "INVALID" : "UNKNOWN", cryptShaAsString(dhash));
+                assertion(-500977, (dhn && !dhn->on)); // a meanwhile invalidated dhn migh have been scheduled when it was still valid
                 return TLV_TX_DATA_DONE;
         }
 
-        if (dhn->desc_frame_len > tx_iterator_cache_data_space_max(it) || dhn->desc_frame_len != ttn->frame_msgs_length ) {
+	assertion(-502060, (it->ttn->frame_msgs_length == dhn->desc_frame_len));
+	assertion(-502061, (dhn->desc_frame_len <= tx_iterator_cache_data_space_max(it)));
 
-                dbgf_sys(DBGT_ERR, "desc_len=%d ttn_len=%d frames_out_pos=%d cache_msgs_size=%d space_pref=%d space_max=%d ",
-                        dhn->desc_frame_len, ttn->frame_msgs_length, it->frames_out_pos, it->frame_cache_msgs_size,
-                        tx_iterator_cache_data_space_pref(it), tx_iterator_cache_data_space_max(it));
+        memcpy(tx_iterator_cache_msg_ptr(it), dhn->desc_frame, dhn->desc_frame_len);
 
-		assertion(-502060, (ttn->frame_msgs_length == dhn->desc_frame_len));
-		assertion(-502061, (dhn->desc_frame_len <= tx_iterator_cache_data_space_max(it)));
-        }
-
-        memcpy((char*) adv, dhn->desc_frame, dhn->desc_frame_len);
-
-        dbgf_track(DBGT_INFO, "id=%s descr_size=%zu", cryptShaAsString(&dhn->on->nodeId), dhn->desc_frame_len);
+	dbgf_track(DBGT_INFO, "dhash=%s id=%s descr_size=%zu",
+		cryptShaAsString(dhash), cryptShaAsString(&dhn->on->nodeId), dhn->desc_frame_len);
 
         return dhn->desc_frame_len;
 }
@@ -3106,10 +3116,12 @@ struct dhash_node *process_dhash_description_neighIID4x
 (struct packet_buff *pb, DHASH_T *dhash, uint8_t* dsc, uint16_t desc_len, IID_T neighIID4x)
 {
         TRACE_FUNCTION_CALL;
+	assertion(-500000, (dhash));
         struct dhash_node *dhn = NULL;
         struct local_node *local = pb->i.link->local;
         struct description_cache_node *cache = NULL;
-        IDM_T is_transmitters_iid = neighIID4x > IID_RSVD_MAX && neighIID4x == pb->i.transmittersIID;
+	IDM_T is_transmitter = (memcmp(dhash, &pb->i.dhash, sizeof(DHASH_T)) == 0);
+        IDM_T is_transmitters_iid = is_transmitter && neighIID4x > IID_RSVD_MAX;
 
         assertion(-500688, (dhash));
         assertion(-500689, (!(is_transmitters_iid && !memcmp(dhash, &(self->dhn->dhash), sizeof(*dhash))))); // cant be transmitters' and myselfs'
@@ -3122,15 +3134,16 @@ struct dhash_node *process_dhash_description_neighIID4x
 	} else if ((dhn = avl_find_item(&dhash_tree, dhash))) {
                 // is about a known dhash:
                 
-                if (is_transmitters_iid) {
+                if (is_transmitter) {
                         // is about the transmitter:
 
                         update_local_neigh(pb, dhn);
 
-                        if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
+			if (is_transmitters_iid &&
+				iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
                                 return (struct dhash_node *) FAILURE_PTR;
 
-                        assertion(-500968, (is_described_neigh(pb->i.link, pb->i.transmittersIID)));
+                        assertion(-500968, (is_described_neigh(pb->i.link, dhash)));
 
                 } else if (neighIID4x > IID_RSVD_MAX && local->neigh) {
                         // received via a known neighbor, and is NOT about the transmitter:
@@ -3142,7 +3155,7 @@ struct dhash_node *process_dhash_description_neighIID4x
 
                                 local->neigh->neighIID4me = neighIID4x;
 
-                        } else if (dhn == local->neigh->dhn && !is_transmitters_iid) {
+                        } else if (dhn == local->neigh->dhn && !is_transmitter) {
                                 // is about a neighbors' dhash itself which is NOT the transmitter ???!!!
 
                                 dbgf_sys(DBGT_ERR, "%s via %s neighIID4x=%d IS NOT transmitter=%d",
@@ -3164,7 +3177,7 @@ struct dhash_node *process_dhash_description_neighIID4x
 		if (dsc)
 			cache_description(dsc, desc_len, dhash);
 
-		if (((is_transmitters_iid || local->neigh) ) &&
+		if (((is_transmitter || local->neigh) ) &&
 			(cache = get_cached_description(dhash)) &&
 			(dhn = process_description(pb, cache, dhash)) ) {
 			
@@ -3176,7 +3189,7 @@ struct dhash_node *process_dhash_description_neighIID4x
 
 			} else {
 
-				if (is_transmitters_iid)
+				if (is_transmitter)
 					//is about the transmitter  and  a description + dhash is known
 					update_local_neigh(pb, dhn);
 
@@ -3184,7 +3197,7 @@ struct dhash_node *process_dhash_description_neighIID4x
 					iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
 					return(struct dhash_node *) FAILURE_PTR;
 
-				assertion(-500969, IMPLIES(is_transmitters_iid, is_described_neigh(pb->i.link, pb->i.transmittersIID)));
+				assertion(-500969, IMPLIES(is_transmitters_iid, is_described_neigh(pb->i.link, &pb->i.dhash)));
 			}
 		}
         }
@@ -3209,7 +3222,7 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
         struct packet_buff *pb = it->pb;
         struct msg_dhash_adv *adv = (struct msg_dhash_adv*) (it->msg);
         IID_T neighIID4x = ntohs(adv->transmitterIID4x);
-        IDM_T is_transmitter_adv = (neighIID4x == pb->i.transmittersIID);
+        IDM_T is_transmitter = (memcmp(&adv->dhash, &pb->i.dhash, sizeof(DHASH_T))==0);
         struct dhash_node *dhn;
 
         dbgf_track(DBGT_INFO, "via NB: %s", pb->i.llip_str);
@@ -3217,7 +3230,7 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
         if (neighIID4x <= IID_RSVD_MAX)
                 return TLV_RX_DATA_FAILURE;
 
-        if (!(is_transmitter_adv || is_described_neigh(pb->i.link, pb->i.transmittersIID))) {
+        if (!(is_transmitter || is_described_neigh(pb->i.link, &pb->i.dhash))) {
                 dbgf_track(DBGT_INFO, "via undescribed NB: %s", pb->i.llip_str);
                 return sizeof (struct msg_dhash_adv);
         }
@@ -3230,13 +3243,13 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
 
 	} else if (dhn == NULL) {
 
-		schedule_tx_task(pb->i.link->local->best_tp_lndev, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, 0, 0, 0, neighIID4x);
+		schedule_tx_task(pb->i.link->local->best_tp_lndev, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, &adv->dhash, sizeof(adv->dhash), 0, 0);
 
 	} else {
 
 		assertion(-500690, (dhn && dhn->on)); // UNDESCRIBED or fully described
 		//if rcvd transmitters' description then it must have become a described neighbor:
-		assertion(-500488, IMPLIES(is_transmitter_adv, (is_described_neigh(pb->i.link, pb->i.transmittersIID))));
+		assertion(-500488, IMPLIES(is_transmitter, (is_described_neigh(pb->i.link, &pb->i.dhash))));
 	}
 
         return sizeof (struct msg_dhash_adv);
@@ -3288,41 +3301,39 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 		assertion(-500691, (dhn->on));
 
 		if (desc_adv_tx_unsolicited && dhn->on->updated_timestamp == bmx_time &&
-			is_described_neigh(pb->i.link, pb->i.transmittersIID)) {
+			is_described_neigh(pb->i.link, &pb->i.dhash)) {
 
 			struct link_dev_node **lndev_arr = lndevs_get_best_tp(pb->i.link->local);
 			int d;
 
 			for (d = 0; (lndev_arr[d]); d++)
-				schedule_tx_task(lndev_arr[d], FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, 0, 0, dhn->myIID4orig, 0);
+				schedule_tx_task(lndev_arr[d], FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T), 0, 0);
 		}
 	}
 	
         return it->frame_data_length;
 }
 
+
 STATIC_FUNC
-int32_t rx_msg_dhash_or_description_request(struct rx_frame_iterator *it)
+int32_t rx_msg_dhash_request(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-        assertion( -500365 , (sizeof( struct msg_description_request ) == sizeof( struct msg_dhash_request)));
 
         struct packet_buff *pb = it->pb;
         struct hdr_dhash_request *hdr = (struct hdr_dhash_request*) (it->frame_data);
-        struct msg_dhash_request *req = (struct msg_dhash_request*) (it->msg);
-        IID_T myIID4x = ntohs(req->receiverIID4x);
+        struct msg_dhash_request *msg = (struct msg_dhash_request*) (it->msg);
+        IID_T myIID4x = ntohs(msg->receiverIID4x);
 
         if (hdr->destination_local_id != my_local_id)
+		//TODO: consider that the received local_id might be a duplicate:
                 return sizeof ( struct msg_dhash_request);
-
-        //TODO: consider that the received local_id might be a duplicate:
 
         dbgf_track(DBGT_INFO, "%s NB %s destination_local_id=0x%X myIID4x %d",
                 it->handl->name, pb->i.llip_str, ntohl(hdr->destination_local_id), myIID4x);
 
-
         if (myIID4x <= IID_RSVD_MAX)
-                return sizeof ( struct msg_dhash_request);
+                return TLV_RX_DATA_FAILURE;
 
         struct dhash_node *dhn = iid_get_node_by_myIID4x(myIID4x);
         struct orig_node *on = dhn ? dhn->on : NULL;
@@ -3340,17 +3351,7 @@ int32_t rx_msg_dhash_or_description_request(struct rx_frame_iterator *it)
 
         assertion(-500251, (dhn && dhn->myIID4orig == myIID4x));
 
-        if (it->frame_type == FRAME_TYPE_DESC_REQ) {
-
-                schedule_tx_task(pb->i.link->local->best_tp_lndev, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, 0, 0, myIID4x, 0);
-
-        } else {
-
-                schedule_tx_task(pb->i.link->local->best_tp_lndev, FRAME_TYPE_HASH_ADV, SCHEDULE_MIN_MSG_SIZE, 0, 0, myIID4x, 0);
-        }
-
-
-
+	schedule_tx_task(pb->i.link->local->best_tp_lndev, FRAME_TYPE_HASH_ADV, SCHEDULE_MIN_MSG_SIZE, 0, 0, myIID4x, 0);
 
         // most probably the requesting node is also interested in my metric to the requested node:
         if (on->curr_rt_lndev && on->ogmSqn_next == on->ogmSqn_send &&
@@ -3359,9 +3360,48 @@ int32_t rx_msg_dhash_or_description_request(struct rx_frame_iterator *it)
                 set_ogmSqn_toBeSend_and_aggregated(on, on->ogmMetric_next, on->ogmSqn_next, ((OGM_SQN_T) (on->ogmSqn_next - 1)));
         }
 
-
-
         return sizeof ( struct msg_dhash_request);
+}
+
+
+STATIC_FUNC
+int32_t rx_msg_description_request(struct rx_frame_iterator *it)
+{
+        TRACE_FUNCTION_CALL;
+
+        struct packet_buff *pb = it->pb;
+        struct hdr_description_request *hdr = (struct hdr_description_request*) (it->frame_data);
+        struct msg_description_request *msg = (struct msg_description_request*) (it->msg);
+
+        if (hdr->destination_local_id != my_local_id)
+		//TODO: consider that the received local_id might be a duplicate:
+                return sizeof (struct msg_description_request);
+
+        dbgf_track(DBGT_INFO, "%s NB %s destination_local_id=0x%X dhash=%s",
+                it->handl->name, pb->i.llip_str, ntohl(hdr->destination_local_id), cryptShaAsString(&msg->dhash));
+
+        struct dhash_node *dhn = avl_find_item(&dhash_tree, &msg->dhash);
+	struct orig_node *on = dhn ? dhn->on : NULL;
+        assertion(-500270, (IMPLIES(dhn && on, (dhn->desc_frame))));
+
+        if (!dhn || !on || ((TIME_T) (bmx_time - dhn->referred_by_me_timestamp)) > DEF_DESC0_REFERRED_TO) {
+
+                dbgf_track(DBGT_WARN, "%s from %s requesting %s %s dhn=%d on=%d",
+                        it->handl->name, pb->i.llip_str, !!dhn, !!on);
+
+                return sizeof (struct msg_description_request);
+        }
+
+	schedule_tx_task(pb->i.link->local->best_tp_lndev, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &msg->dhash, sizeof(DHASH_T), 0, 0);
+
+        // most probably the requesting node is also interested in my metric to the requested node:
+        if (on->curr_rt_lndev && on->ogmSqn_next == on->ogmSqn_send &&
+                (((OGM_SQN_MASK) & (on->ogmSqn_next - on->ogmSqn_rangeMin)) < on->ogmSqn_rangeSize) //needed after description updates!
+                ) {
+                set_ogmSqn_toBeSend_and_aggregated(on, on->ogmMetric_next, on->ogmSqn_next, ((OGM_SQN_T) (on->ogmSqn_next - 1)));
+        }
+
+        return sizeof (struct msg_description_request);
 }
 
 
@@ -3583,10 +3623,10 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                         return TLV_RX_DATA_PROCESSED;
 
 
-                } else if (!IMPLIES(f_handl->rx_requires_described_neigh, (pb && is_described_neigh(pb->i.link, pb->i.transmittersIID)))) {
+                } else if (!IMPLIES(f_handl->rx_requires_described_neigh, (pb && is_described_neigh(pb->i.link, &pb->i.dhash)))) {
 
-                        dbgf_track(DBGT_INFO, "%s - UNDESCRIBED IID=%d of neigh=%s - skipping frame type=%s",
-                                it->caller, pb->i.transmittersIID, pb->i.llip_str, f_handl->name);
+                        dbgf_track(DBGT_INFO, "%s - UNDESCRIBED dhash=%s of neigh=%s - skipping frame type=%s",
+                                it->caller, cryptShaAsString(&pb->i.dhash), pb->i.llip_str, f_handl->name);
 
                         return TLV_RX_DATA_PROCESSED;
 
@@ -3664,11 +3704,11 @@ IDM_T rx_frames(struct packet_buff *pb)
 
         struct local_node *local = pb->i.link->local;
 
-        if (!is_described_neigh(pb->i.link, pb->i.transmittersIID)) {
+        if (!is_described_neigh(pb->i.link, &pb->i.dhash)) {
 
                 dbgf_track(DBGT_INFO, "schedule frame_type=%d", FRAME_TYPE_HASH_REQ);
 
-                schedule_tx_task(local->best_tp_lndev, FRAME_TYPE_HASH_REQ, SCHEDULE_MIN_MSG_SIZE, 0, 0, 0, pb->i.transmittersIID);
+                schedule_tx_task(local->best_tp_lndev, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, &pb->i.dhash, sizeof(DHASH_T), 0, 0);
         }
 
         if (msg_dev_req_enabled && UXX_LT(DEVADV_SQN_MAX, local->dev_adv_sqn, local->link_adv_dev_sqn_ref)) {
@@ -4310,6 +4350,7 @@ void tx_packet(void *devp)
 
                         phdr->comp_version = my_compatibility;
                         phdr->transmitterIID = htons(myIID4me);
+			phdr->dhash = self->dhn->dhash;
                         phdr->link_adv_sqn = htons(my_link_adv_sqn);
                         phdr->local_id = my_local_id;
                         phdr->dev_idx = dev->llip_key.idx;
@@ -4478,7 +4519,7 @@ void update_my_description_adv(void)
                 int d;
 
                 for (d = 0; (lndev_arr[d]); d++)
-                        schedule_tx_task(lndev_arr[d], FRAME_TYPE_DESC_ADVS, tx.frames_out_pos, 0, 0, myIID4me, 0);
+                        schedule_tx_task(lndev_arr[d], FRAME_TYPE_DESC_ADVS, tx.frames_out_pos, &dhash, sizeof(dhash), 0  , 0);
         }
 
         my_description_changed = NO;
@@ -4653,6 +4694,7 @@ void rx_packet( struct packet_buff *pb )
 	phdr = (struct packet_header *)pb->packet.data;
 
         pb->i.transmittersIID = ntohs(phdr->transmitterIID);
+	pb->i.dhash = phdr->dhash;
         pb->i.link_sqn = ntohs(phdr->link_adv_sqn);
 
         pb->i.link_key.local_id = phdr->local_id;
@@ -4685,12 +4727,14 @@ void rx_packet( struct packet_buff *pb )
 
 	struct dev_ip_key any_key = { .ip = pb->i.llip, .idx = 0 };
 	struct dev_node *anyIf;
+
         if (((anyIf = avl_find_item(&dev_ip_tree, &any_key)) || (anyIf = avl_next_item(&dev_ip_tree, &any_key))) &&
 		is_ip_equal(&pb->i.llip, &anyIf->llip_key.ip)) {
 
 		struct dev_ip_key outIf_key = { .ip = pb->i.llip, .idx = pb->i.link_key.dev_idx };
 		struct dev_node *outIf = avl_find_item(&dev_ip_tree, &outIf_key);
 		anyIf = outIf ? outIf : anyIf;
+
 		if (!outIf || (((my_local_id != pb->i.link_key.local_id || anyIf->llip_key.idx != pb->i.link_key.dev_idx) &&
                         (((TIME_T) (bmx_time - my_local_id_timestamp)) > (4 * (TIME_T) my_tx_interval))) ||
                         ((myIID4me != pb->i.transmittersIID) && (((TIME_T) (bmx_time - myIID4me_timestamp)) > (4 * (TIME_T) my_tx_interval))))) {
@@ -4934,8 +4978,8 @@ void init_msg( void )
         handl.min_msg_size = sizeof (struct msg_description_request);
         handl.fixed_msg_size = 1;
         handl.tx_task_interval_min = DEF_TX_DESC0_REQ_TO;
-        handl.tx_msg_handler = tx_msg_dhash_or_description_request;
-        handl.rx_msg_handler = rx_msg_dhash_or_description_request;
+        handl.tx_msg_handler = tx_msg_description_request;
+        handl.rx_msg_handler = rx_msg_description_request;
         register_frame_handler(packet_frame_db, FRAME_TYPE_DESC_REQ, &handl);
 
 
@@ -5000,8 +5044,8 @@ void init_msg( void )
         handl.min_msg_size = sizeof (struct msg_dhash_request);
         handl.fixed_msg_size = 1;
         handl.tx_task_interval_min = DEF_TX_DHASH0_REQ_TO;
-        handl.tx_msg_handler = tx_msg_dhash_or_description_request;
-        handl.rx_msg_handler = rx_msg_dhash_or_description_request;
+        handl.tx_msg_handler = tx_msg_dhash_request;
+        handl.rx_msg_handler = rx_msg_dhash_request;
         register_frame_handler(packet_frame_db, FRAME_TYPE_HASH_REQ, &handl);
 
         handl.name = "DHASH_ADV";

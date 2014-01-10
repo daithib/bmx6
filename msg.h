@@ -276,6 +276,7 @@ struct packet_header // 17 bytes
 {
 	uint8_t    comp_version;     //  8
 	uint8_t    capabilities;     //  8  reserved
+        CRYPTSHA1_T dhash;
 
 	IID_T      transmitterIID;   // 16 IID of transmitter node
 
@@ -567,6 +568,10 @@ struct msg_rp_adv { // 1 byte
 
 
 
+struct msg_dhash_adv { // 2 + X bytes
+	IID_T transmitterIID4x;
+	DHASH_T dhash;
+} __attribute__((packed));
 
 
 struct msg_dhash_request { // 2 bytes
@@ -579,10 +584,17 @@ struct hdr_dhash_request { // 4 bytes
 } __attribute__((packed));
 
 
-struct msg_dhash_adv { // 2 + X bytes
-	IID_T transmitterIID4x;
+struct msg_description_request { // 2 bytes
 	DHASH_T dhash;
 } __attribute__((packed));
+
+
+struct hdr_description_request { // 4 bytes
+	LOCAL_ID_T destination_local_id;
+	struct msg_description_request msg[];
+} __attribute__((packed));
+
+
 
 
 
@@ -625,12 +637,6 @@ struct msg_ref_req {
 #define BMX_DSC_TLV_SHA_DUMMY       0x1E
 #define BMX_DSC_TLV_SIGNATURE_DUMMY 0x1F
 
-
-
-
-
-#define msg_description_request msg_dhash_request
-#define hdr_description_request hdr_dhash_request
 
 
 struct dsc_msg_version {

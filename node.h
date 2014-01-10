@@ -490,6 +490,7 @@ struct packet_buff {
 		//filled in by rx_packet()
 		uint32_t rx_counter;
 		IID_T transmittersIID;
+                CRYPTSHA1_T dhash;
 		LINKADV_SQN_T link_sqn;
 
 		struct link_node_key link_key;
@@ -548,7 +549,8 @@ void blacklist_neighbor(struct packet_buff *pb);
 
 IDM_T blacklisted_neighbor(struct packet_buff *pb, DHASH_T *dhash);
 
-struct neigh_node *is_described_neigh( struct link_node *link, IID_T transmittersIID4x );
+struct neigh_node *is_described_neigh( struct link_node *link, DHASH_T *transmittersDhash);
+
 void purge_dhash_invalid_list( IDM_T force_purge_all );
 void invalidate_dhash( struct dhash_node *dhn, DHASH_T *dhash );
 void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired, struct orig_node *except_on);
