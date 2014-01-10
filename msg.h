@@ -272,20 +272,17 @@
 
 #if MIN_COMPATIBILITY <= CV17
 
-struct packet_header // 17 bytes
+struct packet_header
 {
 	uint8_t    comp_version;     //  8
 	uint8_t    capabilities;     //  8  reserved
+        
         CRYPTSHA1_T dhash;
-
-	IID_T      transmitterIID;   // 16 IID of transmitter node
 
 	LOCAL_ID_T local_id;         // 32
 
 	LINKADV_SQN_T link_adv_sqn;  // 16 used for processing: link_adv, lq_adv, rp_adv, ogm_adv, ogm_ack
 	DEVADV_IDX_T   dev_idx;      //  8
-
-//	uint8_t    reserved_for_2byte_alignement;  //  8
 
 } __attribute__((packed,__may_alias__));
 #endif
@@ -723,6 +720,7 @@ struct msg_ogm_adv // 4 bytes
 
 struct hdr_ogm_adv { // 2 bytes
 	AGGREG_SQN_T aggregation_sqn;
+        IID_T transmittersIID;
 	uint8_t ogm_dst_field_size;
 
 	struct msg_ogm_adv msg[];

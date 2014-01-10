@@ -1325,7 +1325,7 @@ void _add_tun_bit_node(struct tun_search_node *tsna, struct tun_net_node *tnna)
                                 tsn_netKey->mask <= tnn_netKey->mask : tbkn.tsn->netPrefixMin <= tnn_netKey->mask) &&
                                 is_ip_net_equal(&tsn_netKey->ip, &tnn_netKey->ip, XMIN(tsn_netKey->mask, tnn_netKey->mask), tnn_netKey->af) &&
                                 //IMPLIES(strlen(tsn_gid->name), !strcmp(tsn_gid->name, tnn_gid->name)) &&
-                                IMPLIES(!is_zero(tsn_gid, sizeof(GLOBAL_ID_T)), !memcmp(tsn_gid, tnn_gid, sizeof(GLOBAL_ID_T)))
+                                IMPLIES(!is_zero(tsn_gid, sizeof(GLOBAL_ID_T)), cryptShasEqual(tsn_gid, tnn_gid))
                                 )) {
 
                                 dbgf_track(DBGT_INFO, "failed A");

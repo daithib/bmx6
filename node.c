@@ -481,7 +481,7 @@ struct neigh_node *is_described_neigh( struct link_node *link, DHASH_T *transmit
         struct neigh_node *neigh = link->local->neigh;
 
         if (neigh && neigh->dhn && neigh->dhn->on &&
-		memcmp(&neigh->dhn->dhash, transmittersDhash, sizeof(DHASH_T))== 0) {
+		cryptShasEqual(&neigh->dhn->dhash, transmittersDhash)) {
 
                 assertion(-500938, (neigh->dhn->neigh == neigh));
 

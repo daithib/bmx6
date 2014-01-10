@@ -2765,6 +2765,7 @@ int32_t tx_frame_ogm_advs(struct tx_frame_iterator *it)
                 assertion(-501144, (((int) ttn->frame_msgs_length) <= tx_iterator_cache_data_space_pref(it)));
 
                 hdr->aggregation_sqn = sqn;
+		hdr->transmittersIID = htons(myIID4me);
                 hdr->ogm_dst_field_size = oan->ogm_dest_bytes;
                 
                 if (oan->ogm_dest_bytes)
@@ -2849,6 +2850,7 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
         uint8_t *ogm_destination_field = it->msg;
         AGGREG_SQN_T aggregation_sqn = hdr->aggregation_sqn;
         uint16_t ogm_dst_field_size = hdr->ogm_dst_field_size;
+	IID_T transmittersIID = ntohs(hdr->transmittersIID);
 
         if (ogm_dst_field_size > (OGM_DEST_ARRAY_BIT_SIZE / 8) ||
                 it->frame_msgs_length < ((int) sizeof (struct msg_ogm_adv)) ||
@@ -2973,7 +2975,7 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
 
                 IID_NODE_T *dhn = iid_get_node_by_neighIID4x(neigh, neighIID4x, !only_process_sender_and_refresh_all/*verbose*/);
 
-                if (only_process_sender_and_refresh_all && neighIID4x != pb->i.transmittersIID)
+                if (only_process_sender_and_refresh_all && neighIID4x != transmittersIID)
                         continue;
 
 
@@ -3120,11 +3122,10 @@ struct dhash_node *process_dhash_description_neighIID4x
         struct dhash_node *dhn = NULL;
         struct local_node *local = pb->i.link->local;
         struct description_cache_node *cache = NULL;
-	IDM_T is_transmitter = (memcmp(dhash, &pb->i.dhash, sizeof(DHASH_T)) == 0);
-        IDM_T is_transmitters_iid = is_transmitter && neighIID4x > IID_RSVD_MAX;
+	IDM_T is_transmitter = cryptShasEqual(dhash, &pb->i.dhash);
 
         assertion(-500688, (dhash));
-        assertion(-500689, (!(is_transmitters_iid && !memcmp(dhash, &(self->dhn->dhash), sizeof(*dhash))))); // cant be transmitters' and myselfs'
+        assertion(-500689, (!(is_transmitter && cryptShasEqual(dhash, &(self->dhn->dhash))))); // cant be transmitter' and myselfs'
         assertion(-502062, (!avl_find(&dhash_invalid_tree, dhash)));
 
 	if (avl_find(&dhash_invalid_tree, dhash)) {
@@ -3139,7 +3140,7 @@ struct dhash_node *process_dhash_description_neighIID4x
 
                         update_local_neigh(pb, dhn);
 
-			if (is_transmitters_iid &&
+			if (neighIID4x > IID_RSVD_MAX &&
 				iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
                                 return (struct dhash_node *) FAILURE_PTR;
 
@@ -3158,8 +3159,9 @@ struct dhash_node *process_dhash_description_neighIID4x
                         } else if (dhn == local->neigh->dhn && !is_transmitter) {
                                 // is about a neighbors' dhash itself which is NOT the transmitter ???!!!
 
-                                dbgf_sys(DBGT_ERR, "%s via %s neighIID4x=%d IS NOT transmitter=%d",
-                                        cryptShaAsString(&dhn->on->nodeId), pb->i.llip_str, neighIID4x, pb->i.transmittersIID);
+                                dbgf_sys(DBGT_ERR, "nodeId=%s dhash=%s via %s neighIID4x=%d IS NOT transmitterDhash=%s",
+                                        cryptShaAsString(&dhn->on->nodeId), cryptShaAsString(dhash), pb->i.llip_str,
+					neighIID4x, cryptShaAsString(&pb->i.dhash));
 
                                 return (struct dhash_node *) FAILURE_PTR;
 
@@ -3197,17 +3199,17 @@ struct dhash_node *process_dhash_description_neighIID4x
 					iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
 					return(struct dhash_node *) FAILURE_PTR;
 
-				assertion(-500969, IMPLIES(is_transmitters_iid, is_described_neigh(pb->i.link, &pb->i.dhash)));
+				assertion(-500969, IMPLIES(is_transmitter, is_described_neigh(pb->i.link, &pb->i.dhash)));
 			}
 		}
         }
 
-	dbgf_track(DBGT_INFO, "via dev=%s NB=%s dhash=%8X.. %s %s %s neighIID4x=%d is_sender=%d %s",
+	dbgf_track(DBGT_INFO, "via dev=%s NB=%s dhash=%8X.. %s %s %s neighIID4x=%d is_transmitter=%d %s",
                 pb->i.iif->label_cfg.str, pb->i.llip_str, dhash->h.u32[0],
                 (dsc ? nodeIdAsStringFromDescAdv(dsc) : "NO DESCRIPTION"), (cache ? "CACHED" : "-"),
                 (dhn?(dhn==FAILURE_PTR?"FAILURE":
                         (dhn==UNRESOLVED_PTR?"UNRESOLVED":(dhn==REJECTED_PTR?"REJECTED":"RESOLVED"))):"UNKNOWN"),
-                neighIID4x, is_transmitters_iid,
+                neighIID4x, is_transmitter,
 		((dhn && dhn!=FAILURE_PTR && dhn!=UNRESOLVED_PTR && dhn!=REJECTED_PTR && dhn->on) ?
 			cryptShaAsString(&dhn->on->nodeId) : DBG_NIL));
 
@@ -3222,7 +3224,7 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
         struct packet_buff *pb = it->pb;
         struct msg_dhash_adv *adv = (struct msg_dhash_adv*) (it->msg);
         IID_T neighIID4x = ntohs(adv->transmitterIID4x);
-        IDM_T is_transmitter = (memcmp(&adv->dhash, &pb->i.dhash, sizeof(DHASH_T))==0);
+        IDM_T is_transmitter = cryptShasEqual(&adv->dhash, &pb->i.dhash);
         struct dhash_node *dhn;
 
         dbgf_track(DBGT_INFO, "via NB: %s", pb->i.llip_str);
@@ -4349,7 +4351,6 @@ void tx_packet(void *devp)
                         memset(phdr, 0, sizeof (struct packet_header));
 
                         phdr->comp_version = my_compatibility;
-                        phdr->transmitterIID = htons(myIID4me);
 			phdr->dhash = self->dhn->dhash;
                         phdr->link_adv_sqn = htons(my_link_adv_sqn);
                         phdr->local_id = my_local_id;
@@ -4693,7 +4694,6 @@ void rx_packet( struct packet_buff *pb )
 
 	phdr = (struct packet_header *)pb->packet.data;
 
-        pb->i.transmittersIID = ntohs(phdr->transmitterIID);
 	pb->i.dhash = phdr->dhash;
         pb->i.link_sqn = ntohs(phdr->link_adv_sqn);
 
@@ -4728,26 +4728,26 @@ void rx_packet( struct packet_buff *pb )
 	struct dev_ip_key any_key = { .ip = pb->i.llip, .idx = 0 };
 	struct dev_node *anyIf;
 
-        if (((anyIf = avl_find_item(&dev_ip_tree, &any_key)) || (anyIf = avl_next_item(&dev_ip_tree, &any_key))) &&
-		is_ip_equal(&pb->i.llip, &anyIf->llip_key.ip)) {
+	if ((anyIf = avl_closest_item(&dev_ip_tree, &any_key)) && is_ip_equal(&pb->i.llip, &anyIf->llip_key.ip)) {
 
 		struct dev_ip_key outIf_key = { .ip = pb->i.llip, .idx = pb->i.link_key.dev_idx };
 		struct dev_node *outIf = avl_find_item(&dev_ip_tree, &outIf_key);
 		anyIf = outIf ? outIf : anyIf;
 
-		if (!outIf || (((my_local_id != pb->i.link_key.local_id || anyIf->llip_key.idx != pb->i.link_key.dev_idx) &&
+		if (!outIf ||
+			(((my_local_id != pb->i.link_key.local_id || anyIf->llip_key.idx != pb->i.link_key.dev_idx) &&
                         (((TIME_T) (bmx_time - my_local_id_timestamp)) > (4 * (TIME_T) my_tx_interval))) ||
-                        ((myIID4me != pb->i.transmittersIID) && (((TIME_T) (bmx_time - myIID4me_timestamp)) > (4 * (TIME_T) my_tx_interval))))) {
+                        (!cryptShasEqual(&self->dhn->dhash, &pb->i.dhash) && (((TIME_T) (bmx_time - myIID4me_timestamp)) > (4 * (TIME_T) my_tx_interval))))) {
 
                         // my local_id  or myIID4me might have just changed and then, due to delay,
                         // I might receive my own packet back containing my previous (now non-matching) local_id of myIID4me
                         dbgf_mute(60, DBGL_SYS, DBGT_ERR, "DAD-Alert (duplicate Address) from NB=%s via dev=%s  "
-				"iifIdx=0X%X aifIdx=0X%X rcvdIdx=0x%X  myLocalId=%X rcvdLocalId=%X  myIID4me=%d rcvdIID=%d "
+				"iifIdx=0X%X aifIdx=0X%X rcvdIdx=0x%X  myLocalId=%X rcvdLocalId=%X  myDhash=%s rcvdDhash=%s "
 				"oif=%d aif=%d dipt=%d time=%d mlidts=%d txintv=%d mi4mts=%d",
                                 pb->i.llip_str, iif->label_cfg.str,
 				iif->llip_key.idx, anyIf->llip_key.idx, pb->i.link_key.dev_idx,
                                 ntohl(my_local_id), ntohl(pb->i.link_key.local_id),
-                                myIID4me, pb->i.transmittersIID, outIf?1:0, anyIf?1:0, dev_ip_tree.items,
+                                cryptShaAsString(&self->dhn->dhash), cryptShaAsString(&pb->i.dhash), outIf?1:0, anyIf?1:0, dev_ip_tree.items,
 				bmx_time, my_local_id_timestamp, my_tx_interval, myIID4me_timestamp);
 
                         goto process_packet_error;
@@ -4782,8 +4782,8 @@ void rx_packet( struct packet_buff *pb )
                 return;
 
 
-        dbgf_all(DBGT_INFO, "version=%i, reserved=%X, size=%i IID=%d rcvd udp_len=%d via NB %s %s %s",
-                phdr->comp_version, phdr->capabilities, pb->i.length, pb->i.transmittersIID,
+        dbgf_all(DBGT_INFO, "version=%i, reserved=%X, size=%i dhash=%s rcvd udp_len=%d via NB %s %s %s",
+                phdr->comp_version, phdr->capabilities, pb->i.length, cryptShaAsString(&pb->i.dhash),
                 pb->i.length, pb->i.llip_str, iif->label_cfg.str, pb->i.unicast ? "UNICAST" : "BRC");
 
 

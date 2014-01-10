@@ -288,7 +288,7 @@ int process_dsc_tlv_sha(struct rx_frame_iterator *it)
 	SHA1_T dataSha;
 	cryptShaAtomic(data, dataLen, &dataSha);
 	
-	if (memcmp(&msg->dataSha, &dataSha, sizeof(SHA1_T)))
+	if (!cryptShasEqual(&msg->dataSha, &dataSha))
 		goto_error(finish, "2"); 
 
 finish: {

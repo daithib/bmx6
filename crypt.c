@@ -939,6 +939,11 @@ char *cryptShaAsShortStr( CRYPTSHA1_T *sha)
         return out[c];
 }
 
+int cryptShasEqual( CRYPTSHA1_T *sha1, CRYPTSHA1_T *sha2)
+{
+	return !memcmp(sha1, sha2, sizeof(CRYPTSHA1_T));
+}
+
 int cryptKeyTypeByLen(int len) {
 	return 	len == CRYPT_RSA512_LEN ? CRYPT_RSA512_TYPE : (
 		len == CRYPT_RSA1024_LEN ? CRYPT_RSA1024_TYPE : (

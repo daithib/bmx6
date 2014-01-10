@@ -102,6 +102,8 @@ void cryptShaFinal( CRYPTSHA1_T *sha);
 char *cryptShaAsString( CRYPTSHA1_T *sha);
 char *cryptShaAsShortStr( CRYPTSHA1_T *sha);
 
+int cryptShasEqual( CRYPTSHA1_T *sha1, CRYPTSHA1_T *sha2);
+
 int cryptKeyTypeByLen(int len);
 int cryptKeyLenByType(int type);
 char *cryptKeyTypeAsString(int type);
