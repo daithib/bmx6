@@ -733,7 +733,6 @@ struct hdr_ogm_adv { // 2 bytes
  */
 
 struct msg_ogm_ack {
-//	IID_T transmitterIID4x;
 	OGM_DEST_T ogm_destination;   // 1 byte
 	AGGREG_SQN_T aggregation_sqn; // 1 byte
 } __attribute__((packed));

@@ -129,12 +129,6 @@ void dump(struct packet_buff *pb)
         dbgf_dump(DBGT_NONE, "%s data: %s",
                 direction == DUMP_DIRECTION_IN ? "in " : "out", memAsHexString(((uint8_t*) phdr), plength));
 
-        dbgf_dump(DBGT_NONE, "          bmx_version     pkt_sqn local_id  next frame...");
-        dbgf_dump(DBGT_NONE, "            reserved  link_adv_sqn        dev_idx");
-        dbgf_dump(DBGT_NONE, "              pkt_length");
-        dbgf_dump(DBGT_NONE, "                  transmitterIID");
-
-
 
         (*dev_plugin_data)->tmp_all[direction][DUMP_TYPE_UDP_PAYLOAD] += (plength << IMPROVE_ROUNDOFF);
 
