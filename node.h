@@ -475,6 +475,20 @@ struct black_node {
 	DHASH_T dhash;
 };
 
+struct packet_header
+{
+	uint8_t    comp_version;     //  8
+	uint8_t    capabilities;     //  8  reserved
+        
+        CRYPTSHA1_T dhash;
+
+	LOCAL_ID_T local_id;         // 32
+
+	LINKADV_SQN_T link_adv_sqn;  // 16 used for processing: link_adv, lq_adv, rp_adv, ogm_adv, ogm_ack
+	DEVADV_IDX_T   dev_idx;      //  8
+
+} __attribute__((packed,__may_alias__));
+
 
 
 struct packet_buff {
@@ -490,26 +504,22 @@ struct packet_buff {
 		//filled in by rx_packet()
 		uint32_t rx_counter;
 		IID_T transmittersIID;
-                CRYPTSHA1_T dhash;
-		LINKADV_SQN_T link_sqn;
-
-		struct link_node_key link_key;
 
 		IPX_T llip;
 		char llip_str[INET6_ADDRSTRLEN];
 		struct dev_node *oif;
 		struct link_dev_node *lndev;
 		struct link_node *link;
-
-//		struct neigh_node *described_neigh; // might be updated again process_dhash_description_neighIID4x()
 	} i;
 
 	union {
-//		struct packet_header header;
+		struct packet_header hdr;
 		unsigned char data[MAX_UDPD_SIZE + 1];
-	} packet;
+	} p;
 
 };
+
+
 
 
 extern struct orig_node *self;

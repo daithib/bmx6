@@ -1169,23 +1169,29 @@ struct link_node *get_link_node(struct packet_buff *pb)
 {
         TRACE_FUNCTION_CALL;
         struct link_node *link;
-        dbgf_all(DBGT_INFO, "NB=%s, local_id=%X dev_idx=0x%X",
-                pb->i.llip_str, ntohl(pb->i.link_key.local_id), pb->i.link_key.dev_idx);
+	LINKADV_SQN_T link_sqn = ntohs(pb->p.hdr.link_adv_sqn);
+	struct link_node_key link_key = {.local_id=pb->p.hdr.local_id, .dev_idx=pb->p.hdr.dev_idx};
 
-        struct local_node *local = avl_find_item(&local_tree, &pb->i.link_key.local_id);
+	dbgf_all(DBGT_INFO, "NB=%s local_id=%X dev_idx=0x%X",
+		pb->i.llip_str, ntohl(link_key.local_id), link_key.dev_idx);
+
+	if (link_key.dev_idx < DEVADV_IDX_MIN || link_key.local_id == LOCAL_ID_INVALID)
+		return NULL;
+
+        struct local_node *local = avl_find_item(&local_tree, &link_key.local_id);
 
 
         if (local) {
 
-                if ((((LINKADV_SQN_T) (pb->i.link_sqn - local->packet_link_sqn_ref)) > LINKADV_SQN_DAD_RANGE)) {
+                if ((((LINKADV_SQN_T) (link_sqn - local->packet_link_sqn_ref)) > LINKADV_SQN_DAD_RANGE)) {
 
                         dbgf_sys(DBGT_ERR, "DAD-Alert NB=%s local_id=%X dev=%s link_sqn=%d link_sqn_max=%d dad_range=%d dad_to=%d",
-                                pb->i.llip_str, ntohl(pb->i.link_key.local_id), pb->i.iif->label_cfg.str, pb->i.link_sqn, local->packet_link_sqn_ref,
+                                pb->i.llip_str, ntohl(link_key.local_id), pb->i.iif->label_cfg.str, link_sqn, local->packet_link_sqn_ref,
                                 LINKADV_SQN_DAD_RANGE, LINKADV_SQN_DAD_RANGE * my_tx_interval);
 
                         purge_local_node(local);
 
-                        assertion(-500984, (!avl_find_item(&local_tree, &pb->i.link_key.local_id)));
+                        assertion(-500984, (!avl_find_item(&local_tree, &link_key.local_id)));
 
                         return NULL;
                 }
@@ -1196,40 +1202,19 @@ struct link_node *get_link_node(struct packet_buff *pb)
 
         if (local) {
 
-                link = avl_find_item(&local->link_tree, &pb->i.link_key.dev_idx);
+                link = avl_find_item(&local->link_tree, &link_key.dev_idx);
 
-                assertion(-500943, (link == avl_find_item(&link_tree, &pb->i.link_key)));
+                assertion(-500943, (link == avl_find_item(&link_tree, &link_key)));
 
                 if (link && !is_ip_equal(&pb->i.llip, &link->link_ip)) {
 
-/*
-                        if (((TIME_T) (bmx_time - link->pkt_time_max)) < (TIME_T) dad_to) {
-
-                                dbgf_sys(DBGT_WARN,
-                                        "DAD-Alert (local_id collision, this can happen)! NB=%s via dev=%s"
-                                        "cached llIP=%s local_id=%X dev_idx=0x%X ! sending problem adv...",
-                                        pb->i.llip_str, pb->i.iif->label_cfg.str, ip6AsStr( &link->link_ip),
-                                        ntohl(pb->i.link_key.local_id), pb->i.link_key.dev_idx);
-
-                                // be carefull here. Errornous PROBLEM_ADVs cause neighboring nodes to cease!!!
-                                //struct link_dev_node dummy_lndev = {.key ={.dev = pb->i.iif, .link = link}, .mr = {ZERO_METRIC_RECORD, ZERO_METRIC_RECORD}};
-
-				struct problem_type problem = { .problem_code = FRAME_TYPE_PROBLEM_CODE_DUP_LINK_ID, .local_id = link->key.local_id };
-
-                                schedule_tx_task(&pb->i.iif->dummy_lndev, FRAME_TYPE_PROBLEM_ADV, sizeof (struct msg_problem_adv),
-                                        &problem, sizeof(problem), 0, pb->i.transmittersIID);
-
-                                // its safer to purge the old one, otherwise we might end up with hundrets
-                                //return NULL;
-                        }
-*/
                         dbgf_sys(DBGT_WARN, "Reinitialized! NB=%s via dev=%s "
                                 "cached llIP=%s local_id=%X dev_idx=0x%X ! Reinitializing link_node...",
                                 pb->i.llip_str, pb->i.iif->label_cfg.str, ip6AsStr( &link->link_ip),
-                                ntohl(pb->i.link_key.local_id), pb->i.link_key.dev_idx);
+                                ntohl(link_key.local_id), link_key.dev_idx);
 
                         purge_link_node(&link->key, NULL, NO);
-                        ASSERTION(-500213, !avl_find(&link_tree, &pb->i.link_key));
+                        ASSERTION(-500213, !avl_find(&link_tree, &link_key));
                         link = NULL;
                 }
 
@@ -1240,16 +1225,16 @@ struct link_node *get_link_node(struct packet_buff *pb)
                         return NULL;
                 }
 
-                assertion(-500944, (!avl_find_item(&link_tree, &pb->i.link_key)));
+                assertion(-500944, (!avl_find_item(&link_tree, &link_key)));
                 local = debugMallocReset(sizeof(struct local_node), -300336);
                 AVL_INIT_TREE(local->link_tree, struct link_node, key.dev_idx);
-                local->local_id = pb->i.link_key.local_id;
+                local->local_id = link_key.local_id;
                 local->link_adv_msg_for_me = LINKADV_MSG_IGNORED;
                 local->link_adv_msg_for_him = LINKADV_MSG_IGNORED;
                 avl_insert(&local_tree, local, -300337);
         }
 
-        local->packet_link_sqn_ref = pb->i.link_sqn;
+        local->packet_link_sqn_ref = link_sqn;
         local->packet_time = bmx_time;
 
 
@@ -1259,7 +1244,7 @@ struct link_node *get_link_node(struct packet_buff *pb)
 
                 LIST_INIT_HEAD(link->lndev_list, struct link_dev_node, list, list);
 
-                link->key = pb->i.link_key;
+                link->key = link_key;
                 link->link_ip = pb->i.llip;
                 link->local = local;
 

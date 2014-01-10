@@ -114,7 +114,7 @@ void dump(struct packet_buff *pb)
 
         IDM_T direction = pb->i.iif ? DUMP_DIRECTION_IN : DUMP_DIRECTION_OUT;
         struct dev_node *dev = pb->i.iif ? pb->i.iif : pb->i.oif;
-        struct packet_header *phdr = (struct packet_header *)pb->packet.data;
+        struct packet_header *phdr = (struct packet_header *)pb->p.data;
 
         struct dump_data **dev_plugin_data =
                 (struct dump_data **) (get_plugin_data(dev, PLUGIN_DATA_DEV, data_dev_plugin_registry));

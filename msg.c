@@ -2557,12 +2557,14 @@ int32_t rx_frame_link_adv( struct rx_frame_iterator *it)
         struct local_node *local = it->pb->i.link->local;
 
         DEVADV_SQN_T dev_sqn_ref = ntohs(hdr->dev_sqn_ref);
+	LINKADV_SQN_T link_sqn = ntohs(it->pb->p.hdr.link_adv_sqn);
+
 
         dbgf_all(DBGT_INFO, " ");
 
        // DAD:link_adv_sqn mismatch has been checked in get_link_node()!
 
-        if (it->pb->i.link_sqn == local->link_adv_sqn) {
+        if (link_sqn == local->link_adv_sqn) {
 
                 if (local->link_adv_dev_sqn_ref != dev_sqn_ref || local->link_adv_msgs != msgs || memcmp(local->link_adv, adv, it->frame_msgs_length )) {
 
@@ -2578,7 +2580,7 @@ int32_t rx_frame_link_adv( struct rx_frame_iterator *it)
         } else {
 
                 dbgf_track(DBGT_INFO, "new LINK_ADV from NB=%s dev=%s link_sqn=%d->%d dev_sqn=%d->%d dev_adv_sqn=%d",
-                        it->pb->i.llip_str, it->pb->i.iif->label_cfg.str, local->link_adv_sqn, it->pb->i.link_sqn,
+                        it->pb->i.llip_str, it->pb->i.iif->label_cfg.str, local->link_adv_sqn, link_sqn,
                         local->link_adv_dev_sqn_ref, dev_sqn_ref, local->dev_adv_sqn);
 
 
@@ -2589,7 +2591,7 @@ int32_t rx_frame_link_adv( struct rx_frame_iterator *it)
 
                 memcpy(local->link_adv, adv, it->frame_msgs_length);
 
-                local->link_adv_sqn = it->pb->i.link_sqn;
+                local->link_adv_sqn = link_sqn;
                 local->link_adv_time = bmx_time;
                 local->link_adv_dev_sqn_ref = dev_sqn_ref;
                 local->link_adv_msgs = msgs;
@@ -2665,13 +2667,15 @@ int32_t rx_frame_rp_adv(struct rx_frame_iterator *it)
 
         struct msg_rp_adv* adv = (struct msg_rp_adv*) it->msg;
         struct local_node *local = it->pb->i.link->local;
+	LINKADV_SQN_T link_sqn = ntohs(it->pb->p.hdr.link_adv_sqn);
+
         struct avl_node *link_an = NULL;
         struct link_node *link;
         struct link_dev_node *lndev = NULL;
         uint16_t msgs = it->frame_msgs_length / sizeof (struct msg_rp_adv);
         uint16_t m;
 
-        if (it->pb->i.link_sqn != local->link_adv_sqn)
+        if (link_sqn != local->link_adv_sqn)
                 return it->frame_msgs_length;
 
         if (msgs > local->link_adv_msgs)
@@ -2847,6 +2851,8 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
         struct packet_buff *pb = it->pb;
         struct local_node *local = pb->i.link->local;
         struct neigh_node *neigh = pb->i.link->local->neigh;
+	LINKADV_SQN_T link_sqn = ntohs(pb->p.hdr.link_adv_sqn);
+
         uint8_t *ogm_destination_field = it->msg;
         AGGREG_SQN_T aggregation_sqn = hdr->aggregation_sqn;
         uint16_t ogm_dst_field_size = hdr->ogm_dst_field_size;
@@ -2861,10 +2867,9 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
                 return TLV_RX_DATA_FAILURE;
         }
 
-        if (it->pb->i.link_sqn != local->link_adv_sqn) {
+        if (link_sqn != local->link_adv_sqn) {
 
-                dbgf_track(DBGT_INFO, "rcvd link_sqn=%d != local->link_adv_sqn=%d",
-                        it->pb->i.link_sqn, local->link_adv_sqn);
+                dbgf_track(DBGT_INFO, "rcvd link_sqn=%d != local->link_adv_sqn=%d", link_sqn, local->link_adv_sqn);
                 return it->frame_msgs_length;
 
         } else if (ogm_dst_field_size > ((local->link_adv_msgs / 8) + ((local->link_adv_msgs % 8) ? 1 : 0))) {
@@ -3071,15 +3076,17 @@ int32_t rx_frame_ogm_acks(struct rx_frame_iterator *it)
         struct packet_buff *pb = it->pb;
         struct local_node *local = pb->i.link->local;
         struct neigh_node *neigh = pb->i.link->local->neigh;
+	LINKADV_SQN_T link_sqn = ntohs(pb->p.hdr.link_adv_sqn);
+
         uint16_t pos;
 
         if (!neigh)
                 return it->frame_msgs_length;
 
-        if (it->pb->i.link_sqn != local->link_adv_sqn || local->link_adv_msg_for_me == LINKADV_MSG_IGNORED) {
+        if (link_sqn != local->link_adv_sqn || local->link_adv_msg_for_me == LINKADV_MSG_IGNORED) {
 
                 dbgf_track(DBGT_INFO, "rcvd link_sqn=%d != local->link_adv_sqn=%d or ignored link_adv_msg_for_me=%d",
-                        it->pb->i.link_sqn, local->link_adv_sqn, local->link_adv_msg_for_me);
+                        link_sqn, local->link_adv_sqn, local->link_adv_msg_for_me);
 
                 return it->frame_msgs_length;
         }
@@ -3122,7 +3129,7 @@ struct dhash_node *process_dhash_description_neighIID4x
         struct dhash_node *dhn = NULL;
         struct local_node *local = pb->i.link->local;
         struct description_cache_node *cache = NULL;
-	IDM_T is_transmitter = cryptShasEqual(dhash, &pb->i.dhash);
+	IDM_T is_transmitter = cryptShasEqual(dhash, &pb->p.hdr.dhash);
 
         assertion(-500688, (dhash));
         assertion(-500689, (!(is_transmitter && cryptShasEqual(dhash, &(self->dhn->dhash))))); // cant be transmitter' and myselfs'
@@ -3161,7 +3168,7 @@ struct dhash_node *process_dhash_description_neighIID4x
 
                                 dbgf_sys(DBGT_ERR, "nodeId=%s dhash=%s via %s neighIID4x=%d IS NOT transmitterDhash=%s",
                                         cryptShaAsString(&dhn->on->nodeId), cryptShaAsString(dhash), pb->i.llip_str,
-					neighIID4x, cryptShaAsString(&pb->i.dhash));
+					neighIID4x, cryptShaAsString(&pb->p.hdr.dhash));
 
                                 return (struct dhash_node *) FAILURE_PTR;
 
@@ -3199,7 +3206,7 @@ struct dhash_node *process_dhash_description_neighIID4x
 					iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
 					return(struct dhash_node *) FAILURE_PTR;
 
-				assertion(-500969, IMPLIES(is_transmitter, is_described_neigh(pb->i.link, &pb->i.dhash)));
+				assertion(-500969, IMPLIES(is_transmitter, is_described_neigh(pb->i.link, &pb->p.hdr.dhash)));
 			}
 		}
         }
@@ -3224,7 +3231,7 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
         struct packet_buff *pb = it->pb;
         struct msg_dhash_adv *adv = (struct msg_dhash_adv*) (it->msg);
         IID_T neighIID4x = ntohs(adv->transmitterIID4x);
-        IDM_T is_transmitter = cryptShasEqual(&adv->dhash, &pb->i.dhash);
+        IDM_T is_transmitter = cryptShasEqual(&adv->dhash, &pb->p.hdr.dhash);
         struct dhash_node *dhn;
 
         dbgf_track(DBGT_INFO, "via NB: %s", pb->i.llip_str);
@@ -3232,7 +3239,7 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
         if (neighIID4x <= IID_RSVD_MAX)
                 return TLV_RX_DATA_FAILURE;
 
-        if (!(is_transmitter || is_described_neigh(pb->i.link, &pb->i.dhash))) {
+        if (!(is_transmitter || is_described_neigh(pb->i.link, &pb->p.hdr.dhash))) {
                 dbgf_track(DBGT_INFO, "via undescribed NB: %s", pb->i.llip_str);
                 return sizeof (struct msg_dhash_adv);
         }
@@ -3251,7 +3258,7 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
 
 		assertion(-500690, (dhn && dhn->on)); // UNDESCRIBED or fully described
 		//if rcvd transmitters' description then it must have become a described neighbor:
-		assertion(-500488, IMPLIES(is_transmitter, (is_described_neigh(pb->i.link, &pb->i.dhash))));
+		assertion(-500488, IMPLIES(is_transmitter, (is_described_neigh(pb->i.link, &pb->p.hdr.dhash))));
 	}
 
         return sizeof (struct msg_dhash_adv);
@@ -3303,7 +3310,7 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 		assertion(-500691, (dhn->on));
 
 		if (desc_adv_tx_unsolicited && dhn->on->updated_timestamp == bmx_time &&
-			is_described_neigh(pb->i.link, &pb->i.dhash)) {
+			is_described_neigh(pb->i.link, &pb->p.hdr.dhash)) {
 
 			struct link_dev_node **lndev_arr = lndevs_get_best_tp(pb->i.link->local);
 			int d;
@@ -3625,10 +3632,10 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                         return TLV_RX_DATA_PROCESSED;
 
 
-                } else if (!IMPLIES(f_handl->rx_requires_described_neigh, (pb && is_described_neigh(pb->i.link, &pb->i.dhash)))) {
+                } else if (!IMPLIES(f_handl->rx_requires_described_neigh, (pb && is_described_neigh(pb->i.link, &pb->p.hdr.dhash)))) {
 
                         dbgf_track(DBGT_INFO, "%s - UNDESCRIBED dhash=%s of neigh=%s - skipping frame type=%s",
-                                it->caller, cryptShaAsString(&pb->i.dhash), pb->i.llip_str, f_handl->name);
+                                it->caller, cryptShaAsString(&pb->p.hdr.dhash), pb->i.llip_str, f_handl->name);
 
                         return TLV_RX_DATA_PROCESSED;
 
@@ -3691,7 +3698,7 @@ IDM_T rx_frames(struct packet_buff *pb)
         struct rx_frame_iterator it = {
                 .caller = __FUNCTION__, .onOld = NULL, .op = 0, .pb = pb,
                 .db = packet_frame_db, .process_filter = FRAME_TYPE_PROCESS_ALL,
-                .frame_type = -1, .frames_in = (pb->packet.data + sizeof (struct packet_header)),
+                .frame_type = -1, .frames_in = (pb->p.data + sizeof (struct packet_header)),
                 .frames_length = (pb->i.length - sizeof (struct packet_header)),
 		.dhnNew = NULL
 	};
@@ -3706,11 +3713,11 @@ IDM_T rx_frames(struct packet_buff *pb)
 
         struct local_node *local = pb->i.link->local;
 
-        if (!is_described_neigh(pb->i.link, &pb->i.dhash)) {
+        if (!is_described_neigh(pb->i.link, &pb->p.hdr.dhash)) {
 
                 dbgf_track(DBGT_INFO, "schedule frame_type=%d", FRAME_TYPE_HASH_REQ);
 
-                schedule_tx_task(local->best_tp_lndev, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, &pb->i.dhash, sizeof(DHASH_T), 0, 0);
+                schedule_tx_task(local->best_tp_lndev, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, &pb->p.hdr.dhash, sizeof(DHASH_T), 0, 0);
         }
 
         if (msg_dev_req_enabled && UXX_LT(DEVADV_SQN_MAX, local->dev_adv_sqn, local->link_adv_dev_sqn_ref)) {
@@ -3770,7 +3777,7 @@ int8_t send_udp_packet(struct packet_buff *pb, struct sockaddr_storage *dst, int
         status = sendmsg( send_sock, &m, 0 );
          */
 
-        status = sendto(send_sock, pb->packet.data, pb->i.length, 0, (struct sockaddr *) dst, sizeof (struct sockaddr_storage));
+        status = sendto(send_sock, pb->p.data, pb->i.length, 0, (struct sockaddr *) dst, sizeof (struct sockaddr_storage));
 
 	if ( status < 0 ) {
 
@@ -4210,7 +4217,7 @@ void tx_packet(void *devp)
 
         struct tx_frame_iterator it = {
                 .caller = __FUNCTION__, .db = packet_frame_db,
-                .frames_out_ptr = (pb.packet.data + sizeof (struct packet_header)),
+                .frames_out_ptr = (pb.p.data + sizeof (struct packet_header)),
                 .frames_out_max =  PKT_FRAMES_SIZE_MAX,
                 .frames_out_pref = PKT_FRAMES_SIZE_OUT,
                 .frame_cache_array = cache_data_array,
@@ -4337,7 +4344,7 @@ void tx_packet(void *devp)
 
                 if (result == TLV_TX_DATA_FULL || (it.frame_type == FRAME_TYPE_NOP && it.frames_out_pos)) {
 
-			struct packet_header *phdr = (struct packet_header *)pb.packet.data;
+			struct packet_header *phdr = (struct packet_header *)pb.p.data;
 
                         assertion(-501338, (it.frames_out_pos && it.frames_out_num));
                         assertion(-501339, IMPLIES(it.frames_out_num > 1, it.frames_out_pos <= it.frames_out_pref));
@@ -4681,119 +4688,62 @@ void rx_packet( struct packet_buff *pb )
         TRACE_FUNCTION_CALL;
 
         struct dev_node *iif = pb->i.iif;
-	struct packet_header *phdr = NULL;
+	struct packet_header *phdr = &pb->p.hdr;
+
+	pb->i.llip = (*((struct sockaddr_in6*) &(pb->i.addr))).sin6_addr;
+        ip6ToStr(&pb->i.llip, pb->i.llip_str);
+
+	struct dev_ip_key any_key = { .ip = pb->i.llip, .idx = 0 };
+	struct dev_node *anyIf;
+
+        assertion(-500841, ((iif->active && iif->if_llocal_addr)));
 
         if (drop_all_packets)
                 return;
 
-        assertion(-500841, ((iif->active && iif->if_llocal_addr)));
+	if (pb->i.length < (int)sizeof(phdr->comp_version) ||
+		phdr->comp_version < (my_compatibility - 1) || phdr->comp_version > (my_compatibility + 1))
+                goto process_packet_error;
 
-	if (pb->i.length != (int) (sizeof(struct packet_header)) &&
-		pb->i.length < (int) (sizeof(struct packet_header) + sizeof(struct tlv_hdr)))
+	if ((pb->i.length != (int) (sizeof(struct packet_header)) &&
+		pb->i.length < (int) (sizeof(struct packet_header) + sizeof(struct tlv_hdr))) ||
+		pb->i.length > (int) (PKT_FRAMES_SIZE_MAX + sizeof(struct packet_header)))
 		goto process_packet_error;
 
-	phdr = (struct packet_header *)pb->packet.data;
+	if ((anyIf = avl_closest_item(&dev_ip_tree, &any_key)) && is_ip_equal(&pb->i.llip, &anyIf->llip_key.ip))
+                return;
 
-	pb->i.dhash = phdr->dhash;
-        pb->i.link_sqn = ntohs(phdr->link_adv_sqn);
+	if (cryptShasEqual(&phdr->dhash, &self->dhn->dhash))
+		return;
 
-        pb->i.link_key.local_id = phdr->local_id;
-        pb->i.link_key.dev_idx = phdr->dev_idx;
-
-	pb->i.llip = (*((struct sockaddr_in6*) &(pb->i.addr))).sin6_addr;
+	cb_packet_hooks(pb);
 
 	if (!is_ip_net_equal(&pb->i.llip, &IP6_LINKLOCAL_UC_PREF, IP6_LINKLOCAL_UC_PLEN, AF_INET6)) {
 		dbgf_all(DBGT_ERR, "non-link-local IPv6 source address %s", ip6AsStr(&pb->i.llip));
 		return;
 	}
 
-        //TODO: check broadcast source!!
-
-
-
-        ip6ToStr(&pb->i.llip, pb->i.llip_str);
-
-        dbgf_all(DBGT_INFO, "via %s %s %s size %d", iif->label_cfg.str, iif->ip_llocal_str, pb->i.llip_str, pb->i.length);
-
-	// immediately drop invalid packets...
-        if (    
-                ((phdr->comp_version < (my_compatibility - 1)) || (phdr->comp_version > (my_compatibility + 1))) ||
-                pb->i.length  > (int)(PKT_FRAMES_SIZE_MAX + sizeof(struct packet_header)) ||
-                pb->i.link_key.dev_idx < DEVADV_IDX_MIN || pb->i.link_key.local_id == LOCAL_ID_INVALID ) {
-
-                goto process_packet_error;
-        }
-
-
-	struct dev_ip_key any_key = { .ip = pb->i.llip, .idx = 0 };
-	struct dev_node *anyIf;
-
-	if ((anyIf = avl_closest_item(&dev_ip_tree, &any_key)) && is_ip_equal(&pb->i.llip, &anyIf->llip_key.ip)) {
-
-		struct dev_ip_key outIf_key = { .ip = pb->i.llip, .idx = pb->i.link_key.dev_idx };
-		struct dev_node *outIf = avl_find_item(&dev_ip_tree, &outIf_key);
-		anyIf = outIf ? outIf : anyIf;
-
-		if (!outIf ||
-			(((my_local_id != pb->i.link_key.local_id || anyIf->llip_key.idx != pb->i.link_key.dev_idx) &&
-                        (((TIME_T) (bmx_time - my_local_id_timestamp)) > (4 * (TIME_T) my_tx_interval))) ||
-                        (!cryptShasEqual(&self->dhn->dhash, &pb->i.dhash) && (((TIME_T) (bmx_time - myIID4me_timestamp)) > (4 * (TIME_T) my_tx_interval))))) {
-
-                        // my local_id  or myIID4me might have just changed and then, due to delay,
-                        // I might receive my own packet back containing my previous (now non-matching) local_id of myIID4me
-                        dbgf_mute(60, DBGL_SYS, DBGT_ERR, "DAD-Alert (duplicate Address) from NB=%s via dev=%s  "
-				"iifIdx=0X%X aifIdx=0X%X rcvdIdx=0x%X  myLocalId=%X rcvdLocalId=%X  myDhash=%s rcvdDhash=%s "
-				"oif=%d aif=%d dipt=%d time=%d mlidts=%d txintv=%d mi4mts=%d",
-                                pb->i.llip_str, iif->label_cfg.str,
-				iif->llip_key.idx, anyIf->llip_key.idx, pb->i.link_key.dev_idx,
-                                ntohl(my_local_id), ntohl(pb->i.link_key.local_id),
-                                cryptShaAsString(&self->dhn->dhash), cryptShaAsString(&pb->i.dhash), outIf?1:0, anyIf?1:0, dev_ip_tree.items,
-				bmx_time, my_local_id_timestamp, my_tx_interval, myIID4me_timestamp);
-
-                        goto process_packet_error;
-
-                } else if (outIf && outIf != iif && is_ip_equal(&outIf->llip_key.ip, &iif->llip_key.ip)) {
-
-			//ASSERTION(-500840, (oif == iif)); // so far, only unique own interface IPs are allowed!!
-                        dbgf_mute(60, DBGL_SYS, DBGT_ERR, "Link-Alert! Rcvd my own packet on different dev=%s idx=0x%X than send dev=%s idx=0x%X "
-				"with same link-local ip=%s my_local_id=%X ! Separate links or fix link-local IPs!!!",
-                                iif->label_cfg.str, iif->llip_key.idx, outIf->label_cfg.str, outIf->llip_key.idx,
-				iif->ip_llocal_str, ntohl(my_local_id));
-		}
-
-                return;
-        }
-
-        if (my_local_id == pb->i.link_key.local_id) {
-
-                if (new_local_id(NULL) == LOCAL_ID_INVALID) {
-                        goto process_packet_error;
-                }
-
-                dbgf_sys(DBGT_WARN, "DAD-Alert (duplicate link ID, this can happen) via dev=%s NB=%s "
-                        "is using my local_id=%X dev_idx=0x%X!  Choosing new local_id=%X dev_idx=0x%X for myself, dropping packet",
-                        iif->label_cfg.str, pb->i.llip_str, ntohl(pb->i.link_key.local_id), pb->i.link_key.dev_idx, ntohl(my_local_id), iif->llip_key.idx);
-
-                return;
-        }
-
-
-        if (!(pb->i.lndev = get_link_dev_node(pb)))
-                return;
-
-
-        dbgf_all(DBGT_INFO, "version=%i, reserved=%X, size=%i dhash=%s rcvd udp_len=%d via NB %s %s %s",
-                phdr->comp_version, phdr->capabilities, pb->i.length, cryptShaAsString(&pb->i.dhash),
-                pb->i.length, pb->i.llip_str, iif->label_cfg.str, pb->i.unicast ? "UNICAST" : "BRC");
-
-
-        cb_packet_hooks(pb);
+	if (avl_find_item(&dhash_invalid_tree, &phdr->dhash))
+		return;
 
         if (blacklisted_neighbor(pb, NULL))
                 return;
 
         if (drop_all_frames)
                 return;
+
+
+
+        if (!(pb->i.lndev = get_link_dev_node(pb)))
+                return;
+
+        dbgf_all(DBGT_INFO, "via %s %s %s size %d", iif->label_cfg.str, iif->ip_llocal_str, pb->i.llip_str, pb->i.length);
+
+        dbgf_all(DBGT_INFO, "version=%i, reserved=%X, size=%i dhash=%s rcvd udp_len=%d via NB %s %s %s",
+                phdr->comp_version, phdr->capabilities, pb->i.length, cryptShaAsString(&phdr->dhash),
+                pb->i.length, pb->i.llip_str, iif->label_cfg.str, pb->i.unicast ? "UNICAST" : "BRC");
+
+
 
         if (rx_frames(pb) == SUCCESS)
                 return;
@@ -4802,11 +4752,10 @@ void rx_packet( struct packet_buff *pb )
 process_packet_error:
 
         dbgf_sys(DBGT_WARN,
-                "Drop (remaining) packet: rcvd problematic packet via NB=%s dev=%s "
-                "(version=%i local_id=%X dev_idx=0x%X capabilities=%d udp_len=%d my_version=%d max_udpd_size=%d",
-                pb->i.llip_str, iif->label_cfg.str, phdr?phdr->comp_version:-1,
-                ntohl(pb->i.link_key.local_id), pb->i.link_key.dev_idx, phdr?phdr->capabilities:-1, pb->i.length,
-                my_compatibility, MAX_UDPD_SIZE);
+                "Drop (remaining) problematic packet: via NB=%s dev=%s len=%d my_version=%d "
+                "dhash=%s version=%i capabilities=%d",
+                pb->i.llip_str, iif->label_cfg.str, pb->i.length, my_compatibility,
+		cryptShaAsString(&phdr->dhash), phdr->comp_version, phdr->capabilities);
 
         blacklist_neighbor(pb);
 

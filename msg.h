@@ -270,26 +270,6 @@
 
 
 
-#if MIN_COMPATIBILITY <= CV17
-
-struct packet_header
-{
-	uint8_t    comp_version;     //  8
-	uint8_t    capabilities;     //  8  reserved
-        
-        CRYPTSHA1_T dhash;
-
-	LOCAL_ID_T local_id;         // 32
-
-	LINKADV_SQN_T link_adv_sqn;  // 16 used for processing: link_adv, lq_adv, rp_adv, ogm_adv, ogm_ack
-	DEVADV_IDX_T   dev_idx;      //  8
-
-} __attribute__((packed,__may_alias__));
-#endif
-
-#if MAX_COMPATIBILITY >= CV16
-// understand tlv_header as well
-#endif
 
 
 

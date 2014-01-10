@@ -351,8 +351,8 @@ loop4Event:
 				pb.i.unicast = NO;
 				
 				errno=0;
-				pb.i.length = recvfrom( pb.i.iif->rx_mcast_sock, pb.packet.data,
-				                             sizeof(pb.packet.data) - 1, 0,
+				pb.i.length = recvfrom( pb.i.iif->rx_mcast_sock, pb.p.data,
+				                             sizeof(pb.p.data) - 1, 0,
 				                             (struct sockaddr *)&pb.i.addr, &addr_len );
 				
 				if ( pb.i.length < 0  &&  ( errno == EWOULDBLOCK || errno == EAGAIN ) ) {
@@ -377,8 +377,8 @@ loop4Event:
 				pb.i.unicast = NO;
 				
 				errno=0;
-				pb.i.length = recvfrom( pb.i.iif->rx_fullbrc_sock, pb.packet.data,
-				                             sizeof(pb.packet.data) - 1, 0,
+				pb.i.length = recvfrom( pb.i.iif->rx_fullbrc_sock, pb.p.data,
+				                             sizeof(pb.p.data) - 1, 0,
 				                             (struct sockaddr *)&pb.i.addr, &addr_len );
 				
 				if ( pb.i.length < 0  &&  ( errno == EWOULDBLOCK || errno == EAGAIN ) ) {
@@ -404,7 +404,7 @@ loop4Event:
 				pb.i.unicast = YES;
 					
 				struct msghdr msghdr;
-				struct iovec iovec = {.iov_base = pb.packet.data, .iov_len = sizeof(pb.packet.data) - 1};
+				struct iovec iovec = {.iov_base = pb.p.data, .iov_len = sizeof(pb.p.data) - 1};
 				char buf[4096];
 				struct cmsghdr *cp;
 				struct timeval *tv_stamp = NULL;
