@@ -100,6 +100,15 @@ void * avl_next_item( struct avl_tree *tree, void *key)
         return an ? an->item : NULL;
 }
 
+
+void * avl_closest_item(struct avl_tree *tree, void *key) {
+	
+	void *item = avl_find_item(tree, key);
+
+	return item ? item : avl_next_item(tree, key);
+}
+
+
 void *avl_first_item(struct avl_tree *tree)
 {
 #ifdef AVL_5XLINKED
