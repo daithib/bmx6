@@ -48,6 +48,8 @@
 static int32_t drop_all_frames = DEF_DROP_ALL_FRAMES;
 static int32_t drop_all_packets = DEF_DROP_ALL_PACKETS;
 
+static int32_t packet_sign = 0;
+static int32_t packet_verify = 0;
 
 static int32_t pref_udpd_size = DEF_UDPD_SIZE;
 static int32_t desc_size_out = DEF_DESC_SIZE;
@@ -4363,6 +4365,13 @@ void tx_packet(void *devp)
                         phdr->local_id = my_local_id;
                         phdr->dev_idx = dev->llip_key.idx;
 
+			if (packet_sign) {
+				uint8_t signature[CRYPT_RSA_MAX_LEN];
+				CRYPTSHA1_T sha;
+				cryptShaAtomic(it.frames_out_ptr, it.frames_out_pos, &sha);
+				cryptSign(&sha, signature, my_PubKey->rawKeyLen);
+			}
+
                         cb_packet_hooks(&pb);
 
                         send_udp_packet(&pb, &dev->tx_netwbrc_addr, dev->unicast_sock);
@@ -4768,6 +4777,12 @@ struct opt_type msg_options[]=
 //       ord parent long_name             shrt Attributes                            *ival              min                 max                default              *func,*syntax,*help
 
 #ifndef LESS_OPTIONS
+        {ODI, 0, "packetSign",            0,   9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &packet_sign,    0,                  1,                 0,0,                  0,
+			ARG_VALUE_FORM,	""}
+        ,
+        {ODI, 0, "packetVerify",          0,   9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &packet_verify,  0,                  1,                 0,0,                  0,
+			ARG_VALUE_FORM,	""}
+	,
         {ODI, 0, ARG_UDPD_SIZE,            0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &pref_udpd_size, MIN_UDPD_SIZE,      MAX_UDPD_SIZE,     DEF_UDPD_SIZE,0,      0,
 			ARG_VALUE_FORM,	HLP_UDPD_SIZE}
         ,

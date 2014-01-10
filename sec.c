@@ -132,8 +132,7 @@ int create_dsc_tlv_signature(struct tx_frame_iterator *it)
 		struct dsc_msg_signature *dext_msg = dext_dptr(it->dext, BMX_DSC_TLV_SIGNATURE);
 
 		dext_msg->type = my_PubKey->rawKeyType;
-		cryptSign(&dataSha, dext_msg->signature, &keySpace);
-		assertion(-502103, (keySpace == my_PubKey->rawKeyLen));
+		cryptSign(&dataSha, dext_msg->signature, keySpace);
 
 		desc_msg->type = dext_msg->type;
 		memcpy( desc_msg->signature, dext_msg->signature, keySpace);
@@ -341,15 +340,14 @@ int32_t rsa_load( char *tmp_path ) {
 
 
 	cryptShaAtomic(in, inLen, &inSha);
-	encLen = sizeof(enc);
 
-	if (cryptSign(&inSha, enc, &encLen) != SUCCESS) {
+	if (cryptSign(&inSha, enc, my_PubKey->rawKeyLen) != SUCCESS) {
 		dbgf_sys(DBGT_ERR, "Failed Sign inLen=%d outLen=%d inData=%s outData=%s",
-			inLen, encLen, memAsHexString((char*)in, inLen), memAsHexString((char*)enc, encLen));
+			inLen, encLen, memAsHexString((char*)in, inLen), memAsHexString((char*)enc, my_PubKey->rawKeyLen));
 		return FAILURE;
 	}
 
-	if (cryptVerify(enc, encLen, &inSha, my_PubKey) != SUCCESS) {
+	if (cryptVerify(enc, my_PubKey->rawKeyLen, &inSha, my_PubKey) != SUCCESS) {
 		dbgf_sys(DBGT_ERR, "Failed Verify inSha=%s", cryptShaAsString(&inSha));
 		return FAILURE;
 	}

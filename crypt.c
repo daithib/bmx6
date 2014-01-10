@@ -404,14 +404,13 @@ int cryptDecrypt(uint8_t *in, size_t inLen, uint8_t *out, size_t *outLen) {
 	return SUCCESS;
 }
 
-int cryptSign( CRYPTSHA1_T *inSha, uint8_t *out, size_t *outLen) {
+int cryptSign( CRYPTSHA1_T *inSha, uint8_t *out, size_t outLen) {
 
-	int ret;
+	assertion(-500000, (outLen = my_PrivKey->rawKeyLen));
 
-	if ((ret = RsaSSL_Sign((uint8_t*)inSha, sizeof(CRYPTSHA1_T), out, *outLen, (RsaKey *)my_PrivKey->backendKey, &cryptRng)) < 0)
+	if ((RsaSSL_Sign((uint8_t*)inSha, sizeof(CRYPTSHA1_T), out, outLen, (RsaKey *)my_PrivKey->backendKey, &cryptRng)) < 0)
 		return FAILURE;
 
-	*outLen = ret;
 	return SUCCESS;
 }
 
@@ -763,11 +762,11 @@ int cryptDecrypt(uint8_t *in, size_t inLen, uint8_t *out, size_t *outLen) {
 	return SUCCESS;
 }
 
-int cryptSign( CRYPTSHA1_T *inSha, uint8_t *out, size_t *outLen) {
+int cryptSign( CRYPTSHA1_T *inSha, uint8_t *out, size_t outLen) {
 
 	rsa_context *pk = my_PrivKey->backendKey;
 
-	assertion( -500000, (*outLen >= my_PrivKey->rawKeyLen));
+	assertion( -500000, (outLen >= my_PrivKey->rawKeyLen));
 
 #if CRYPTLIB <= POLARSSL_1_2_9
 	if (rsa_pkcs1_sign(pk, ctr_drbg_random, &ctr_drbg, RSA_PRIVATE, SIG_RSA_SHA1, sizeof(CRYPTSHA1_T), (uint8_t*)inSha, out))
@@ -778,8 +777,6 @@ int cryptSign( CRYPTSHA1_T *inSha, uint8_t *out, size_t *outLen) {
 #else
 # error "Please fix CRYPTLIB"
 #endif
-
-	*outLen = my_PrivKey->rawKeyLen;
 
 	return SUCCESS;
 }
