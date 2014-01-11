@@ -3857,11 +3857,16 @@ int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 
 	} else {
 
-		return (max ? it->frames_out_max : it->frames_out_pref) - (
+		int32_t frame_space =
+			(max ? it->frames_out_max : it->frames_out_pref) - (
 			it->frames_out_pos +
 			(int) sizeof(struct tlv_hdr) + handl->data_header_size +
 			(handl->next_db ? ((int)sizeof(struct tlv_hdr)) : 0) +
 			it->frame_cache_msgs_size );
+
+		int32_t cache_space = it->frame_cache_size - it->frame_cache_msgs_size;
+
+		return XMIN(frame_space, cache_space);
 	}
 }
 
@@ -4013,8 +4018,9 @@ int32_t tx_frame_iterate(IDM_T iterate_msg, struct tx_frame_iterator *it)
         ASSERTION(-500777, (IMPLIES((it->frame_cache_msgs_size && handl->tx_msg_handler),
                 is_zero(tx_iterator_cache_msg_ptr(it), tx_iterator_cache_data_space_max(it)))));
 
-        ASSERTION(-501000, (IMPLIES((!it->frame_cache_msgs_size || handl->tx_frame_handler),
-                is_zero(it->frame_cache_array, tx_iterator_cache_data_space_max(it)))));
+        assertion_dbg(-501000, (IMPLIES((!it->frame_cache_msgs_size || handl->tx_frame_handler),
+                is_zero(it->frame_cache_array, tx_iterator_cache_data_space_max(it)))),
+		"db=%s t=%d cache_msgs_size=%d", it->db->name, t, it->frame_cache_msgs_size);
 
         assertion(-500779, (it->frames_out_pos <= it->frames_out_max));
         assertion(-500780, (it->frames_out_ptr));
