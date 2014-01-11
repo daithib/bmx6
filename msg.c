@@ -4477,6 +4477,8 @@ void update_my_description_adv(void)
 
 	assertion(-502082, (!terminating));
 
+	dbgf_track(DBGT_INFO, "");
+
 	uint8_t *frame_cache_array = debugMallocReset(vrt_frame_data_size_out, -300586);
 
         if (!initializing)

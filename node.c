@@ -990,6 +990,8 @@ void free_orig_node(struct orig_node *on)
 /*	if (on==self)
 		return;
 */
+	assertion(-500000, IMPLIES(!terminating, on != self));
+
         purge_orig_router(on, NULL, NO);
 
         if (on->added) {
