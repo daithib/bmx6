@@ -621,6 +621,7 @@ void update_neigh_dhash(struct orig_node *on, struct dhash_node *dhn)
 
         if (on->dhn) {
                 neigh = on->dhn->neigh;
+
                 on->dhn->neigh = NULL;
                 on->dhn->on = NULL;
 

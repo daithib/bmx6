@@ -4541,6 +4541,9 @@ void update_my_description_adv(void)
 
         my_description_changed = NO;
 
+	assertion(-500000, (self->dhn && self->dhn == avl_find_item(&dhash_tree, &self->dhn->dhash)));
+	assertion(-500000, (self == avl_find_item(&orig_tree, &self->nodeId)));
+
 	debugFree(frame_cache_array, -300585);
 }
 
