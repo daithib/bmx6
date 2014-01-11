@@ -4661,7 +4661,8 @@ static int32_t ref_status_creator(struct status_handl *handl, void *data)
 
 			if (dtn->dext_key.dext->dhn) {
 				snprintf(origs_str + strlen(origs_str), sizeof(status[i].referencees) - strlen(origs_str),
-					"%s%s", strlen(origs_str) ? " ":"", nodeIdAsStringFromDescAdv(dtn->dext_key.dext->dhn->desc_frame) );
+					"%s%s", strlen(origs_str) ? " ":"", 
+					cryptShaAsShortStr(nodeIdFromDescAdv(dtn->dext_key.dext->dhn->desc_frame)) );
 			}
 
 			for (rft_pos=0; rft_pos<sizeof(rft_bits);rft_pos++)
