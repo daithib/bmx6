@@ -4103,7 +4103,7 @@ int32_t tx_tlv_msg(struct tx_frame_iterator *in)
 
 	struct tx_frame_iterator out = {
 		.caller = in->caller, .ttn = in->ttn, .dext = in->dext, .db = in->handl->next_db,
-		.frames_out_ptr = in->frame_cache_array,
+		.frames_out_ptr = (in->frame_cache_array + in->frame_cache_msgs_size),
 		.frames_out_pref = tx_iterator_cache_data_space_pref(in),
 		.frames_out_max =  tx_iterator_cache_data_space_max(in),
 		.frame_cache_array = cache_data_array, .frame_cache_size = sizeof(cache_data_array),
