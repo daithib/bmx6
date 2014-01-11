@@ -3135,7 +3135,6 @@ struct dhash_node *process_dhash_description_neighIID4x
 
         assertion(-500688, (dhash));
         assertion(-500689, (!(is_transmitter && cryptShasEqual(dhash, &(self->dhn->dhash))))); // cant be transmitter' and myselfs'
-        assertion(-502062, (!avl_find(&dhash_invalid_tree, dhash)));
 
 	if (avl_find(&dhash_invalid_tree, dhash)) {
 
