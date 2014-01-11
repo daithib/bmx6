@@ -56,7 +56,7 @@ int32_t my_compatibility = DEF_COMPATIBILITY;
 
 int32_t my_pettiness = DEF_PETTINESS;
 
-uint32_t my_descSqn = 0;
+uint32_t my_runtimeKey = 0;
 
 char my_Hostname[MAX_HOSTNAME_LEN] = "";
 
@@ -1405,11 +1405,6 @@ int main(int argc, char *argv[])
 	init_control();
         init_avl();
 	init_crypt();
-
-        unsigned int random;
-        cryptRand( &random, sizeof (random));
-	srand( random );
-
         init_ip();
 	init_msg();
 	init_sec();
@@ -1429,6 +1424,7 @@ int main(int argc, char *argv[])
                 assertion(-500809, (0));
         }
 
+	cryptRand(&my_runtimeKey, sizeof(my_runtimeKey));
 
         register_options_array(bmx_options, sizeof ( bmx_options), CODE_CATEGORY_NAME);
 

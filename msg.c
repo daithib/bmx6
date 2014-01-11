@@ -162,6 +162,8 @@ char *tlv_rx_result_str(int32_t r)
                 return "TLV_FAILURE";
         case TLV_RX_DATA_REJECTED:
                 return "TLV_REJECTED";
+        case TLV_RX_DATA_REBOOTED:
+                return "TLV_REBOOTED";
         case TLV_RX_DATA_DONE:
                 return "TLV_DONE";
         case TLV_RX_DATA_BLOCKED:
@@ -393,8 +395,10 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *onOld, 
         TRACE_FUNCTION_CALL;
         assertion(-500370, (op == TLV_OP_DEL || op == TLV_OP_TEST || op == TLV_OP_NEW || op == TLV_OP_DEBUG ||
                 (op >= TLV_OP_CUSTOM_MIN && op <= TLV_OP_CUSTOM_MAX) || (op >= TLV_OP_PLUGIN_MIN && op <= TLV_OP_PLUGIN_MAX)));
-        assertion(-500590, IMPLIES(onOld == self, (op == TLV_OP_DEBUG ||
+
+        assertion(-500590, IMPLIES(onOld == self, (op == TLV_OP_DEBUG || op == TLV_OP_TEST ||
                 (op >= TLV_OP_CUSTOM_MIN && op <= TLV_OP_CUSTOM_MAX) || (op >= TLV_OP_PLUGIN_MIN && op <= TLV_OP_PLUGIN_MAX))));
+
         assertion(-500807, (dhnNew && dhnNew->desc_frame && dhnNew->dext));
 	assertion(-502047, IMPLIES(op == TLV_OP_DEL || op == TLV_OP_NEW,onOld));
         assertion(-501354, IMPLIES(op == TLV_OP_DEL, onOld->added));
@@ -429,12 +433,12 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *onOld, 
 			blocked = YES;
 	}
 
-	assertion( -502048, (result==TLV_RX_DATA_DONE || result==TLV_RX_DATA_REJECTED || result==TLV_RX_DATA_FAILURE));
+	assertion( -502048, (result==TLV_RX_DATA_DONE || result==TLV_RX_DATA_REBOOTED || result==TLV_RX_DATA_REJECTED || result==TLV_RX_DATA_FAILURE));
 
         if ((op >= TLV_OP_CUSTOM_MIN && op <= TLV_OP_CUSTOM_MAX) || (op >= TLV_OP_PLUGIN_MIN && op <= TLV_OP_PLUGIN_MAX))
                 return result;
 
-        if (result==TLV_RX_DATA_REJECTED || result == TLV_RX_DATA_FAILURE || blocked) {
+        if (result==TLV_RX_DATA_REBOOTED || result==TLV_RX_DATA_REJECTED || result == TLV_RX_DATA_FAILURE || blocked) {
 
                 assertion(-501355, (op == TLV_OP_TEST));
 
@@ -442,7 +446,7 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *onOld, 
                         pb ? pb->i.llip_str : DBG_NIL, it.frame_type, (((uint8_t)it.frame_type) <= db->handl_max) ? db->handls[it.frame_type].name : "",
                         it.frame_data_length, it.frames_pos, blocked ? "BLOCKED" : "", tlv_rx_result_str(result));
 
-		if (result==TLV_RX_DATA_FAILURE || result==TLV_RX_DATA_REJECTED)
+		if (result==TLV_RX_DATA_REBOOTED || result==TLV_RX_DATA_REJECTED || result == TLV_RX_DATA_FAILURE)
 			return result;
 		else
 			return TLV_RX_DATA_BLOCKED;
@@ -1841,11 +1845,11 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 
 	result = process_description_tlvs(pb, on, dhnNew, TLV_OP_TEST, FRAME_TYPE_PROCESS_ALL);
 
-	assertion( -502054, (result==TLV_RX_DATA_BLOCKED || result==TLV_RX_DATA_DONE || result==TLV_RX_DATA_REJECTED || result==TLV_RX_DATA_FAILURE));
+	assertion( -502054, (result==TLV_RX_DATA_BLOCKED || result==TLV_RX_DATA_DONE ||
+		result == TLV_RX_DATA_REBOOTED || result == TLV_RX_DATA_REJECTED || result == TLV_RX_DATA_FAILURE));
 
-	if (result==TLV_RX_DATA_FAILURE || result==TLV_RX_DATA_REJECTED)
+	if (result==TLV_RX_DATA_REBOOTED || result==TLV_RX_DATA_REJECTED || result==TLV_RX_DATA_FAILURE)
 		goto process_desc0_error;
-
 
         if (!on) // create new orig:
                 on = init_orig_node(nodeIdFromDescAdv(dhnNew->desc_frame));
@@ -1900,13 +1904,21 @@ process_desc0_error:
 		cache ? nodeIdAsStringFromDescAdv(cache->desc_frame) : "???", pb->i.iif->label_cfg.str, pb->i.llip_str);
 
 
-	if (result==TLV_RX_DATA_FAILURE) {
+	if (result==TLV_RX_DATA_REBOOTED) {
 
-		blacklist_neighbor(pb);
-		return (struct dhash_node *) FAILURE_PTR;
+		assertion(-500000, (on));
+		assertion(-500000, (on != self));
+		free_orig_node(on);
+		return (struct dhash_node *) UNRESOLVED_PTR;
+
+	} else if (result == TLV_RX_DATA_REJECTED) {
+
+		return (struct dhash_node *) REJECTED_PTR;
 
 	} else {
-		return (struct dhash_node *) REJECTED_PTR;
+		assertion(-500000, (result==TLV_RX_DATA_FAILURE));
+		blacklist_neighbor(pb);
+		return (struct dhash_node *) FAILURE_PTR;
 	}
 }
 
@@ -2017,10 +2029,11 @@ int32_t create_dsc_tlv_version(struct tx_frame_iterator *it)
         dsc->ogmSqnMin = htons(self->ogmSqn_rangeMin);
         dsc->ogmSqnRange = htons(self->ogmSqn_rangeSize);
         dsc->capabilities = htons(my_desc_capabilities);
+	dsc->runtimeKey = htonl(my_runtimeKey);
 
         uint32_t rev_u32;
         sscanf(GIT_REV, "%8X", &rev_u32);
-        dsc->revision = htonl(rev_u32);
+        dsc->codeRevision = htonl(rev_u32);
         dsc->comp_version = my_compatibility;
         dsc->descSqn = getDescriptionSqn( NULL, 1);
 
@@ -2046,13 +2059,27 @@ int32_t process_dsc_tlv_version(struct rx_frame_iterator *it)
 
 		assertion(-502059, (old));
 		
-		if (ntohl(old->descSqn) >= ntohl(new->descSqn) ) {
+		if (ntohl(new->descSqn) <= ntohl(old->descSqn)) {
 
-			dbgf_sys(DBGT_WARN, "IGNORED rcvd descSqn=%d (current descSqn=%d) from nodeId=%s via dev=%s ip=%s",
-				ntohl(new->descSqn), ntohl(old->descSqn), nodeIdAsStringFromDescAdv(it->dhnNew->desc_frame),
-				it->pb->i.iif->label_cfg.str, it->pb->i.llip_str);
-
+			if (new->descSqn == old->descSqn) {
+				dbgf_sys(DBGT_ERR, "IGNORED rcvd descSqn=%d (current descSqn=%d) from nodeId=%s via dev=%s ip=%s",
+					ntohl(new->descSqn), ntohl(old->descSqn), nodeIdAsStringFromDescAdv(it->dhnNew->desc_frame),
+					it->pb->i.iif->label_cfg.str, it->pb->i.llip_str);
+			}
 			return TLV_RX_DATA_REJECTED;
+		}
+
+		if (new->runtimeKey != old->runtimeKey) {
+
+			if (it->onOld == self) {
+				dbgf_sys(DBGT_ERR, "WTF: rcvd my nodeId=%s (%s) with different runtimeKey=%X (%X) and greater descSqn=%d (%d)",
+					nodeIdAsStringFromDescAdv(it->dhnNew->desc_frame), cryptShaAsString(&self->nodeId),
+					ntohl(new->runtimeKey), ntohl(old->runtimeKey), ntohl(new->descSqn), ntohl(old->descSqn));
+				EXITERROR(-500000, (0));
+				return TLV_RX_DATA_REJECTED;
+			}
+
+			return TLV_RX_DATA_REBOOTED;
 		}
 	}
 
@@ -3658,7 +3685,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                         if (it->msg == it->frame_data + it->frame_data_length) {
 				return TLV_RX_DATA_PROCESSED;
 			} else {
-				assertion(-502072, (result == TLV_RX_DATA_BLOCKED || result == TLV_RX_DATA_FAILURE || result == TLV_RX_DATA_REJECTED));
+				assertion(-502072, (result == TLV_RX_DATA_BLOCKED || result == TLV_RX_DATA_FAILURE || result == TLV_RX_DATA_REJECTED || result == TLV_RX_DATA_REBOOTED));
 				goto_error(rx_frame_iterate_error, "failed rx_msg_handler");
                         }
 
@@ -3670,7 +3697,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 			if ( result == it->frame_msgs_length || result == TLV_RX_DATA_PROCESSED) {
 				return TLV_RX_DATA_PROCESSED;
 			} else {
-				assertion(-502073, (result == TLV_RX_DATA_BLOCKED || result == TLV_RX_DATA_FAILURE || result == TLV_RX_DATA_REJECTED));
+				assertion(-502073, (result == TLV_RX_DATA_BLOCKED || result == TLV_RX_DATA_FAILURE || result == TLV_RX_DATA_REJECTED || result == TLV_RX_DATA_REBOOTED));
 				goto_error(rx_frame_iterate_error, "failed rx_frame_handler");
                         }
                 }

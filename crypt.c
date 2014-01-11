@@ -969,6 +969,10 @@ void init_crypt(void) {
 	
 	cryptRngInit();
 	cryptShaInit();
+
+        unsigned int random;
+        cryptRand( &random, sizeof (random));
+	srand( random );
 }
 
 void cleanup_crypt(void) {

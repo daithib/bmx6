@@ -369,8 +369,9 @@ struct frame_hdr_rhash_adv {
 
 // iterator return codes:
 
-#define TLV_RX_DATA_FAILURE     (-4) // syntax error: exit or blacklist. Transmitter should NOT have send this!
-#define TLV_RX_DATA_REJECTED    (-3) // incompatible version, outdated sqn. Marked as invalid to avoid further requests
+#define TLV_RX_DATA_FAILURE     (-5) // syntax error: exit or blacklist. Transmitter should NOT have send this!
+#define TLV_RX_DATA_REJECTED    (-4) // incompatible version, outdated sqn. Marked as invalid to avoid further requests
+#define TLV_RX_DATA_REBOOTED    (-3) // changed runtimeKey
 #define TLV_RX_DATA_DONE        (-2) // done, nothing more to do
 #define TLV_RX_DATA_BLOCKED     (-1) // blocked due to DAD.
 #define TLV_RX_DATA_PROCESSED   (0)  // > means succesfully processed returned amount of data
@@ -622,11 +623,13 @@ struct dsc_msg_version {
 	uint8_t capabilities;
 
         DESC_SQN_T descSqn;
+        uint32_t runtimeKey;
 
 	OGM_SQN_T ogmSqnMin;
 	OGM_SQN_T ogmSqnRange;
 
-	uint32_t revision;    //TODO: move to dsc_msg_names
+	uint32_t codeRevision;
+
 } __attribute__((packed));
 
 
@@ -635,9 +638,10 @@ struct dsc_msg_version {
 {FIELD_TYPE_UINT,             -1, 8,                       1, FIELD_RELEVANCE_HIGH, "comp_version" }, \
 {FIELD_TYPE_HEX,              -1, 8,                       1, FIELD_RELEVANCE_MEDI, "capabilities" }, \
 {FIELD_TYPE_UINT,             -1, (8*sizeof(DESC_SQN_T)),  0, FIELD_RELEVANCE_HIGH, "descSqn" }, \
+{FIELD_TYPE_STRING_BINARY,    -1, (8*sizeof(uint32_t)),    0, FIELD_RELEVANCE_HIGH, "runtimeKey" }, \
 {FIELD_TYPE_UINT,             -1, (8*sizeof(OGM_SQN_T)),   0, FIELD_RELEVANCE_MEDI, "ogmSqnMin" }, \
 {FIELD_TYPE_UINT,             -1, (8*sizeof(OGM_SQN_T)),   0, FIELD_RELEVANCE_MEDI, ARG_OGM_SQN_RANGE }, \
-{FIELD_TYPE_HEX,              -1, 32,                      0, FIELD_RELEVANCE_HIGH, "revision" }, \
+{FIELD_TYPE_HEX,              -1, 32,                      0, FIELD_RELEVANCE_HIGH, "codeRevision" }, \
 FIELD_FORMAT_END}
 
 

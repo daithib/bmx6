@@ -60,6 +60,7 @@ extern int32_t my_compatibility;
 #define ARG_PETTINESS "pettiness"
 
 extern int32_t my_pettiness;
+extern uint32_t my_runtimeKey;
 
 #define MAX_HOSTNAME_LEN 32
 extern char my_Hostname[];
@@ -287,8 +288,6 @@ typedef uint16_t HELLO_SQN_T;
 // descriptions 
 typedef uint32_t DESC_SQN_T;
 
-
-extern uint32_t my_descSqn;
 
 #define ARG_DSQN_PATH "descSqnPath"
 #define DEF_DSQN_PATH "/etc/bmx6/descSqn"
