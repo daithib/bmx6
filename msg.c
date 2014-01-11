@@ -3213,10 +3213,11 @@ struct dhash_node *process_dhash_description_neighIID4x
 		}
         }
 
-	dbgf_track(DBGT_INFO, "via dev=%s NB=%s dhash=%8X.. %s %s %s neighIID4x=%d is_transmitter=%d %s",
+	dbgf_track(DBGT_INFO, "via dev=%s NB=%s dhash=%8X.. (desc)nodeId=%s cache=%s dhn=%s neighIID4x=%d is_transmitter=%d (on)nodeId=%s",
                 pb->i.iif->label_cfg.str, pb->i.llip_str, dhash->h.u32[0],
-                (dsc ? nodeIdAsStringFromDescAdv(dsc) : "NO DESCRIPTION"), (cache ? "CACHED" : "-"),
-                (dhn?(dhn==FAILURE_PTR?"FAILURE":
+                (dsc ? nodeIdAsStringFromDescAdv(dsc) : "NO DESCRIPTION"),
+		(cache ? "CACHED" : "-"),
+                (dhn ? (dhn==FAILURE_PTR?"FAILURE":
                         (dhn==UNRESOLVED_PTR?"UNRESOLVED":(dhn==REJECTED_PTR?"REJECTED":"RESOLVED"))):"UNKNOWN"),
                 neighIID4x, is_transmitter,
 		((dhn && dhn!=FAILURE_PTR && dhn!=UNRESOLVED_PTR && dhn!=REJECTED_PTR && dhn->on) ?
@@ -3513,7 +3514,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 	int32_t result = TLV_RX_DATA_FAILURE;
 	uint8_t is_virtual_desc = (it->db == description_tlv_db && it->dhnNew);
 
-        dbgf_track(DBGT_INFO, "%s - db=%s f_type=%d f_pos=%d f_len=%d",
+        dbgf_track(DBGT_INFO, "%s - db=%s (prev)f_type=%d f_pos=%d f_len=%d",
 	        it->caller, it->db->name, it->frame_type, it->frames_pos, it->frames_length);
 
         if (it->frames_pos == it->frames_length ) {
@@ -3593,7 +3594,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 it->frame_msgs_fixed = (f_handl->fixed_msg_size && f_handl->min_msg_size) ? (it->frame_msgs_length / f_handl->min_msg_size) : 0;
                 it->msg = f_data + f_handl->data_header_size;
             
-                dbgf_all(DBGT_INFO, "%s - type=%s frame_length=%d frame_data_length=%d frame_msgs_length=%d",
+                dbgf_track(DBGT_INFO, "%s - type=%s frame_length=%d frame_data_length=%d frame_msgs_length=%d",
                         it->caller, f_handl->name, f_len, f_data_len, it->frame_msgs_length);
 
 
