@@ -3136,6 +3136,8 @@ struct dhash_node *process_dhash_description_neighIID4x
         assertion(-500688, (dhash));
         assertion(-500689, (!(is_transmitter && cryptShasEqual(dhash, &(self->dhn->dhash))))); // cant be transmitter' and myselfs'
 
+	dbgf_sys(DBGT_INFO, "dhash=%s", cryptShaAsString(dhash));
+
 	if (avl_find(&dhash_invalid_tree, dhash)) {
 
 		dhn = (struct dhash_node*)REJECTED_PTR;
@@ -3292,7 +3294,7 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 
 	cryptShaAtomic(it->frame_data, it->frame_data_length, &dhash);
 
-	dbgf_track( DBGT_INFO, "rcvd descId=%s nodeId=%s via_dev=%s via_ip=%s",
+	dbgf_sys( DBGT_INFO, "rcvd dhash=%s nodeId=%s via_dev=%s via_ip=%s",
 		memAsHexString(&dhash, sizeof(SHA1_T)),
 		nodeIdAsStringFromDescAdv(it->frame_data),
 		pb->i.iif->label_cfg.str, pb->i.llip_str);
@@ -4503,11 +4505,24 @@ void update_my_description_adv(void)
 		assertion_dbg(-500798, result>=TLV_TX_DATA_DONE, "frame_type=%d result=%s", tx.frame_type, tlv_tx_result_str(result));
 	}
 
-        DHASH_T dhash;
-	cryptShaAtomic(tx.frames_out_ptr, tx.frames_out_pos, &dhash);
-	struct dhash_node *dhn = get_dhash_node( tx.frames_out_ptr, tx.frames_out_pos, tx.dext, &dhash);
+        DHASH_T dhashNew;
+	cryptShaAtomic(tx.frames_out_ptr, tx.frames_out_pos, &dhashNew);
+	struct dhash_node *dhnNew = get_dhash_node(tx.frames_out_ptr, tx.frames_out_pos, tx.dext, &dhashNew);
 
-	update_neigh_dhash( self, dhn );
+	DHASH_T dhashOld = {.h.u32={0}};
+	if (!initializing) {
+		assertion(-500000, (self->dhn));
+		dhashOld = self->dhn->dhash;
+		assertion(-500000, IMPLIES(!initializing, !avl_find(&dhash_invalid_tree, &dhashOld)));
+	}
+
+	update_neigh_dhash( self, dhnNew );
+
+	assertion(-500000, IMPLIES(!initializing, avl_find(&dhash_invalid_tree, &dhashOld)));
+
+	dbgf_sys(DBGT_INFO, "dhashOld=%s dhashNew=%s for nodeId=%s",
+		cryptShaAsString(&dhashOld), cryptShaAsString(&dhashNew), cryptShaAsString(&self->nodeId));
+
 /*
 	dbgf_sys(DBGT_INFO, "adding my desc_frame_size=%d dhash=%s desc_frame_data=%s dext_len=%d dext_data=%s",
 		tx.frames_out_pos, cryptShaAsString(&dhash), memAsHexString(tx.frames_out_ptr, tx.frames_out_pos),
@@ -4544,7 +4559,7 @@ void update_my_description_adv(void)
                 int d;
 
                 for (d = 0; (lndev_arr[d]); d++)
-                        schedule_tx_task(lndev_arr[d], FRAME_TYPE_DESC_ADVS, tx.frames_out_pos, &dhash, sizeof(dhash), 0  , 0);
+                        schedule_tx_task(lndev_arr[d], FRAME_TYPE_DESC_ADVS, tx.frames_out_pos, &dhashNew, sizeof(dhashNew), 0  , 0);
         }
 
         my_description_changed = NO;
