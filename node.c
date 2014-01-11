@@ -553,7 +553,7 @@ void invalidate_dhash( struct dhash_node *dhn, DHASH_T *dhash )
 	assertion( -502087, XOR(dhn, dhash));
 
 	if (!dhn) {
-		dhn = debugMallocReset(sizeof(DHASH_T), -300628);
+		dhn = debugMallocReset(sizeof(struct dhash_node), -300628);
 		dhn->dhash = *dhash;
 	} else {
 		dext_free(&dhn->dext);
