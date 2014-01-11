@@ -958,6 +958,7 @@ struct orig_status {
         GLOBAL_ID_T *shortId;
         GLOBAL_ID_T *globalId;
         char* name;
+	CRYPTSHA1_T *dhash;
         uint8_t blocked;
         IPX_T primaryIp;
         uint16_t routes;
@@ -976,6 +977,7 @@ static const struct field_format orig_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_SHORT_ID,  orig_status, shortId,       1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, orig_status, globalId,      1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      orig_status, name,          1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, orig_status, dhash,         1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              orig_status, blocked,       1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_IPX,               orig_status, primaryIp,     1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              orig_status, routes,        1, FIELD_RELEVANCE_HIGH),
@@ -1007,6 +1009,7 @@ static int32_t orig_status_creator(struct status_handl *handl, void *data)
                 status[i].globalId = &on->nodeId;
                 status[i].shortId = &on->nodeId;
                 status[i].name = on->hostname;
+		status[i].dhash = &on->dhn->dhash;
                 status[i].blocked = on->blocked;
                 status[i].primaryIp = on->primary_ip;
                 status[i].routes = on->rt_tree.items;
