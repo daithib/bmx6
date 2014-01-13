@@ -147,6 +147,8 @@ void prof_update( void *unused) {
 
 		uint8_t active = (pn->timeBefore > 0);
 
+		dbgf_sys(DBGT_INFO, "updating %s active=%d", pn->k.name, active);
+
 		if (active)
 			prof_end(pn);
 
