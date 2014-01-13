@@ -32,9 +32,9 @@ struct prof_ctx {
     uint64_t timeTotal;
     clock_t clockBefore;
     clock_t clockPeriod;
-    clock_t clockTotal;
+    uint64_t clockTotal;
     
-    uint32_t load_kPercent;
+    uint32_t load_period;
 };
 
 struct prof_ctx *prof_init( char *name, char *parent, struct orig_node *orig, struct neigh_node *neigh);
