@@ -96,8 +96,8 @@ SBINDIR =       $(INSTALL_PREFIX)/usr/sbin
 
 SRC_FILES= "\(\.c\)\|\(\.h\)\|\(Makefile\)\|\(INSTALL\)\|\(LIESMICH\)\|\(README\)\|\(THANKS\)\|\(./posix\)\|\(./linux\)\|\(./man\)\|\(./doc\)"
 
-SRC_C =  bmx.c node.c crypt.c sec.c msg.c z.c metrics.c iptools.c tools.c plugin.c list.c allocate.c avl.c hna.c control.c schedule.c ip.c
-SRC_H =  bmx.h node.h crypt.h sec.h msg.h z.h metrics.h iptools.h tools.h plugin.h list.h allocate.h avl.h hna.h control.h schedule.h ip.h
+SRC_C =  bmx.c node.c crypt.c sec.c msg.c z.c metrics.c iptools.c tools.c plugin.c list.c allocate.c avl.c hna.c control.c schedule.c ip.c prof.c
+SRC_H =  bmx.h node.h crypt.h sec.h msg.h z.h metrics.h iptools.h tools.h plugin.h list.h allocate.h avl.h hna.h control.h schedule.h ip.h prof.h
 
 SRC_C += $(shell echo "$(CFLAGS) $(EXTRA_CFLAGS)" | grep -q "DTRAFFIC_DUMP" && echo dump.c )
 SRC_H += $(shell echo "$(CFLAGS) $(EXTRA_CFLAGS)" | grep -q "DTRAFFIC_DUMP" && echo dump.h )
