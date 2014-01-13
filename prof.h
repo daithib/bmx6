@@ -27,8 +27,14 @@ struct prof_ctx {
     struct avl_tree childs_tree;
     int8_t active_childs;
     
-    clock_t before;
-    uint32_t total;
+    uint64_t timeBefore;
+    uint64_t timePeriod;
+    uint64_t timeTotal;
+    clock_t clockBefore;
+    clock_t clockPeriod;
+    clock_t clockTotal;
+    
+    uint32_t load_kPercent;
 };
 
 struct prof_ctx *prof_init( char *name, char *parent, struct orig_node *orig, struct neigh_node *neigh);
@@ -39,3 +45,5 @@ void prof_start( struct prof_ctx *p);
 void prof_end( struct prof_ctx *p);
 
 
+void init_prof( void );
+void cleanup_prof(void);
