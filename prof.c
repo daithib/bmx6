@@ -74,6 +74,9 @@ void prof_free( struct prof_ctx **p)
 	
 	avl_remove(&prof_tree, &((*p)->k), -300000);
 
+	if ((*p)->parent)
+		avl_remove(&((*p)->parent->childs_tree), &((*p)->k), -300000);
+
 	debugFree(*p, -300000);
 	*p = NULL;
 }
@@ -265,14 +268,11 @@ static int32_t prof_status_creator(struct status_handl *handl, void *data)
         return status_size;
 }
 
-static struct prof_ctx *prof_main = NULL;
+
 
 void init_prof( void )
 {
 	register_status_handl(sizeof (struct prof_status), 1, prof_status_format, "cpu", prof_status_creator);
-
-	prof_main = prof_init("main", NULL, NULL, NULL);
-	prof_start(prof_main);
 
 	task_register(5000, prof_update_all, NULL, -300000);
 
@@ -281,6 +281,4 @@ void init_prof( void )
 void cleanup_prof(void)
 {
 
-	//(prof_main);
-	prof_free(&prof_main);
 }

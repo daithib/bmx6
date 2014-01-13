@@ -42,6 +42,7 @@
 #include "iptools.h"
 #include "plugin.h"
 #include "allocate.h"
+#include "prof.h"
 
 #define CODE_CATEGORY_NAME "message"
 
@@ -149,6 +150,8 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it);
 static const void* REJECTED_PTR = (void*) & REJECTED_PTR;
 static const void* UNRESOLVED_PTR = (void*) & UNRESOLVED_PTR;
 static const void* FAILURE_PTR = (void*) & FAILURE_PTR;
+
+static struct prof_ctx *prof_rx_packet = NULL;
 
 
 /***********************************************************
@@ -4749,6 +4752,7 @@ int32_t opt_update_dext_method(uint8_t cmd, uint8_t _save, struct opt_type *opt,
 void rx_packet( struct packet_buff *pb )
 {
         TRACE_FUNCTION_CALL;
+	prof_start(prof_rx_packet);
 
         struct dev_node *iif = pb->i.iif;
 	struct packet_header *phdr = &pb->p.hdr;
@@ -4762,7 +4766,7 @@ void rx_packet( struct packet_buff *pb )
         assertion(-500841, ((iif->active && iif->if_llocal_addr)));
 
         if (drop_all_packets)
-                return;
+                goto finish;
 
 	if (pb->i.length < (int)sizeof(phdr->comp_version) ||
 		phdr->comp_version < (my_compatibility - 1) || phdr->comp_version > (my_compatibility + 1))
@@ -4774,31 +4778,31 @@ void rx_packet( struct packet_buff *pb )
 		goto process_packet_error;
 
 	if ((anyIf = avl_closest_item(&dev_ip_tree, &any_key)) && is_ip_equal(&pb->i.llip, &anyIf->llip_key.ip))
-                return;
+                goto finish;
 
 	if (cryptShasEqual(&phdr->dhash, &self->dhn->dhash))
-		return;
+		goto finish;
 
 	cb_packet_hooks(pb);
 
 	if (!is_ip_net_equal(&pb->i.llip, &IP6_LINKLOCAL_UC_PREF, IP6_LINKLOCAL_UC_PLEN, AF_INET6)) {
 		dbgf_all(DBGT_ERR, "non-link-local IPv6 source address %s", ip6AsStr(&pb->i.llip));
-		return;
+		goto finish;
 	}
 
 	if (avl_find_item(&dhash_invalid_tree, &phdr->dhash))
-		return;
+		goto finish;
 
         if (blacklisted_neighbor(pb, NULL))
-                return;
+                goto finish;
 
         if (drop_all_frames)
-                return;
+                goto finish;
 
 
 
         if (!(pb->i.lndev = get_link_dev_node(pb)))
-                return;
+                goto finish;
 
         dbgf_all(DBGT_INFO, "via %s %s %s size %d", iif->label_cfg.str, iif->ip_llocal_str, pb->i.llip_str, pb->i.length);
 
@@ -4809,7 +4813,7 @@ void rx_packet( struct packet_buff *pb )
 
 
         if (rx_frames(pb) == SUCCESS)
-                return;
+                goto finish;
 
 
 process_packet_error:
@@ -4822,7 +4826,9 @@ process_packet_error:
 
         blacklist_neighbor(pb);
 
-        return;
+finish:
+	prof_stop(prof_rx_packet);
+	return;
 }
 
 STATIC_FUNC
@@ -4934,6 +4940,8 @@ void init_msg( void )
         register_status_handl(sizeof (struct ref_status), 1, ref_status_format, ARG_REFERENCES, ref_status_creator);
 
         task_register(my_ogm_interval, schedule_my_originator_message, NULL, -300356);
+
+	prof_rx_packet = prof_init("rx_packete", "main", NULL, NULL);
 
 	packet_frame_db = init_frame_db(FRAME_TYPE_ARRSZ, "packet_frame_db");
 	packet_desc_db = init_frame_db(1, "packet_desc_db");
@@ -5165,7 +5173,7 @@ void init_msg( void )
 void cleanup_msg( void )
 {
 //	update_my_description_adv();
-	
+
         schedule_or_purge_ogm_aggregations(YES /*purge_all*/);
 	
         if (lndev_arr)
@@ -5181,5 +5189,7 @@ void cleanup_msg( void )
 	free_frame_db(&description_tlv_db);
 	free_frame_db(&packet_desc_db);
 	free_frame_db(&packet_frame_db);
+
+	prof_free(&prof_rx_packet);
 }
 

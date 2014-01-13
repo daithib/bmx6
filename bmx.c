@@ -98,7 +98,7 @@ TIME_SEC_T bmx_time_sec = 0;
 
 uint32_t s_curr_avg_cpu_load = 0;
 
-
+static struct prof_ctx *prof_main = NULL;
 
 
 IDM_T validate_param(int32_t probe, int32_t min, int32_t max, char *name)
@@ -275,6 +275,8 @@ void cleanup_all(int32_t status)
                 cleanup_ip();
 		cleanup_crypt();
 		cleanup_config();
+
+		prof_free(&prof_main);
 
 		// last, close debugging system and check for forgotten resources...
 		cleanup_control();
@@ -1344,6 +1346,10 @@ int main(int argc, char *argv[])
 	init_schedule();
 
 	My_pid = getpid();
+
+	prof_main = prof_init("main", NULL, NULL, NULL);
+	prof_start(prof_main);
+
 
 	signal( SIGINT, handler );
 	signal( SIGTERM, handler );
