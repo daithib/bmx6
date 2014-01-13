@@ -48,6 +48,7 @@
 #include "iptools.h"
 #include "plugin.h"
 #include "allocate.h"
+#include "prof.h"
 
 #define CODE_CATEGORY_NAME "general"
 
@@ -267,6 +268,7 @@ void cleanup_all(int32_t status)
                 purge_link_route_orig_nodes(NULL, NO, NULL);
 
 		cleanup_plugin();
+		cleanup_prof();
 		cleanup_sec();
 		cleanup_msg();
 		cleanup_node();
@@ -1358,6 +1360,7 @@ int main(int argc, char *argv[])
         init_ip();
 	init_msg();
 	init_sec();
+	init_prof();
 
         if (init_plugin() == SUCCESS) {
 
