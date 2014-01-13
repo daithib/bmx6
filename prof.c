@@ -123,10 +123,12 @@ void prof_stop( struct prof_ctx *p)
 	uint64_t timeAfter = (tvAfter.tv_sec * 1000000) + tvAfter.tv_usec;
 
 //	assertion(-500000, (clockAfter >= p->clockBefore)); //this wraps around some time..
-	assertion(-500000, (timeAfter > p->timeBefore));
+//	assertion(-500000, (timeAfter > p->timeBefore));
 
 	p->clockPeriod += (clockAfter - p->clockBefore);
 	p->timePeriod += (timeAfter - p->timeBefore);
+
+	assertion(-500000, (p->timePeriod < 10*1000000));
 
 	p->clockBefore = p->timeBefore = 0;
 
