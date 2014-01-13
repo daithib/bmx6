@@ -726,7 +726,37 @@ finish: {
 	return SUCCESS;
 }
 }
+
+CRYPTKEY_T *cryptKeyMake( int32_t keyBitSize ) {
+
+	int ret = 0;
+	char *goto_error_code = NULL;
+	CRYPTKEY_T *key = debugMallocReset(sizeof(CRYPTKEY_T), -300000);
+
+	rsa_context *rsa = debugMallocReset(sizeof(rsa_context), -300000);
+	rsa_init(rsa, RSA_PKCS_V15, 0);
+
+        if ((ret = rsa_gen_key( rsa, ctr_drbg_random, &ctr_drbg, keyBitSize, CRYPT_KEY_E_VAL )))
+		goto_error(finish, "Failed making rsa key! ret=%d");
+
+	key->backendKey = rsa;
+	key->nativeBackendKey = 1;
+	cryptKeyAddRaw(key);
+
+finish: {
+	if (goto_error_code) {
+
+		cryptKeyFree(&key);
+
+		dbgf_sys(DBGT_ERR, "%s ret=%d derSz=%d path=%s", goto_error_code, ret);
+		return NULL;
+	}
+
+	return key;
+}
+}
 #endif
+
 
 int cryptEncrypt( uint8_t *in, size_t inLen, uint8_t *out, size_t *outLen, CRYPTKEY_T *pubKey) {
 
