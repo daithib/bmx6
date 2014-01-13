@@ -42,7 +42,7 @@ struct prof_ctx *prof_init( char *name, char *parent, struct orig_node *orig, st
 void prof_free( struct prof_ctx **p);
 
 void prof_start( struct prof_ctx *p);
-void prof_end( struct prof_ctx *p);
+void prof_stop( struct prof_ctx *p);
 
 
 void init_prof( void );

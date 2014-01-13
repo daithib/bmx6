@@ -70,7 +70,8 @@ void prof_free( struct prof_ctx **p)
 	assertion(-500000, (p && *p));
 	assertion(-500000, (!(((*p)->childs_tree).items)));
 	assertion(-500000, (avl_find_item(&prof_tree, &((*p)->k))));
-
+	assertion(-500000, !((*p)->timeBefore));
+	
 	avl_remove(&prof_tree, &((*p)->k), -300000);
 
 	debugFree(*p, -300000);
@@ -109,7 +110,7 @@ void prof_start( struct prof_ctx *p)
 	ASSERTION(-500000, (prof_check(p, 0) == SUCCESS));
 }
 
-void prof_end( struct prof_ctx *p)
+void prof_stop( struct prof_ctx *p)
 {
 	assertion(-500000, (p->timeBefore));
 	assertion(-500000, (!p->active_childs));
@@ -150,7 +151,7 @@ void prof_update( void *unused) {
 		dbgf_sys(DBGT_INFO, "updating %s active=%d", pn->k.name, active);
 
 		if (active)
-			prof_end(pn);
+			prof_stop(pn);
 
 		if (pn->timePeriod) {
 
@@ -226,14 +227,16 @@ void init_prof( void )
 {
 	register_status_handl(sizeof (struct prof_status), 1, prof_status_format, "cpu", prof_status_creator);
 
-	task_register(5000, prof_update, NULL, -300000);
-
 	prof_main = prof_init("main", NULL, NULL, NULL);
+	prof_start(prof_main);
+
+	task_register(5000, prof_update, NULL, -300000);
 
 }
 
 void cleanup_prof(void)
 {
 
+	prof_stop(prof_main);
 	prof_free(&prof_main);
 }
