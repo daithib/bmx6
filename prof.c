@@ -113,8 +113,7 @@ void prof_start( struct prof_ctx *p)
 void prof_stop( struct prof_ctx *p)
 {
 	assertion(-500000, (p->timeBefore));
-	assertion(-500000, (!p->active_childs));
-	ASSERTION(-500000, (prof_check(p, 1) == SUCCESS));
+	ASSERTION(-500000, (prof_check(p, 0) == SUCCESS));
 
 	struct timeval tvAfter;
 	TIME_T clockAfter = clock();
