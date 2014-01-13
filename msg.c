@@ -21,6 +21,7 @@
 #include <stdarg.h>
 
 #include <unistd.h>
+#include <sys/time.h>
 #include <errno.h>
 #include <stdint.h>
 #include <netinet/udp.h>
