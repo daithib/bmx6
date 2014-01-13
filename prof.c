@@ -221,6 +221,10 @@ static int32_t prof_status_creator(struct status_handl *handl, void *data)
 //		status[i].total = pn->clockTotal;
 		sprintf(status->sysCpu, "%.4f", ((float)pn->load_period)/1000);
 
+		if (!pn->timeTotal ||
+			(pn->parent && (!pn->parent->load_period || !pn->parent->timeTotal)))
+			continue;
+
 		uint32_t load_total = (((uint64_t) pn->clockTotal)*
 				((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
 				pn->timeTotal;
