@@ -664,8 +664,6 @@ void wait_sec_msec( TIME_SEC_T sec, TIME_T msec );
 
 void cleanup_all( int32_t status );
 
-void upd_time( struct timeval *precise_tv );
-
 char *get_human_uptime( uint32_t reference );
 
 DESC_SQN_T getDescriptionSqn( char* newPath, uint8_t ass );

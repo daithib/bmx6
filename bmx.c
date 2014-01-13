@@ -89,8 +89,6 @@ const IDM_T CONST_NO = NO;
 
 uint32_t test_magic_number = 1234543210;
 
-static struct timeval start_time_tv;
-static struct timeval curr_tv;
 
 
 TIME_T bmx_time = 0;
@@ -152,51 +150,6 @@ void trace_function_call(const char *func)
 
 
 #endif
-
-void upd_time(struct timeval *precise_tv)
-{
-        static const struct timeval MAX_TV = {(((MAX_SELECT_TIMEOUT_MS + MAX_SELECT_SAFETY_MS) / 1000)), (((MAX_SELECT_TIMEOUT_MS + MAX_SELECT_SAFETY_MS) % 1000)*1000)};
-
-        struct timeval bmx_tv, diff_tv, acceptable_max_tv, acceptable_min_tv = curr_tv;
-
-        timeradd( &MAX_TV, &curr_tv, &acceptable_max_tv );
-
-	gettimeofday( &curr_tv, NULL );
-
-	if ( timercmp( &curr_tv, &acceptable_max_tv, > ) ) {
-
-		timersub( &curr_tv, &acceptable_max_tv, &diff_tv );
-		timeradd( &start_time_tv, &diff_tv, &start_time_tv );
-
-                dbg_sys(DBGT_WARN, "critical system time drift detected: ++ca %ld s, %ld us! Correcting reference!",
-		     diff_tv.tv_sec, diff_tv.tv_usec );
-
-                if ( diff_tv.tv_sec > CRITICAL_PURGE_TIME_DRIFT )
-                        purge_link_route_orig_nodes(NULL, NO, self);
-
-	} else 	if ( timercmp( &curr_tv, &acceptable_min_tv, < ) ) {
-
-		timersub( &acceptable_min_tv, &curr_tv, &diff_tv );
-		timersub( &start_time_tv, &diff_tv, &start_time_tv );
-
-                dbg_sys(DBGT_WARN, "critical system time drift detected: --ca %ld s, %ld us! Correcting reference!",
-		     diff_tv.tv_sec, diff_tv.tv_usec );
-
-                if ( diff_tv.tv_sec > CRITICAL_PURGE_TIME_DRIFT )
-                        purge_link_route_orig_nodes(NULL, NO, self);
-
-	}
-
-	timersub( &curr_tv, &start_time_tv, &bmx_tv );
-
-	if ( precise_tv ) {
-		precise_tv->tv_sec = bmx_tv.tv_sec;
-		precise_tv->tv_usec = bmx_tv.tv_usec;
-	}
-
-	bmx_time = ( (bmx_tv.tv_sec * 1000) + (bmx_tv.tv_usec / 1000) );
-	bmx_time_sec = bmx_tv.tv_sec;
-}
 
 char *get_human_uptime(uint32_t reference)
 {
@@ -1386,10 +1339,7 @@ int main(int argc, char *argv[])
 	}
 
 #endif
-	gettimeofday( &start_time_tv, NULL );
-        curr_tv = start_time_tv;
-
-	upd_time( NULL );
+	init_schedule();
 
 	My_pid = getpid();
 

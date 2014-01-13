@@ -451,7 +451,7 @@ IDM_T rtnl_rcv( int fd, uint32_t pid, uint32_t seq, uint8_t cmd, uint8_t quiet, 
 
                         if ( (err == EINTR || err == EWOULDBLOCK || err == EAGAIN ) && max_retries-- > 0 ) {
                                 usleep(500);
-                                upd_time( NULL );
+//                              upd_time( NULL );
                                 more_data = YES;
                                 continue;
                         } else {

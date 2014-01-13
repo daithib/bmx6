@@ -46,7 +46,9 @@ struct tx_task_node {
 	TIME_T send_ts;
 };
 
-//void init_schedule( void );
+void upd_time( struct timeval *precise_tv );
+
+void init_schedule( void );
 void change_selects( void );
 void cleanup_schedule( void );
 void task_register( TIME_T timeout, void (* task) (void *), void *data, int32_t tag );
