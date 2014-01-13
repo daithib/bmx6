@@ -70,7 +70,7 @@ void prof_free( struct prof_ctx **p)
 	assertion(-500000, (p && *p));
 	assertion(-500000, (!(((*p)->childs_tree).items)));
 	assertion(-500000, (avl_find_item(&prof_tree, &((*p)->k))));
-	assertion(-500000, !((*p)->timeBefore));
+//	assertion(-500000, !((*p)->timeBefore));
 	
 	avl_remove(&prof_tree, &((*p)->k), -300000);
 
@@ -281,6 +281,6 @@ void init_prof( void )
 void cleanup_prof(void)
 {
 
-	prof_stop(prof_main);
+	//(prof_main);
 	prof_free(&prof_main);
 }

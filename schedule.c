@@ -65,6 +65,7 @@ void upd_time(struct timeval *precise_tv)
 
 	gettimeofday( &curr_tv, NULL );
 
+
 	if ( timercmp( &curr_tv, &acceptable_max_tv, > ) ) {
 
 		timersub( &curr_tv, &acceptable_max_tv, &diff_tv );
