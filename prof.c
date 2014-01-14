@@ -255,7 +255,7 @@ prof_status_iterate_childs: {
 
 	status = &(status[1]);
 
-	struct avl_node *an;
+	struct avl_node *an = NULL;
 	struct prof_ctx *cn;
 	while ((cn=avl_iterate_item(&pn->childs_tree, &an))) {
 		status = prof_status_iterate(cn, status);
