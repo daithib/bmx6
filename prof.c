@@ -119,7 +119,7 @@ void prof_stop( struct prof_ctx *p)
 	TIME_T clockPeriod = (clockAfter - p->clockBeforePStart);
 	assertion(-500000, (clockPeriod < ((~((TIME_T)0))>>1)) ); //this wraps around some time..
 
-	p->clockRunningPeriod += (clockAfter - p->clockBeforePStart);
+	p->clockRunningPeriod += clockPeriod;
 
 	p->clockBeforePStart = 0;
 	p->active_prof = 0;
@@ -243,7 +243,7 @@ static int32_t prof_status_creator(struct status_handl *handl, void *data)
 			durationPrevPeriod;
 
 		if (loadParentPrevPeriod)
-			sprintf(status[i].relCurrCpu, "%.4f", ((float)((loadPrevPeriod*100)/loadParentPrevPeriod)));
+			sprintf(status[i].relCurrCpu, "%.4f", ((((float)loadPrevPeriod)*100)/((float)loadParentPrevPeriod)));
 		else if (!loadParentPrevPeriod && loadPrevPeriod)
 			sprintf(status[i].relCurrCpu, "ERR");
 
@@ -252,7 +252,7 @@ static int32_t prof_status_creator(struct status_handl *handl, void *data)
 			timeAfterPrevPeriod;
 
 		if (loadParentPrevTotal)
-			sprintf(status[i].relAvgCpu, "%.4f", ((float)((loadPrevTotal*100)/loadParentPrevTotal)));
+			sprintf(status[i].relAvgCpu, "%.4f", ((((float)loadPrevTotal)*100)/((float)loadParentPrevTotal)));
 		else if (!loadParentPrevTotal && loadPrevTotal)
 			sprintf(status[i].relAvgCpu, "ERR");
 
