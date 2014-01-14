@@ -200,62 +200,81 @@ static const struct field_format prof_status_format[] = {
         FIELD_FORMAT_END
 };
 
-static int32_t prof_status_creator(struct status_handl *handl, void *data)
+STATIC_FUNC
+struct prof_status *prof_status_iterate(struct prof_ctx *pn, struct prof_status *status)
+{
+	status->neighId = pn->k.neigh ? &pn->k.neigh->dhn->on->nodeId : NULL;
+	status->origId = &pn->k.orig ? &pn->k.orig->nodeId : NULL;
+	status->name = pn->k.name;
+	status->parent = pn->parent ? pn->parent->k.name : NULL;
+	sprintf(status->sysCurrCpu, DBG_NIL);
+	sprintf(status->relCurrCpu, DBG_NIL);
+	sprintf(status->sysAvgCpu, DBG_NIL);
+	sprintf(status->relAvgCpu, DBG_NIL);
+
+	if (!durationPrevPeriod || !timeAfterPrevPeriod)
+		goto prof_status_iterate_childs;
+
+	uint32_t loadPrevPeriod = (((uint64_t) pn->clockPrevPeriod)*
+		((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
+		durationPrevPeriod;
+
+	sprintf(status->sysCurrCpu, "%.4f", ((float) loadPrevPeriod) / 1000);
+
+	uint32_t loadPrevTotal = (((uint64_t) pn->clockPrevTotal)*
+		((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
+		timeAfterPrevPeriod;
+
+	sprintf(status->sysAvgCpu, "%.4f", ((float) loadPrevTotal) / 1000);
+
+	if (!pn->parent)
+		goto prof_status_iterate_childs;
+
+	uint32_t loadParentPrevPeriod = (((uint64_t) pn->parent->clockPrevPeriod)*
+		((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
+		durationPrevPeriod;
+
+	if (loadParentPrevPeriod)
+		sprintf(status->relCurrCpu, "%.4f", ((((float) loadPrevPeriod)*100) / ((float) loadParentPrevPeriod)));
+	else if (!loadParentPrevPeriod && loadPrevPeriod)
+		sprintf(status->relCurrCpu, "ERR");
+
+	uint32_t loadParentPrevTotal = (((uint64_t) pn->parent->clockPrevTotal)*
+		((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
+		timeAfterPrevPeriod;
+
+	if (loadParentPrevTotal)
+		sprintf(status->relAvgCpu, "%.4f", ((((float) loadPrevTotal)*100) / ((float) loadParentPrevTotal)));
+	else if (!loadParentPrevTotal && loadPrevTotal)
+		sprintf(status->relAvgCpu, "ERR");
+
+
+prof_status_iterate_childs: {
+	status++;
+
+	struct avl_node *an;
+	struct prof_ctx *cn;
+	while ((cn=avl_iterate_item(&pn->childs_tree, &an))) {
+		status = prof_status_iterate(cn, status);
+	}
+}
+	return status;
+}
+
+STATIC_FUNC
+int32_t prof_status_creator(struct status_handl *handl, void *data)
 {
         struct avl_node *it = NULL;
         struct prof_ctx *pn;
         uint32_t status_size = (prof_tree.items) * sizeof (struct prof_status);
-        uint32_t i = 0;
         struct prof_status *status = ((struct prof_status*) (handl->data = debugRealloc(handl->data, status_size, -300366)));
         memset(status, 0, status_size);
 
-        for (i=0; (pn = avl_iterate_item(&prof_tree, &it)); i++) {
+	while ((pn = avl_iterate_item(&prof_tree, &it))) {
 
-                status[i].neighId = pn->k.neigh ? &pn->k.neigh->dhn->on->nodeId : NULL;
-                status[i].origId = &pn->k.orig ? &pn->k.orig->nodeId : NULL;
-                status[i].name = pn->k.name;
-		status[i].parent = pn->parent ? pn->parent->k.name : NULL;
-		sprintf(status[i].sysCurrCpu, DBG_NIL);
-		sprintf(status[i].relCurrCpu, DBG_NIL);
-		sprintf(status[i].sysAvgCpu, DBG_NIL);
-		sprintf(status[i].relAvgCpu, DBG_NIL);
-
-		if (!durationPrevPeriod || !timeAfterPrevPeriod)
-			continue;
-
-		uint32_t loadPrevPeriod = (((uint64_t) pn->clockPrevPeriod)*
-			((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
-			durationPrevPeriod;
-
-		sprintf(status[i].sysCurrCpu, "%.4f", ((float)loadPrevPeriod)/1000);
-
-		uint32_t loadPrevTotal = (((uint64_t) pn->clockPrevTotal)*
-			((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
-			timeAfterPrevPeriod;
-
-		sprintf(status[i].sysAvgCpu, "%.4f", ((float)loadPrevTotal)/1000);
-
-		if (!pn->parent)
-			continue;
-
-		uint32_t loadParentPrevPeriod = (((uint64_t) pn->parent->clockPrevPeriod)*
-			((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
-			durationPrevPeriod;
-
-		if (loadParentPrevPeriod)
-			sprintf(status[i].relCurrCpu, "%.4f", ((((float)loadPrevPeriod)*100)/((float)loadParentPrevPeriod)));
-		else if (!loadParentPrevPeriod && loadPrevPeriod)
-			sprintf(status[i].relCurrCpu, "ERR");
-
-		uint32_t loadParentPrevTotal = (((uint64_t) pn->parent->clockPrevTotal)*
-			((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
-			timeAfterPrevPeriod;
-
-		if (loadParentPrevTotal)
-			sprintf(status[i].relAvgCpu, "%.4f", ((((float)loadPrevTotal)*100)/((float)loadParentPrevTotal)));
-		else if (!loadParentPrevTotal && loadPrevTotal)
-			sprintf(status[i].relAvgCpu, "ERR");
-
+		if (!pn->parent) {
+			status = prof_status_iterate(pn, status);
+		}
         }
 
         return status_size;
