@@ -180,8 +180,8 @@ struct prof_status {
         char* name;
 	char* parent;
 //	uint32_t total;
-	char sysCpu[10];
-	char relCpu[10];
+	char sysCurrCpu[10];
+	char relCurrCpu[10];
 	char sysAvgCpu[10];
 	char relAvgCpu[10];
 
@@ -193,8 +193,8 @@ static const struct field_format prof_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      prof_status, name,          1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      prof_status, parent,        1, FIELD_RELEVANCE_HIGH),
 //      FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              prof_status, total,         1, FIELD_RELEVANCE_HIGH),
-        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       prof_status, sysCpu,        1, FIELD_RELEVANCE_HIGH),
-        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       prof_status, relCpu,        1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       prof_status, sysCurrCpu,    1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       prof_status, relCurrCpu,    1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       prof_status, sysAvgCpu,     1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       prof_status, relAvgCpu,     1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_END
@@ -215,8 +215,8 @@ static int32_t prof_status_creator(struct status_handl *handl, void *data)
                 status[i].origId = &pn->k.orig ? &pn->k.orig->nodeId : NULL;
                 status[i].name = pn->k.name;
 		status[i].parent = pn->parent ? pn->parent->k.name : NULL;
-		sprintf(status[i].sysCpu, DBG_NIL);
-		sprintf(status[i].relCpu, DBG_NIL);
+		sprintf(status[i].sysCurrCpu, DBG_NIL);
+		sprintf(status[i].relCurrCpu, DBG_NIL);
 		sprintf(status[i].sysAvgCpu, DBG_NIL);
 		sprintf(status[i].relAvgCpu, DBG_NIL);
 
@@ -227,7 +227,7 @@ static int32_t prof_status_creator(struct status_handl *handl, void *data)
 			((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
 			durationPrevPeriod;
 
-		sprintf(status[i].sysCpu, "%.4f", ((float)loadPrevPeriod)/1000);
+		sprintf(status[i].sysCurrCpu, "%.4f", ((float)loadPrevPeriod)/1000);
 
 		uint32_t loadPrevTotal = (((uint64_t) pn->clockPrevTotal)*
 			((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
@@ -243,18 +243,18 @@ static int32_t prof_status_creator(struct status_handl *handl, void *data)
 			durationPrevPeriod;
 
 		if (loadParentPrevPeriod)
-			sprintf(status[i].relCpu, "%.4f", ((float)((loadPrevPeriod*100)/loadParentPrevPeriod)));
+			sprintf(status[i].relCurrCpu, "%.4f", ((float)((loadPrevPeriod*100)/loadParentPrevPeriod)));
 		else if (!loadParentPrevPeriod && loadPrevPeriod)
-			sprintf(status[i].relCpu, "ERR");
+			sprintf(status[i].relCurrCpu, "ERR");
 
 		uint32_t loadParentPrevTotal = (((uint64_t) pn->parent->clockPrevTotal)*
 			((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
 			timeAfterPrevPeriod;
 
 		if (loadParentPrevTotal)
-			sprintf(status[i].sysAvgCpu, "%.4f", ((float)((loadPrevTotal*100)/loadParentPrevTotal)));
+			sprintf(status[i].relAvgCpu, "%.4f", ((float)((loadPrevTotal*100)/loadParentPrevTotal)));
 		else if (!loadParentPrevTotal && loadPrevTotal)
-			sprintf(status[i].sysAvgCpu, "ERR");
+			sprintf(status[i].relAvgCpu, "ERR");
 
         }
 
