@@ -1011,7 +1011,6 @@ int32_t opt_version(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt
 int32_t opt_status(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
 {
         TRACE_FUNCTION_CALL;
-	prof_start(&prof_opt_status);
 
         if ( cmd == OPT_CHECK || cmd == OPT_APPLY) {
 
@@ -1037,9 +1036,16 @@ int32_t opt_status(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_
 
                 if ((handl = avl_find_item(&status_tree, status_name))) {
 
-                        if (cmd == OPT_APPLY && (data_len = ((*(handl->frame_creator))(handl, NULL)))) {
-                                dbg_printf(cn, "%s:\n", handl->status_name);
-                                fields_dbg_table(cn, relevance, data_len, handl->data, handl->min_msg_size, handl->format);
+                        if (cmd == OPT_APPLY) {
+
+				prof_start(prof_opt_status);
+
+				if ((data_len = ((*(handl->frame_creator))(handl, NULL)))) {
+					dbg_printf(cn, "%s:\n", handl->status_name);
+					fields_dbg_table(cn, relevance, data_len, handl->data, handl->min_msg_size, handl->format);
+				}
+
+				prof_stop(prof_opt_status);
                         }
 
                 } else {
@@ -1049,13 +1055,9 @@ int32_t opt_status(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_
                                 dbg_printf(cn, "%s ", handl->status_name);
                         }
                         dbg_printf(cn, "\n");
-			prof_stop(&prof_opt_status);
                         return FAILURE;
                 }
-
 	}
-
-	prof_stop(&prof_opt_status);
 	return SUCCESS;
 }
 
