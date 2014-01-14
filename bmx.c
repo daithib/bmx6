@@ -99,6 +99,7 @@ TIME_SEC_T bmx_time_sec = 0;
 uint32_t s_curr_avg_cpu_load = 0;
 
 static struct prof_ctx *prof_main = NULL;
+static struct prof_ctx *prof_opt_status = NULL;
 
 
 IDM_T validate_param(int32_t probe, int32_t min, int32_t max, char *name)
@@ -276,6 +277,7 @@ void cleanup_all(int32_t status)
 		cleanup_crypt();
 		cleanup_config();
 
+		prof_free(&prof_opt_status);
 		prof_free(&prof_main);
 
 		// last, close debugging system and check for forgotten resources...
@@ -1009,6 +1011,7 @@ int32_t opt_version(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt
 int32_t opt_status(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
 {
         TRACE_FUNCTION_CALL;
+	prof_start(&prof_opt_status);
 
         if ( cmd == OPT_CHECK || cmd == OPT_APPLY) {
 
@@ -1046,11 +1049,13 @@ int32_t opt_status(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_
                                 dbg_printf(cn, "%s ", handl->status_name);
                         }
                         dbg_printf(cn, "\n");
+			prof_stop(&prof_opt_status);
                         return FAILURE;
                 }
 
 	}
 
+	prof_stop(&prof_opt_status);
 	return SUCCESS;
 }
 
@@ -1348,6 +1353,7 @@ int main(int argc, char *argv[])
 	My_pid = getpid();
 
 	prof_main = prof_init("main", NULL, NULL, NULL);
+	prof_opt_status = prof_init("opt_status", "main", NULL, NULL);
 	prof_start(prof_main);
 
 
