@@ -26,15 +26,14 @@ struct prof_ctx {
     struct prof_ctx *parent;
     struct avl_tree childs_tree;
     int8_t active_childs;
+    int8_t active_prof;
     
-    uint64_t timeBefore;
-    uint64_t timePeriod;
-    uint64_t timeTotal;
-    clock_t clockBefore;
-    clock_t clockPeriod;
-    uint64_t clockTotal;
+    clock_t clockBeforePStart;
+    clock_t clockRunningPeriod;
+    clock_t clockPrevPeriod;
+    uint64_t clockPrevTotal;
     
-    uint32_t load_period;
+//    uint32_t loadPrevPeriod;
 };
 
 struct prof_ctx *prof_init( char *name, char *parent, struct orig_node *orig, struct neigh_node *neigh);

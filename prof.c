@@ -87,7 +87,7 @@ STATIC_FUNC
 int prof_check(struct prof_ctx *p, int childs)
 {
 	if (prof_check_disabled ||
-		!p || (p->timeBefore && p->active_childs == childs && prof_check(p->parent, 1) == SUCCESS))
+		!p || (p->active_prof && p->active_childs == childs && prof_check(p->parent, 1) == SUCCESS))
 		return SUCCESS;
 
 	dbgf_sys(DBGT_ERR, "%s % %p", p->k.name, p->k.neigh, p->k.orig);
@@ -97,47 +97,39 @@ int prof_check(struct prof_ctx *p, int childs)
 
 void prof_start( struct prof_ctx *p)
 {
-	assertion(-500000, (!p->timeBefore));
+	assertion(-500000, (!p->active_prof));
+	assertion(-500000, (!p->clockBeforePStart));
 	assertion(-500000, (!p->active_childs));
 
-	struct timeval tvBefore;
-
-	upd_time(&tvBefore);
-	p->timeBefore = (tvBefore.tv_sec * 1000000) + tvBefore.tv_usec;
-	p->clockBefore = (TIME_T)clock();
+	p->clockBeforePStart = (TIME_T)clock();
+	p->active_prof = 1;
 
 	if (p->parent)
 		p->parent->active_childs++;
-
 
 	ASSERTION(-500000, (prof_check(p, 0) == SUCCESS));
 }
 
 void prof_stop( struct prof_ctx *p)
 {
-	assertion(-500000, (p->timeBefore));
+	assertion(-500000, (p->active_prof));
 	ASSERTION(-500000, (prof_check(p, 0) == SUCCESS));
 
-	struct timeval tvAfter;
 	TIME_T clockAfter = clock();
+	TIME_T clockPeriod = (clockAfter - p->clockBeforePStart);
+	assertion(-500000, (clockPeriod < ((~((TIME_T)0))>>1)) ); //this wraps around some time..
 
-	upd_time(&tvAfter);
+	p->clockRunningPeriod += (clockAfter - p->clockBeforePStart);
 
-	uint64_t timeAfter = (tvAfter.tv_sec * 1000000) + tvAfter.tv_usec;
-
-//	assertion(-500000, (clockAfter >= p->clockBefore)); //this wraps around some time..
-//	assertion(-500000, (timeAfter > p->timeBefore));
-	assertion(-500000, (((uint64_t)(timeAfter - p->timeBefore)) < 10*1000000));
-
-	p->clockPeriod += (clockAfter - p->clockBefore);
-	p->timePeriod += (timeAfter - p->timeBefore);
-
-	p->clockBefore = p->timeBefore = 0;
+	p->clockBeforePStart = 0;
+	p->active_prof = 0;
 
 	if (p->parent)
 		p->parent->active_childs--;
 }
 
+static uint64_t durationPrevPeriod = 0;
+static uint64_t timeAfterPrevPeriod = 0;
 
 STATIC_FUNC
 void prof_update_all( void *unused) {
@@ -145,37 +137,38 @@ void prof_update_all( void *unused) {
 	struct avl_node *an=NULL;
 	struct prof_ctx *pn;
 
+	struct timeval tvAfterRunningPeriod;
+	upd_time(&tvAfterRunningPeriod);
+	uint64_t timeAfterRunningPeriod = (tvAfterRunningPeriod.tv_sec * 1000000) + tvAfterRunningPeriod.tv_usec;
+
+	durationPrevPeriod = (timeAfterRunningPeriod - timeAfterPrevPeriod);
+
+	assertion(-500000, (durationPrevPeriod > 0));
+	assertion(-500000, (durationPrevPeriod < 10*1000000));
+
 	prof_check_disabled = YES;
 
 	while ((pn = avl_iterate_item(&prof_tree, &an))) {
-		uint8_t active = (pn->timeBefore > 0);
+
+		uint8_t active = pn->active_prof;
 
 		dbgf_sys(DBGT_INFO, "updating %s active=%d", pn->k.name, active);
 
 		if (active)
 			prof_stop(pn);
 
-		if (pn->timePeriod) {
+		pn->clockPrevPeriod = pn->clockRunningPeriod;
+		pn->clockPrevTotal += pn->clockRunningPeriod;
 
-			pn->load_period = (((uint64_t) pn->clockPeriod)*
-				((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
-				pn->timePeriod;
-
-			pn->clockTotal += pn->clockPeriod;
-			pn->timeTotal += pn->timePeriod;
-
-			pn->clockPeriod = 0;
-			pn->timePeriod = 0;
-
-		} else {
-			pn->load_period = 0;
-		}
+		pn->clockRunningPeriod = 0;
 
 		if (active)
 			prof_start(pn);
 	}
 
 	prof_check_disabled = NO;
+
+	timeAfterPrevPeriod = timeAfterRunningPeriod;
 
 	task_register(5000, prof_update_all, NULL, -300000);
 }
@@ -222,42 +215,47 @@ static int32_t prof_status_creator(struct status_handl *handl, void *data)
                 status[i].origId = &pn->k.orig ? &pn->k.orig->nodeId : NULL;
                 status[i].name = pn->k.name;
 		status[i].parent = pn->parent ? pn->parent->k.name : NULL;
-//		status[i].total = pn->clockTotal;
-		sprintf(status[i].sysCpu, "%.4f", ((float)pn->load_period)/1000);
+		sprintf(status[i].sysCpu, DBG_NIL);
+		sprintf(status[i].relCpu, DBG_NIL);
+		sprintf(status[i].sysAvgCpu, DBG_NIL);
+		sprintf(status[i].relAvgCpu, DBG_NIL);
 
-		if (!pn->timeTotal ||
-			(pn->parent && (!pn->parent->load_period || !pn->parent->timeTotal))) {
-
-			sprintf(status[i].relCpu, DBG_NIL);
-			sprintf(status[i].sysAvgCpu, DBG_NIL);
-			sprintf(status[i].relAvgCpu, DBG_NIL);
-
+		if (!durationPrevPeriod || !timeAfterPrevPeriod)
 			continue;
-		}
 
-		uint32_t load_total = (((uint64_t) pn->clockTotal)*
-				((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
-				pn->timeTotal;
+		uint32_t loadPrevPeriod = (((uint64_t) pn->clockPrevPeriod)*
+			((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
+			durationPrevPeriod;
 
-		sprintf(status[i].relCpu, "%.4f", pn->parent ?
-			(((float)pn->load_period * 100) / ((float) pn->parent->load_period)) :
-			(((float)pn->load_period)/1000));
+		sprintf(status[i].sysCpu, "%.4f", ((float)loadPrevPeriod)/1000);
 
+		uint32_t loadPrevTotal = (((uint64_t) pn->clockPrevTotal)*
+			((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
+			timeAfterPrevPeriod;
 
-		sprintf(status[i].sysAvgCpu, "%.4f", ((float)load_total)/1000);
+		sprintf(status[i].sysAvgCpu, "%.4f", ((float)loadPrevTotal)/1000);
 
-		if (pn->parent) {
+		if (!pn->parent)
+			continue;
 
-			uint32_t load_parent_total = (((uint64_t) pn->parent->clockTotal)*
-				((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
-				pn->parent->timeTotal;
+		uint32_t loadParentPrevPeriod = (((uint64_t) pn->parent->clockPrevPeriod)*
+			((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
+			durationPrevPeriod;
 
-			sprintf(status[i].relAvgCpu, "%.4f", (((float) load_total * 100) / ((float) load_parent_total)));
+		if (loadParentPrevPeriod)
+			sprintf(status[i].relCpu, "%.4f", ((float)((loadPrevPeriod*100)/loadParentPrevPeriod)));
+		else if (!loadParentPrevPeriod && loadPrevPeriod)
+			sprintf(status[i].relCpu, "ERR");
 
+		uint32_t loadParentPrevTotal = (((uint64_t) pn->parent->clockPrevTotal)*
+			((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
+			timeAfterPrevPeriod;
 
-		} else {
-			sprintf(status[i].relAvgCpu, "%.4f", (((float) load_total) / 1000));
-		}
+		if (loadParentPrevTotal)
+			sprintf(status[i].sysAvgCpu, "%.4f", ((float)((loadPrevTotal*100)/loadParentPrevTotal)));
+		else if (!loadParentPrevTotal && loadPrevTotal)
+			sprintf(status[i].sysAvgCpu, "ERR");
+
         }
 
         return status_size;
