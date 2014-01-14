@@ -203,6 +203,8 @@ static const struct field_format prof_status_format[] = {
 STATIC_FUNC
 struct prof_status *prof_status_iterate(struct prof_ctx *pn, struct prof_status *status)
 {
+	dbgf_sys(DBGT_INFO, "dbg pn=%s status=%p", pn->k.name, status);
+
 	status->neighId = pn->k.neigh ? &pn->k.neigh->dhn->on->nodeId : NULL;
 	status->origId = &pn->k.orig ? &pn->k.orig->nodeId : NULL;
 	status->name = pn->k.name;
