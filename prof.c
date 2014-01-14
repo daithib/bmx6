@@ -250,7 +250,8 @@ struct prof_status *prof_status_iterate(struct prof_ctx *pn, struct prof_status 
 
 
 prof_status_iterate_childs: {
-	status++;
+
+	status = &(status[1]);
 
 	struct avl_node *an;
 	struct prof_ctx *cn;
