@@ -211,26 +211,26 @@ static int32_t prof_status_creator(struct status_handl *handl, void *data)
 {
         struct avl_node *it = NULL;
         struct prof_ctx *pn;
-        uint32_t status_size = (data ? 1 : prof_tree.items) * sizeof (struct prof_status);
+        uint32_t status_size = (prof_tree.items) * sizeof (struct prof_status);
         uint32_t i = 0;
         struct prof_status *status = ((struct prof_status*) (handl->data = debugRealloc(handl->data, status_size, -300366)));
         memset(status, 0, status_size);
 
-        while (data ? (pn = data) : (pn = avl_iterate_item(&prof_tree, &it))) {
+        for (i=0; (pn = avl_iterate_item(&prof_tree, &it)); i++) {
 
                 status[i].neighId = pn->k.neigh ? &pn->k.neigh->dhn->on->nodeId : NULL;
                 status[i].origId = &pn->k.orig ? &pn->k.orig->nodeId : NULL;
                 status[i].name = pn->k.name;
 		status[i].parent = pn->parent ? pn->parent->k.name : NULL;
 //		status[i].total = pn->clockTotal;
-		sprintf(status->sysCpu, "%.4f", ((float)pn->load_period)/1000);
+		sprintf(status[i].sysCpu, "%.4f", ((float)pn->load_period)/1000);
 
 		if (!pn->timeTotal ||
 			(pn->parent && (!pn->parent->load_period || !pn->parent->timeTotal))) {
 
-			sprintf(status->relCpu, DBG_NIL);
-			sprintf(status->sysAvgCpu, DBG_NIL);
-			sprintf(status->relAvgCpu, DBG_NIL);
+			sprintf(status[i].relCpu, DBG_NIL);
+			sprintf(status[i].sysAvgCpu, DBG_NIL);
+			sprintf(status[i].relAvgCpu, DBG_NIL);
 
 			continue;
 		}
@@ -239,12 +239,12 @@ static int32_t prof_status_creator(struct status_handl *handl, void *data)
 				((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
 				pn->timeTotal;
 
-		sprintf(status->relCpu, "%.4f", pn->parent ?
+		sprintf(status[i].relCpu, "%.4f", pn->parent ?
 			(((float)pn->load_period * 100) / ((float) pn->parent->load_period)) :
 			(((float)pn->load_period)/1000));
 
 
-		sprintf(status->sysAvgCpu, "%.4f", ((float)load_total)/1000);
+		sprintf(status[i].sysAvgCpu, "%.4f", ((float)load_total)/1000);
 
 		if (pn->parent) {
 
@@ -252,16 +252,12 @@ static int32_t prof_status_creator(struct status_handl *handl, void *data)
 				((((uint64_t) 100)*1000 * 1000000) / ((uint64_t) CLOCKS_PER_SEC))) /
 				pn->parent->timeTotal;
 
-			sprintf(status->relAvgCpu, "%.4f", (((float) load_total * 100) / ((float) load_parent_total)));
+			sprintf(status[i].relAvgCpu, "%.4f", (((float) load_total * 100) / ((float) load_parent_total)));
 
 
 		} else {
-			sprintf(status->relAvgCpu, "%.4f", (((float) load_total) / 1000));
+			sprintf(status[i].relAvgCpu, "%.4f", (((float) load_total) / 1000));
 		}
-
-                i++;
-                if(data)
-                        break;
         }
 
         return status_size;
