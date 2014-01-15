@@ -221,7 +221,6 @@ typedef struct ifname IFNAME_T;
 //#define IPV6_MULTICAST_U32 0xFF000000
 
 
-extern const struct link_dev_key ZERO_LINK_KEY;
 
 
 
@@ -399,7 +398,7 @@ struct dev_node {
 	IFNAME_T name_phy_cfg;  //key for dev_name_tree
 	IFNAME_T label_cfg;
 
-	struct link_dev_node dummy_lndev;
+        LinkNode dummyLink;
 
 	struct dev_ip_key llip_key;
 //	IPX_T llocal_ip_key; //TODO: Remove (use llip_key.ip instead)

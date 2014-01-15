@@ -853,10 +853,10 @@ static const struct field_format link_status_format[] = {
 
 static int32_t link_status_creator(struct status_handl *handl, void *data)
 {
-        struct avl_node *link_it, *local_it;
-        struct link_node *link;
+        struct avl_node *linkDev_it, *local_it;
+	LinkDevNode *linkDev;
         struct local_node *local;
-        uint32_t max_size = link_dev_tree.items * sizeof (struct link_status);
+        uint32_t max_size = link_tree.items * sizeof (struct link_status);
         uint32_t i = 0;
 
         struct link_status *status = ((struct link_status*) (handl->data = debugRealloc(handl->data, max_size, -300358)));
@@ -866,28 +866,28 @@ static int32_t link_status_creator(struct status_handl *handl, void *data)
 
                 struct orig_node *on = local->neigh ? local->neigh->dhn->on : NULL;
 
-                for (link_it = NULL; on && (link = avl_iterate_item(&local->link_tree, &link_it));) {
-                        struct link_dev_node *lndev = NULL;
+                for (linkDev_it = NULL; on && (linkDev = avl_iterate_item(&local->linkDev_tree, &linkDev_it));) {
+			LinkNode *link = NULL;
 
-                        while ((lndev = list_iterate(&link->lndev_list, lndev))) {
+                        while ((link = list_iterate(&linkDev->link_list, link))) {
 
                                 status[i].globalId = &on->nodeId;
                                 status[i].shortId = &on->nodeId;
                                 status[i].name = on->hostname;
-                                status[i].llocalIp = link->link_ip;
-                                status[i].viaDev = lndev->key.dev->label_cfg;
-                                status[i].rxRate = ((lndev->timeaware_rx_probe * 100) / UMETRIC_MAX);
-                                status[i].bestRxLink = (lndev == local->best_rp_lndev);
-                                status[i].txRate = ((lndev->timeaware_tx_probe * 100) / UMETRIC_MAX);
-                                status[i].bestTxLink = (lndev == local->best_tp_lndev);
-                                status[i].routes = (lndev == local->best_rp_lndev) ? local->orig_routes : 0;
-                                status[i].wantsOgms = (lndev == local->best_rp_lndev) ? local->rp_ogm_request_rcvd : 0;
-                                status[i].myDevIdx = lndev->key.dev->llip_key.idx;
-                                status[i].nbDevIdx = link->key.dev_idx;
-                                status[i].lastHelloSqn = link->hello_sqn_max;
-                                status[i].lastHelloAdv = ((TIME_T) (bmx_time - link->hello_time_max)) / 1000;
+                                status[i].llocalIp = linkDev->link_ip;
+                                status[i].viaDev = link->key.myDev->label_cfg;
+                                status[i].rxRate = ((link->timeaware_rx_probe * 100) / UMETRIC_MAX);
+                                status[i].bestRxLink = (link == local->best_rp_link);
+                                status[i].txRate = ((link->timeaware_tx_probe * 100) / UMETRIC_MAX);
+                                status[i].bestTxLink = (link == local->best_tp_link);
+                                status[i].routes = (link == local->best_rp_link) ? local->orig_routes : 0;
+                                status[i].wantsOgms = (link == local->best_rp_link) ? local->rp_ogm_request_rcvd : 0;
+                                status[i].myDevIdx = link->key.myDev->llip_key.idx;
+                                status[i].nbDevIdx = linkDev->key.dev_idx;
+                                status[i].lastHelloSqn = linkDev->hello_sqn_max;
+                                status[i].lastHelloAdv = ((TIME_T) (bmx_time - linkDev->hello_time_max)) / 1000;
 
-                                status[i].nbLocalId = link->key.local_id;
+                                status[i].nbLocalId = linkDev->key.local_id;
                                 status[i].nbIid4Me = local->neigh ? local->neigh->neighIID4me : 0;
                                 status[i].linkAdv4Him = local->link_adv_msg_for_him;
                                 status[i].linkAdv4Me = local->link_adv_msg_for_me;
@@ -969,8 +969,10 @@ static int32_t orig_status_creator(struct status_handl *handl, void *data)
                 status[i].blocked = on->blocked;
                 status[i].primaryIp = on->primary_ip;
                 status[i].routes = on->rt_tree.items;
-                status[i].viaIp = (on->curr_rt_lndev ? on->curr_rt_lndev->key.link->link_ip : ZERO_IP);
-                status[i].viaDev = on->curr_rt_lndev && on->curr_rt_lndev->key.dev ? on->curr_rt_lndev->key.dev->name_phy_cfg.str : DBG_NIL;
+                status[i].viaIp = (on->curr_rt_link ? 
+			on->curr_rt_link->key.linkDev->link_ip :
+			ZERO_IP);
+                status[i].viaDev = on->curr_rt_link && on->curr_rt_link->key.myDev ? on->curr_rt_link->key.myDev->name_phy_cfg.str : DBG_NIL;
                 status[i].metric = (on->curr_rt_local ? (on->curr_rt_local->mr.umetric) : (on == self ? UMETRIC_MAX : 0));
                 status[i].myIid4x = on->dhn->myIID4orig;
                 status[i].descSqn = ntohl(((struct dsc_msg_version*)dext_dptr(on->dhn->dext, BMX_DSC_TLV_VERSION))->descSqn);
@@ -1264,7 +1266,7 @@ void bmx(void)
 
         for (an = NULL; (dev = avl_iterate_item(&dev_ip_tree, &an));) {
 
-                schedule_tx_task(&dev->dummy_lndev, FRAME_TYPE_DEV_ADV, SCHEDULE_UNKNOWN_MSGS_SIZE, 0, 0, 0, 0);
+                schedule_tx_task(&dev->dummyLink, FRAME_TYPE_DEV_ADV, SCHEDULE_UNKNOWN_MSGS_SIZE, 0, 0, 0, 0);
 //                schedule_tx_task(&dev->dummy_lndev, FRAME_TYPE_DESC_ADVS, self->dhn->desc_frame_len, 0, 0, myIID4me, 0);
         }
 

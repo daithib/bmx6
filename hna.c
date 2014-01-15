@@ -162,14 +162,14 @@ IDM_T configure_route(IDM_T del, struct orig_node *on, struct net_key *key)
 
         } else {
 
-                struct link_dev_node *lndev = on->curr_rt_lndev;
+		LinkNode *link = on->curr_rt_link;
 
-                assertion(-500820, (lndev));
-                ASSERTION(-500239, (avl_find(&link_dev_tree, &(lndev->key))));
-                assertion(-500579, (lndev->key.dev->if_llocal_addr));
+                assertion(-500820, (link));
+                ASSERTION(-500239, (avl_find(&link_tree, &(link->key))));
+                assertion(-500579, (link->key.myDev->if_llocal_addr));
 
                 return iproute(IP_ROUTE_HNA, ADD, NO, key, RT_TABLE_HNA, 0,
-                        lndev->key.dev->if_llocal_addr->ifa.ifa_index, &(lndev->key.link->link_ip),
+                        link->key.myDev->if_llocal_addr->ifa.ifa_index, &(link->key.linkDev->link_ip),
                         (key->af == AF_INET ? (&(self->primary_ip)) : NULL), DEF_IP_METRIC, NULL);
 
         }
@@ -444,7 +444,7 @@ void configure_hna(IDM_T del, struct net_key* key, struct orig_node *on, uint8_t
                 }
 		 */
 
-        } else if (on->curr_rt_lndev && !(flags & DESC_MSG_HNA_FLAG_NO_ROUTE)) {
+        } else if (on->curr_rt_link && !(flags & DESC_MSG_HNA_FLAG_NO_ROUTE)) {
 
                 configure_route(del, on, key);
         }

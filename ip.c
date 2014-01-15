@@ -1851,9 +1851,9 @@ void dev_deactivate( struct dev_node *dev )
                 purge_tx_task_list(dev->tx_task_lists, NULL, NULL);
 
                 struct avl_node *an;
-                struct link_dev_node *lndev;
-                for (an = NULL; (lndev = avl_iterate_item(&link_dev_tree, &an));) {
-                        purge_tx_task_list(lndev->tx_task_lists, NULL, dev);
+		LinkNode *link;
+                for (an = NULL; (link = avl_iterate_item(&link_tree, &an));) {
+                        purge_tx_task_list(link->tx_task_lists, NULL, dev);
                 }
 
 
@@ -3082,7 +3082,7 @@ int32_t opt_dev(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_par
 
                         //dev->umetric_max = DEF_DEV_BITRATE_MAX;
 
-                        dev->dummy_lndev.key.dev = dev;
+                        dev->dummyLink.key.myDev = dev;
                         
                         /*
                          * specifying the outgoing src address for IPv6 seems not working

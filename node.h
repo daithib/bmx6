@@ -234,13 +234,55 @@ typedef CRYPTSHA1_T RHASH_T;
 typedef CRYPTSHA1_T GLOBAL_ID_T;
 
 
+typedef struct {
+	DEVADV_IDX_T dev_idx;
+	LOCAL_ID_T local_id;
+} __attribute__((packed)) LinkDevKey;
+
+typedef struct {
+
+	LinkDevKey key;
+
+	IPX_T link_ip;
+
+	TIME_T pkt_time_max;
+	TIME_T hello_time_max;
+
+	HELLO_SQN_T hello_sqn_max;
+
+	struct local_node *local; // set immediately
+
+	struct list_head link_list; // list with one link_node_dev element per link
+} LinkDevNode;
+
+
+typedef struct {
+	LinkDevNode *linkDev;
+	struct dev_node *myDev;
+} __attribute__((packed)) LinkKey;
+
+typedef struct {
+	struct list_node list;
+	LinkKey key;
+
+	UMETRIC_T tx_probe_umetric;
+	UMETRIC_T timeaware_tx_probe;
+	struct lndev_probe_record rx_probe_record;
+	UMETRIC_T timeaware_rx_probe;
+
+	struct list_head tx_task_lists[FRAME_TYPE_ARRSZ]; // scheduled frames and messages
+	int16_t link_adv_msg;
+	TIME_T pkt_time_max;
+} LinkNode;
+
+
 struct local_node {
 
 	LOCAL_ID_T local_id;
-	struct avl_tree link_tree;
-	struct link_dev_node *best_rp_lndev;
-	struct link_dev_node *best_tp_lndev;
-	struct link_dev_node *best_lndev;
+	struct avl_tree linkDev_tree;
+	LinkNode *best_rp_link;
+	LinkNode *best_tp_link;
+	LinkNode *best_link;
 	struct neigh_node *neigh; // to be set when confirmed, use carefully
 
 	TIME_T packet_time;
@@ -268,32 +310,6 @@ struct local_node {
 
 
 
-struct link_node_key {
-	DEVADV_IDX_T dev_idx;
-	LOCAL_ID_T local_id;
-} __attribute__((packed));
-
-struct link_node {
-
-	struct link_node_key key;
-
-	IPX_T link_ip;
-
-	TIME_T pkt_time_max;
-	TIME_T hello_time_max;
-
-	HELLO_SQN_T hello_sqn_max;
-
-	struct local_node *local; // set immediately
-
-	struct list_head lndev_list; // list with one link_node_dev element per link
-};
-
-
-struct link_dev_key {
-	struct link_node *link;
-	struct dev_node *dev;
-} __attribute__((packed));
 
 struct router_node {
 
@@ -305,24 +321,8 @@ struct router_node {
 	OGM_SQN_T ogm_sqn_last;
 	UMETRIC_T ogm_umetric_last;
 
-	UMETRIC_T path_metric_best; //TODO removed
-	struct link_dev_node *path_lndev_best;
-};
-
-
-
-struct link_dev_node {
-	struct list_node list;
-	struct link_dev_key key;
-
-	UMETRIC_T tx_probe_umetric;
-	UMETRIC_T timeaware_tx_probe;
-	struct lndev_probe_record rx_probe_record;
-	UMETRIC_T timeaware_rx_probe;
-
-	struct list_head tx_task_lists[FRAME_TYPE_ARRSZ]; // scheduled frames and messages
-	int16_t link_adv_msg;
-	TIME_T pkt_time_max;
+	UMETRIC_T best_path_metric; //TODO removed
+	LinkNode *best_path_link;
 };
 
 
@@ -441,7 +441,7 @@ struct orig_node {
 
 	struct router_node *best_rt_local;  // TODO: remove
 	struct router_node *curr_rt_local;   // the currently used local neighbor for routing
-	struct link_dev_node *curr_rt_lndev; // the configured route in the kernel!
+	LinkNode *curr_rt_link; // the configured route in the kernel!
 
 	//size of plugin data is defined during intialization and depends on registered PLUGIN_DATA_ORIG hooks
 	void *plugin_data[];
@@ -501,15 +501,19 @@ struct packet_buff {
 		int length;
 		uint8_t unicast;
 
-		//filled in by rx_packet()
-		uint32_t rx_counter;
-		IID_T transmittersIID;
+		//filled in by tx_packet()
+		struct dev_node *oif;
 
+		//filled in by rx_packet():
 		IPX_T llip;
 		char llip_str[INET6_ADDRSTRLEN];
-		struct dev_node *oif;
-		struct link_dev_node *lndev;
-		struct link_node *link;
+                
+                //remove:
+		LinkNode *link;
+                LinkDevNode *linkDev;
+//		IID_T transmittersIID;
+//		uint32_t rx_counter;
+                
 	} i;
 
 	union {
@@ -534,8 +538,8 @@ extern TIME_T my_local_id_timestamp;
 extern struct avl_tree dhash_tree;
 extern struct avl_tree dhash_invalid_tree;
 extern struct avl_tree local_tree;
-extern struct avl_tree link_tree;
 extern struct avl_tree link_dev_tree;
+extern struct avl_tree link_tree;
 extern struct avl_tree neigh_tree;
 extern struct avl_tree orig_tree;
 
@@ -553,13 +557,13 @@ IID_NODE_T* iid_get_node_by_neighIID4x(IID_NEIGH_T *nn, IID_T neighIID4x, IDM_T 
 IID_NODE_T* iid_get_node_by_myIID4x( IID_T myIID4x );
 
 
-struct link_dev_node *get_link_dev_node(struct packet_buff *pb);
+LinkNode *getLinkNode(struct packet_buff *pb);
 
 void blacklist_neighbor(struct packet_buff *pb);
 
 IDM_T blacklisted_neighbor(struct packet_buff *pb, DHASH_T *dhash);
 
-struct neigh_node *is_described_neigh( struct link_node *link, DHASH_T *transmittersDhash);
+struct neigh_node *is_described_neigh(LinkDevNode *linkDev, DHASH_T *transmittersDhash);
 
 void purge_dhash_invalid_list( IDM_T force_purge_all );
 void invalidate_dhash( struct dhash_node *dhn, DHASH_T *dhash );
@@ -573,7 +577,7 @@ SHA1_T *nodeIdFromDescAdv( uint8_t *desc_adv );
 char *nodeIdAsStringFromDescAdv( uint8_t *desc_adv );
 
 void purge_local_node(struct local_node *local);
-void purge_link_node(struct link_node_key *only_link_key, struct dev_node *only_dev, IDM_T only_expired);
+void purge_link_node(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T only_expired);
 
 void update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn);
 void update_neigh_dhash(struct orig_node *on, struct dhash_node *dhn);
