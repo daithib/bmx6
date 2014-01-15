@@ -435,6 +435,7 @@ void init_sec( void )
 
 	static const struct field_format pubkey_format[] = DESCRIPTION_MSG_PUBKEY_FORMAT;
         handl.name = "PUBKEY";
+	handl.is_mandatory = 1;
         handl.min_msg_size = sizeof(struct dsc_msg_pubkey);
         handl.fixed_msg_size = 0;
 	handl.dextReferencing = (int32_t*)&always_fref;
@@ -446,7 +447,8 @@ void init_sec( void )
 
 	static const struct field_format signature_format[] = DESCRIPTION_MSG_SIGNATURE_FORMAT;
         handl.name = "SIGNATURE";
-        handl.min_msg_size = sizeof(struct dsc_msg_signature);
+	handl.is_mandatory = 1;
+	handl.min_msg_size = sizeof(struct dsc_msg_signature);
         handl.fixed_msg_size = 0;
 	handl.dextReferencing = (int32_t*)&never_fref;
 	handl.dextCompression = (int32_t*)&never_fzip;

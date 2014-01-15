@@ -3539,6 +3539,26 @@ void process_description_tlvs_del( struct orig_node *on, uint8_t ft_start, uint8
 	}
 }
 
+STATIC_FUNC
+int8_t missed_mandatory_frames(struct rx_frame_iterator *it, int8_t f_start, int8_t f_end)
+{
+	assertion(-500000, (f_start >= 0));
+	assertion(-500000, (f_end <= it->db->handl_max));
+
+	if (it->process_filter != FRAME_TYPE_PROCESS_ALL || f_start > f_end)
+		return NO;
+
+	int8_t f;
+	for (f = f_start; f <= f_end; f++) {
+		if (it->db->handls[f].is_mandatory) {
+			dbgf_sys(DBGT_WARN,"frame_type=%s",it->db->handls[f].name);
+			return YES;
+		}
+	}
+
+
+	return NO;
+}
 
 int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 {
@@ -3558,6 +3578,9 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 	        it->caller, it->db->name, it->frame_type, it->frames_pos, it->frames_length);
 
         if (it->frames_pos == it->frames_length ) {
+
+		if (missed_mandatory_frames(it, it->frame_type+1, it->db->handl_max))
+			goto_error(rx_frame_iterate_error, "missing mandatory frame");
 		
 		if ( it->db == description_tlv_db && it->onOld && it->onOld->added && it->op == TLV_OP_NEW &&
 			it->process_filter == FRAME_TYPE_PROCESS_ALL && it->frame_type < it->db->handl_max ) {
@@ -3607,6 +3630,9 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 
 			goto_error(rx_frame_iterate_error, "unordered or double frame_type");
                 }
+
+		if (missed_mandatory_frames(it, it->frame_type+1, f_type-1))
+			goto_error(rx_frame_iterate_error, "missing mandatory frame");
 
                 if (it->db == description_tlv_db && it->onOld && it->onOld->added && it->op == TLV_OP_NEW &&
 			it->process_filter == FRAME_TYPE_PROCESS_ALL && it->frame_type + 1 < f_type) {
@@ -5027,6 +5053,7 @@ void init_msg( void )
 
 	static const struct field_format version_format[] = VERSION_MSG_FORMAT;
         handl.name = "VERSION";
+	handl.is_mandatory = 1;
 	handl.min_msg_size = sizeof (struct dsc_msg_version);
         handl.fixed_msg_size = 1;
 	handl.dextReferencing = (int32_t*)&never_fref;
