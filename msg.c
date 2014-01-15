@@ -4238,6 +4238,9 @@ void tx_packet(void *devp)
         static struct packet_buff pb;
         struct dev_node *dev = devp;
 
+	static struct prof_ctx prof_tx_packet = { .k = {.name="tx_packet", .parent="main"}};
+	prof_start(&prof_tx_packet);
+
         assertion(-500204, (dev));
 
         dev->tx_task = NULL;
@@ -4426,6 +4429,7 @@ void tx_packet(void *devp)
         }
 
         assertion(-500797, (!it.frames_out_pos));
+	prof_stop(&prof_tx_packet);
 }
 
 void tx_packets( void *unused ) {
