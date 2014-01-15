@@ -98,9 +98,6 @@ TIME_SEC_T bmx_time_sec = 0;
 
 uint32_t s_curr_avg_cpu_load = 0;
 
-static struct prof_ctx *prof_main = NULL;
-static struct prof_ctx *prof_opt_status = NULL;
-
 
 IDM_T validate_param(int32_t probe, int32_t min, int32_t max, char *name)
 {
@@ -264,21 +261,21 @@ void cleanup_all(int32_t status)
                 // first, restore defaults...
                 cb_plugin_hooks(PLUGIN_CB_TERM, NULL);
 
-		cleanup_schedule();
+//		cleanup_schedule();
 
                 purge_link_route_orig_nodes(NULL, NO, NULL);
 
 		cleanup_plugin();
-		cleanup_prof();
 		cleanup_sec();
 		cleanup_msg();
 		cleanup_node();
                 cleanup_ip();
 		cleanup_crypt();
 		cleanup_config();
-
-		prof_free(&prof_opt_status);
-		prof_free(&prof_main);
+		cleanup_prof();
+//		cleanup_avl();
+//		cleanup_tools();
+		cleanup_schedule();
 
 		// last, close debugging system and check for forgotten resources...
 		cleanup_control();
@@ -1037,15 +1034,16 @@ int32_t opt_status(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_
                 if ((handl = avl_find_item(&status_tree, status_name))) {
 
                         if (cmd == OPT_APPLY) {
+				static struct prof_ctx prof_opt_status = {.k ={.name="opt_status", .parent="main"}};
 
-				prof_start(prof_opt_status);
+				prof_start(&prof_opt_status);
 
 				if ((data_len = ((*(handl->frame_creator))(handl, NULL)))) {
 					dbg_printf(cn, "%s:\n", handl->status_name);
 					fields_dbg_table(cn, relevance, data_len, handl->data, handl->min_msg_size, handl->format);
 				}
 
-				prof_stop(prof_opt_status);
+				prof_stop(&prof_opt_status);
                         }
 
                 } else {
@@ -1350,13 +1348,7 @@ int main(int argc, char *argv[])
 	}
 
 #endif
-	init_schedule();
-
 	My_pid = getpid();
-
-	prof_main = prof_init("main", NULL, NULL, NULL);
-	prof_opt_status = prof_init("opt_status", "main", NULL, NULL);
-	prof_start(prof_main);
 
 
 	signal( SIGINT, handler );
@@ -1367,14 +1359,21 @@ int main(int argc, char *argv[])
 #ifdef TEST_DEBUG_MALLOC
         debugMalloc(1, -300525); //testing debugMalloc
 #endif
-        init_tools();
+
+
 	init_control();
+	init_schedule();
+
+        init_tools();
         init_avl();
+
+	init_prof();
+//	init_config();
 	init_crypt();
         init_ip();
+//	init_node()
 	init_msg();
 	init_sec();
-	init_prof();
 
         if (init_plugin() == SUCCESS) {
 
@@ -1390,6 +1389,9 @@ int main(int argc, char *argv[])
         } else {
                 assertion(-500809, (0));
         }
+
+	static struct prof_ctx prof_main = { .k={.name="main"}};
+	prof_start(&prof_main);
 
 	cryptRand(&my_runtimeKey, sizeof(my_runtimeKey));
 
