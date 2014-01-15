@@ -19,18 +19,23 @@ struct prof_ctx_key {
     struct neigh_node *neigh;
     struct orig_node *orig;
     char *name;
-    char *parent;
 } __attribute__((packed));
 
 struct prof_ctx {
+    // must be initialized:
     struct prof_ctx_key k;
+    char *parent_name;
+    // updated by first prof_start() -> prof_init():
     struct prof_ctx *parent;
     struct avl_tree childs_tree;
     int8_t initialized;
+    
     int8_t active_childs;
     int8_t active_prof;
     
     clock_t clockBeforePStart;
+    
+    // updated by prof_stop():
     clock_t clockRunningPeriod;
     clock_t clockPrevPeriod;
     uint64_t clockPrevTotal;

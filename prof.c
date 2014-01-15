@@ -46,8 +46,8 @@ void prof_init( struct prof_ctx *sp)
 	assertion(-500000, (!(sp->k.orig && sp->k.neigh)));
 	assertion(-500000, (!avl_find_item(&prof_tree, &sp->k)));
 
-	if (sp->k.parent) {
-		struct prof_ctx_key pk = {.name=sp->k.parent};
+	if (sp->parent_name) {
+		struct prof_ctx_key pk = {.name=sp->parent_name};
 		struct prof_ctx *pp = avl_find_item(&prof_tree, &pk);
 
 		assertion(-500000, (pp));
