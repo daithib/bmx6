@@ -179,8 +179,8 @@ void prof_update_all( void *unused) {
 struct prof_status {
         GLOBAL_ID_T *neighId;
         GLOBAL_ID_T *origId;
-        char* name;
 	char* parent;
+        char* name;
 //	uint32_t total;
 	char sysCurrCpu[10];
 	char relCurrCpu[10];
@@ -192,8 +192,8 @@ struct prof_status {
 static const struct field_format prof_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_SHORT_ID,  prof_status, neighId,       1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, prof_status, origId,        1, FIELD_RELEVANCE_HIGH),
-        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      prof_status, name,          1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      prof_status, parent,        1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      prof_status, name,          1, FIELD_RELEVANCE_HIGH),
 //      FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              prof_status, total,         1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       prof_status, sysCurrCpu,    1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       prof_status, relCurrCpu,    1, FIELD_RELEVANCE_HIGH),
@@ -209,8 +209,8 @@ struct prof_status *prof_status_iterate(struct prof_ctx *pn, struct prof_status 
 
 	status->neighId = pn->k.neigh ? &pn->k.neigh->dhn->on->nodeId : NULL;
 	status->origId = &pn->k.orig ? &pn->k.orig->nodeId : NULL;
-	status->name = pn->k.name;
 	status->parent = pn->parent ? pn->parent->k.name : NULL;
+	status->name = pn->k.name;
 	sprintf(status->sysCurrCpu, DBG_NIL);
 	sprintf(status->relCurrCpu, DBG_NIL);
 	sprintf(status->sysAvgCpu, DBG_NIL);
