@@ -3305,18 +3305,23 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 
         assertion(-500550, (it->frame_msgs_length >= ((int) sizeof (struct dsc_msg_version))));
 
+	int32_t goto_error_code;
+	static struct prof_ctx prof_rx_frame_description_adv = { .k={.name="rx_frame_description_adv", .parent="rx_packet"}};
+
+	prof_start(&prof_rx_frame_description_adv);
+
 	if (it->frame_data_length > (int)MAX_DESC_SIZE)
-		return TLV_RX_DATA_FAILURE;
+		goto_error(finish, TLV_RX_DATA_FAILURE);
 
 	struct tlv_hdr tlvHdr = { .u.u16 = ntohs(((struct tlv_hdr*)it->frame_data)->u.u16) };
 	struct desc_hdr_rhash *rhashHdr = ((struct desc_hdr_rhash*)(it->frame_data + sizeof(struct tlv_hdr)));
 
 	if (tlvHdr.u.tlv.type != BMX_DSC_TLV_RHASH ||
 		tlvHdr.u.tlv.length != sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) )
-		return TLV_RX_DATA_FAILURE;
+		goto_error(finish, TLV_RX_DATA_FAILURE);
 
 	if (rhashHdr->compression || rhashHdr->reserved || rhashHdr->expanded_type != BMX_DSC_TLV_PUBKEY)
-		return TLV_RX_DATA_FAILURE;
+		goto_error(finish, TLV_RX_DATA_FAILURE);
 
 	DHASH_T dhash;
 	struct packet_buff *pb = it->pb;
@@ -3334,7 +3339,7 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 
 	if (dhn == FAILURE_PTR) {
 
-		return TLV_RX_DATA_FAILURE;
+		goto_error(finish, TLV_RX_DATA_FAILURE);
 
 	} else if (dhn == UNRESOLVED_PTR || dhn == REJECTED_PTR || dhn == NULL) {
 
@@ -3353,7 +3358,12 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 		}
 	}
 	
-        return it->frame_data_length;
+        goto_error(finish, it->frame_data_length);
+
+finish:
+	prof_stop(&prof_rx_frame_description_adv);
+
+	return goto_error_code;
 }
 
 
