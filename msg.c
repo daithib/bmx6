@@ -3306,7 +3306,7 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
         assertion(-500550, (it->frame_msgs_length >= ((int) sizeof (struct dsc_msg_version))));
 
 	int32_t goto_error_code;
-	static struct prof_ctx prof_rx_frame_description_adv = { .k={.name="rx_frame_description_adv", .parent="rx_packet"}};
+	static struct prof_ctx prof_rx_frame_description_adv = { .k={.name="rx_frame_description_adv"}, .parent_name="rx_packet"};
 
 	prof_start(&prof_rx_frame_description_adv);
 
@@ -4248,7 +4248,7 @@ void tx_packet(void *devp)
         static struct packet_buff pb;
         struct dev_node *dev = devp;
 
-	static struct prof_ctx prof_tx_packet = { .k = {.name="tx_packet", .parent="main"}};
+	static struct prof_ctx prof_tx_packet = { .k = {.name="tx_packet"}, .parent_name="main"};
 	prof_start(&prof_tx_packet);
 
         assertion(-500204, (dev));
@@ -4416,7 +4416,7 @@ void tx_packet(void *devp)
                         phdr->dev_idx = dev->llip_key.idx;
 
 			if (packet_sign) {
-				static struct prof_ctx prof_tx_packet_sign = { .k ={.name="tx_packet_sign", .parent="tx_packet"}};
+				static struct prof_ctx prof_tx_packet_sign = { .k ={.name="tx_packet_sign"}, .parent_name="tx_packet"};
 				prof_start(&prof_tx_packet_sign);
 				uint8_t signature[CRYPT_RSA_MAX_LEN];
 				CRYPTSHA1_T sha;
@@ -4769,7 +4769,7 @@ void rx_packet( struct packet_buff *pb )
 {
         TRACE_FUNCTION_CALL;
 
-	static struct prof_ctx prof_rx_packet = { .k={.name="rx_packet", .parent="main"}};
+	static struct prof_ctx prof_rx_packet = { .k={.name="rx_packet"}, .parent_name="main"};
 	prof_start(&prof_rx_packet);
 
         struct dev_node *iif = pb->i.iif;
