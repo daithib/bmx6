@@ -1034,7 +1034,7 @@ int32_t opt_status(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_
                 if ((handl = avl_find_item(&status_tree, status_name))) {
 
                         if (cmd == OPT_APPLY) {
-				static struct prof_ctx prof_opt_status = {.k ={.name="opt_status", .parent="main"}};
+				static struct prof_ctx prof_opt_status = {.k ={.name="opt_status"}, .parent_name="main"};
 
 				prof_start(&prof_opt_status);
 
