@@ -39,46 +39,45 @@
 
 static AVL_TREE(prof_tree, struct prof_ctx, k);
 
-struct prof_ctx *prof_init( char *name, char *parent, struct orig_node *orig, struct neigh_node *neigh)
+void prof_init( struct prof_ctx *sp)
 {
-	assertion(-500000, (name && strlen(name)< 100));
-	assertion(-500000, (!(orig && neigh)));
-	struct prof_ctx_key pk = {.name=parent};
-	struct prof_ctx_key sk = {.name=name, .neigh=neigh, .orig=orig};
+	assertion(-500000, (!sp->initialized));
+	assertion(-500000, (sp && sp->k.name && strlen(sp->k.name)< 100));
+	assertion(-500000, (!(sp->k.orig && sp->k.neigh)));
+	assertion(-500000, (!avl_find_item(&prof_tree, &sp->k)));
 
-	struct prof_ctx *pp = parent ? avl_find_item(&prof_tree, &pk) : NULL;
-	struct prof_ctx *sp = debugMallocReset(sizeof(struct prof_ctx), -300000);
+	if (sp->k.parent) {
+		struct prof_ctx_key pk = {.name=sp->k.parent};
+		struct prof_ctx *pp = avl_find_item(&prof_tree, &pk);
 
-	assertion(-500000, IMPLIES(parent, pp));
-	assertion(-500000, (!avl_find_item(&prof_tree, &sk)));
+		assertion(-500000, (pp));
 
-	sp->k = sk;
-	AVL_INIT_TREE(sp->childs_tree, struct prof_ctx, k);
-
-	if (pp) {
 		avl_insert(&pp->childs_tree, sp, -300000);
 		sp->parent = pp;
 	}
 
-	avl_insert(&prof_tree, sp, -300000);
+	AVL_INIT_TREE(sp->childs_tree, struct prof_ctx, k);
 
-	return sp;
+	avl_insert(&prof_tree, sp, -300000);
+	sp->initialized = 1;
+
 }
 
-void prof_free( struct prof_ctx **p)
+void prof_free( struct prof_ctx *p)
 {
-	assertion(-500000, (p && *p));
-	assertion(-500000, (!(((*p)->childs_tree).items)));
-	assertion(-500000, (avl_find_item(&prof_tree, &((*p)->k))));
+	assertion(-500000, (p));
+	assertion(-500000, (p->initialized));
+	assertion(-500000, (!(p->childs_tree.items)));
+	assertion(-500000, (avl_find_item(&prof_tree, &p->k)));
 //	assertion(-500000, !((*p)->timeBefore));
+
+	p->initialized = 0;
 	
-	avl_remove(&prof_tree, &((*p)->k), -300000);
+	avl_remove(&prof_tree, &p->k, -300000);
 
-	if ((*p)->parent)
-		avl_remove(&((*p)->parent->childs_tree), &((*p)->k), -300000);
+	if (p->parent)
+		avl_remove(&(p->parent->childs_tree), &p->k, -300000);
 
-	debugFree(*p, -300000);
-	*p = NULL;
 }
 
 static uint8_t prof_check_disabled = 0;
@@ -100,6 +99,9 @@ void prof_start( struct prof_ctx *p)
 	assertion(-500000, (!p->active_prof));
 	assertion(-500000, (!p->clockBeforePStart));
 	assertion(-500000, (!p->active_childs));
+
+	if (!p->initialized)
+		prof_init(p);
 
 	p->clockBeforePStart = (TIME_T)clock();
 	p->active_prof = 1;
@@ -296,4 +298,13 @@ void init_prof( void )
 void cleanup_prof(void)
 {
 
+        struct avl_node *it = NULL;
+        struct prof_ctx *pn;
+
+	for (it = NULL; (pn = avl_iterate_item(&prof_tree, &it));) {
+		pn->parent = NULL;
+		while ((avl_remove_first_item(&(pn->childs_tree), -300000)));
+        }
+
+	while ((avl_remove_first_item(&prof_tree, -300000)));
 }
