@@ -152,8 +152,6 @@ static const void* REJECTED_PTR = (void*) & REJECTED_PTR;
 static const void* UNRESOLVED_PTR = (void*) & UNRESOLVED_PTR;
 static const void* FAILURE_PTR = (void*) & FAILURE_PTR;
 
-static struct prof_ctx *prof_rx_packet = NULL;
-
 
 /***********************************************************
   The core frame/message structures and handlers
@@ -4753,7 +4751,9 @@ int32_t opt_update_dext_method(uint8_t cmd, uint8_t _save, struct opt_type *opt,
 void rx_packet( struct packet_buff *pb )
 {
         TRACE_FUNCTION_CALL;
-	prof_start(prof_rx_packet);
+
+	static struct prof_ctx prof_rx_packet = { .k={.name="rx_packet", .parent="main"}};
+	prof_start(&prof_rx_packet);
 
         struct dev_node *iif = pb->i.iif;
 	struct packet_header *phdr = &pb->p.hdr;
@@ -4828,7 +4828,7 @@ process_packet_error:
         blacklist_neighbor(pb);
 
 finish:
-	prof_stop(prof_rx_packet);
+	prof_stop(&prof_rx_packet);
 	return;
 }
 
@@ -4941,8 +4941,6 @@ void init_msg( void )
         register_status_handl(sizeof (struct ref_status), 1, ref_status_format, ARG_REFERENCES, ref_status_creator);
 
         task_register(my_ogm_interval, schedule_my_originator_message, NULL, -300356);
-
-	prof_rx_packet = prof_init("rx_packete", "main", NULL, NULL);
 
 	packet_frame_db = init_frame_db(FRAME_TYPE_ARRSZ, "packet_frame_db");
 	packet_desc_db = init_frame_db(1, "packet_desc_db");
@@ -5190,7 +5188,5 @@ void cleanup_msg( void )
 	free_frame_db(&description_tlv_db);
 	free_frame_db(&packet_desc_db);
 	free_frame_db(&packet_frame_db);
-
-	prof_free(&prof_rx_packet);
 }
 
