@@ -829,6 +829,7 @@ struct frame_handl {
 	uint8_t is_destination_specific_frame; // particularly: is NO advertisement AND individual frames are created for each destination
 	int32_t *dextCompression;
 	int32_t *dextReferencing;
+        uint8_t rx_processUnVerifiedLink;
 	uint8_t rx_requires_described_neigh;
         uint16_t data_header_size;
         uint16_t min_msg_size;

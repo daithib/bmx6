@@ -510,6 +510,7 @@ struct packet_buff {
                 
                 //remove:
 		LinkNode *link;
+                LinkNode *verifiedLink;
 //              LinkDevNode *linkDev;
 //		IID_T transmittersIID;
 //		uint32_t rx_counter;
