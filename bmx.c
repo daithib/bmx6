@@ -875,14 +875,14 @@ static int32_t link_status_creator(struct status_handl *handl, void *data)
                                 status[i].shortId = &on->nodeId;
                                 status[i].name = on->hostname;
                                 status[i].llocalIp = linkDev->link_ip;
-                                status[i].viaDev = link->key.myDev->label_cfg;
+                                status[i].viaDev = link->k.myDev->label_cfg;
                                 status[i].rxRate = ((link->timeaware_rx_probe * 100) / UMETRIC_MAX);
                                 status[i].bestRxLink = (link == local->best_rp_link);
                                 status[i].txRate = ((link->timeaware_tx_probe * 100) / UMETRIC_MAX);
                                 status[i].bestTxLink = (link == local->best_tp_link);
                                 status[i].routes = (link == local->best_rp_link) ? local->orig_routes : 0;
                                 status[i].wantsOgms = (link == local->best_rp_link) ? local->rp_ogm_request_rcvd : 0;
-                                status[i].myDevIdx = link->key.myDev->llip_key.idx;
+                                status[i].myDevIdx = link->k.myDev->llip_key.idx;
                                 status[i].nbDevIdx = linkDev->key.dev_idx;
                                 status[i].lastHelloSqn = linkDev->hello_sqn_max;
                                 status[i].lastHelloAdv = ((TIME_T) (bmx_time - linkDev->hello_time_max)) / 1000;
@@ -970,9 +970,9 @@ static int32_t orig_status_creator(struct status_handl *handl, void *data)
                 status[i].primaryIp = on->primary_ip;
                 status[i].routes = on->rt_tree.items;
                 status[i].viaIp = (on->curr_rt_link ? 
-			on->curr_rt_link->key.linkDev->link_ip :
+			on->curr_rt_link->k.linkDev->link_ip :
 			ZERO_IP);
-                status[i].viaDev = on->curr_rt_link && on->curr_rt_link->key.myDev ? on->curr_rt_link->key.myDev->name_phy_cfg.str : DBG_NIL;
+                status[i].viaDev = on->curr_rt_link && on->curr_rt_link->k.myDev ? on->curr_rt_link->k.myDev->name_phy_cfg.str : DBG_NIL;
                 status[i].metric = (on->curr_rt_local ? (on->curr_rt_local->mr.umetric) : (on == self ? UMETRIC_MAX : 0));
                 status[i].myIid4x = on->dhn->myIID4orig;
                 status[i].descSqn = ntohl(((struct dsc_msg_version*)dext_dptr(on->dhn->dext, BMX_DSC_TLV_VERSION))->descSqn);

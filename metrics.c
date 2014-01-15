@@ -510,13 +510,13 @@ UMETRIC_T apply_lndev_metric_algo(LinkNode *link, const UMETRIC_T *path, struct 
 {
         TRACE_FUNCTION_CALL;
 
-        assertion(-500823, (link->key.myDev->umetric_max));
+        assertion(-500823, (link->k.myDev->umetric_max));
 
         UMETRIC_T tq = umetric_to_the_power_of_n(link->timeaware_tx_probe, algo->algo_tp_exp_numerator, algo->algo_tp_exp_divisor);
         UMETRIC_T rq = umetric_to_the_power_of_n(link->timeaware_rx_probe, algo->algo_rp_exp_numerator, algo->algo_rp_exp_divisor);
         UMETRIC_T lq = umetric_multiply_normalized(tq, rq);
 
-        return apply_metric_algo(&lq, &link->key.myDev->umetric_max, path, algo);
+        return apply_metric_algo(&lq, &link->k.myDev->umetric_max, path, algo);
 }
 
 
@@ -743,12 +743,12 @@ UMETRIC_T timeaware_rx_probe(LinkNode *link)
 STATIC_FUNC
 UMETRIC_T timeaware_tx_probe(LinkNode *link)
 {
-        if (((TIME_T) (bmx_time - link->key.linkDev->local->rp_adv_time)) < TP_ADV_DELAY_TOLERANCE)
+        if (((TIME_T) (bmx_time - link->k.linkDev->local->rp_adv_time)) < TP_ADV_DELAY_TOLERANCE)
                 return link->tx_probe_umetric;
 
-        if (((TIME_T) (bmx_time - link->key.linkDev->local->rp_adv_time)) < TP_ADV_DELAY_RANGE) {
+        if (((TIME_T) (bmx_time - link->k.linkDev->local->rp_adv_time)) < TP_ADV_DELAY_RANGE) {
                 return (link->tx_probe_umetric *
-                        ((UMETRIC_T) (TP_ADV_DELAY_RANGE - (bmx_time - link->key.linkDev->local->rp_adv_time)))) /
+                        ((UMETRIC_T) (TP_ADV_DELAY_RANGE - (bmx_time - link->k.linkDev->local->rp_adv_time)))) /
                         TP_ADV_DELAY_RANGE;
         }
 
@@ -760,13 +760,13 @@ void lndev_assign_best(struct local_node *onlyLocal, LinkNode *onlyLink )
 {
         TRACE_FUNCTION_CALL;
 
-        assertion(-501133, (IMPLIES(onlyLink, onlyLocal && onlyLocal == onlyLink->key.linkDev->local)));
-        ASSERTION(-500792, (IMPLIES(onlyLink, onlyLink->key.linkDev == avl_find_item(&onlyLocal->linkDev_tree, &onlyLink->key.linkDev->key.dev_idx))));
+        assertion(-501133, (IMPLIES(onlyLink, onlyLocal && onlyLocal == onlyLink->k.linkDev->local)));
+        ASSERTION(-500792, (IMPLIES(onlyLink, onlyLink->k.linkDev == avl_find_item(&onlyLocal->linkDev_tree, &onlyLink->k.linkDev->key.dev_idx))));
 
         dbgf_all(DBGT_INFO, "only_local=%X only_lndev.link=%s only_lndev.dev=%s",
                 onlyLocal ? ntohl(onlyLocal->local_id) : 0,
-                onlyLink ? ip6AsStr(&onlyLink->key.linkDev->link_ip) : DBG_NIL,
-                onlyLink ? onlyLink->key.myDev->label_cfg.str : DBG_NIL);
+                onlyLink ? ip6AsStr(&onlyLink->k.linkDev->link_ip) : DBG_NIL,
+                onlyLink ? onlyLink->k.myDev->label_cfg.str : DBG_NIL);
 
         struct avl_node *local_an = NULL;
         struct local_node *local;
@@ -787,7 +787,7 @@ void lndev_assign_best(struct local_node *onlyLocal, LinkNode *onlyLink )
 
                 dbgf_all(DBGT_INFO, "local_id=%X", ntohl(local->local_id));
 
-                while ((onlyLink && (linkDev = onlyLink->key.linkDev)) || (linkDev = avl_iterate_item(&local->linkDev_tree, &link_an))) {
+                while ((onlyLink && (linkDev = onlyLink->k.linkDev)) || (linkDev = avl_iterate_item(&local->linkDev_tree, &link_an))) {
 
                         LinkNode *currLink = NULL;
                         LinkNode *prevLink = NULL;
@@ -797,7 +797,7 @@ void lndev_assign_best(struct local_node *onlyLocal, LinkNode *onlyLink )
                         while ((onlyLink && (currLink = onlyLink)) || (currLink = list_iterate(&linkDev->link_list, currLink))) {
 
                                 dbgf_all(DBGT_INFO, "lndev=%s items=%d",
-                                        currLink->key.myDev->label_cfg.str, linkDev->link_list.items);
+                                        currLink->k.myDev->label_cfg.str, linkDev->link_list.items);
 
                                 currLink->timeaware_rx_probe = timeaware_rx_probe(currLink);
                                 currLink->timeaware_tx_probe = timeaware_tx_probe(currLink);
@@ -842,7 +842,7 @@ void update_link_probe_record(LinkNode *link, HELLO_SQN_T sqn, uint8_t probe)
 {
 
         TRACE_FUNCTION_CALL;
-	LinkDevNode *linkDev = link->key.linkDev;
+	LinkDevNode *linkDev = link->k.linkDev;
         struct lndev_probe_record *lpr = &link->rx_probe_record;
 
         ASSERTION(-501049, ((sizeof (((struct lndev_probe_record*) NULL)->hello_array)) * 8 == MAX_HELLO_SQN_WINDOW));
@@ -995,7 +995,7 @@ IDM_T update_path_metrics(struct packet_buff *pb, struct orig_node *on, OGM_SQN_
                 return SUCCESS;
         }
 
-        struct local_node *local = pb->i.link->key.linkDev->local;
+        struct local_node *local = pb->i.link->k.linkDev->local;
         struct router_node *next_rt = NULL;
         struct router_node *prev_rt = on->curr_rt_local;
         IDM_T is_ogm_sqn_new = UXX_GT(OGM_SQN_MASK, ogmSqn, on->ogmSqn_maxRcvd);
@@ -1040,8 +1040,8 @@ IDM_T update_path_metrics(struct packet_buff *pb, struct orig_node *on, OGM_SQN_
                 rt = router_node_create(local, on, ogm_sqn_max);
 
                 dbg_track(DBGT_INFO, "new router via_ip=%s to nodeId=%s metric=%ju (curr_rt=%s metric=%ju total %d)",
-                        ip6AsStr(&best_rt_link->key.linkDev->link_ip), cryptShaAsString(&on->nodeId), best_rt_metric,
-                        on->curr_rt_link ? ip6AsStr(&on->curr_rt_link->key.linkDev->link_ip) : DBG_NIL,
+                        ip6AsStr(&best_rt_link->k.linkDev->link_ip), cryptShaAsString(&on->nodeId), best_rt_metric,
+                        on->curr_rt_link ? ip6AsStr(&on->curr_rt_link->k.linkDev->link_ip) : DBG_NIL,
                         on->curr_rt_link ? on->curr_rt_local->mr.umetric : 0, on->rt_tree.items);
 
         }
@@ -1079,11 +1079,11 @@ IDM_T update_path_metrics(struct packet_buff *pb, struct orig_node *on, OGM_SQN_
 
                                 dbg_track(DBGT_INFO, "changed route to nodeId=%s ip=%s via_ip=%s via_dev=%s metric=%s   (prev %s %s metric=%s sqn_max=%d sqn_in=%d)",
                                         cryptShaAsString(&on->nodeId), on->primary_ip_str,
-                                        ip6AsStr(&next_rt->best_path_link->key.linkDev->link_ip),
-                                        next_rt->best_path_link->key.myDev->label_cfg.str,
+                                        ip6AsStr(&next_rt->best_path_link->k.linkDev->link_ip),
+                                        next_rt->best_path_link->k.myDev->label_cfg.str,
                                         umetric_to_human(next_rt->mr.umetric),
-                                        ip6AsStr(on->curr_rt_link ? &on->curr_rt_link->key.linkDev->link_ip : &ZERO_IP),
-                                        on->curr_rt_link ? on->curr_rt_link->key.myDev->label_cfg.str : DBG_NIL,
+                                        ip6AsStr(on->curr_rt_link ? &on->curr_rt_link->k.linkDev->link_ip : &ZERO_IP),
+                                        on->curr_rt_link ? on->curr_rt_link->k.myDev->label_cfg.str : DBG_NIL,
                                         umetric_to_human(on->curr_rt_local ? on->curr_rt_local->mr.umetric : 0),
                                         ogm_sqn_max, ogmSqn);
 

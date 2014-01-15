@@ -628,14 +628,14 @@ struct tx_task_node *tx_task_new(LinkNode *destLink, struct tx_task_node *test)
         if (handl->is_destination_specific_frame) {
 
                 // ensure, this is NOT a dummy dest_lndev!!!:
-                ASSERTION(-500850, (destLink && destLink == avl_find_item(&link_tree, &destLink->key)));
+                ASSERTION(-500850, (destLink && destLink == avl_find_item(&link_tree, &destLink->k)));
 
                 list_add_tail(&(destLink->tx_task_lists[test->task.type]), &ttn->list);
 
                 dbgf_track(DBGT_INFO, "added %s to lndev local_id=%X link_ip=%s dev=%s tx_tasks_list.items=%d",
-                        handl->name, ntohl(destLink->key.linkDev->key.local_id),
-                        ip6AsStr(&destLink->key.linkDev->link_ip),
-                        destLink->key.myDev->label_cfg.str, destLink->tx_task_lists[test->task.type].items);
+                        handl->name, ntohl(destLink->k.linkDev->key.local_id),
+                        ip6AsStr(&destLink->k.linkDev->link_ip),
+                        destLink->k.myDev->label_cfg.str, destLink->tx_task_lists[test->task.type].items);
 
         } else {
 
@@ -654,21 +654,21 @@ void schedule_tx_task(LinkNode *destLink, uint16_t frame_type, int16_t frame_msg
         if (!destLink)
                 return;
 
-        if (destLink->key.myDev->linklayer == TYP_DEV_LL_LO)
+        if (destLink->k.myDev->linklayer == TYP_DEV_LL_LO)
                 return;
 
         assertion(-501047, (!cleaning_up)); // this function MUST NOT be called during cleanup
-        assertion(-500756, (destLink && destLink->key.myDev));
+        assertion(-500756, (destLink && destLink->k.myDev));
 //        ASSERTION(-500713, (initializing || iid_get_node_by_myIID4x(myIID4me)));
         ASSERTION(-500714, IMPLIES(myIID4x, iid_get_node_by_myIID4x(myIID4x)));
         assertion(-501090, (frame_msgs_len >= SCHEDULE_MIN_MSG_SIZE));
-        assertion(-501091, (destLink->key.myDev->active));
-        assertion(-501092, (destLink->key.myDev->linklayer != TYP_DEV_LL_LO));
+        assertion(-501091, (destLink->k.myDev->active));
+        assertion(-501092, (destLink->k.myDev->linklayer != TYP_DEV_LL_LO));
 	assertion(-501573, (dlen <= TX_TASK_MAX_DATA_LEN));
 
         // ensure, this is NOT a dummy dest_lndev if:!!!
         ASSERTION(-500976, (IMPLIES(handl->is_destination_specific_frame,
-                (destLink == avl_find_item(&link_tree, &destLink->key)))));
+                (destLink == avl_find_item(&link_tree, &destLink->k)))));
 
 
         if (handl->tx_iterations && !(*handl->tx_iterations))
@@ -683,14 +683,14 @@ void schedule_tx_task(LinkNode *destLink, uint16_t frame_type, int16_t frame_msg
                 ? DBGL_CHANGES : DBGL_ALL), DBGT_INFO,
                  "%s to NB=%s local_id=0x%X via dev=%s frame_msgs_len=%d data=%s myIID4x=%d neighIID4x=%d ",
                 handl->name,
-                destLink->key.linkDev ? ip6AsStr(&destLink->key.linkDev->link_ip) : DBG_NIL,
-                destLink->key.linkDev ? destLink->key.linkDev->local->local_id : 0,
-                destLink->key.myDev->label_cfg.str, frame_msgs_len, memAsHexString(data, dlen), myIID4x, neighIID4x);
+                destLink->k.linkDev ? ip6AsStr(&destLink->k.linkDev->link_ip) : DBG_NIL,
+                destLink->k.linkDev ? destLink->k.linkDev->local->local_id : 0,
+                destLink->k.myDev->label_cfg.str, frame_msgs_len, memAsHexString(data, dlen), myIID4x, neighIID4x);
 
         if (handl->tx_tp_min && *(handl->tx_tp_min) > destLink->timeaware_tx_probe) {
 
                 dbgf_track(DBGT_INFO, "NOT sending %s (via dev=%s data=%s myIID4x=%d neighIID4x=%d) tp=%ju < %ju",
-                        handl->name, destLink->key.myDev->label_cfg.str, memAsHexString(data, dlen), myIID4x, neighIID4x,
+                        handl->name, destLink->k.myDev->label_cfg.str, memAsHexString(data, dlen), myIID4x, neighIID4x,
                         destLink->timeaware_tx_probe, *(handl->tx_tp_min));
                 return;
         }
@@ -698,7 +698,7 @@ void schedule_tx_task(LinkNode *destLink, uint16_t frame_type, int16_t frame_msg
         if (handl->tx_rp_min && *(handl->tx_rp_min) > destLink->timeaware_rx_probe) {
 
                 dbgf_track(DBGT_INFO, "NOT sending %s (via dev=%s data=%s myIID4x=%d neighIID4x=%d) rp=%ju < %ju",
-                        handl->name, destLink->key.myDev->label_cfg.str, memAsHexString(data, dlen), myIID4x, neighIID4x,
+                        handl->name, destLink->k.myDev->label_cfg.str, memAsHexString(data, dlen), myIID4x, neighIID4x,
                         destLink->timeaware_rx_probe, *(handl->tx_rp_min));
                 return;
         }
@@ -707,7 +707,7 @@ void schedule_tx_task(LinkNode *destLink, uint16_t frame_type, int16_t frame_msg
         memset(&test_task, 0, sizeof (test_task));
 	if( data && dlen)
 		memcpy(test_task.task.data, data, dlen);
-        test_task.task.dev = destLink->key.myDev;
+        test_task.task.dev = destLink->k.myDev;
         test_task.task.myIID4x = myIID4x;
         test_task.task.neighIID4x = neighIID4x;
         test_task.task.type = frame_type;
@@ -716,9 +716,9 @@ void schedule_tx_task(LinkNode *destLink, uint16_t frame_type, int16_t frame_msg
 
         // advertisements are send to all and are not bound to a specific destinations,
         // therfore tx_task_obsolete should not filter due to the destination_dev_id
-        if (!handl->is_advertisement && destLink->key.linkDev) {
+        if (!handl->is_advertisement && destLink->k.linkDev) {
                 //ASSERTION(-500915, (destLink == avl_find_item(&link_tree, &dest_lndev->key)));
-                test_task.task.linkDev = destLink->key.linkDev;
+                test_task.task.linkDev = destLink->k.linkDev;
         }
 
         test_task.frame_msgs_length = frame_msgs_len == SCHEDULE_MIN_MSG_SIZE ? handl->min_msg_size : frame_msgs_len;
@@ -970,17 +970,17 @@ LinkNode **lndevs_get_unacked_ogm_neighbors(struct ogm_aggreg_node *oan)
 			oan->tx_attempt == 0/*first ogm-adv frame shall be send to all neighbors*/) {
 
 			LinkNode *bestLink = local->best_tp_link;
-			assertion(-500446, (bestLink->key.myDev));
-			assertion(-500447, (bestLink->key.myDev->active));
+			assertion(-500446, (bestLink->k.myDev));
+			assertion(-500447, (bestLink->k.myDev->active));
 			assertion(-500444, (d <= dev_ip_tree.items));
 
                         dbgf_all(DBGT_INFO, "  redundant=%d via dev=%s to local_id=%X dev_idx=0x%X",
-                                bestLink->key.myDev->tmp_flag_for_to_be_send_adv, bestLink->key.myDev->label_cfg.str,
-                                ntohl(bestLink->key.linkDev->key.local_id), bestLink->key.linkDev->key.dev_idx);
+                                bestLink->k.myDev->tmp_flag_for_to_be_send_adv, bestLink->k.myDev->label_cfg.str,
+                                ntohl(bestLink->k.linkDev->key.local_id), bestLink->k.linkDev->key.dev_idx);
 
-                        if (bestLink->key.myDev->tmp_flag_for_to_be_send_adv == NO) {
+                        if (bestLink->k.myDev->tmp_flag_for_to_be_send_adv == NO) {
                                 linkArray[d++] = bestLink;
-                                bestLink->key.myDev->tmp_flag_for_to_be_send_adv = YES;
+                                bestLink->k.myDev->tmp_flag_for_to_be_send_adv = YES;
                         }
 
                         if (not_acked) {
@@ -994,8 +994,8 @@ LinkNode **lndevs_get_unacked_ogm_neighbors(struct ogm_aggreg_node *oan)
 
                                 dbg_track(DBGT_WARN, "schedule ogm_aggregation_sqn=%3d msgs=%2d dest_bytes=%d tx_attempt=%2d/%d via dev=%s to NB=%s",
                                         oan->sqn, oan->aggregated_msgs, oan->ogm_dest_bytes, (oan->tx_attempt + 1),
-                                        ogm_adv_tx_iters, bestLink->key.myDev->label_cfg.str,
-                                        ip6AsStr(&bestLink->key.linkDev->link_ip));
+                                        ogm_adv_tx_iters, bestLink->k.myDev->label_cfg.str,
+                                        ip6AsStr(&bestLink->k.linkDev->link_ip));
                         }
                 }
         }
@@ -1025,16 +1025,16 @@ LinkNode **lndevs_get_best_tp(struct local_node *except_local)
 			LinkNode *bestLink = local->best_tp_link;
 
                         assertion(-500445, (bestLink));
-                        assertion(-500446, (bestLink->key.myDev));
-                        assertion(-500447, (bestLink->key.myDev->active));
+                        assertion(-500446, (bestLink->k.myDev));
+                        assertion(-500447, (bestLink->k.myDev->active));
 
                         dbgf_all(DBGT_INFO, "  via dev=%s to local_id=%X dev_idx=0x%X (redundant %d)",
-                                bestLink->key.myDev->label_cfg.str, ntohl(bestLink->key.linkDev->key.local_id),
-                                bestLink->key.linkDev->key.dev_idx, bestLink->key.myDev->tmp_flag_for_to_be_send_adv);
+                                bestLink->k.myDev->label_cfg.str, ntohl(bestLink->k.linkDev->key.local_id),
+                                bestLink->k.linkDev->key.dev_idx, bestLink->k.myDev->tmp_flag_for_to_be_send_adv);
 
-                        if (bestLink->key.myDev->tmp_flag_for_to_be_send_adv == NO) {
+                        if (bestLink->k.myDev->tmp_flag_for_to_be_send_adv == NO) {
                                 linkArray[d++] = bestLink;
-                                bestLink->key.myDev->tmp_flag_for_to_be_send_adv = YES;
+                                bestLink->k.myDev->tmp_flag_for_to_be_send_adv = YES;
                         }
 
                         assertion(-500444, (d <= dev_ip_tree.items));
@@ -1412,7 +1412,7 @@ int32_t rx_msg_ref_request(struct rx_frame_iterator *it)
 	struct ref_node *refn = ref_node_get(rhash);
 
 	if (refn && refn->dext_tree.items)
-		schedule_tx_task(it->pb->i.linkDev->local->best_tp_link, FRAME_TYPE_REF_ADV, refn->f_body_len, &refn->rhash, sizeof(SHA1_T), 0, 0);
+		schedule_tx_task(it->pb->i.link->k.linkDev->local->best_tp_link, FRAME_TYPE_REF_ADV, refn->f_body_len, &refn->rhash, sizeof(SHA1_T), 0, 0);
 
 	return sizeof(struct msg_ref_req);
 }
@@ -1718,7 +1718,7 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *f_body, uint32_t f_bo
 		if (!refn) {
 
 			if(pb)
-				schedule_tx_task(pb->i.linkDev->local->best_tp_link, FRAME_TYPE_REF_REQ, SCHEDULE_MIN_MSG_SIZE,
+				schedule_tx_task(pb->i.link->k.linkDev->local->best_tp_link, FRAME_TYPE_REF_REQ, SCHEDULE_MIN_MSG_SIZE,
 					&(msg[m].rframe_hash), sizeof(SHA1_T), 0, 0);
 
 			solvable = NULL;
@@ -1810,7 +1810,7 @@ STATIC_FUNC
 struct dhash_node * process_description(struct packet_buff *pb, struct description_cache_node *cache, DHASH_T *dhash)
 {
         TRACE_FUNCTION_CALL;
-        assertion(-500262, (pb && pb->i.linkDev && cache && cache->desc_frame));
+        assertion(-500262, (pb && pb->i.link->k.linkDev && cache && cache->desc_frame));
         assertion(-500381, (!avl_find( &dhash_tree, dhash )));
 
 	// First check if dext is fully resolvable::
@@ -2360,7 +2360,7 @@ int32_t rx_frame_dev_adv( struct rx_frame_iterator *it)
 
         uint16_t msgs = it->frame_msgs_length / sizeof (struct msg_dev_adv);
 
-        struct local_node *local = it->pb->i.linkDev->local;
+        struct local_node *local = it->pb->i.link->k.linkDev->local;
 
         DEVADV_SQN_T dev_sqn = ntohs(hdr->dev_sqn);
 
@@ -2394,7 +2394,7 @@ int32_t rx_frame_dev_adv( struct rx_frame_iterator *it)
         } else if (local->dev_adv_sqn != dev_sqn) {
 
                 dbgf_track(DBGT_INFO, "new DEV_ADV from NB=%s local_id=0x%X dev=%s dev_sqn=%d->%d",
-                        it->pb->i.llip_str,  it->pb->i.linkDev->local->local_id , it->pb->i.iif->label_cfg.str,
+                        it->pb->i.llip_str,  it->pb->i.link->k.linkDev->local->local_id , it->pb->i.iif->label_cfg.str,
                         local->dev_adv_sqn, dev_sqn);
 
                 if (local->dev_adv)
@@ -2416,13 +2416,13 @@ int32_t rx_frame_dev_adv( struct rx_frame_iterator *it)
 STATIC_FUNC
 void set_link_adv_msg(uint16_t msg, LinkNode *link)
 {
-        my_link_adv_buff[msg].transmitter_dev_idx = link->key.myDev->llip_key.idx;
-        my_link_adv_buff[msg].peer_dev_idx = link->key.linkDev->key.dev_idx;
-        my_link_adv_buff[msg].peer_local_id = link->key.linkDev->key.local_id;
+        my_link_adv_buff[msg].transmitter_dev_idx = link->k.myDev->llip_key.idx;
+        my_link_adv_buff[msg].peer_dev_idx = link->k.linkDev->key.dev_idx;
+        my_link_adv_buff[msg].peer_local_id = link->k.linkDev->key.local_id;
         link->link_adv_msg = msg;
         
-        if (link->key.linkDev->local->link_adv_msg_for_him == LINKADV_MSG_IGNORED)
-                link->key.linkDev->local->link_adv_msg_for_him = msg;
+        if (link->k.linkDev->local->link_adv_msg_for_him == LINKADV_MSG_IGNORED)
+                link->k.linkDev->local->link_adv_msg_for_him = msg;
 }
 
 void update_my_link_adv(uint32_t changes)
@@ -2471,7 +2471,7 @@ void update_my_link_adv(uint32_t changes)
 
         for (an = NULL; (link = avl_iterate_item(&link_tree, &an));){
                 link->link_adv_msg = LINKADV_MSG_IGNORED;
-                link->key.linkDev->local->link_adv_msg_for_him = LINKADV_MSG_IGNORED;
+                link->k.linkDev->local->link_adv_msg_for_him = LINKADV_MSG_IGNORED;
         }
 
         for (an = NULL; (local = avl_iterate_item(&local_tree, &an));)
@@ -2487,7 +2487,7 @@ void update_my_link_adv(uint32_t changes)
 
                 //TODO: sort out lndevs with reasonable worse rq than best_rqlndev: if (lndev->key.link->local->best_lndev)
                 if (link->timeaware_rx_probe * LINKADV_ADD_RP_4DIF >=
-                        link->key.linkDev->local->best_rp_link->timeaware_rx_probe * LINKADV_ADD_RP_4MIN)
+                        link->k.linkDev->local->best_rp_link->timeaware_rx_probe * LINKADV_ADD_RP_4MIN)
                         set_link_adv_msg(msg++, link);
 
         }
@@ -2585,7 +2585,7 @@ int32_t rx_frame_link_adv( struct rx_frame_iterator *it)
 
         uint16_t msgs = it->frame_msgs_length  / sizeof (struct msg_link_adv);
 
-        struct local_node *local = it->pb->i.linkDev->local;
+        struct local_node *local = it->pb->i.link->k.linkDev->local;
 
         DEVADV_SQN_T dev_sqn_ref = ntohs(hdr->dev_sqn_ref);
 	LINKADV_SQN_T link_sqn = ntohs(it->pb->p.hdr.link_adv_sqn);
@@ -2669,12 +2669,12 @@ int32_t tx_frame_rp_adv(struct tx_frame_iterator *it)
                 assertion(-501041, (link->rx_probe_record.hello_umetric <= UMETRIC_MAX));
 
                 if (link->timeaware_rx_probe * LINKADV_ADD_RP_4DIF <
-                        link->key.linkDev->local->best_rp_link->timeaware_rx_probe * LINKADV_ADD_RP_4MAX)
+                        link->k.linkDev->local->best_rp_link->timeaware_rx_probe * LINKADV_ADD_RP_4MAX)
                         continue;
 
                 msg[link->link_adv_msg].rp_127range = (link->timeaware_rx_probe * 127) / UMETRIC_MAX;
 
-                msg[link->link_adv_msg].ogm_request = link->key.linkDev->local->orig_routes ? YES : NO;
+                msg[link->link_adv_msg].ogm_request = link->k.linkDev->local->orig_routes ? YES : NO;
 
                 msg_max = XMAX(msg_max, link->link_adv_msg);
 
@@ -2697,7 +2697,7 @@ int32_t rx_frame_rp_adv(struct rx_frame_iterator *it)
         TRACE_FUNCTION_CALL;
 
         struct msg_rp_adv* adv = (struct msg_rp_adv*) it->msg;
-        struct local_node *local = it->pb->i.linkDev->local;
+        struct local_node *local = it->pb->i.link->k.linkDev->local;
 	LINKADV_SQN_T link_sqn = ntohs(it->pb->p.hdr.link_adv_sqn);
 
         struct avl_node *link_an = NULL;
@@ -2745,7 +2745,7 @@ int32_t rx_frame_rp_adv(struct rx_frame_iterator *it)
 
                 for (link = NULL; (link = list_iterate(&linkDev->link_list, link));) {
 
-                        if (link->key.myDev->llip_key.idx == local->link_adv[m].peer_dev_idx) {
+                        if (link->k.myDev->llip_key.idx == local->link_adv[m].peer_dev_idx) {
 
                                 link->tx_probe_umetric = (UMETRIC_MAX * ((UMETRIC_T) (adv[m].rp_127range))) / 127;
                                 lndev_assign_best(local, link);
@@ -2880,8 +2880,8 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
 
         struct hdr_ogm_adv *hdr = (struct hdr_ogm_adv *) it->frame_data;
         struct packet_buff *pb = it->pb;
-        struct local_node *local = pb->i.linkDev->local;
-        struct neigh_node *neigh = pb->i.linkDev->local->neigh;
+        struct local_node *local = pb->i.link->k.linkDev->local;
+        struct neigh_node *neigh = pb->i.link->k.linkDev->local->neigh;
 	LINKADV_SQN_T link_sqn = ntohs(pb->p.hdr.link_adv_sqn);
 
         uint8_t *ogm_destination_field = it->msg;
@@ -3026,7 +3026,7 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
                                         ogm.u.o.sqn, neighIID4x, cryptShaAsString(&on->nodeId), pb->i.llip_str,
                                         on->ogmSqn_rangeMin, on->ogmSqn_rangeSize);
 
-                                purge_local_node(pb->i.linkDev->local);
+                                purge_local_node(pb->i.link->k.linkDev->local);
 
                                 return TLV_RX_DATA_FAILURE;
                         }
@@ -3105,8 +3105,8 @@ int32_t rx_frame_ogm_acks(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
         struct packet_buff *pb = it->pb;
-        struct local_node *local = pb->i.linkDev->local;
-        struct neigh_node *neigh = pb->i.linkDev->local->neigh;
+        struct local_node *local = pb->i.link->k.linkDev->local;
+        struct neigh_node *neigh = pb->i.link->k.linkDev->local->neigh;
 	LINKADV_SQN_T link_sqn = ntohs(pb->p.hdr.link_adv_sqn);
 
         uint16_t pos;
@@ -3158,7 +3158,7 @@ struct dhash_node *process_dhash_description_neighIID4x
         TRACE_FUNCTION_CALL;
 	assertion(-500000, (dhash));
         struct dhash_node *dhn = NULL;
-        struct local_node *local = pb->i.linkDev->local;
+        struct local_node *local = pb->i.link->k.linkDev->local;
         struct description_cache_node *cache = NULL;
 	IDM_T is_transmitter = cryptShasEqual(dhash, &pb->p.hdr.dhash);
 
@@ -3183,7 +3183,7 @@ struct dhash_node *process_dhash_description_neighIID4x
 				iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
                                 return (struct dhash_node *) FAILURE_PTR;
 
-                        assertion(-500968, (is_described_neigh(pb->i.linkDev, dhash)));
+                        assertion(-500968, (is_described_neigh(pb->i.link->k.linkDev, dhash)));
 
                 } else if (neighIID4x > IID_RSVD_MAX && local->neigh) {
                         // received via a known neighbor, and is NOT about the transmitter:
@@ -3238,7 +3238,7 @@ struct dhash_node *process_dhash_description_neighIID4x
 					iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
 					return(struct dhash_node *) FAILURE_PTR;
 
-				assertion(-500969, IMPLIES(is_transmitter, is_described_neigh(pb->i.linkDev, &pb->p.hdr.dhash)));
+				assertion(-500969, IMPLIES(is_transmitter, is_described_neigh(pb->i.link->k.linkDev, &pb->p.hdr.dhash)));
 			}
 		}
         }
@@ -3272,7 +3272,7 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
         if (neighIID4x <= IID_RSVD_MAX)
                 return TLV_RX_DATA_FAILURE;
 
-        if (!(is_transmitter || is_described_neigh(pb->i.linkDev, &pb->p.hdr.dhash))) {
+        if (!(is_transmitter || is_described_neigh(pb->i.link->k.linkDev, &pb->p.hdr.dhash))) {
                 dbgf_track(DBGT_INFO, "via undescribed NB: %s", pb->i.llip_str);
                 return sizeof (struct msg_dhash_adv);
         }
@@ -3285,13 +3285,13 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
 
 	} else if (dhn == NULL) {
 
-		schedule_tx_task(pb->i.linkDev->local->best_tp_link, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, &adv->dhash, sizeof(adv->dhash), 0, 0);
+		schedule_tx_task(pb->i.link->k.linkDev->local->best_tp_link, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, &adv->dhash, sizeof(adv->dhash), 0, 0);
 
 	} else {
 
 		assertion(-500690, (dhn && dhn->on)); // UNDESCRIBED or fully described
 		//if rcvd transmitters' description then it must have become a described neighbor:
-		assertion(-500488, IMPLIES(is_transmitter, (is_described_neigh(pb->i.linkDev, &pb->p.hdr.dhash))));
+		assertion(-500488, IMPLIES(is_transmitter, (is_described_neigh(pb->i.link->k.linkDev, &pb->p.hdr.dhash))));
 	}
 
         return sizeof (struct msg_dhash_adv);
@@ -3348,9 +3348,9 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 		assertion(-500691, (dhn->on));
 
 		if (desc_adv_tx_unsolicited && dhn->on->updated_timestamp == bmx_time &&
-			is_described_neigh(pb->i.linkDev, &pb->p.hdr.dhash)) {
+			is_described_neigh(pb->i.link->k.linkDev, &pb->p.hdr.dhash)) {
 
-			LinkNode **array = lndevs_get_best_tp(pb->i.linkDev->local);
+			LinkNode **array = lndevs_get_best_tp(pb->i.link->k.linkDev->local);
 			int d;
 
 			for (d = 0; (array[d]); d++)
@@ -3403,7 +3403,7 @@ int32_t rx_msg_dhash_request(struct rx_frame_iterator *it)
 
         assertion(-500251, (dhn && dhn->myIID4orig == myIID4x));
 
-	schedule_tx_task(pb->i.linkDev->local->best_tp_link, FRAME_TYPE_HASH_ADV, SCHEDULE_MIN_MSG_SIZE, 0, 0, myIID4x, 0);
+	schedule_tx_task(pb->i.link->k.linkDev->local->best_tp_link, FRAME_TYPE_HASH_ADV, SCHEDULE_MIN_MSG_SIZE, 0, 0, myIID4x, 0);
 
         // most probably the requesting node is also interested in my metric to the requested node:
         if (on->curr_rt_link && on->ogmSqn_next == on->ogmSqn_send &&
@@ -3444,7 +3444,7 @@ int32_t rx_msg_description_request(struct rx_frame_iterator *it)
                 return sizeof (struct msg_description_request);
         }
 
-	schedule_tx_task(pb->i.linkDev->local->best_tp_link, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &msg->dhash, sizeof(DHASH_T), 0, 0);
+	schedule_tx_task(pb->i.link->k.linkDev->local->best_tp_link, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &msg->dhash, sizeof(DHASH_T), 0, 0);
 
         // most probably the requesting node is also interested in my metric to the requested node:
         if (on->curr_rt_link && on->ogmSqn_next == on->ogmSqn_send &&
@@ -3481,9 +3481,9 @@ int32_t rx_msg_hello_adv(struct rx_frame_iterator *it)
 	// is actually a reasonable good link which should be included so that
 	// also link_rp msgs could be send:
         if (pb->i.link->link_adv_msg == LINKADV_MSG_IGNORED && (
-                pb->i.link == pb->i.linkDev->local->best_rp_link || // its our best link or
+                pb->i.link == pb->i.link->k.linkDev->local->best_rp_link || // its our best link or
                 (pb->i.link->timeaware_rx_probe * LINKADV_ADD_RP_4DIF >= // its reasonable good compared to our best link
-                pb->i.linkDev->local->best_rp_link->timeaware_rx_probe * LINKADV_ADD_RP_4MAX)
+                pb->i.link->k.linkDev->local->best_rp_link->timeaware_rx_probe * LINKADV_ADD_RP_4MAX)
                 )) {
 		// then: create new link_adv frame which includes this link.
                 update_my_link_adv(LINKADV_CHANGES_NEW);
@@ -3701,7 +3701,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                         return TLV_RX_DATA_PROCESSED;
 
 
-                } else if (!IMPLIES(f_handl->rx_requires_described_neigh, (pb && is_described_neigh(pb->i.linkDev, &pb->p.hdr.dhash)))) {
+                } else if (!IMPLIES(f_handl->rx_requires_described_neigh, (pb && is_described_neigh(pb->i.link->k.linkDev, &pb->p.hdr.dhash)))) {
 
                         dbgf_track(DBGT_INFO, "%s - UNDESCRIBED dhash=%s of neigh=%s - skipping frame type=%s",
                                 it->caller, cryptShaAsString(&pb->p.hdr.dhash), pb->i.llip_str, f_handl->name);
@@ -3780,9 +3780,9 @@ IDM_T rx_frames(struct packet_buff *pb)
                 return FAILURE;
         }
 
-        struct local_node *local = pb->i.linkDev->local;
+        struct local_node *local = pb->i.link->k.linkDev->local;
 
-        if (!is_described_neigh(pb->i.linkDev, &pb->p.hdr.dhash)) {
+        if (!is_described_neigh(pb->i.link->k.linkDev, &pb->p.hdr.dhash)) {
 
                 dbgf_track(DBGT_INFO, "schedule frame_type=%d", FRAME_TYPE_HASH_REQ);
 
@@ -3793,7 +3793,7 @@ IDM_T rx_frames(struct packet_buff *pb)
 
                 dbgf_track(DBGT_INFO,
                         "schedule DEV_REQ to NB=%s local_id=0x%X via dev=%s dev_adv_sqn=%d link_adv_dev_sqn_ref=%d",
-                        pb->i.llip_str, local->local_id, local->best_tp_link->key.myDev->label_cfg.str,
+                        pb->i.llip_str, local->local_id, local->best_tp_link->k.myDev->label_cfg.str,
                         local->dev_adv_sqn, local->link_adv_dev_sqn_ref);
 
                 schedule_tx_task(&pb->i.iif->dummyLink, FRAME_TYPE_DEV_REQ, SCHEDULE_MIN_MSG_SIZE, &local->local_id, sizeof(LOCAL_ID_T), 0, 0);
@@ -3804,7 +3804,7 @@ IDM_T rx_frames(struct packet_buff *pb)
 
                 dbgf_track(DBGT_INFO,
                         "schedule LINK_REQ to NB=%s local_id=0x%X via dev=%s  link_adv_sqn=%d packet_link_sqn_ref=%d",
-                        pb->i.llip_str, local->local_id, local->best_tp_link->key.myDev->label_cfg.str,
+                        pb->i.llip_str, local->local_id, local->best_tp_link->k.myDev->label_cfg.str,
                         local->link_adv_sqn, local->packet_link_sqn_ref);
 
                 local->rp_ogm_request_rcvd = 0;
@@ -4243,9 +4243,9 @@ void next_tx_task_list(struct dev_node *dev, struct tx_frame_iterator *it, struc
                 {
                         link = list_entry(lndev_pos, LinkNode, list);
 
-                        if (link->key.myDev == dev && link->tx_task_lists[it->frame_type].items) {
+                        if (link->k.myDev == dev && link->tx_task_lists[it->frame_type].items) {
 
-                                assertion(-500866, (link->key.linkDev == linkDev));
+                                assertion(-500866, (link->k.linkDev == linkDev));
 
                                 it->tx_task_list = &(link->tx_task_lists[it->frame_type]);
 

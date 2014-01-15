@@ -263,7 +263,7 @@ typedef struct {
 
 typedef struct {
 	struct list_node list;
-	LinkKey key;
+	LinkKey k;
 
 	UMETRIC_T tx_probe_umetric;
 	UMETRIC_T timeaware_tx_probe;
@@ -510,7 +510,7 @@ struct packet_buff {
                 
                 //remove:
 		LinkNode *link;
-                LinkDevNode *linkDev;
+//              LinkDevNode *linkDev;
 //		IID_T transmittersIID;
 //		uint32_t rx_counter;
                 

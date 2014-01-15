@@ -3082,7 +3082,7 @@ int32_t opt_dev(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_par
 
                         //dev->umetric_max = DEF_DEV_BITRATE_MAX;
 
-                        dev->dummyLink.key.myDev = dev;
+                        dev->dummyLink.k.myDev = dev;
                         
                         /*
                          * specifying the outgoing src address for IPv6 seems not working

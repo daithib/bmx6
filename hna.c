@@ -165,11 +165,11 @@ IDM_T configure_route(IDM_T del, struct orig_node *on, struct net_key *key)
 		LinkNode *link = on->curr_rt_link;
 
                 assertion(-500820, (link));
-                ASSERTION(-500239, (avl_find(&link_tree, &(link->key))));
-                assertion(-500579, (link->key.myDev->if_llocal_addr));
+                ASSERTION(-500239, (avl_find(&link_tree, &(link->k))));
+                assertion(-500579, (link->k.myDev->if_llocal_addr));
 
                 return iproute(IP_ROUTE_HNA, ADD, NO, key, RT_TABLE_HNA, 0,
-                        link->key.myDev->if_llocal_addr->ifa.ifa_index, &(link->key.linkDev->link_ip),
+                        link->k.myDev->if_llocal_addr->ifa.ifa_index, &(link->k.linkDev->link_ip),
                         (key->af == AF_INET ? (&(self->primary_ip)) : NULL), DEF_IP_METRIC, NULL);
 
         }
