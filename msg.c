@@ -4406,10 +4406,13 @@ void tx_packet(void *devp)
                         phdr->dev_idx = dev->llip_key.idx;
 
 			if (packet_sign) {
+				static struct prof_ctx prof_tx_packet_sign = { .k ={.name="tx_packet_sign", .parent="tx_packet"}};
+				prof_start(&prof_tx_packet_sign);
 				uint8_t signature[CRYPT_RSA_MAX_LEN];
 				CRYPTSHA1_T sha;
 				cryptShaAtomic(it.frames_out_ptr, it.frames_out_pos, &sha);
 				cryptSign(&sha, signature, my_PubKey->rawKeyLen);
+				prof_stop(&prof_tx_packet_sign);
 			}
 
                         cb_packet_hooks(&pb);
