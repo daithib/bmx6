@@ -154,7 +154,7 @@ void prof_update_all( void *unused) {
 
 		uint8_t active = pn->active_prof;
 
-		dbgf_sys(DBGT_INFO, "updating %s active=%d", pn->k.name, active);
+		dbgf_all(DBGT_INFO, "updating %s active=%d", pn->k.name, active);
 
 		if (active)
 			prof_stop(pn);
@@ -205,7 +205,7 @@ static const struct field_format prof_status_format[] = {
 STATIC_FUNC
 struct prof_status *prof_status_iterate(struct prof_ctx *pn, struct prof_status *status)
 {
-	dbgf_sys(DBGT_INFO, "dbg pn=%s status=%p", pn->k.name, status);
+	dbgf_all(DBGT_INFO, "dbg pn=%s status=%p", pn->k.name, status);
 
 	status->neighId = pn->k.neigh ? &pn->k.neigh->dhn->on->nodeId : NULL;
 	status->origId = &pn->k.orig ? &pn->k.orig->nodeId : NULL;
