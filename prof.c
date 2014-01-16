@@ -179,8 +179,8 @@ void prof_update_all( void *unused) {
 struct prof_status {
         GLOBAL_ID_T *neighId;
         GLOBAL_ID_T *origId;
-	char* parent;
-        char* name;
+	const char* parent;
+        const char* name;
 //	uint32_t total;
 	char sysCurrCpu[10];
 	char relCurrCpu[10];

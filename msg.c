@@ -50,9 +50,6 @@
 static int32_t drop_all_frames = DEF_DROP_ALL_FRAMES;
 static int32_t drop_all_packets = DEF_DROP_ALL_PACKETS;
 
-static int32_t packet_sign = 0;
-static int32_t packet_verify = 0;
-
 static int32_t pref_udpd_size = DEF_UDPD_SIZE;
 static int32_t desc_size_out = DEF_DESC_SIZE;
 static int32_t vrt_frame_data_size_out = DEF_VRT_FRAME_DATA_SIZE;
@@ -148,9 +145,9 @@ STATIC_FUNC
 int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it);
 
 
-static const void* REJECTED_PTR = (void*) & REJECTED_PTR;
-static const void* UNRESOLVED_PTR = (void*) & UNRESOLVED_PTR;
-static const void* FAILURE_PTR = (void*) & FAILURE_PTR;
+const void* REJECTED_PTR = (void*) & REJECTED_PTR;
+const void* UNRESOLVED_PTR = (void*) & UNRESOLVED_PTR;
+const void* FAILURE_PTR = (void*) & FAILURE_PTR;
 
 
 /***********************************************************
@@ -299,7 +296,7 @@ void register_frame_handler(struct frame_db *db, int pos, struct frame_handl *ha
 
 
 
-STATIC_FUNC
+
 struct description_cache_node * get_cached_description(DHASH_T *dhash)
 {
         TRACE_FUNCTION_CALL;
@@ -667,7 +664,7 @@ void schedule_tx_task(LinkNode *destLink, uint16_t frame_type, int16_t frame_msg
         dbgf((( /* debug interesting frame types: */ frame_type == FRAME_TYPE_PROBLEM_ADV ||
                 frame_type == FRAME_TYPE_HASH_REQ || frame_type == FRAME_TYPE_HASH_ADV ||
                 frame_type == FRAME_TYPE_DESC_REQ ||frame_type == FRAME_TYPE_DESC_ADVS ||
-                frame_type == FRAME_TYPE_LINK_REQ_ADV || frame_type == FRAME_TYPE_LINK_ADV ||
+                frame_type == FRAME_TYPE_LINK_REQ || frame_type == FRAME_TYPE_LINK_ADV ||
                 frame_type == FRAME_TYPE_DEV_REQ || frame_type == FRAME_TYPE_DEV_ADV)
                 ? DBGL_CHANGES : DBGL_ALL), DBGT_INFO,
                  "%s to NB=%s local_id=0x%X via dev=%s frame_msgs_len=%d data=%s",
@@ -1789,7 +1786,6 @@ resolve_ref_frame_error:
 }
 
 
-STATIC_FUNC
 struct dhash_node * process_description(struct packet_buff *pb, struct description_cache_node *cache, DHASH_T *dhash)
 {
         TRACE_FUNCTION_CALL;
@@ -3141,7 +3137,8 @@ struct dhash_node *process_dhash_description_neighIID4x
         TRACE_FUNCTION_CALL;
 	assertion(-500000, (dhash));
         struct dhash_node *dhn = NULL;
-        struct local_node *local = pb->i.link->k.linkDev->local;
+//        struct local_node *local = pb->i.link->k.linkDev->local;
+	struct neigh_node *neigh = pb->i.link->k.linkDev->local->neigh;
         struct description_cache_node *cache = NULL;
 	IDM_T is_transmitter = cryptShasEqual(dhash, &pb->p.hdr.dhash);
 
@@ -3163,12 +3160,12 @@ struct dhash_node *process_dhash_description_neighIID4x
                         update_local_neigh(pb, dhn);
 
 			if (neighIID4x > IID_RSVD_MAX &&
-				iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
+				iid_set_neighIID4x(&neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
                                 return (struct dhash_node *) FAILURE_PTR;
 
                         assertion(-500968, (is_described_neigh(pb->i.link->k.linkDev, dhash)));
 
-                } else if (neighIID4x > IID_RSVD_MAX && local->neigh) {
+                } else if (neighIID4x > IID_RSVD_MAX && neigh) {
                         // received via a known neighbor, and is NOT about the transmitter:
 
                         if (dhn == self->dhn) {
@@ -3176,9 +3173,9 @@ struct dhash_node *process_dhash_description_neighIID4x
 
                                 dbgf_all(DBGT_INFO, "msg refers myself via %s neighIID4me %d", pb->i.llip_str, neighIID4x);
 
-                                local->neigh->neighIID4me = neighIID4x;
+                                neigh->neighIID4me = neighIID4x;
 
-                        } else if (dhn == local->neigh->dhn && !is_transmitter) {
+                        } else if (dhn == neigh->dhn && !is_transmitter) {
                                 // is about a neighbors' dhash itself which is NOT the transmitter ???!!!
 
                                 dbgf_sys(DBGT_ERR, "nodeId=%s dhash=%s via %s neighIID4x=%d IS NOT transmitterDhash=%s",
@@ -3191,7 +3188,7 @@ struct dhash_node *process_dhash_description_neighIID4x
                                 // is about.a another dhash known by me and a (neighboring) transmitter..:
                         }
 
-                        if (iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
+                        if (iid_set_neighIID4x(&neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
                                 return (struct dhash_node *) FAILURE_PTR;
                 }
 
@@ -3201,15 +3198,15 @@ struct dhash_node *process_dhash_description_neighIID4x
 		if (dsc)
 			cache_description(dsc, desc_len, dhash);
 
-		if (((is_transmitter || local->neigh) ) &&
+		if (((is_transmitter || neigh) ) &&
 			(cache = get_cached_description(dhash)) &&
 			(dhn = process_description(pb, cache, dhash)) ) {
 			
 			if (dhn == REJECTED_PTR) {
 				
 				invalidate_dhash(NULL, dhash);
-				
-			} else if (dhn== FAILURE_PTR || dhn == UNRESOLVED_PTR ) {
+
+			} else if (dhn == FAILURE_PTR || dhn == UNRESOLVED_PTR) {
 
 			} else {
 
@@ -3218,7 +3215,7 @@ struct dhash_node *process_dhash_description_neighIID4x
 					update_local_neigh(pb, dhn);
 
 				if (neighIID4x > IID_RSVD_MAX &&
-					iid_set_neighIID4x(&local->neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
+					iid_set_neighIID4x(&neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
 					return(struct dhash_node *) FAILURE_PTR;
 
 				assertion(-500969, IMPLIES(is_transmitter, is_described_neigh(pb->i.link->k.linkDev, &pb->p.hdr.dhash)));
@@ -3682,14 +3679,14 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                                 pb->i.link ? pb->i.link->timeaware_rx_probe : 0, f_handl->name);
 
                         return TLV_RX_DATA_PROCESSED;
-/*
+
 		} else if (!f_handl->rx_processUnVerifiedLink && !pb->i.verifiedLink) {
 
-			dbgf_sys(DBGT_INFO, "%s - VERIFIED link to dhash=%s neigh=%s needed for frame type=%s",
+			dbgf_sys(DBGT_INFO, "%s - NON-VERIFIED link to dhash=%s neigh=%s, needed for frame type=%s",
 				it->caller, cryptShaAsString(&pb->p.hdr.dhash), pb->i.llip_str, f_handl->name);
 
 			return TLV_RX_DATA_PROCESSED;
-*/
+
                 } else if (!IMPLIES(f_handl->rx_requires_described_neigh, (pb && is_described_neigh(pb->i.link->k.linkDev, &pb->p.hdr.dhash)))) {
 
                         dbgf_track(DBGT_INFO, "%s - UNDESCRIBED dhash=%s of neigh=%s - skipping frame type=%s",
@@ -3769,41 +3766,43 @@ IDM_T rx_frames(struct packet_buff *pb)
                 return FAILURE;
         }
 
-        struct local_node *local = pb->i.link->k.linkDev->local;
+	if (result == TLV_RX_DATA_DONE) {
 
-        if (!is_described_neigh(pb->i.link->k.linkDev, &pb->p.hdr.dhash)) {
+		struct local_node *local = pb->i.link->k.linkDev->local;
 
-                dbgf_track(DBGT_INFO, "schedule frame_type=%d", FRAME_TYPE_HASH_REQ);
+		if (!is_described_neigh(pb->i.link->k.linkDev, &pb->p.hdr.dhash)) {
 
-                schedule_tx_task(local->best_tp_link, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, &pb->p.hdr.dhash, sizeof(DHASH_T));
-        }
+			dbgf_track(DBGT_INFO, "schedule frame_type=%d", FRAME_TYPE_HASH_REQ);
 
-        if (msg_dev_req_enabled && UXX_LT(DEVADV_SQN_MAX, local->dev_adv_sqn, local->link_adv_dev_sqn_ref)) {
+			schedule_tx_task(local->best_tp_link, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, &pb->p.hdr.dhash, sizeof(DHASH_T));
+		}
 
-                dbgf_track(DBGT_INFO,
-                        "schedule DEV_REQ to NB=%s local_id=0x%X via dev=%s dev_adv_sqn=%d link_adv_dev_sqn_ref=%d",
-                        pb->i.llip_str, local->local_id, local->best_tp_link->k.myDev->label_cfg.str,
-                        local->dev_adv_sqn, local->link_adv_dev_sqn_ref);
+		if (msg_dev_req_enabled && UXX_LT(DEVADV_SQN_MAX, local->dev_adv_sqn, local->link_adv_dev_sqn_ref)) {
 
-                schedule_tx_task(&pb->i.iif->dummyLink, FRAME_TYPE_DEV_REQ, SCHEDULE_MIN_MSG_SIZE, &local->local_id, sizeof(LOCAL_ID_T));
-        }
+			dbgf_track(DBGT_INFO,
+				"schedule DEV_REQ to NB=%s local_id=0x%X via dev=%s dev_adv_sqn=%d link_adv_dev_sqn_ref=%d",
+				pb->i.llip_str, local->local_id, local->best_tp_link->k.myDev->label_cfg.str,
+				local->dev_adv_sqn, local->link_adv_dev_sqn_ref);
 
-//        if (UXX_LT(LINKADV_SQN_MAX, pb->i.link->local->link_adv_sqn, pb->i.link_sqn)) {
-        if (UXX_LT(LINKADV_SQN_MAX, local->link_adv_sqn, local->packet_link_sqn_ref)) {
+			schedule_tx_task(&pb->i.iif->dummyLink, FRAME_TYPE_DEV_REQ, SCHEDULE_MIN_MSG_SIZE, &local->local_id, sizeof(LOCAL_ID_T));
+		}
 
-                dbgf_track(DBGT_INFO,
-                        "schedule LINK_REQ to NB=%s local_id=0x%X via dev=%s  link_adv_sqn=%d packet_link_sqn_ref=%d",
-                        pb->i.llip_str, local->local_id, local->best_tp_link->k.myDev->label_cfg.str,
-                        local->link_adv_sqn, local->packet_link_sqn_ref);
+		//        if (UXX_LT(LINKADV_SQN_MAX, pb->i.link->local->link_adv_sqn, pb->i.link_sqn)) {
+		if (UXX_LT(LINKADV_SQN_MAX, local->link_adv_sqn, local->packet_link_sqn_ref)) {
 
-                local->rp_ogm_request_rcvd = 0;
+			dbgf_track(DBGT_INFO,
+				"schedule LINK_REQ to NB=%s local_id=0x%X via dev=%s  link_adv_sqn=%d packet_link_sqn_ref=%d",
+				pb->i.llip_str, local->local_id, local->best_tp_link->k.myDev->label_cfg.str,
+				local->link_adv_sqn, local->packet_link_sqn_ref);
 
-                if (local->neigh)
-                        memset(local->neigh->ogm_aggregations_not_acked, 0, sizeof (local->neigh->ogm_aggregations_not_acked));
+			local->rp_ogm_request_rcvd = 0;
 
-                schedule_tx_task(&pb->i.iif->dummyLink, FRAME_TYPE_LINK_REQ_ADV, SCHEDULE_MIN_MSG_SIZE, &local->local_id, sizeof(LOCAL_ID_T));
-        }
+			if (local->neigh)
+				memset(local->neigh->ogm_aggregations_not_acked, 0, sizeof(local->neigh->ogm_aggregations_not_acked));
 
+			schedule_tx_task(&pb->i.iif->dummyLink, FRAME_TYPE_LINK_REQ, SCHEDULE_MIN_MSG_SIZE, &local->local_id, sizeof(LOCAL_ID_T));
+		}
+	}
 
         return SUCCESS;
 }
@@ -4430,16 +4429,6 @@ void tx_packet(void *devp)
                         phdr->local_id = my_local_id;
                         phdr->dev_idx = dev->llip_key.idx;
 
-			if (packet_sign) {
-				static struct prof_ctx prof_tx_packet_sign = { .k ={.name="tx_packet_sign"}, .parent_name="tx_packet"};
-				prof_start(&prof_tx_packet_sign);
-				uint8_t signature[CRYPT_RSA_MAX_LEN];
-				CRYPTSHA1_T sha;
-				cryptShaAtomic(it.frames_out_ptr, it.frames_out_pos, &sha);
-				cryptSign(&sha, signature, my_PubKey->rawKeyLen);
-				prof_stop(&prof_tx_packet_sign);
-			}
-
                         cb_packet_hooks(&pb);
 
                         send_udp_packet(&pb, &dev->tx_netwbrc_addr, dev->unicast_sock);
@@ -4870,12 +4859,6 @@ struct opt_type msg_options[]=
 //       ord parent long_name             shrt Attributes                            *ival              min                 max                default              *func,*syntax,*help
 
 #ifndef LESS_OPTIONS
-        {ODI, 0, "packetSign",            0,   9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &packet_sign,    0,                  1,                 0,0,                  0,
-			ARG_VALUE_FORM,	""}
-        ,
-        {ODI, 0, "packetVerify",          0,   9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &packet_verify,  0,                  1,                 0,0,                  0,
-			ARG_VALUE_FORM,	""}
-	,
         {ODI, 0, ARG_UDPD_SIZE,            0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &pref_udpd_size, MIN_UDPD_SIZE,      MAX_UDPD_SIZE,     DEF_UDPD_SIZE,0,      0,
 			ARG_VALUE_FORM,	HLP_UDPD_SIZE}
         ,
@@ -4993,7 +4976,7 @@ void init_msg( void )
 
 
         static const struct field_format ref_format[] = MSG_RHASH_FORMAT;
-        handl.name = "RHASH";
+        handl.name = "DSC_RHASH";
         handl.data_header_size = sizeof( struct desc_hdr_rhash);
         handl.min_msg_size = sizeof (struct desc_msg_rhash);
         handl.fixed_msg_size = 1;
@@ -5003,7 +4986,7 @@ void init_msg( void )
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_RHASH, &handl);
 
 
-        handl.name = "REF_REQ";
+        handl.name = "REFERENCE_REQ";
         handl.is_destination_specific_frame = 1;
         handl.tx_iterations = &desc_req_tx_iters;
         handl.tx_tp_min = &UMETRIC_NBDISCOVERY_MIN;
@@ -5014,7 +4997,7 @@ void init_msg( void )
         handl.rx_msg_handler = rx_msg_ref_request;
         register_frame_handler(packet_frame_db, FRAME_TYPE_REF_REQ, &handl);
 
-        handl.name = "REF_ADV";
+        handl.name = "REFERENCE_ADV";
         handl.is_advertisement = 1;
 	handl.rx_processUnVerifiedLink = 1;
         handl.tx_iterations = &desc_adv_tx_iters;
@@ -5027,7 +5010,7 @@ void init_msg( void )
         register_frame_handler(packet_frame_db, FRAME_TYPE_REF_ADV, &handl);
 
 
-        handl.name = "DESC_REQ";
+        handl.name = "DESCRIPTION_REQ";
         handl.is_destination_specific_frame = 1;
         handl.tx_iterations = &desc_req_tx_iters;
         handl.tx_tp_min = &UMETRIC_NBDISCOVERY_MIN;
@@ -5042,7 +5025,7 @@ void init_msg( void )
 
 
 	static const struct field_format version_format[] = VERSION_MSG_FORMAT;
-        handl.name = "VERSION";
+        handl.name = "DSC_VERSION";
 	handl.is_mandatory = 1;
 	handl.min_msg_size = sizeof (struct dsc_msg_version);
         handl.fixed_msg_size = 1;
@@ -5054,7 +5037,7 @@ void init_msg( void )
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_VERSION, &handl);
 
 	static const struct field_format names_format[] = NAMES_MSG_FORMAT;
-        handl.name = "HOSTNAME";
+        handl.name = "DSC_HOSTNAME";
 	handl.min_msg_size = 0;
         handl.fixed_msg_size = 0;
 	handl.dextReferencing = (int32_t*)&never_fref;
@@ -5065,7 +5048,7 @@ void init_msg( void )
         register_frame_handler(description_names_db, BMX_DSC_NAMES_HOSTNAME, &handl);
 
 	static const struct field_format tlv_format[] = TLV_FORMAT;
-        handl.name = "NAMES";
+        handl.name = "DSC_NAMES";
 	handl.min_msg_size = sizeof (struct tlv_hdr);
 	handl.dextReferencing = (int32_t*)&dflt_fref;
 	handl.dextCompression = (int32_t*)&dflt_fzip;
@@ -5075,7 +5058,7 @@ void init_msg( void )
 	handl.next_db = description_names_db;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_NAMES, &handl);
 
-	handl.name = "DESCRIPTION";
+	handl.name = "DESCRIPTION_ADV";
 	handl.min_msg_size = (
 		sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) +
 		sizeof(struct tlv_hdr) + sizeof(struct dsc_msg_signature) +
@@ -5084,7 +5067,7 @@ void init_msg( void )
 	handl.rx_frame_handler = rx_frame_description_adv;
 	register_frame_handler(packet_desc_db, 0, &handl);
 
-	handl.name = "DESC_ADV_FRAMES";
+	handl.name = "DESCRIPTION_ADV_FRAMES";
 	handl.is_advertisement = 1;
 	handl.tx_iterations = &desc_adv_tx_iters;
 	handl.min_msg_size = sizeof (struct tlv_hdr) + packet_desc_db->handls[0].min_msg_size;
@@ -5160,7 +5143,7 @@ void init_msg( void )
         handl.tx_task_interval_min = CONTENT_MIN_TX_INTERVAL__CHECK_FOR_REDUNDANCY;
         handl.tx_msg_handler = tx_msg_link_req;
         handl.rx_msg_handler = rx_msg_link_req;
-        register_frame_handler(packet_frame_db, FRAME_TYPE_LINK_REQ_ADV, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_LINK_REQ, &handl);
 
         handl.name = "LINK_ADV";
         handl.is_advertisement = 1;

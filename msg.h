@@ -215,36 +215,36 @@
 
 #define FRAME_TYPE_RSVD0        0
 
-#define FRAME_TYPE_PROBLEM_ADV  2  // yet only used to indicate local/link_id collisions
 
-#define FRAME_TYPE_TEST_ADV     3  // just for testing zero-message rx/tx_frame_iterator()
+#define FRAME_TYPE_REF_REQ      1
+#define FRAME_TYPE_REF_ADV      2
 
-#define FRAME_TYPE_HELLO_ADV    4 // most-simple BMX-NG hello (nb-discovery) advertisements
+#define FRAME_TYPE_DESC_REQ     3
+#define FRAME_TYPE_DESC_ADVS    4
 
-#define FRAME_TYPE_DEV_REQ      6
-#define FRAME_TYPE_DEV_ADV      7
-#define FRAME_TYPE_LINK_REQ_ADV 8
-#define FRAME_TYPE_LINK_ADV     9
+#define FRAME_TYPE_SIGNATURE_ADV    5
 
-#define FRAME_TYPE_RP_ADV      11
+#define FRAME_TYPE_PROBLEM_ADV  6  // yet only used to indicate local/link_id collisions
 
-#define FRAME_TYPE_REF_REQ     12
-#define FRAME_TYPE_REF_ADV     13
+#define FRAME_TYPE_DEV_REQ      8
+#define FRAME_TYPE_DEV_ADV      9
 
-#define FRAME_TYPE_DESC_REQ    14
-#define FRAME_TYPE_DESC_ADVS    15
+#define FRAME_TYPE_LINK_REQ    10
+#define FRAME_TYPE_LINK_ADV    11
 
+#define FRAME_TYPE_HELLO_ADV   12 // most-simple BMX-NG hello (nb-discovery) advertisements
+#define FRAME_TYPE_RP_ADV      13
 
 #define FRAME_TYPE_HASH_REQ    18  // Hash-for-description-of-OG-ID requests
 #define FRAME_TYPE_HASH_ADV    19  // Hash-for-description-of-OG-ID advertisements
 
-//#define FRAME_TYPE_HELLO_REPS  21  // most-simple BMX-NG hello (nb-discovery) replies
-
 #define FRAME_TYPE_OGM_ADV     22 // most simple BMX-NG (type 0) OGM advertisements
 #define FRAME_TYPE_OGM_ACK     23 // most simple BMX-NG (type 0) OGM advertisements
 
-#define FRAME_TYPE_NOP         24
-#define FRAME_TYPE_MAX_KNOWN    24
+#define FRAME_TYPE_SIGNATURE_DUMMY 24
+
+#define FRAME_TYPE_NOP         25
+#define FRAME_TYPE_MAX_KNOWN   25
 #define FRAME_TYPE_MAX         (FRAME_TYPE_ARRSZ-1)
 
 
@@ -915,6 +915,16 @@ OGM_SQN_T set_ogmSqn_toBeSend_and_aggregated(struct orig_node *on, UMETRIC_T um,
 void update_my_description_adv( void );
 void update_my_dev_adv(void);
 void update_my_link_adv(uint32_t changes);
+
+
+struct description_cache_node * get_cached_description(DHASH_T *dhash);
+
+extern const void* REJECTED_PTR;
+extern const void* UNRESOLVED_PTR;
+extern const void* FAILURE_PTR;
+
+
+struct dhash_node * process_description(struct packet_buff *pb, struct description_cache_node *cache, DHASH_T *dhash);
 
 void dext_free(struct desc_extension **dext);
 IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, struct dhash_node *dhn, uint8_t op, uint8_t filter);

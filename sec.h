@@ -29,10 +29,23 @@
 #define DEF_KEY_PATH "/etc/bmx6/rsa.der"
 
 #define ARG_DESC_VERIFY "descVerification"
-#define MIN_DESC_VERIFY 0
+#define MIN_DESC_VERIFY 512
 #define MAX_DESC_VERIFY 4096
 #define DEF_DESC_VERIFY 4096
-#define HLP_DESC_VERIFY "verify RSA description signatures up-to given key length"
+#define HLP_DESC_VERIFY "verify description signatures up-to given RSA key length"
+
+#define ARG_PACKET_SIGN "packetSigning"
+#define MIN_PACKET_SIGN 0
+#define MAX_PACKET_SIGN 1024
+#define DEF_PACKET_SIGN 512
+#define HLP_PACKET_SIGN "sign outgoing packets with given RSA key length"
+
+#define ARG_PACKET_VERIFY "packetVerification"
+#define MIN_PACKET_VERIFY 0
+#define MAX_PACKET_VERIFY 4096
+#define DEF_PACKET_VERIFY 1024
+#define HLP_PACKET_VERIFY "verify incoming packet signature up-to given RSA key length"
+
 
 #define DESCRIPTION_MSG_PUBKEY_FORMAT { \
 {FIELD_TYPE_UINT,          -1, 8*sizeof(struct dsc_msg_pubkey),     1, FIELD_RELEVANCE_HIGH,  "type"}, \

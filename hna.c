@@ -3423,7 +3423,7 @@ int32_t hna_init( void )
         struct frame_handl tlv_handl;
         memset( &tlv_handl, 0, sizeof(tlv_handl));
 
-        tlv_handl.name = "HNA6";
+        tlv_handl.name = "DSC_HNA6";
         tlv_handl.min_msg_size = sizeof (struct dsc_msg_hna6);
         tlv_handl.fixed_msg_size = 1;
 	tlv_handl.dextCompression = (int32_t*)&dflt_fzip;
@@ -3433,7 +3433,7 @@ int32_t hna_init( void )
         tlv_handl.msg_format = hna6_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_HNA6, &tlv_handl);
 
-        tlv_handl.name = "TUN6";
+        tlv_handl.name = "DSC_TUN6";
         tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun6);
         tlv_handl.fixed_msg_size = 1;
 	tlv_handl.dextCompression = (int32_t*)&dflt_fzip;
@@ -3443,7 +3443,7 @@ int32_t hna_init( void )
         tlv_handl.msg_format = tun6_adv_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN6, &tlv_handl);
 
-        tlv_handl.name = "TUN4IN6_INGRESS";
+        tlv_handl.name = "DSC_TUN4IN6_INGRESS";
         tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun4in6ingress);
         tlv_handl.fixed_msg_size = 1;
 	tlv_handl.dextCompression = (int32_t*)&dflt_fzip;
@@ -3453,7 +3453,7 @@ int32_t hna_init( void )
         tlv_handl.msg_format = tun4in6_ingress_adv_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN4IN6_INGRESS, &tlv_handl);
 
-        tlv_handl.name = "TUN6IN6_INGRESS";
+        tlv_handl.name = "DSC_TUN6IN6_INGRESS";
         tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun6in6ingress);
         tlv_handl.fixed_msg_size = 1;
 	tlv_handl.dextCompression = (int32_t*)&dflt_fzip;
@@ -3463,7 +3463,7 @@ int32_t hna_init( void )
         tlv_handl.msg_format = tun6in6_ingress_adv_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN6IN6_INGRESS, &tlv_handl);
 
-        tlv_handl.name = "TUN4IN6_SRC";
+        tlv_handl.name = "DSC_TUN4IN6_SRC";
         tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun4in6src);
         tlv_handl.fixed_msg_size = 1;
 	tlv_handl.dextCompression = (int32_t*)&dflt_fzip;
@@ -3473,7 +3473,7 @@ int32_t hna_init( void )
         tlv_handl.msg_format = tun4in6_src_adv_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN4IN6_SRC, &tlv_handl);
 
-        tlv_handl.name = "TUN6IN6_SRC";
+        tlv_handl.name = "DSC_TUN6IN6_SRC";
         tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun6in6src);
         tlv_handl.fixed_msg_size = 1;
 	tlv_handl.dextCompression = (int32_t*)&dflt_fzip;
@@ -3483,7 +3483,7 @@ int32_t hna_init( void )
         tlv_handl.msg_format = tun6in6_src_adv_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN6IN6_SRC, &tlv_handl);
 
-        tlv_handl.name = "TUN4IN6_NET";
+        tlv_handl.name = "DSC_TUN4IN6_NET";
         tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun4in6net);
         tlv_handl.fixed_msg_size = 1;
 	tlv_handl.dextCompression = (int32_t*)&dflt_fzip;
@@ -3493,7 +3493,7 @@ int32_t hna_init( void )
         tlv_handl.msg_format = tun4in6_adv_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_TUN4IN6_NET, &tlv_handl);
 
-        tlv_handl.name = "TUN6IN6_NET";
+        tlv_handl.name = "DSC_TUN6IN6_NET";
         tlv_handl.min_msg_size = sizeof (struct dsc_msg_tun6in6net);
         tlv_handl.fixed_msg_size = 1;
 	tlv_handl.dextCompression = (int32_t*)&dflt_fzip;

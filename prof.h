@@ -18,7 +18,7 @@
 struct prof_ctx_key {
     struct neigh_node *neigh;
     struct orig_node *orig;
-    char *name;
+    const char *name;
 } __attribute__((packed));
 
 struct prof_ctx {

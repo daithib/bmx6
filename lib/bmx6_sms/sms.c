@@ -451,7 +451,7 @@ static int32_t sms_init( void ) {
         tlv_handl.fixed_msg_size = 0;
 	tlv_handl.dextCompression = &sms_fzip;
 	tlv_handl.dextReferencing = &sms_fref;
-        tlv_handl.name = "SMS";
+        tlv_handl.name = "DSC_SMS";
         tlv_handl.tx_frame_handler = create_description_sms;
         tlv_handl.rx_frame_handler = process_description_sms;
         tlv_handl.msg_format = json_extension_format;
