@@ -154,9 +154,13 @@ int process_frame_signature(struct rx_frame_iterator *it)
 	if (cryptVerify(msg->signature, sign_len, &dataSha, pkey_crypt) != SUCCESS )
 		goto_error( finish, "5");
 
-	it->pb->i.verifiedLink = getLinkNode(it->pb);
+	{
+		//TODO: move this and phdr.link_sqn and dev_idx to LINK_VERSION_ADV (or so):
+		//TODO: purge pb->i.link usage
+		it->pb->i.verifiedLink = getLinkNode(it->pb);
 
-	update_local_neigh(it->pb, dhn);
+		update_local_neigh(it->pb, dhn);
+	}
 
 
 finish: {
