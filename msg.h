@@ -919,7 +919,7 @@ void update_my_link_adv(uint32_t changes);
 void dext_free(struct desc_extension **dext);
 IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, struct dhash_node *dhn, uint8_t op, uint8_t filter);
 IDM_T desc_frame_changed(  struct rx_frame_iterator *it, uint8_t f_type );
-void purge_tx_task_list(struct list_head *tx_tasks_list, LinkDevNode *onlyLinkDev, struct dev_node *only_dev);
+int purge_tx_task_list(struct list_head *tx_tasks_list, LinkDevNode *onlyLinkDev, struct dev_node *only_dev);
 SHA1_T *ref_node_key(uint8_t *f_body, uint32_t f_body_len, uint8_t compression, uint8_t nested, uint8_t reserved);
 void ref_node_purge (IDM_T all_unused);
 
@@ -932,8 +932,7 @@ void rx_packet( struct packet_buff *pb );
 #define SCHEDULE_UNKNOWN_MSGS_SIZE 0
 #define SCHEDULE_MIN_MSG_SIZE -1
 
-void schedule_tx_task(LinkNode *destLink, uint16_t frame_type, int16_t frame_msgs_len,
-        void *data, uint32_t dlen, IID_T myIID4x, IID_T neighIID4x);
+void schedule_tx_task(LinkNode *destLink, uint16_t frame_type, int16_t frame_msgs_len, void *data, uint32_t dlen);
 
 void register_frame_handler(struct frame_db *db, int pos, struct frame_handl *handl);
 

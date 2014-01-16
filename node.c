@@ -829,7 +829,7 @@ void purge_orig_router(struct orig_node *onlyOrig, LinkNode *onlyLink, IDM_T onl
 
 
 
-void purge_link_node(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T only_expired)
+void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T only_expired)
 {
         TRACE_FUNCTION_CALL;
 
@@ -956,7 +956,7 @@ void purge_local_node(struct local_node *local)
         while (linkDev_tree_items && (linkDev = avl_first_item(&local->linkDev_tree))) {
 
                 assertion(-501016, (linkDev_tree_items == local->linkDev_tree.items));
-                purge_link_node(&linkDev->key, NULL, NO);
+                purge_linkDevs(&linkDev->key, NULL, NO);
                 linkDev_tree_items--;
         }
 
@@ -1030,7 +1030,7 @@ void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired, 
         dbgf_all( DBGT_INFO, "%s %s only expired",
                 only_dev ? only_dev->label_cfg.str : DBG_NIL, only_expired ? " " : "NOT");
 
-        purge_link_node(NULL, only_dev, only_expired);
+        purge_linkDevs(NULL, only_dev, only_expired);
 
         int i;
         for (i = IID_RSVD_MAX + 1; i < my_iid_repos.max_free; i++) {
@@ -1216,7 +1216,7 @@ LinkDevNode *getLinkDevNode(struct packet_buff *pb)
                                 pb->i.llip_str, pb->i.iif->label_cfg.str, ip6AsStr( &linkDev->link_ip),
                                 ntohl(linkDevKey.local_id), linkDevKey.dev_idx);
 
-                        purge_link_node(&linkDev->key, NULL, NO);
+                        purge_linkDevs(&linkDev->key, NULL, NO);
                         ASSERTION(-500213, !avl_find(&link_dev_tree, &linkDevKey));
                         linkDev = NULL;
                 }

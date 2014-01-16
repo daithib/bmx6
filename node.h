@@ -578,7 +578,7 @@ SHA1_T *nodeIdFromDescAdv( uint8_t *desc_adv );
 char *nodeIdAsStringFromDescAdv( uint8_t *desc_adv );
 
 void purge_local_node(struct local_node *local);
-void purge_link_node(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T only_expired);
+void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T only_expired);
 
 void update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn);
 void update_neigh_dhash(struct orig_node *on, struct dhash_node *dhn);

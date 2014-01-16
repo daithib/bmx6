@@ -31,8 +31,6 @@ struct tx_task_content {
 	struct dev_node *dev; // the outgoing interface to be used for transmitting
 	LinkDevNode *linkDev;
 	uint8_t data[TX_TASK_MAX_DATA_LEN];
-	IID_T myIID4x;
-	IID_T neighIID4x;
 	uint16_t type;
 } __attribute__((packed));
 

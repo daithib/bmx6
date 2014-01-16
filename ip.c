@@ -1846,14 +1846,15 @@ void dev_deactivate( struct dev_node *dev )
 
 	if ( dev->linklayer != TYP_DEV_LL_LO ) {
 
-		purge_link_node(NULL, dev, NO);
+
+		purge_linkDevs(NULL, dev, NO);
 
                 purge_tx_task_list(dev->tx_task_lists, NULL, NULL);
 
                 struct avl_node *an;
 		LinkNode *link;
                 for (an = NULL; (link = avl_iterate_item(&link_tree, &an));) {
-                        purge_tx_task_list(link->tx_task_lists, NULL, dev);
+                        assertion(-500000, (!purge_tx_task_list(link->tx_task_lists, NULL, dev)));
                 }
 
 
