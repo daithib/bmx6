@@ -138,7 +138,7 @@ int process_packet_signature(struct rx_frame_iterator *it)
 	struct dsc_msg_signature *msg = (struct dsc_msg_signature*)(it->frame_data);
 
 	uint8_t *data = it->frame_data + it->frame_data_length;
-	int32_t dataLen = it->frames_length - (it->frames_pos + it->frame_length);
+	int32_t dataLen = it->frames_length - it->frames_pos;
 	CRYPTSHA1_T packetSha;
 
 	struct dsc_msg_pubkey *pkey_msg = dext_dptr(dhn->dext, BMX_DSC_TLV_PUBKEY);
@@ -171,11 +171,11 @@ int process_packet_signature(struct rx_frame_iterator *it)
 
 finish: {
 	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO,
-		"%s %s verifying  data_len=%d data_sha=%s \n"
+		"%s verifying  data_len=%d data_sha=%s \n"
 		"sign_len=%d signature=%s\n"
 		"pkey_type=%s pkey_len=%d pkey=%s \n"
 		"problem?=%s",
-		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", dataLen, cryptShaAsString(&packetSha),
+		goto_error_code?"Failed":"Succeeded", dataLen, cryptShaAsString(&packetSha),
 		sign_len, memAsHexString(msg->signature, sign_len),
 		pkey_msg ? cryptKeyTypeAsString(pkey_msg->type) : "---", pkey_msg ? cryptKeyLenByType(pkey_msg->type) : 0,
 		pkey_crypt ? memAsHexString(pkey_crypt->rawKey, pkey_crypt->rawKeyLen) : "---",
