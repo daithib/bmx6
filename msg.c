@@ -697,7 +697,7 @@ void schedule_tx_task(LinkNode *destLink, uint16_t frame_type, int16_t frame_msg
 
         // advertisements are send to all and are not bound to a specific destinations,
         // therfore tx_task_obsolete should not filter due to the destination_dev_id
-        if (!handl->is_advertisement && destLink->k.linkDev) {
+        if (!handl->is_advertisement) {
                 //ASSERTION(-500915, (destLink == avl_find_item(&link_tree, &dest_lndev->key)));
                 test_task.task.linkDev = destLink->k.linkDev;
         }
@@ -4214,8 +4214,7 @@ void tx_packet(void *devp)
                         ASSERTION(-500918, (IMPLIES(!handl->is_advertisement, it.ttn->task.linkDev &&
                                 it.ttn->task.linkDev == avl_find_item(&link_dev_tree, &it.ttn->task.linkDev->key))));
 
-                        ASSERTION(-500920, (IMPLIES(!handl->is_advertisement, it.ttn->task.dev &&
-                                it.ttn->task.dev == avl_find_item(&dev_ip_tree, &it.ttn->task.dev->llip_key))));
+			ASSERTION(-500920, (it.ttn->task.dev && it.ttn->task.dev == avl_find_item(&dev_ip_tree, &it.ttn->task.dev->llip_key)));
 
 
 
@@ -4904,6 +4903,7 @@ void init_msg( void )
 
 
         handl.name = "DESCRIPTION_REQ";
+        handl.is_advertisement = 1;
 	handl.rx_processUnVerifiedLink = 1;
         handl.tx_iterations = &desc_req_tx_iters;
         handl.data_header_size = sizeof( struct hdr_description_request);
