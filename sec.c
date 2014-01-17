@@ -94,7 +94,7 @@ int create_packet_signature(struct tx_frame_iterator *it)
 		msg->type = my_PubKey->rawKeyType;
 		cryptSign(&packetSha, msg->signature, keySpace);
 
-		dbgf_sys(DBGT_INFO, "fixed RSA%d type=%d signature=%s of dataSha=%s over dataLen=%d data=%s (dataOffset=%d)",
+		dbgf_all(DBGT_INFO, "fixed RSA%d type=%d signature=%s of dataSha=%s over dataLen=%d data=%s (dataOffset=%d)",
 			(keySpace*8), msg->type, memAsHexString(msg->signature, keySpace),
 			cryptShaAsString(&packetSha), dataLen, memAsHexString(data, dataLen), dataOffset);
 
@@ -169,8 +169,8 @@ int process_packet_signature(struct rx_frame_iterator *it)
 
 
 
-finish: {
-	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO,
+finish:{
+		dbgf(goto_error_code ? DBGL_SYS : DBGL_ALL, goto_error_code ? DBGT_ERR : DBGT_INFO,
 		"%s verifying  data_len=%d data_sha=%s \n"
 		"sign_len=%d signature=%s\n"
 		"pkey_type=%s pkey_len=%d pkey=%s \n"
