@@ -1687,8 +1687,10 @@ int32_t resolve_ref_frame(struct packet_buff *pb, uint8_t *f_body, uint32_t f_bo
 
 		if (!refn) {
 
-			if(pb)
-				schedule_tx_task(pb->i.link->k.linkDev->local->best_tp_link, FRAME_TYPE_REF_REQ, SCHEDULE_MIN_MSG_SIZE, &(msg[m].rframe_hash), sizeof(SHA1_T));
+			if(pb) {
+				LinkNode *bestLink = pb->i.verifiedLink ? pb->i.verifiedLink->k.linkDev->local->best_tp_link : &pb->i.iif->dummyLink;
+				schedule_tx_task(bestLink, FRAME_TYPE_REF_REQ, SCHEDULE_MIN_MSG_SIZE, &(msg[m].rframe_hash), sizeof(SHA1_T));
+			}
 
 			solvable = NULL;
 
@@ -4933,10 +4935,10 @@ void init_msg( void )
 
 
         handl.name = "REFERENCE_REQ";
+        handl.is_advertisement = 1;
 	handl.rx_processUnVerifiedLink = 1;
         handl.is_destination_specific_frame = 1;
         handl.tx_iterations = &desc_req_tx_iters;
-        handl.tx_tp_min = &UMETRIC_NBDISCOVERY_MIN;
         handl.min_msg_size = sizeof (struct msg_ref_req);
         handl.fixed_msg_size = 1;
         handl.tx_task_interval_min = DEF_TX_REF_REQ_TO;
