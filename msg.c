@@ -4196,7 +4196,6 @@ void tx_packet(void *devp)
 
 			signatures_needed = 1;
 			result = TLV_TX_DATA_FULL;
-			break;
 
 		} else if (it.frame_type > FRAME_TYPE_LINK_VERSION && it.frames_out_pos == 0 && signatures_needed) {
 
@@ -4208,7 +4207,8 @@ void tx_packet(void *devp)
 			linkDev_tree_it = NULL;
 			it.tx_task_list = NULL;
 			continue;
-		}
+
+		} else {
 
 
                 list_for_each_safe(lpos, ltmp, it.tx_task_list)
@@ -4304,6 +4304,7 @@ void tx_packet(void *devp)
                                 assertion(-500791, (0));
                         }
                 }
+		}
 
                 if (it.frames_out_pos > prev_frames_out_pos) {
 			last_send_frame_type = it.frame_type;
