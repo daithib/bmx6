@@ -120,10 +120,11 @@ int process_packet_signature(struct rx_frame_iterator *it)
         struct description_cache_node *cache = NULL;
 	struct dhash_node *dhn, *dhnOld;
 
-	if (((dhnOld = dhn = avl_find_item(&dhash_tree, dhash)) || (
-		(cache = get_cached_description(dhash)) &&
-		(dhn = process_description(it->pb, cache, dhash)) ) ) &&
-		(dhn == NULL || dhn == UNRESOLVED_PTR || dhn == REJECTED_PTR || dhn == FAILURE_PTR) ) {
+	if ((
+		(dhnOld = dhn = avl_find_item(&dhash_tree, dhash)) ||
+		((cache = get_cached_description(dhash)) && (dhn = process_description(it->pb, cache, dhash))) ||
+		!dhn
+		) && (dhn == NULL || dhn == UNRESOLVED_PTR || dhn == REJECTED_PTR || dhn == FAILURE_PTR)) {
 
 		return TLV_RX_DATA_REJECTED;
 
