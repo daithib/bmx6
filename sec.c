@@ -62,7 +62,7 @@ int create_packet_signature(struct tx_frame_iterator *it)
 	if (!packetSigning)
 		return TLV_TX_DATA_DONE;
 
-	dbgf_all(DBGT_INFO, "f_type=%s msg=%p dataOffset=%d", it->handl->name, msg, dataOffset  );
+	dbgf_all(DBGT_INFO, "f_type=%s msg=%p frames_out_pos=%d dataOffset=%d", it->handl->name, msg, it->frames_out_pos, dataOffset  );
 
 	if (it->frame_type==FRAME_TYPE_SIGNATURE_ADV) {
 
