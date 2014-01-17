@@ -66,7 +66,7 @@ int create_packet_signature(struct tx_frame_iterator *it)
 
 	if (it->frame_type==FRAME_TYPE_SIGNATURE_ADV) {
 
-		assertion(-502098, (!msg && !dataOffset));
+//		assertion(-502098, (!msg && !dataOffset));
 
 		msg = (struct dsc_msg_signature*) (it->frames_out_ptr + it->frames_out_pos + sizeof(struct tlv_hdr));
 
@@ -75,7 +75,7 @@ int create_packet_signature(struct tx_frame_iterator *it)
 		return sizeof(struct dsc_msg_signature) + my_PubKey->rawKeyLen;
 
 	} else {
-		assertion(-502099, (it->frame_type == FRAME_TYPE_SIGNATURE_DUMMY));
+		assertion(-502099, (it->frame_type > FRAME_TYPE_LINK_VERSION));
 		assertion(-502100, (msg && dataOffset));
 		assertion(-502101, (it->frames_out_pos > dataOffset));
 
@@ -110,9 +110,6 @@ STATIC_FUNC
 int process_packet_signature(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-
-	if (it->frame_type == FRAME_TYPE_SIGNATURE_DUMMY)
-		return TLV_RX_DATA_PROCESSED;
 
 	assertion(-502104, (it->frame_data_length == it->frame_msgs_length && it->frame_data == it->msg));
 
@@ -598,12 +595,6 @@ void init_sec( void )
         handl.rx_frame_handler = process_packet_signature;
 	handl.msg_format = signature_format;
         register_frame_handler(packet_frame_db, FRAME_TYPE_SIGNATURE_ADV, &handl);
-
-	handl.name = "SIGNATURE_DUMMY";
-	handl.rx_processUnVerifiedLink = 1;
-        handl.tx_frame_handler = create_packet_signature;
-        handl.rx_frame_handler = process_packet_signature;
-        register_frame_handler(packet_frame_db, FRAME_TYPE_SIGNATURE_DUMMY, &handl);
 
 
 	static const struct field_format pubkey_format[] = DESCRIPTION_MSG_PUBKEY_FORMAT;

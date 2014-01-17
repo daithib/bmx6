@@ -241,7 +241,6 @@
 #define FRAME_TYPE_OGM_ADV      22 // most simple BMX-NG (type 0) OGM advertisements
 #define FRAME_TYPE_OGM_ACK      23 // most simple BMX-NG (type 0) OGM advertisements
 
-#define FRAME_TYPE_SIGNATURE_DUMMY 24
 
 #define FRAME_TYPE_NOP          25
 #define FRAME_TYPE_MAX_KNOWN    25

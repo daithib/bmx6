@@ -4161,9 +4161,6 @@ void tx_packet(void *devp)
 
         assertion(-500205, (dev->active));
 
-	schedule_tx_task(&dev->dummyLink, FRAME_TYPE_SIGNATURE_ADV, sizeof(struct dsc_msg_signature) + my_PubKey->rawKeyLen, 0, 0);
-	schedule_tx_task(&dev->dummyLink, FRAME_TYPE_SIGNATURE_DUMMY, SCHEDULE_MIN_MSG_SIZE, 0, 0);
-	schedule_tx_task(&dev->dummyLink, FRAME_TYPE_LINK_VERSION, SCHEDULE_MIN_MSG_SIZE, 0, 0);
         schedule_tx_task(&dev->dummyLink, FRAME_TYPE_HELLO_ADV, SCHEDULE_MIN_MSG_SIZE, 0, 0);
 
         if (my_link_adv_msgs)
@@ -4182,6 +4179,8 @@ void tx_packet(void *devp)
         };
 
         struct avl_node *linkDev_tree_it = NULL;
+	int8_t signatures_needed = 0;
+	int8_t last_send_frame_type = -1;
 
         while (it.frame_type < FRAME_TYPE_NOP) {
 
@@ -4190,8 +4189,27 @@ void tx_packet(void *devp)
                 struct list_node *lpos, *ltmp, *lprev = (struct list_node*) it.tx_task_list;
                 int32_t result = TLV_TX_DATA_DONE;
                 struct frame_handl *handl = &it.db->handls[it.frame_type];
-                uint16_t old_frames_out_pos = it.frames_out_pos;
+                uint16_t prev_frames_out_pos = it.frames_out_pos;
                 uint32_t item =0;
+
+		if (it.frame_type > FRAME_TYPE_LINK_VERSION && it.frames_out_pos > 0 && !signatures_needed) {
+
+			signatures_needed = 1;
+			result = TLV_TX_DATA_FULL;
+			break;
+
+		} else if (it.frame_type > FRAME_TYPE_LINK_VERSION && it.frames_out_pos == 0 && signatures_needed) {
+
+			schedule_tx_task(&dev->dummyLink, FRAME_TYPE_SIGNATURE_ADV, sizeof(struct dsc_msg_signature) + my_PubKey->rawKeyLen, 0, 0);
+//			schedule_tx_task(&dev->dummyLink, FRAME_TYPE_SIGNATURE_DUMMY, SCHEDULE_MIN_MSG_SIZE, 0, 0);
+			schedule_tx_task(&dev->dummyLink, FRAME_TYPE_LINK_VERSION, SCHEDULE_MIN_MSG_SIZE, 0, 0);
+
+			it.frame_type = FRAME_TYPE_SIGNATURE_ADV;
+			linkDev_tree_it = NULL;
+			it.tx_task_list = NULL;
+			continue;
+		}
+
 
                 list_for_each_safe(lpos, ltmp, it.tx_task_list)
                 {
@@ -4287,41 +4305,49 @@ void tx_packet(void *devp)
                         }
                 }
 
-                if (it.frames_out_pos > old_frames_out_pos) {
+                if (it.frames_out_pos > prev_frames_out_pos) {
+			last_send_frame_type = it.frame_type;
                         dbgf_all(DBGT_INFO, "prepared frame_type=%s frame_size=%d frames_out_pos=%d",
-                                handl->name, (it.frames_out_pos - old_frames_out_pos), it.frames_out_pos);
+                                handl->name, (it.frames_out_pos - prev_frames_out_pos), it.frames_out_pos);
                 }
 
                 assertion(-500796, (!it.frame_cache_msgs_size));
-                assertion(-500800, (it.frames_out_pos >= old_frames_out_pos));
+                assertion(-500800, (it.frames_out_pos >= prev_frames_out_pos));
 
                 if (result == TLV_TX_DATA_FULL || (it.frame_type == FRAME_TYPE_NOP && it.frames_out_pos)) {
 
-			struct packet_header *phdr = (struct packet_header *)pb.p.data;
+			if (last_send_frame_type < FRAME_TYPE_SIGNATURE_ADV || last_send_frame_type > FRAME_TYPE_LINK_VERSION) {
 
-                        assertion(-501338, (it.frames_out_pos && it.frames_out_num));
-                        assertion(-501339, IMPLIES(it.frames_out_num > 1, it.frames_out_pos <= it.frames_out_pref));
-                        assertion(-501340, IMPLIES(it.frames_out_num == 1, it.frames_out_pos <= it.frames_out_max));
+				if (last_send_frame_type > FRAME_TYPE_LINK_VERSION) {
+					it.db->handls[FRAME_TYPE_SIGNATURE_ADV].tx_frame_handler(&it);
+				}
 
-                        pb.i.oif = dev;
-                        pb.i.length = (it.frames_out_pos + sizeof ( struct packet_header));
+				struct packet_header *phdr = (struct packet_header *) pb.p.data;
 
-			my_packet_sqn++;
+				assertion(-501338, (it.frames_out_pos && it.frames_out_num));
+				assertion(-501339, IMPLIES(it.frames_out_num > 1, it.frames_out_pos <= it.frames_out_pref));
+				assertion(-501340, IMPLIES(it.frames_out_num == 1, it.frames_out_pos <= it.frames_out_max));
 
-                        memset(phdr, 0, sizeof (struct packet_header));
+				pb.i.oif = dev;
+				pb.i.length = (it.frames_out_pos + sizeof( struct packet_header));
 
-                        phdr->comp_version = my_compatibility;
-			phdr->dhash = self->dhn->dhash;
-                        phdr->link_adv_sqn = htons(my_link_adv_sqn);
-                        phdr->local_id = my_local_id;
-                        phdr->dev_idx = dev->llip_key.idx;
+				my_packet_sqn++;
 
-                        cb_packet_hooks(&pb);
+				memset(phdr, 0, sizeof(struct packet_header));
 
-                        send_udp_packet(&pb, &dev->tx_netwbrc_addr, dev->unicast_sock);
+				phdr->comp_version = my_compatibility;
+				phdr->dhash = self->dhn->dhash;
+				phdr->link_adv_sqn = htons(my_link_adv_sqn);
+				phdr->local_id = my_local_id;
+				phdr->dev_idx = dev->llip_key.idx;
 
-                        dbgf_all(DBGT_INFO, "send packet size=%d  via dev=%s",
-                                pb.i.length, dev->label_cfg.str);
+				cb_packet_hooks(&pb);
+
+				send_udp_packet(&pb, &dev->tx_netwbrc_addr, dev->unicast_sock);
+
+				dbgf_all(DBGT_INFO, "send packet size=%d  via dev=%s",
+					pb.i.length, dev->label_cfg.str);
+			}
 
                         memset(&pb.i, 0, sizeof (pb.i));
 
