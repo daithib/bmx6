@@ -98,6 +98,7 @@ int create_packet_signature(struct tx_frame_iterator *it)
 
 		msg = NULL;
 		dataOffset = 0;
+
 		prof_stop(&prof_tx_packet_sign);
 		return TLV_TX_DATA_IGNORED;
 	}
@@ -590,6 +591,11 @@ void init_sec( void )
 	handl.msg_format = signature_format;
         register_frame_handler(packet_frame_db, FRAME_TYPE_SIGNATURE_ADV, &handl);
 
+	handl.name = "SIGNATURE_DUMMY";
+	handl.rx_processUnVerifiedLink = 1;
+        handl.tx_frame_handler = create_packet_signature;
+        handl.rx_frame_handler = process_packet_signature;
+        register_frame_handler(description_tlv_db, FRAME_TYPE_SIGNATURE_DUMMY, &handl);
 
 
 	static const struct field_format pubkey_format[] = DESCRIPTION_MSG_PUBKEY_FORMAT;
@@ -617,8 +623,6 @@ void init_sec( void )
 
         handl.name = "DSC_SIGNATURE_DUMMY";
 	handl.rx_processUnVerifiedLink = 1;
-        handl.min_msg_size = 0;
-        handl.fixed_msg_size = 0;
         handl.tx_frame_handler = create_dsc_tlv_signature;
         handl.rx_frame_handler = process_dsc_tlv_signature;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_SIGNATURE_DUMMY, &handl);
