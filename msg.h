@@ -816,7 +816,6 @@ struct tx_frame_iterator {
 struct frame_handl {
         uint8_t is_mandatory;
         uint8_t is_advertisement;              // NO link information required for tx_frame_...(), dev is enough
-	uint8_t is_destination_specific_frame; // particularly: is NO advertisement AND individual frames are created for each destination
 	int32_t *dextCompression;
 	int32_t *dextReferencing;
         uint8_t rx_processUnVerifiedLink;
