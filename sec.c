@@ -183,6 +183,8 @@ finish: {
 
 	if (goto_error_code) {
 
+		EXITERROR(-500000, (0));
+
 		if (!dhnOld && dhn) //TODO: DO not block myIID4x reserved for this node! It was never used!
 			free_orig_node(dhn->on);
 
