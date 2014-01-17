@@ -586,8 +586,6 @@ struct tx_task_node *tx_task_new(LinkNode *destLink, struct tx_task_node *test)
 
                 if ((ttn = avl_find_item(&test->task.dev->tx_task_interval_tree, &test->task))) {
 
-                        ASSERTION(-500906, (IMPLIES((!handl->is_advertisement), (ttn->task.linkDev == test->task.linkDev))));
-
                         ttn->frame_msgs_length = test->frame_msgs_length;
                         ttn->tx_iterations = XMAX(ttn->tx_iterations, test->tx_iterations);
 
@@ -691,17 +689,10 @@ void schedule_tx_task(LinkNode *destLink, uint16_t frame_type, int16_t frame_msg
 	if( data && dlen)
 		memcpy(test_task.task.data, data, dlen);
         test_task.task.dev = destLink->k.myDev;
+	test_task.task.linkDev = destLink->k.linkDev;
         test_task.task.type = frame_type;
         test_task.tx_iterations = handl->tx_iterations ? *handl->tx_iterations : 1;
         test_task.considered_ts = bmx_time - 1;
-
-        // advertisements are send to all and are not bound to a specific destinations,
-        // therfore tx_task_obsolete should not filter due to the destination_dev_id
-        if (!handl->is_advertisement) {
-                //ASSERTION(-500915, (destLink == avl_find_item(&link_tree, &dest_lndev->key)));
-                test_task.task.linkDev = destLink->k.linkDev;
-        }
-
         test_task.frame_msgs_length = frame_msgs_len == SCHEDULE_MIN_MSG_SIZE ? handl->min_msg_size : frame_msgs_len;
 
 
@@ -1984,7 +1975,7 @@ int32_t tx_msg_description_request(struct tx_frame_iterator *it)
         assertion(-500858, (IMPLIES((dhn && dhn->on), dhn->desc_frame)));
 
         dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%X dev_idx=%d iterations=%d time=%d requesting dhash=%s %s llneigh=%d",
-                it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, ntohl(ttn->task.linkDev->key.local_id),
+                it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, ntohl(linkDev?linkDev->key.local_id:0),
                 linkDev ? linkDev->key.dev_idx : -1, ttn->tx_iterations, ttn->considered_ts, cryptShaAsString(dhash),
                 dhn ? "ALREADY RESOLVED (req cancelled)" : "", (linkDev ? linkDev->local->neigh : 0));
 
@@ -4211,9 +4202,6 @@ void tx_packet(void *devp)
 
                         assertion(-500440, (it.ttn->task.type == it.frame_type));
 
-                        ASSERTION(-500918, (IMPLIES(!handl->is_advertisement, it.ttn->task.linkDev &&
-                                it.ttn->task.linkDev == avl_find_item(&link_dev_tree, &it.ttn->task.linkDev->key))));
-
 			ASSERTION(-500920, (it.ttn->task.dev && it.ttn->task.dev == avl_find_item(&dev_ip_tree, &it.ttn->task.dev->llip_key)));
 
 
@@ -4879,7 +4867,6 @@ void init_msg( void )
 
 
         handl.name = "REFERENCE_REQ";
-        handl.is_advertisement = 1;
 	handl.rx_processUnVerifiedLink = 1;
         handl.tx_iterations = &desc_req_tx_iters;
         handl.min_msg_size = sizeof (struct msg_ref_req);
@@ -4890,7 +4877,6 @@ void init_msg( void )
         register_frame_handler(packet_frame_db, FRAME_TYPE_REF_REQ, &handl);
 
         handl.name = "REFERENCE_ADV";
-        handl.is_advertisement = 1;
 	handl.rx_processUnVerifiedLink = 1;
         handl.tx_iterations = &desc_adv_tx_iters;
 	handl.data_header_size = sizeof(struct frame_hdr_rhash_adv);
@@ -4903,7 +4889,6 @@ void init_msg( void )
 
 
         handl.name = "DESCRIPTION_REQ";
-        handl.is_advertisement = 1;
 	handl.rx_processUnVerifiedLink = 1;
         handl.tx_iterations = &desc_req_tx_iters;
         handl.data_header_size = sizeof( struct hdr_description_request);
@@ -4960,7 +4945,6 @@ void init_msg( void )
 
 	handl.name = "DESCRIPTION_ADV_FRAMES";
 	handl.rx_processUnVerifiedLink = 1;
-	handl.is_advertisement = 1;
 	handl.tx_iterations = &desc_adv_tx_iters;
 	handl.min_msg_size = sizeof (struct tlv_hdr) + packet_desc_db->handls[0].min_msg_size;
 	handl.tx_task_interval_min = DEF_TX_DESC0_ADV_TO;
@@ -4982,7 +4966,6 @@ void init_msg( void )
         register_frame_handler(packet_frame_db, FRAME_TYPE_HASH_REQ, &handl);
 
         handl.name = "DHASH_ADV";
-        handl.is_advertisement = 1;
         handl.tx_iterations = &dhash_adv_tx_iters;
         handl.min_msg_size = sizeof (struct msg_dhash_adv);
         handl.fixed_msg_size = 1;
@@ -4994,7 +4977,6 @@ void init_msg( void )
 
         handl.name = "LINK_VERSION_ADV";
 	handl.rx_processUnVerifiedLink = 1;
-        handl.is_advertisement = 1;
         handl.min_msg_size = sizeof (struct msg_link_version_adv);
         handl.fixed_msg_size = 1;
         handl.tx_msg_handler = tx_msg_link_version_adv;
@@ -5002,7 +4984,6 @@ void init_msg( void )
         register_frame_handler(packet_frame_db, FRAME_TYPE_LINK_VERSION, &handl);
 
         handl.name = "HELLO_ADV";
-        handl.is_advertisement = 1;
         handl.min_msg_size = sizeof (struct msg_hello_adv);
         handl.fixed_msg_size = 1;
         handl.tx_msg_handler = tx_msg_hello_adv;
@@ -5022,7 +5003,6 @@ void init_msg( void )
         register_frame_handler(packet_frame_db, FRAME_TYPE_DEV_REQ, &handl);
 
         handl.name = "DEV_ADV";
-        handl.is_advertisement = 1;
         handl.tx_iterations = &dev_adv_tx_iters;
         handl.min_msg_size = sizeof (struct msg_dev_adv);
         handl.fixed_msg_size = 1;
@@ -5034,7 +5014,6 @@ void init_msg( void )
 
 
         handl.name = "LINK_REQ_ADV";
-        handl.is_advertisement = 1;
         handl.tx_iterations = &link_req_tx_iters;
 //        handl.tx_rp_min = &UMETRIC_NBDISCOVERY_MIN;
         handl.min_msg_size = sizeof (struct msg_link_req);
@@ -5045,7 +5024,6 @@ void init_msg( void )
         register_frame_handler(packet_frame_db, FRAME_TYPE_LINK_REQ, &handl);
 
         handl.name = "LINK_ADV";
-        handl.is_advertisement = 1;
         handl.tx_iterations = &link_adv_tx_iters;
         handl.min_msg_size = sizeof (struct msg_link_adv);
         handl.fixed_msg_size = 1;
@@ -5056,7 +5034,6 @@ void init_msg( void )
         register_frame_handler(packet_frame_db, FRAME_TYPE_LINK_ADV, &handl);
 
         handl.name = "RP_ADV";
-        handl.is_advertisement = 1;
         handl.min_msg_size = sizeof (struct msg_rp_adv);
         handl.fixed_msg_size = 1;
         handl.tx_frame_handler = tx_frame_rp_adv;
@@ -5065,7 +5042,6 @@ void init_msg( void )
 
 
         handl.name = "OGM_ADV";
-        handl.is_advertisement = 1;
         handl.data_header_size = sizeof (struct hdr_ogm_adv);
         handl.min_msg_size = sizeof (struct msg_ogm_adv);
         handl.fixed_msg_size = 0;
