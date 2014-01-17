@@ -1393,6 +1393,7 @@ int32_t tx_msg_ref_request(struct tx_frame_iterator *it)
                 it->ttn->tx_iterations = 0;
                 return TLV_TX_DATA_DONE;
         } else {
+		dbgf_sys(DBGT_INFO, "");
 		((struct msg_ref_req*) tx_iterator_cache_msg_ptr(it))->rframe_hash = *rhash;
 		return sizeof (struct msg_ref_req);
 	}
@@ -1405,6 +1406,8 @@ int32_t rx_msg_ref_request(struct rx_frame_iterator *it)
 
 	SHA1_T *rhash = &(((struct msg_ref_req*)it->msg)->rframe_hash);
 	struct ref_node *refn = ref_node_get(rhash);
+
+	dbgf_sys(DBGT_INFO, "");
 
 	if (refn && refn->dext_tree.items)
 		schedule_tx_task(it->pb->i.link->k.linkDev->local->best_tp_link, FRAME_TYPE_REF_ADV, refn->f_body_len, &refn->rhash, sizeof(SHA1_T));
@@ -1450,7 +1453,7 @@ int32_t rx_frame_ref_adv(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	dbgf_track(DBGT_INFO, "")
+	dbgf_sys(DBGT_INFO, "")
 	
 	assertion(-501583, !it->dhnNew && it->frame_type == FRAME_TYPE_REF_ADV);
 
