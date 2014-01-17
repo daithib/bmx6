@@ -1977,16 +1977,16 @@ int32_t tx_msg_description_request(struct tx_frame_iterator *it)
         struct msg_description_request *msg = ((struct msg_description_request*) tx_iterator_cache_msg_ptr(it));
 	DHASH_T *dhash = (DHASH_T*)ttn->task.data;
         struct dhash_node *dhn = avl_find_item(&dhash_tree, dhash);
+	LinkDevNode *linkDev = ttn->task.linkDev;
 
         assertion(-500855, (tx_iterator_cache_data_space_pref(it) >= ((int) (sizeof (struct msg_description_request)))));
-        assertion(-500856, (ttn->task.linkDev));
         assertion(-500870, (ttn->tx_iterations > 0 && ttn->considered_ts != bmx_time));
         assertion(-500858, (IMPLIES((dhn && dhn->on), dhn->desc_frame)));
 
-        dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%X dev_idx=0x%X iterations=%d time=%d requesting dhash=%s %s llneigh=%d",
+        dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%X dev_idx=%d iterations=%d time=%d requesting dhash=%s %s llneigh=%d",
                 it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, ntohl(ttn->task.linkDev->key.local_id),
-                ttn->task.linkDev->key.dev_idx, ttn->tx_iterations, ttn->considered_ts, cryptShaAsString(dhash),
-                dhn ? "ALREADY RESOLVED (req cancelled)" : "", (ttn->task.linkDev->local->neigh));
+                linkDev ? linkDev->key.dev_idx : -1, ttn->tx_iterations, ttn->considered_ts, cryptShaAsString(dhash),
+                dhn ? "ALREADY RESOLVED (req cancelled)" : "", (linkDev ? linkDev->local->neigh : 0));
 
         if (dhn) {
                 // description (and hash) already resolved, skip sending..
@@ -1996,9 +1996,9 @@ int32_t tx_msg_description_request(struct tx_frame_iterator *it)
 
         if (hdr->msg == msg) {
                 assertion(-500854, (is_zero(hdr, sizeof (*hdr))));
-                hdr->destination_local_id = ttn->task.linkDev->key.local_id;
+                hdr->destination_local_id = linkDev ? linkDev->key.local_id : 0;
         } else {
-                assertion(-500871, (hdr->destination_local_id == ttn->task.linkDev->key.local_id));
+                assertion(-500871, (hdr->destination_local_id == (linkDev ? linkDev->key.local_id : 0)));
         }
 
         dbgf_track(DBGT_INFO, "creating msg=%d", ((int) ((((char*) msg) - ((char*) hdr) - sizeof ( *hdr)) / sizeof (*msg))));
@@ -3345,34 +3345,35 @@ int32_t rx_msg_description_request(struct rx_frame_iterator *it)
         struct hdr_description_request *hdr = (struct hdr_description_request*) (it->frame_data);
         struct msg_description_request *msg = (struct msg_description_request*) (it->msg);
 
-        if (hdr->destination_local_id != my_local_id)
-		//TODO: consider that the received local_id might be a duplicate:
-                return sizeof (struct msg_description_request);
+        if (hdr->destination_local_id ? 
+		(hdr->destination_local_id == my_local_id) :
+		(cryptShasEqual(&msg->dhash, &self->dhn->dhash))) {
 
-        dbgf_track(DBGT_INFO, "%s NB %s destination_local_id=0x%X dhash=%s",
-                it->handl->name, pb->i.llip_str, ntohl(hdr->destination_local_id), cryptShaAsString(&msg->dhash));
+		dbgf_track(DBGT_INFO, "%s NB %s destination_local_id=0x%X dhash=%s",
+			it->handl->name, pb->i.llip_str, ntohl(hdr->destination_local_id), cryptShaAsString(&msg->dhash));
 
-        struct dhash_node *dhn = avl_find_item(&dhash_tree, &msg->dhash);
-	struct orig_node *on = dhn ? dhn->on : NULL;
-        assertion(-500270, (IMPLIES(dhn && on, (dhn->desc_frame))));
+		struct dhash_node *dhn = avl_find_item(&dhash_tree, &msg->dhash);
+		struct orig_node *on = dhn ? dhn->on : NULL;
+		assertion(-500270, (IMPLIES(dhn && on, (dhn->desc_frame))));
 
-        if (!dhn || !on || ((TIME_T) (bmx_time - dhn->referred_by_me_timestamp)) > DEF_DESC0_REFERRED_TO) {
+		if (!dhn || !on || ((TIME_T) (bmx_time - dhn->referred_by_me_timestamp)) > DEF_DESC0_REFERRED_TO) {
 
-                dbgf_track(DBGT_WARN, "%s from %s requesting %s %s dhn=%d on=%d",
-                        it->handl->name, pb->i.llip_str, !!dhn, !!on);
+			dbgf_track(DBGT_WARN, "%s from %s requesting %s %s dhn=%d on=%d",
+				it->handl->name, pb->i.llip_str, !!dhn, !!on);
 
-                return sizeof (struct msg_description_request);
-        }
+			return sizeof(struct msg_description_request);
+		}
 
-	schedule_tx_task(pb->i.link->k.linkDev->local->best_tp_link, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &msg->dhash, sizeof(DHASH_T));
+		LinkNode *linkNode = pb->i.verifiedLink ? pb->i.link->k.linkDev->local->best_tp_link : &pb->i.link->k.myDev->dummyLink;
+		schedule_tx_task(linkNode, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &msg->dhash, sizeof(DHASH_T));
 
-        // most probably the requesting node is also interested in my metric to the requested node:
-        if (on->curr_rt_link && on->ogmSqn_next == on->ogmSqn_send &&
-                (((OGM_SQN_MASK) & (on->ogmSqn_next - on->ogmSqn_rangeMin)) < on->ogmSqn_rangeSize) //needed after description updates!
-                ) {
-                set_ogmSqn_toBeSend_and_aggregated(on, on->ogmMetric_next, on->ogmSqn_next, ((OGM_SQN_T) (on->ogmSqn_next - 1)));
-        }
-
+		// most probably the requesting node is also interested in my metric to the requested node:
+		if (on->curr_rt_link && on->ogmSqn_next == on->ogmSqn_send &&
+			(((OGM_SQN_MASK) & (on->ogmSqn_next - on->ogmSqn_rangeMin)) < on->ogmSqn_rangeSize) //needed after description updates!
+			) {
+			set_ogmSqn_toBeSend_and_aggregated(on, on->ogmMetric_next, on->ogmSqn_next, ((OGM_SQN_T) (on->ogmSqn_next - 1)));
+		}
+	}
         return sizeof (struct msg_description_request);
 }
 

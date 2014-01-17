@@ -126,6 +126,9 @@ int process_packet_signature(struct rx_frame_iterator *it)
 		!dhn
 		) && (dhn == NULL || dhn == UNRESOLVED_PTR || dhn == REJECTED_PTR || dhn == FAILURE_PTR)) {
 
+		if (!cache)
+			schedule_tx_task(&it->pb->i.iif->dummyLink, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, dhash, sizeof(DHASH_T));
+
 		return TLV_RX_DATA_REJECTED;
 
 	}
