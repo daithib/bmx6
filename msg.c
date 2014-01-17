@@ -4355,7 +4355,8 @@ void tx_packet(void *devp)
                         it.frames_out_num = 0;
 
                 }
-
+		dbgf_all(DBGT_INFO, "frame_type=%d last_send_frame_type=%d frames_out_pos=%d",
+			it.frame_type, last_send_frame_type, it.frames_out_pos);
         }
 
         assertion(-500797, (!it.frames_out_pos));
