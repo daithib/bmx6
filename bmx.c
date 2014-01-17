@@ -1236,7 +1236,7 @@ static struct opt_type bmx_options[]=
         ,
 #ifndef LESS_OPTIONS
         {ODI,0,ARG_TX_INTERVAL,         0,  9,1, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &my_tx_interval, MIN_TX_INTERVAL, MAX_TX_INTERVAL, DEF_TX_INTERVAL,0, opt_update_description,
-			ARG_VALUE_FORM,	"set aggregation interval (SHOULD be smaller than the half of your and others OGM interval)"}
+			ARG_VALUE_FORM,	"set aggregation interval (SHOULD be at most 1/5 of your and other's OGM interval)"}
         ,
         {ODI,0,ARG_OGM_INTERVAL,        'o',9,1, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &my_ogm_interval,  MIN_OGM_INTERVAL,   MAX_OGM_INTERVAL,   DEF_OGM_INTERVAL,0,   0,
 			ARG_VALUE_FORM,	"set interval in ms with which new originator message (OGM) are send"}

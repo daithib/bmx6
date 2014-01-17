@@ -38,6 +38,8 @@
 #include "plugin.h"
 #include "prof.h"
 #include "sec.h"
+#include "ip.h"
+#include "schedule.h"
 
 //#include "ip.h"
 
@@ -50,7 +52,7 @@ static int32_t packetVerification = DEF_PACKET_VERIFY;
 static int32_t packetSigning = DEF_PACKET_SIGN;
 
 STATIC_FUNC
-int create_frame_signature(struct tx_frame_iterator *it)
+int create_packet_signature(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
@@ -81,16 +83,18 @@ int create_frame_signature(struct tx_frame_iterator *it)
 		int32_t dataLen = it->frames_out_pos - dataOffset;
 		uint8_t *data = it->frames_out_ptr + dataOffset;
 
-		CRYPTSHA1_T dataSha;
-		cryptShaAtomic(data, dataLen, &dataSha);
+		CRYPTSHA1_T packetSha;
+		cryptShaNew(&it->ttn->task.dev->if_llocal_addr->ip_addr, sizeof(IP6_T));
+		cryptShaUpdate(data, dataLen);
+		cryptShaFinal(&packetSha);
 		size_t keySpace = my_PubKey->rawKeyLen;
 
 		msg->type = my_PubKey->rawKeyType;
-		cryptSign(&dataSha, msg->signature, keySpace);
+		cryptSign(&packetSha, msg->signature, keySpace);
 
 		dbgf_sys(DBGT_INFO, "fixed RSA%d type=%d signature=%s of dataSha=%s over dataLen=%d data=%s (dataOffset=%d)",
 			(keySpace*8), msg->type, memAsHexString(msg->signature, keySpace),
-			cryptShaAsString(&dataSha), dataLen, memAsHexString(data, dataLen), dataOffset);
+			cryptShaAsString(&packetSha), dataLen, memAsHexString(data, dataLen), dataOffset);
 
 		msg = NULL;
 		dataOffset = 0;
@@ -100,7 +104,7 @@ int create_frame_signature(struct tx_frame_iterator *it)
 }
 
 STATIC_FUNC
-int process_frame_signature(struct rx_frame_iterator *it)
+int process_packet_signature(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
@@ -130,7 +134,7 @@ int process_frame_signature(struct rx_frame_iterator *it)
 
 	uint8_t *data = it->frame_data + it->frame_data_length;
 	int32_t dataLen = it->frames_length - (it->frames_pos + it->frame_length);
-	CRYPTSHA1_T dataSha;
+	CRYPTSHA1_T packetSha;
 
 	struct dsc_msg_pubkey *pkey_msg = dext_dptr(dhn->dext, BMX_DSC_TLV_PUBKEY);
 	CRYPTKEY_T *pkey_crypt = NULL;
@@ -147,20 +151,17 @@ int process_frame_signature(struct rx_frame_iterator *it)
 	if ( sign_len > (packetVerification/8) )
 		goto_error( finish, "4");
 
-	cryptShaAtomic(data, dataLen, &dataSha);
+	cryptShaNew(&it->pb->i.llip, sizeof(IPX_T));
+	cryptShaUpdate(data, dataLen);
+	cryptShaFinal(&packetSha);
 
 	pkey_crypt = cryptPubKeyFromRaw(pkey_msg->key, sign_len);
 
-	if (cryptVerify(msg->signature, sign_len, &dataSha, pkey_crypt) != SUCCESS )
+	if (cryptVerify(msg->signature, sign_len, &packetSha, pkey_crypt) != SUCCESS )
 		goto_error( finish, "5");
 
-	{
-		//TODO: move this and phdr.link_sqn and dev_idx to LINK_VERSION_ADV (or so):
-		//TODO: purge pb->i.link usage
-		it->pb->i.verifiedLink = getLinkNode(it->pb);
+	it->pb->i.verifiedLinkDhn = dhn;
 
-		update_local_neigh(it->pb, dhn);
-	}
 
 
 finish: {
@@ -169,7 +170,7 @@ finish: {
 		"sign_len=%d signature=%s\n"
 		"pkey_type=%s pkey_len=%d pkey=%s \n"
 		"problem?=%s",
-		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", dataLen, cryptShaAsString(&dataSha),
+		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", dataLen, cryptShaAsString(&packetSha),
 		sign_len, memAsHexString(msg->signature, sign_len),
 		pkey_msg ? cryptKeyTypeAsString(pkey_msg->type) : "---", pkey_msg ? cryptKeyLenByType(pkey_msg->type) : 0,
 		pkey_crypt ? memAsHexString(pkey_crypt->rawKey, pkey_crypt->rawKeyLen) : "---",
@@ -578,13 +579,13 @@ void init_sec( void )
 
 	static const struct field_format signature_format[] = DESCRIPTION_MSG_SIGNATURE_FORMAT;
         handl.name = "SIGNATURE_ADV";
-	handl.is_mandatory = 1;
+	handl.rx_processUnVerifiedLink = 1;
 	handl.min_msg_size = sizeof(struct dsc_msg_signature);
         handl.fixed_msg_size = 0;
 	handl.dextReferencing = (int32_t*)&never_fref;
 	handl.dextCompression = (int32_t*)&never_fzip;
-        handl.tx_frame_handler = create_frame_signature;
-        handl.rx_frame_handler = process_frame_signature;
+        handl.tx_frame_handler = create_packet_signature;
+        handl.rx_frame_handler = process_packet_signature;
 	handl.msg_format = signature_format;
         register_frame_handler(packet_frame_db, FRAME_TYPE_SIGNATURE_ADV, &handl);
 
@@ -614,6 +615,7 @@ void init_sec( void )
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_SIGNATURE, &handl);
 
         handl.name = "DSC_SIGNATURE_DUMMY";
+	handl.rx_processUnVerifiedLink = 1;
         handl.min_msg_size = 0;
         handl.fixed_msg_size = 0;
         handl.tx_frame_handler = create_dsc_tlv_signature;

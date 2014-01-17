@@ -216,35 +216,35 @@
 #define FRAME_TYPE_RSVD0        0
 
 
-#define FRAME_TYPE_REF_REQ      1
-#define FRAME_TYPE_REF_ADV      2
+#define FRAME_TYPE_REF_REQ       1
+#define FRAME_TYPE_REF_ADV       2
 
-#define FRAME_TYPE_DESC_REQ     3
-#define FRAME_TYPE_DESC_ADVS    4
+#define FRAME_TYPE_DESC_REQ      3
+#define FRAME_TYPE_DESC_ADVS     4
 
-#define FRAME_TYPE_SIGNATURE_ADV    5
+#define FRAME_TYPE_SIGNATURE_ADV 5
 
-#define FRAME_TYPE_PROBLEM_ADV  6  // yet only used to indicate local/link_id collisions
+#define FRAME_TYPE_LINK_VERSION  6  // yet only used to indicate local/link_id collisions
 
-#define FRAME_TYPE_DEV_REQ      8
-#define FRAME_TYPE_DEV_ADV      9
+#define FRAME_TYPE_DEV_REQ       8
+#define FRAME_TYPE_DEV_ADV       9
 
-#define FRAME_TYPE_LINK_REQ    10
-#define FRAME_TYPE_LINK_ADV    11
+#define FRAME_TYPE_LINK_REQ     10
+#define FRAME_TYPE_LINK_ADV     11
 
-#define FRAME_TYPE_HELLO_ADV   12 // most-simple BMX-NG hello (nb-discovery) advertisements
-#define FRAME_TYPE_RP_ADV      13
+#define FRAME_TYPE_HELLO_ADV    12 // most-simple BMX-NG hello (nb-discovery) advertisements
+#define FRAME_TYPE_RP_ADV       13
 
-#define FRAME_TYPE_HASH_REQ    18  // Hash-for-description-of-OG-ID requests
-#define FRAME_TYPE_HASH_ADV    19  // Hash-for-description-of-OG-ID advertisements
+#define FRAME_TYPE_HASH_REQ     18  // Hash-for-description-of-OG-ID requests
+#define FRAME_TYPE_HASH_ADV     19  // Hash-for-description-of-OG-ID advertisements
 
-#define FRAME_TYPE_OGM_ADV     22 // most simple BMX-NG (type 0) OGM advertisements
-#define FRAME_TYPE_OGM_ACK     23 // most simple BMX-NG (type 0) OGM advertisements
+#define FRAME_TYPE_OGM_ADV      22 // most simple BMX-NG (type 0) OGM advertisements
+#define FRAME_TYPE_OGM_ACK      23 // most simple BMX-NG (type 0) OGM advertisements
 
 #define FRAME_TYPE_SIGNATURE_DUMMY 24
 
-#define FRAME_TYPE_NOP         25
-#define FRAME_TYPE_MAX_KNOWN   25
+#define FRAME_TYPE_NOP          25
+#define FRAME_TYPE_MAX_KNOWN    25
 #define FRAME_TYPE_MAX         (FRAME_TYPE_ARRSZ-1)
 
 
@@ -405,25 +405,15 @@ char *tlv_op_str(uint8_t op);
 
 struct tlv_hdr tlvSetBigEndian(int16_t type, int16_t length);
 
-struct problem_type {
-    LOCAL_ID_T local_id;
-    uint16_t problem_code;
-};
-
-#define FRAME_TYPE_PROBLEM_CODE_MIN          0x01
-#define FRAME_TYPE_PROBLEM_CODE_DUP_LINK_ID  0x01
-#define FRAME_TYPE_PROBLEM_CODE_MAX          0x01
 
 
 
 
-struct msg_problem_adv { // 4 bytes
-	uint8_t code;
-	uint8_t reserved;
-	LOCAL_ID_T local_id;
+struct msg_link_version_adv {
+    	LOCAL_ID_T local_id;         // 32
+	LINKADV_SQN_T link_adv_sqn;  // 16 used for processing: link_adv, lq_adv, rp_adv, ogm_adv, ogm_ack
+	DEVADV_IDX_T   dev_idx;      //  8
 } __attribute__((packed));
-
-
 
 
 
@@ -830,7 +820,6 @@ struct frame_handl {
 	int32_t *dextCompression;
 	int32_t *dextReferencing;
         uint8_t rx_processUnVerifiedLink;
-	uint8_t rx_requires_described_neigh;
         uint16_t data_header_size;
         uint16_t min_msg_size;
         uint16_t fixed_msg_size;
@@ -852,6 +841,7 @@ struct frame_handl {
 
 struct frame_db {
     uint8_t handl_max;
+    uint8_t rx_processUnVerifiedLink;
     char *name;
     struct frame_handl handls[];
 };

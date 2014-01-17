@@ -693,15 +693,15 @@ void create_neigh_node(struct local_node *local, struct dhash_node * dhn)
 
 
 
-void update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
+void update_local_neigh(LinkNode *link, struct dhash_node *dhn)
 {
         TRACE_FUNCTION_CALL;
-        struct local_node *local = pb->i.link->k.linkDev->local;
+        struct local_node *local = link->k.linkDev->local;
 
         dbgf_all(DBGT_INFO, "local_id=0x%X  dhn->id=%s", local->local_id, cryptShaAsString(&dhn->on->nodeId));
 
         assertion(-500517, (dhn != self->dhn));
-        ASSERTION(-500392, (pb->i.link->k.linkDev == avl_find_item(&local->linkDev_tree, &pb->i.link->k.linkDev->key.dev_idx)));
+        ASSERTION(-500392, (link->k.linkDev == avl_find_item(&local->linkDev_tree, &link->k.linkDev->key.dev_idx)));
         assertion(-500390, (dhn && dhn->on && dhn->on->dhn == dhn));
 
         if (!local->neigh && dhn->neigh) {
@@ -709,8 +709,8 @@ void update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
                 assertion(-500956, (dhn->neigh->dhn == dhn));
                 assertion(-500955, (dhn->neigh->local->neigh == dhn->neigh));
 
-                dbgf_track(DBGT_INFO, "CHANGED link=%s -> LOCAL=%d->%d <- neighIID4me=%d <- dhn->id=%s",
-                        pb->i.llip_str, dhn->neigh->local->local_id, local->local_id, dhn->neigh->neighIID4me,
+                dbgf_track(DBGT_INFO, "CHANGED LOCAL=%d->%d <- neighIID4me=%d <- dhn->id=%s",
+                        dhn->neigh->local->local_id, local->local_id, dhn->neigh->neighIID4me,
                         cryptShaAsString(&dhn->on->nodeId));
 
                 dhn->neigh->local->neigh = NULL;
@@ -722,8 +722,8 @@ void update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
 
                 create_neigh_node(local, dhn);
 
-                dbgf_track(DBGT_INFO, "NEW link=%s <-> LOCAL=%d <-> NEIGHIID4me=%d <-> dhn->id=%s",
-                        pb->i.llip_str, local->local_id, local->neigh->neighIID4me,
+                dbgf_track(DBGT_INFO, "NEW LOCAL=%d <-> NEIGHIID4me=%d <-> dhn->id=%s",
+                        local->local_id, local->neigh->neighIID4me,
                         cryptShaAsString(&dhn->on->nodeId));
 
         } else if (
@@ -738,8 +738,8 @@ void update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn)
 
         } else {
 
-		dbgf_sys(DBGT_ERR, "NONMATCHING LINK=%s -> local=%d -> neighIID4me=%d -> dhn->id=%s",
-			pb->i.llip_str, local->local_id,
+		dbgf_sys(DBGT_ERR, "NONMATCHING local=%d -> neighIID4me=%d -> dhn->id=%s",
+			local->local_id,
 			local->neigh ? local->neigh->neighIID4me : 0,
 			local->neigh && local->neigh->dhn->on ? cryptShaAsString(&local->neigh->dhn->on->nodeId) : DBG_NIL);
 		dbgf_sys(DBGT_ERR, "NONMATCHING local=%d <- neighIID4me=%d <- DHN=%s",
@@ -1168,20 +1168,16 @@ LOCAL_ID_T new_local_id(struct dev_node *dev)
 
 
 STATIC_FUNC
-LinkDevNode *getLinkDevNode(struct packet_buff *pb)
+LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T link_sqn, LOCAL_ID_T local_id, DEVADV_IDX_T dev_idx )
 {
         TRACE_FUNCTION_CALL;
-	LinkDevNode *linkDev;
-	LINKADV_SQN_T link_sqn = ntohs(pb->p.hdr.link_adv_sqn);
-	LinkDevKey linkDevKey = {.local_id=pb->p.hdr.local_id, .dev_idx=pb->p.hdr.dev_idx};
 
-	dbgf_all(DBGT_INFO, "NB=%s local_id=%X dev_idx=0x%X",
-		pb->i.llip_str, ntohl(linkDevKey.local_id), linkDevKey.dev_idx);
+	dbgf_all(DBGT_INFO, "NB=%s local_id=%X dev_idx=0x%X", ip6AsStr(llip), ntohl(local_id), dev_idx);
 
-	if (linkDevKey.dev_idx < DEVADV_IDX_MIN || linkDevKey.local_id == LOCAL_ID_INVALID)
+	if (dev_idx < DEVADV_IDX_MIN || local_id == LOCAL_ID_INVALID)
 		return NULL;
 
-        struct local_node *local = avl_find_item(&local_tree, &linkDevKey.local_id);
+        struct local_node *local = avl_find_item(&local_tree, &local_id);
 
 
         if (local) {
@@ -1189,32 +1185,33 @@ LinkDevNode *getLinkDevNode(struct packet_buff *pb)
                 if ((((LINKADV_SQN_T) (link_sqn - local->packet_link_sqn_ref)) > LINKADV_SQN_DAD_RANGE)) {
 
                         dbgf_sys(DBGT_ERR, "DAD-Alert NB=%s local_id=%X dev=%s link_sqn=%d link_sqn_max=%d dad_range=%d dad_to=%d",
-                                pb->i.llip_str, ntohl(linkDevKey.local_id), pb->i.iif->label_cfg.str, link_sqn, local->packet_link_sqn_ref,
+                                ip6AsStr(llip), ntohl(local_id), iif->label_cfg.str, link_sqn, local->packet_link_sqn_ref,
                                 LINKADV_SQN_DAD_RANGE, LINKADV_SQN_DAD_RANGE * my_tx_interval);
 
                         purge_local_node(local);
 
-                        assertion(-500984, (!avl_find_item(&local_tree, &linkDevKey.local_id)));
+                        assertion(-500984, (!avl_find_item(&local_tree, &local_id)));
 
                         return NULL;
                 }
         }
 
-
-        linkDev = NULL;
+	LinkDevKey linkDevKey = {.local_id = local_id, .dev_idx = dev_idx};
+	
+	LinkDevNode *linkDev = NULL;
 
         if (local) {
 
-                linkDev = avl_find_item(&local->linkDev_tree, &linkDevKey.dev_idx);
+                linkDev = avl_find_item(&local->linkDev_tree, &dev_idx);
 
                 assertion(-500943, (linkDev == avl_find_item(&link_dev_tree, &linkDevKey)));
 
-                if (linkDev && !is_ip_equal(&pb->i.llip, &linkDev->link_ip)) {
+                if (linkDev && !is_ip_equal(llip, &linkDev->link_ip)) {
 
                         dbgf_sys(DBGT_WARN, "Reinitialized! NB=%s via dev=%s "
                                 "cached llIP=%s local_id=%X dev_idx=0x%X ! Reinitializing link_node...",
-                                pb->i.llip_str, pb->i.iif->label_cfg.str, ip6AsStr( &linkDev->link_ip),
-                                ntohl(linkDevKey.local_id), linkDevKey.dev_idx);
+                                ip6AsStr(llip), iif->label_cfg.str, ip6AsStr( &linkDev->link_ip),
+                                ntohl(local_id), dev_idx);
 
                         purge_linkDevs(&linkDev->key, NULL, NO);
                         ASSERTION(-500213, !avl_find(&link_dev_tree, &linkDevKey));
@@ -1231,7 +1228,7 @@ LinkDevNode *getLinkDevNode(struct packet_buff *pb)
                 assertion(-500944, (!avl_find_item(&link_dev_tree, &linkDevKey)));
                 local = debugMallocReset(sizeof(struct local_node), -300336);
                 AVL_INIT_TREE(local->linkDev_tree, LinkDevNode, key.dev_idx);
-                local->local_id = linkDevKey.local_id;
+                local->local_id = local_id;
                 local->link_adv_msg_for_me = LINKADV_MSG_IGNORED;
                 local->link_adv_msg_for_him = LINKADV_MSG_IGNORED;
                 avl_insert(&local_tree, local, -300337);
@@ -1248,13 +1245,13 @@ LinkDevNode *getLinkDevNode(struct packet_buff *pb)
                 LIST_INIT_HEAD(linkDev->link_list, LinkNode, list, list);
 
                 linkDev->key = linkDevKey;
-                linkDev->link_ip = pb->i.llip;
+                linkDev->link_ip = *llip;
                 linkDev->local = local;
 
                 avl_insert(&link_dev_tree, linkDev, -300147);
                 avl_insert(&local->linkDev_tree, linkDev, -300334);
 
-                dbgf_track(DBGT_INFO, "creating new link=%s (total %d)", pb->i.llip_str, link_dev_tree.items);
+                dbgf_track(DBGT_INFO, "creating new link=%s (total %d)", ip6AsStr(llip), link_dev_tree.items);
 
         }
 
@@ -1265,15 +1262,13 @@ LinkDevNode *getLinkDevNode(struct packet_buff *pb)
 
 
 
-LinkNode *getLinkNode(struct packet_buff *pb)
+LinkNode *getLinkNode(struct dev_node *dev, IPX_T *llip, LINKADV_SQN_T link_sqn, LOCAL_ID_T local_id, DEVADV_IDX_T dev_idx)
 {
         TRACE_FUNCTION_CALL;
 
-        assertion(-500607, (pb->i.iif));
-
         LinkNode *link = NULL;
-        struct dev_node *dev = pb->i.iif;
-	LinkDevNode *linkDev = getLinkDevNode(pb);
+
+	LinkDevNode *linkDev = getLinkDevNode(dev, llip, link_sqn, local_id, dev_idx);
 
 	if (!linkDev)
 		return NULL;

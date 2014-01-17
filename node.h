@@ -482,8 +482,8 @@ struct packet_header
         
         CRYPTSHA1_T dhash;
 
+        //TODO: remove:...
 	LOCAL_ID_T local_id;         // 32
-
 	LINKADV_SQN_T link_adv_sqn;  // 16 used for processing: link_adv, lq_adv, rp_adv, ogm_adv, ogm_ack
 	DEVADV_IDX_T   dev_idx;      //  8
 
@@ -510,6 +510,7 @@ struct packet_buff {
                 
                 //remove:
 		LinkNode *link;
+                struct dhash_node *verifiedLinkDhn;
                 LinkNode *verifiedLink;
 //              LinkDevNode *linkDev;
 //		IID_T transmittersIID;
@@ -558,7 +559,7 @@ IID_NODE_T* iid_get_node_by_neighIID4x(IID_NEIGH_T *nn, IID_T neighIID4x, IDM_T 
 IID_NODE_T* iid_get_node_by_myIID4x( IID_T myIID4x );
 
 
-LinkNode *getLinkNode(struct packet_buff *pb);
+LinkNode *getLinkNode(struct dev_node *dev, IPX_T *llip, LINKADV_SQN_T link_sqn, LOCAL_ID_T local_id, DEVADV_IDX_T dev_idx);
 
 void blacklist_neighbor(struct packet_buff *pb);
 
@@ -580,7 +581,7 @@ char *nodeIdAsStringFromDescAdv( uint8_t *desc_adv );
 void purge_local_node(struct local_node *local);
 void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T only_expired);
 
-void update_local_neigh(struct packet_buff *pb, struct dhash_node *dhn);
+void update_local_neigh(LinkNode *link, struct dhash_node *dhn);
 void update_neigh_dhash(struct orig_node *on, struct dhash_node *dhn);
 struct dhash_node* get_dhash_node(uint8_t *desc_frame, uint32_t desc_frame_len, struct desc_extension* dext, DHASH_T *dhash);
 

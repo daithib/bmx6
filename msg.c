@@ -246,11 +246,12 @@ struct tlv_hdr tlvSetBigEndian(int16_t type, int16_t length)
 
 
 STATIC_FUNC
-struct frame_db *init_frame_db(uint8_t handlSz, char *name) {
+struct frame_db *init_frame_db(uint8_t handlSz, uint8_t processUnVerifiedLinks, char *name) {
 
 	struct frame_db *db = debugMallocReset(sizeof(struct frame_db) + (handlSz * sizeof(struct frame_handl)), -300622);
 
 	db->handl_max = handlSz -1;
+	db->rx_processUnVerifiedLink = processUnVerifiedLinks;
 	db->name = name;
 
 	return db;
@@ -661,7 +662,7 @@ void schedule_tx_task(LinkNode *destLink, uint16_t frame_type, int16_t frame_msg
                 return;
 
 
-        dbgf((( /* debug interesting frame types: */ frame_type == FRAME_TYPE_PROBLEM_ADV ||
+        dbgf((( /* debug interesting frame types: */
                 frame_type == FRAME_TYPE_HASH_REQ || frame_type == FRAME_TYPE_HASH_ADV ||
                 frame_type == FRAME_TYPE_DESC_REQ ||frame_type == FRAME_TYPE_DESC_ADVS ||
                 frame_type == FRAME_TYPE_LINK_REQ || frame_type == FRAME_TYPE_LINK_ADV ||
@@ -1125,7 +1126,38 @@ void schedule_or_purge_ogm_aggregations(IDM_T purge_all)
 }
 
 
+STATIC_FUNC
+int32_t tx_msg_link_version_adv(struct tx_frame_iterator *it)
+{
+        TRACE_FUNCTION_CALL;
 
+        struct msg_link_version_adv *adv = (struct msg_link_version_adv *) (tx_iterator_cache_msg_ptr(it));
+
+	adv->local_id = my_local_id;
+	adv->link_adv_sqn = htons(my_link_adv_sqn);
+        adv->dev_idx = it->ttn->task.dev->llip_key.idx;
+
+        return sizeof (struct msg_link_version_adv);
+}
+
+STATIC_FUNC
+int32_t rx_msg_link_version_adv(struct rx_frame_iterator *it)
+{
+        TRACE_FUNCTION_CALL;
+        struct packet_buff_info *pbi = &it->pb->i;
+        struct msg_link_version_adv *msg = (struct msg_link_version_adv*) (it->msg);
+
+	if (!pbi->verifiedLinkDhn)
+		return TLV_RX_DATA_REJECTED;
+
+	//TODO: purge pb->i.link usage
+	if (!(pbi->verifiedLink = getLinkNode(pbi->iif, &pbi->llip, ntohs(msg->link_adv_sqn), msg->local_id, msg->dev_idx)))
+		return TLV_RX_DATA_FAILURE;
+
+	update_local_neigh(pbi->verifiedLink, pbi->verifiedLinkDhn);
+
+        return sizeof (struct msg_link_version_adv);
+}
 
 STATIC_FUNC
 int32_t tx_msg_hello_adv(struct tx_frame_iterator *it)
@@ -1146,49 +1178,6 @@ int32_t tx_msg_hello_adv(struct tx_frame_iterator *it)
 }
 
 
-
-/*
-
-
-STATIC_FUNC
-int32_t tx_frame_test_adv(struct tx_frame_iterator *it)
-{
-        TRACE_FUNCTION_CALL;
-        static uint8_t i = 0xFF;
-        struct hdr_test_adv* hdr = ((struct hdr_test_adv*) tx_iterator_cache_hdr_ptr(it));
-
-        assertion(-501007, (hdr->msg == (struct msg_test_adv*)tx_iterator_cache_msg_ptr(it)));
-        assertion(-501008, ((int) it->ttn->frame_msgs_length <= tx_iterator_cache_data_space(it)));
-
-        hdr->hdr_test = i++;
-
-        return 0;
-}
-
-STATIC_FUNC
-int32_t rx_frame_test_adv( struct rx_frame_iterator *it)
-{
-        TRACE_FUNCTION_CALL;
-
-        struct hdr_test_adv* hdr = (struct hdr_test_adv*) it->frame_data;;
-        struct msg_test_adv* adv = (struct msg_test_adv*) it->msg;
-        assertion(-501017, (adv == hdr->msg));
-
-        uint16_t msgs = it->frame_msgs_length / sizeof (struct msg_test_adv);
-
-        dbgf_sys(DBGT_WARN, "rcvd TEST_ADV via dev=%s msgs_size=%d frame_data_length=%d from: "
-                "NB=%s local_id=%X dev_idx=%d hdr_test=%d",
-                it->pb->i.iif->label_cfg.str, it->frame_msgs_length, it->frame_data_length,
-                it->pb->i.llip_str, it->pb->i.link->key.local_id, it->pb->i.link->key.dev_idx, hdr->hdr_test);
-
-        assertion(-501010, (it->frame_data_length == ((int)(it->frame_msgs_length + sizeof (struct hdr_test_adv)))));
-        assertion(-501009, (!msgs && !it->frame_msgs_length));
-
-        return it->frame_msgs_length;
-}
-
-
-*/
 
 
 
@@ -2820,37 +2809,6 @@ int32_t tx_msg_ogm_ack(struct tx_frame_iterator *it)
 
 
 
-STATIC_FUNC
-int32_t tx_frame_problem_adv(struct tx_frame_iterator *it)
-{
-        TRACE_FUNCTION_CALL;
-	struct problem_type *problem = it->ttn ? (struct problem_type *)it->ttn->task.data : NULL;
-        assertion(-500860, (problem && problem->local_id ));
-        assertion(-500936, (problem->local_id > LOCAL_ID_INVALID));
-
-        dbgf_all(DBGT_INFO, "FRAME_TYPE_PROBLEM_CODE=%d local_id=0x%X", problem->problem_code, problem->local_id);
-
-	assertion(-500846, (0));
-
-        return TLV_TX_DATA_FAILURE;
-}
-
-
-
-
-STATIC_FUNC
-int32_t rx_frame_problem_adv(struct rx_frame_iterator *it)
-{
-        TRACE_FUNCTION_CALL;
-        struct msg_problem_adv *adv = (struct msg_problem_adv *) it->frame_data;
-
-	dbgf_sys(DBGT_WARN, "code=%d", adv->code);
-
-	return TLV_RX_DATA_PROCESSED;
-}
-
-
-
 
 STATIC_FUNC
 int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
@@ -3157,7 +3115,7 @@ struct dhash_node *process_dhash_description_neighIID4x
                 if (is_transmitter) {
                         // is about the transmitter:
 
-                        update_local_neigh(pb, dhn);
+			//update_local_neigh(pb, dhn);
 
 			if (neighIID4x > IID_RSVD_MAX &&
 				iid_set_neighIID4x(&neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
@@ -3212,7 +3170,7 @@ struct dhash_node *process_dhash_description_neighIID4x
 
 				if (is_transmitter)
 					//is about the transmitter  and  a description + dhash is known
-					update_local_neigh(pb, dhn);
+					//update_local_neigh(pb, dhn);
 
 				if (neighIID4x > IID_RSVD_MAX &&
 					iid_set_neighIID4x(&neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
@@ -3680,19 +3638,12 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 
                         return TLV_RX_DATA_PROCESSED;
 
-		} else if (!f_handl->rx_processUnVerifiedLink && !pb->i.verifiedLink) {
+		} else if (!(f_handl->rx_processUnVerifiedLink || it->db->rx_processUnVerifiedLink) && !pb->i.verifiedLink) {
 
-			dbgf_sys(DBGT_INFO, "%s - NON-VERIFIED link to dhash=%s neigh=%s, needed for frame type=%s",
-				it->caller, cryptShaAsString(&pb->p.hdr.dhash), pb->i.llip_str, f_handl->name);
+			dbgf_sys(DBGT_INFO, "%s - NON-VERIFIED link to dhash=%s neigh=%s, needed for frame type=%s db=%s",
+				it->caller, cryptShaAsString(&pb->p.hdr.dhash), pb->i.llip_str, f_handl->name, it->db->name);
 
 			return TLV_RX_DATA_PROCESSED;
-
-                } else if (!IMPLIES(f_handl->rx_requires_described_neigh, (pb && is_described_neigh(pb->i.link->k.linkDev, &pb->p.hdr.dhash)))) {
-
-                        dbgf_track(DBGT_INFO, "%s - UNDESCRIBED dhash=%s of neigh=%s - skipping frame type=%s",
-                                it->caller, cryptShaAsString(&pb->p.hdr.dhash), pb->i.llip_str, f_handl->name);
-
-                        return TLV_RX_DATA_PROCESSED;
 
                 } else if (it->op >= TLV_OP_PLUGIN_MIN && it->op <= TLV_OP_PLUGIN_MAX) {
 
@@ -4273,6 +4224,8 @@ void tx_packet(void *devp)
         assertion(-500205, (dev->active));
 
 
+	schedule_tx_task(&dev->dummyLink, FRAME_TYPE_SIGNATURE_ADV, SCHEDULE_MIN_MSG_SIZE, 0, 0);
+	schedule_tx_task(&dev->dummyLink, FRAME_TYPE_LINK_VERSION, SCHEDULE_MIN_MSG_SIZE, 0, 0);
         schedule_tx_task(&dev->dummyLink, FRAME_TYPE_HELLO_ADV, SCHEDULE_MIN_MSG_SIZE, 0, 0);
 
         if (my_link_adv_msgs)
@@ -4823,7 +4776,9 @@ void rx_packet( struct packet_buff *pb )
 
 
 
-        if (!(pb->i.link = getLinkNode(pb)))
+	
+	//TODO: purge pb->i.link usage
+        if (!(pb->i.link = getLinkNode(pb->i.iif, &pb->i.llip, ntohs(pb->p.hdr.link_adv_sqn), pb->p.hdr.local_id, pb->p.hdr.dev_idx )))
                 goto finish;
 
         dbgf_all(DBGT_INFO, "via %s %s %s size %d", iif->label_cfg.str, iif->ip_llocal_str, pb->i.llip_str, pb->i.length);
@@ -4957,22 +4912,13 @@ void init_msg( void )
 
         task_register(my_ogm_interval, schedule_my_originator_message, NULL, -300356);
 
-	packet_frame_db = init_frame_db(FRAME_TYPE_ARRSZ, "packet_frame_db");
-	packet_desc_db = init_frame_db(1, "packet_desc_db");
-	description_tlv_db = init_frame_db(BMX_DSC_TLV_ARRSZ, "description_tlv_db");
-        description_names_db = init_frame_db(BMX_DSC_NAMES_ARRSZ, "description_names_db");
+	packet_frame_db = init_frame_db(FRAME_TYPE_ARRSZ, 0, "packet_frame_db");
+	packet_desc_db = init_frame_db(1, 1, "packet_desc_db");
+	description_tlv_db = init_frame_db(BMX_DSC_TLV_ARRSZ, 1, "description_tlv_db");
+        description_names_db = init_frame_db(BMX_DSC_NAMES_ARRSZ, 1, "description_names_db");
 
         struct frame_handl handl;
         memset(&handl, 0, sizeof ( handl));
-
-        handl.name = "PROBLEM_ADV";
-        handl.is_advertisement = 1;
-        handl.min_msg_size = sizeof (struct msg_problem_adv);
-        handl.fixed_msg_size = 0;
-        handl.tx_task_interval_min = CONTENT_MIN_TX_INTERVAL__CHECK_FOR_REDUNDANCY;
-        handl.tx_frame_handler = tx_frame_problem_adv;
-        handl.rx_frame_handler = rx_frame_problem_adv;
-        register_frame_handler(packet_frame_db, FRAME_TYPE_PROBLEM_ADV, &handl);
 
 
         static const struct field_format ref_format[] = MSG_RHASH_FORMAT;
@@ -4987,6 +4933,7 @@ void init_msg( void )
 
 
         handl.name = "REFERENCE_REQ";
+	handl.rx_processUnVerifiedLink = 1;
         handl.is_destination_specific_frame = 1;
         handl.tx_iterations = &desc_req_tx_iters;
         handl.tx_tp_min = &UMETRIC_NBDISCOVERY_MIN;
@@ -5011,10 +4958,9 @@ void init_msg( void )
 
 
         handl.name = "DESCRIPTION_REQ";
+	handl.rx_processUnVerifiedLink = 1;
         handl.is_destination_specific_frame = 1;
         handl.tx_iterations = &desc_req_tx_iters;
-        handl.tx_tp_min = &UMETRIC_NBDISCOVERY_MIN;
-//        handl.rx_rp_min = &UMETRIC_NBDISCOVERY_MIN;
         handl.data_header_size = sizeof( struct hdr_description_request);
         handl.min_msg_size = sizeof (struct msg_description_request);
         handl.fixed_msg_size = 1;
@@ -5068,6 +5014,7 @@ void init_msg( void )
 	register_frame_handler(packet_desc_db, 0, &handl);
 
 	handl.name = "DESCRIPTION_ADV_FRAMES";
+	handl.rx_processUnVerifiedLink = 1;
 	handl.is_advertisement = 1;
 	handl.tx_iterations = &desc_adv_tx_iters;
 	handl.min_msg_size = sizeof (struct tlv_hdr) + packet_desc_db->handls[0].min_msg_size;
@@ -5101,6 +5048,14 @@ void init_msg( void )
         register_frame_handler(packet_frame_db, FRAME_TYPE_HASH_ADV, &handl);
 
 
+        handl.name = "LINK_VERSION_ADV";
+	handl.rx_processUnVerifiedLink = 1;
+        handl.is_advertisement = 1;
+        handl.min_msg_size = sizeof (struct msg_link_version_adv);
+        handl.fixed_msg_size = 1;
+        handl.tx_msg_handler = tx_msg_link_version_adv;
+        handl.rx_msg_handler = rx_msg_link_version_adv;
+        register_frame_handler(packet_frame_db, FRAME_TYPE_LINK_VERSION, &handl);
 
         handl.name = "HELLO_ADV";
         handl.is_advertisement = 1;
@@ -5167,7 +5122,6 @@ void init_msg( void )
 
         handl.name = "OGM_ADV";
         handl.is_advertisement = 1;
-        handl.rx_requires_described_neigh = 1;
         handl.data_header_size = sizeof (struct hdr_ogm_adv);
         handl.min_msg_size = sizeof (struct msg_ogm_adv);
         handl.fixed_msg_size = 0;
@@ -5176,7 +5130,6 @@ void init_msg( void )
         register_frame_handler(packet_frame_db, FRAME_TYPE_OGM_ADV, &handl);
 
         handl.name = "OGM_ACK";
-        handl.rx_requires_described_neigh = 0;
         handl.tx_iterations = &ogm_ack_tx_iters;
         handl.min_msg_size = sizeof (struct msg_ogm_ack);
         handl.fixed_msg_size = 1;
