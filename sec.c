@@ -580,6 +580,7 @@ void init_sec( void )
 	static const struct field_format signature_format[] = DESCRIPTION_MSG_SIGNATURE_FORMAT;
         handl.name = "SIGNATURE_ADV";
 	handl.rx_processUnVerifiedLink = 1;
+	handl.is_advertisement = 1;
 	handl.min_msg_size = sizeof(struct dsc_msg_signature);
         handl.fixed_msg_size = 0;
 	handl.dextReferencing = (int32_t*)&never_fref;
