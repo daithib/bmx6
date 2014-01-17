@@ -750,6 +750,21 @@ uint8_t __dbgf_track( void ) {
 	return YES;
 }
 
+uint8_t __dbgf( uint8_t level ) {
+
+	switch(level) {
+	case DBGL_SYS:
+		return YES;
+	case DBGL_CHANGES:
+		if (debug_level == DBGL_CHANGES || !LIST_EMPTY(&dbgl_clients[DBGL_CHANGES]))
+			return YES;
+	case DBGL_ALL:
+		if (debug_level == DBGL_ALL || !LIST_EMPTY(&dbgl_clients[DBGL_ALL]))
+			return YES;
+	}
+	
+	return NO;
+}
 
 
 
