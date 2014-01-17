@@ -60,7 +60,7 @@ int create_packet_signature(struct tx_frame_iterator *it)
 	static int32_t dataOffset = 0;
 
 	if (!packetSigning)
-		return TLV_TX_DATA_IGNORED;
+		return TLV_TX_DATA_DONE;
 
 	dbgf_sys(DBGT_INFO, "f_type=%s msg=%p dataOffset=%d", it->handl->name, msg, dataOffset  );
 
@@ -102,7 +102,7 @@ int create_packet_signature(struct tx_frame_iterator *it)
 		dataOffset = 0;
 
 		prof_stop(&prof_tx_packet_sign);
-		return TLV_TX_DATA_IGNORED;
+		return TLV_TX_DATA_DONE;
 	}
 }
 

@@ -1416,7 +1416,7 @@ int32_t tx_frame_ref_adv(struct tx_frame_iterator *it)
 		return refn->f_body_len;
 	}
 	
-	return TLV_TX_DATA_IGNORED;
+	return TLV_TX_DATA_DONE;
 }
 
 
@@ -4013,7 +4013,7 @@ int32_t tx_frame_iterate(IDM_T iterate_msg, struct tx_frame_iterator *it)
         struct frame_handl *handl = (it->handl = &(it->db->handls[t]));
 
 	if (!handl->name)
-		return TLV_TX_DATA_IGNORED;
+		return TLV_TX_DATA_DONE;
 
         int32_t result;// = TLV_DATA_DONE;
         assertion(-500776, (it->frame_cache_array));
