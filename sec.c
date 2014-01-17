@@ -593,6 +593,7 @@ void init_sec( void )
 
 	handl.name = "SIGNATURE_DUMMY";
 	handl.rx_processUnVerifiedLink = 1;
+	handl.is_advertisement = 1;
         handl.tx_frame_handler = create_packet_signature;
         handl.rx_frame_handler = process_packet_signature;
         register_frame_handler(packet_frame_db, FRAME_TYPE_SIGNATURE_DUMMY, &handl);
