@@ -62,7 +62,7 @@ int create_packet_signature(struct tx_frame_iterator *it)
 	if (!packetSigning)
 		return TLV_TX_DATA_DONE;
 
-	dbgf_sys(DBGT_INFO, "f_type=%s msg=%p dataOffset=%d", it->handl->name, msg, dataOffset  );
+	dbgf_all(DBGT_INFO, "f_type=%s msg=%p dataOffset=%d", it->handl->name, msg, dataOffset  );
 
 	if (it->frame_type==FRAME_TYPE_SIGNATURE_ADV) {
 
@@ -129,7 +129,8 @@ int process_packet_signature(struct rx_frame_iterator *it)
 
 	}
 
-	assertion(-500000, (dhn && dhn->on));
+	assertion(-500000, (dhn));
+	assertion(-500000, (dhn->on));
 
 	char *goto_error_code = NULL;
 	int32_t sign_len = it->frame_data_length - sizeof(struct dsc_msg_signature);
