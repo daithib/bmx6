@@ -3491,7 +3491,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 	int32_t result = TLV_RX_DATA_FAILURE;
 	uint8_t is_virtual_desc = (it->db == description_tlv_db && it->dhnNew);
 
-        dbgf_track(DBGT_INFO, "%s - db=%s (prev)f_type=%d f_pos=%d f_len=%d",
+        dbgf_all(DBGT_INFO, "%s - db=%s (prev)f_type=%d f_pos=%d f_len=%d",
 	        it->caller, it->db->name, it->frame_type, it->frames_pos, it->frames_length);
 
         if (it->frames_pos == it->frames_length ) {
@@ -3577,8 +3577,9 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 it->frame_msgs_fixed = (f_handl->fixed_msg_size && f_handl->min_msg_size) ? (it->frame_msgs_length / f_handl->min_msg_size) : 0;
                 it->msg = f_data + f_handl->data_header_size;
             
-                dbgf_track(DBGT_INFO, "%s - type=%s frame_length=%d frame_data_length=%d frame_msgs_length=%d",
-                        it->caller, f_handl->name, f_len, f_data_len, it->frame_msgs_length);
+                dbgf_track(DBGT_INFO, "%s - pkt_dhash=%s type=%s frame_length=%d frame_data_length=%d frame_msgs_length=%d",
+                        it->caller, it->pb ? cryptShaAsString(&it->pb->p.hdr.dhash) : "---",
+			f_handl->name, f_len, f_data_len, it->frame_msgs_length);
 
 
                 if (f_handl->rx_msg_handler ? // only frame_handler support zero messages per frame!
@@ -4248,7 +4249,7 @@ void tx_packet(void *devp)
                                         tlv_tx_result_str(fit_result), tlv_tx_result_str(result), it.frame_type);
                         }
 
-                        dbgf_all(DBGT_INFO, "%s type=%d =%s considered=%d iterations=%d tlv_result=%s item=%d/%d",
+                        dbgf_track(DBGT_INFO, "%s type=%d =%s considered=%d iterations=%d tlv_result=%s item=%d/%d",
                                 dev->label_cfg.str, it.frame_type, handl->name, it.ttn->considered_ts,
                                 it.ttn->tx_iterations, tlv_tx_result_str(result), item, it.tx_task_list->items);
 
