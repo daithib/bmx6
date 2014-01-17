@@ -3136,18 +3136,19 @@ int32_t rx_frame_ogm_acks(struct rx_frame_iterator *it)
 
 
 STATIC_FUNC
-struct dhash_node *process_dhash_description_neighIID4x
-(struct packet_buff *pb, DHASH_T *dhash, uint8_t* dsc, uint16_t desc_len, IID_T neighIID4x)
+struct dhash_node *process_dhash_description_neighIID4x(struct packet_buff *pb, DHASH_T *dhash, IID_T neighIID4x)
 {
         TRACE_FUNCTION_CALL;
-	assertion(-500000, (dhash));
-        struct dhash_node *dhn = NULL;
-//        struct local_node *local = pb->i.link->k.linkDev->local;
-	struct neigh_node *neigh = pb->i.link->k.linkDev->local->neigh;
+        assertion(-500688, (dhash));
+	assertion(-500000, (pb->i.verifiedLink));
+	assertion(-500000, (neighIID4x > IID_RSVD_MAX));
+
+	struct dhash_node *dhn = NULL, *dhnOld = NULL;
+
+	struct neigh_node *neigh = pb->i.verifiedLink->k.linkDev->local->neigh;
         struct description_cache_node *cache = NULL;
 	IDM_T is_transmitter = cryptShasEqual(dhash, &pb->p.hdr.dhash);
 
-        assertion(-500688, (dhash));
         assertion(-500689, (!(is_transmitter && cryptShasEqual(dhash, &(self->dhn->dhash))))); // cant be transmitter' and myselfs'
 
 	dbgf_sys(DBGT_INFO, "dhash=%s", cryptShaAsString(dhash));
@@ -3156,81 +3157,39 @@ struct dhash_node *process_dhash_description_neighIID4x
 
 		dhn = (struct dhash_node*)REJECTED_PTR;
 
-	} else if ((dhn = avl_find_item(&dhash_tree, dhash))) {
-                // is about a known dhash:
-                
-                if (is_transmitter) {
-                        // is about the transmitter:
+	} else if ((dhn = dhnOld = avl_find_item(&dhash_tree, dhash)) || (
+		(cache = get_cached_description(dhash)) &&
+		(dhn = process_description(pb, cache, dhash)) ) ) {
 
-			//update_local_neigh(pb, dhn);
-
-			if (neighIID4x > IID_RSVD_MAX &&
-				iid_set_neighIID4x(&neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
-                                return (struct dhash_node *) FAILURE_PTR;
-
-                        assertion(-500968, (is_described_neigh(pb->i.link->k.linkDev, dhash)));
-
-                } else if (neighIID4x > IID_RSVD_MAX && neigh) {
-                        // received via a known neighbor, and is NOT about the transmitter:
-
-                        if (dhn == self->dhn) {
-                                // is about myself:
-
-                                dbgf_all(DBGT_INFO, "msg refers myself via %s neighIID4me %d", pb->i.llip_str, neighIID4x);
-
-                                neigh->neighIID4me = neighIID4x;
-
-                        } else if (dhn == neigh->dhn && !is_transmitter) {
-                                // is about a neighbors' dhash itself which is NOT the transmitter ???!!!
-
-                                dbgf_sys(DBGT_ERR, "nodeId=%s dhash=%s via %s neighIID4x=%d IS NOT transmitterDhash=%s",
-                                        cryptShaAsString(&dhn->on->nodeId), cryptShaAsString(dhash), pb->i.llip_str,
-					neighIID4x, cryptShaAsString(&pb->p.hdr.dhash));
-
-                                return (struct dhash_node *) FAILURE_PTR;
-
-                        } else {
-                                // is about.a another dhash known by me and a (neighboring) transmitter..:
-                        }
-
-                        if (iid_set_neighIID4x(&neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
-                                return (struct dhash_node *) FAILURE_PTR;
-                }
-
-        } else {
-                // is about an unconfirmed or unkown dhash:
-
-		if (dsc)
-			cache_description(dsc, desc_len, dhash);
-
-		if (((is_transmitter || neigh) ) &&
-			(cache = get_cached_description(dhash)) &&
-			(dhn = process_description(pb, cache, dhash)) ) {
-			
-			if (dhn == REJECTED_PTR) {
+		if (dhn == REJECTED_PTR) {
 				
-				invalidate_dhash(NULL, dhash);
+			invalidate_dhash(NULL, dhash);
+			
+		} else if (dhn == FAILURE_PTR || dhn == UNRESOLVED_PTR) {
 
-			} else if (dhn == FAILURE_PTR || dhn == UNRESOLVED_PTR) {
+		} else {
+			assertion(-500000, IMPLIES(is_transmitter, dhn == neigh->dhn));
+			assertion(-500000, IMPLIES(!is_transmitter, dhn != neigh->dhn));
 
-			} else {
+			if (dhn == self->dhn)
+				neigh->neighIID4me = neighIID4x;
 
-				if (is_transmitter)
-					//is about the transmitter  and  a description + dhash is known
-					//update_local_neigh(pb, dhn);
+			if (iid_set_neighIID4x(&neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
+				return(struct dhash_node *) FAILURE_PTR;
 
-				if (neighIID4x > IID_RSVD_MAX &&
-					iid_set_neighIID4x(&neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
-					return(struct dhash_node *) FAILURE_PTR;
+			if (desc_adv_tx_unsolicited && !dhnOld) {
 
-				assertion(-500969, IMPLIES(is_transmitter, is_described_neigh(pb->i.link->k.linkDev, &pb->p.hdr.dhash)));
+				LinkNode **array = lndevs_get_best_tp(neigh->local);
+				int d;
+
+				for (d = 0; (array[d]); d++)
+					schedule_tx_task(array[d], FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
 			}
 		}
         }
 
-	dbgf_track(DBGT_INFO, "via dev=%s NB=%s dhash=%8X.. (desc)nodeId=%s cache=%s dhn=%s neighIID4x=%d is_transmitter=%d (on)nodeId=%s",
+	dbgf_track(DBGT_INFO, "via dev=%s NB=%s dhash=%8X..  cache=%s dhn=%s neighIID4x=%d is_transmitter=%d (on)nodeId=%s",
                 pb->i.iif->label_cfg.str, pb->i.llip_str, dhash->h.u32[0],
-                (dsc ? nodeIdAsStringFromDescAdv(dsc) : "NO DESCRIPTION"),
 		(cache ? "CACHED" : "-"),
                 (dhn ? (dhn==FAILURE_PTR?"FAILURE":
                         (dhn==UNRESOLVED_PTR?"UNRESOLVED":(dhn==REJECTED_PTR?"REJECTED":"RESOLVED"))):"UNKNOWN"),
@@ -3258,7 +3217,7 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
         if (neighIID4x <= IID_RSVD_MAX)
                 return TLV_RX_DATA_FAILURE;
 
-	if ((dhn = process_dhash_description_neighIID4x(pb, &adv->dhash, NULL, 0, neighIID4x)) == FAILURE_PTR) {
+	if ((dhn = process_dhash_description_neighIID4x(pb, &adv->dhash, neighIID4x)) == FAILURE_PTR) {
                 
 		return TLV_RX_DATA_FAILURE;
 
@@ -3313,30 +3272,8 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 		nodeIdAsStringFromDescAdv(it->frame_data),
 		pb->i.iif->label_cfg.str, pb->i.llip_str);
 
-
-
-	struct dhash_node *dhn =  process_dhash_description_neighIID4x(pb, &dhash, it->frame_data, it->frame_data_length, IID_RSVD_UNUSED);
-
-	if (dhn == FAILURE_PTR) {
-
-		goto_error(finish, TLV_RX_DATA_FAILURE);
-
-	} else if (dhn == UNRESOLVED_PTR || dhn == REJECTED_PTR || dhn == NULL) {
-
-	} else {
-
-		assertion(-500691, (dhn->on));
-
-		if (desc_adv_tx_unsolicited && dhn->on->updated_timestamp == bmx_time &&
-			is_described_neigh(pb->i.link->k.linkDev, &pb->p.hdr.dhash)) {
-
-			LinkNode **array = lndevs_get_best_tp(pb->i.link->k.linkDev->local);
-			int d;
-
-			for (d = 0; (array[d]); d++)
-				schedule_tx_task(array[d], FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
-		}
-	}
+	if (!avl_find(&dhash_invalid_tree, &dhash) && !avl_find_item(&dhash_tree, &dhash))
+		cache_description(it->frame_data, it->frame_data_length, &dhash);
 	
         goto_error(finish, it->frame_data_length);
 
