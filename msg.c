@@ -4223,8 +4223,8 @@ void tx_packet(void *devp)
 
         assertion(-500205, (dev->active));
 
-
-	schedule_tx_task(&dev->dummyLink, FRAME_TYPE_SIGNATURE_ADV, SCHEDULE_MIN_MSG_SIZE, 0, 0);
+	schedule_tx_task(&dev->dummyLink, FRAME_TYPE_SIGNATURE_ADV, sizeof(struct dsc_msg_signature) + my_PubKey->rawKeyLen, 0, 0);
+	schedule_tx_task(&dev->dummyLink, FRAME_TYPE_SIGNATURE_DUMMY, SCHEDULE_MIN_MSG_SIZE, 0, 0);
 	schedule_tx_task(&dev->dummyLink, FRAME_TYPE_LINK_VERSION, SCHEDULE_MIN_MSG_SIZE, 0, 0);
         schedule_tx_task(&dev->dummyLink, FRAME_TYPE_HELLO_ADV, SCHEDULE_MIN_MSG_SIZE, 0, 0);
 

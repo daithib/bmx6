@@ -35,7 +35,7 @@ const CRYPTKEY_T CYRYPTKEY_ZERO = { .nativeBackendKey=0, .backendKey=NULL, .rawK
 
 static uint8_t shaClean = NO;
 
-CRYPTKEY_T *my_PrivKey = NULL;
+static CRYPTKEY_T *my_PrivKey = NULL;
 
 /******************* accessing cyassl: ***************************************/
 #if CRYPTLIB >= CYASSL_MIN && CRYPTLIB <= CYASSL_MAX

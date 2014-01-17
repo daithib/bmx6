@@ -595,7 +595,7 @@ void init_sec( void )
 	handl.rx_processUnVerifiedLink = 1;
         handl.tx_frame_handler = create_packet_signature;
         handl.rx_frame_handler = process_packet_signature;
-        register_frame_handler(description_tlv_db, FRAME_TYPE_SIGNATURE_DUMMY, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_SIGNATURE_DUMMY, &handl);
 
 
 	static const struct field_format pubkey_format[] = DESCRIPTION_MSG_PUBKEY_FORMAT;
