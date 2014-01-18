@@ -659,7 +659,7 @@ void schedule_tx_task(LinkNode *destLink, uint16_t frame_type, int16_t frame_msg
 
 
         dbgf((( /* debug interesting frame types: */
-                frame_type == FRAME_TYPE_HASH_REQ || frame_type == FRAME_TYPE_HASH_ADV ||
+                frame_type == FRAME_TYPE_DHASH_REQ || frame_type == FRAME_TYPE_DHASH_ADV ||
                 frame_type == FRAME_TYPE_DESC_REQ ||frame_type == FRAME_TYPE_DESC_ADVS ||
                 frame_type == FRAME_TYPE_LINK_REQ || frame_type == FRAME_TYPE_LINK_ADV ||
                 frame_type == FRAME_TYPE_DEV_REQ || frame_type == FRAME_TYPE_DEV_ADV)
@@ -892,21 +892,21 @@ void create_ogm_aggregation(void)
 static LinkNode **linkArray = NULL;
 
 STATIC_FUNC
-void lndevs_prepare(void)
+void linkArrayPrepare(void)
 {
         TRACE_FUNCTION_CALL;
 
-	static uint16_t lndev_arr_items = 0;
+	static uint16_t linkArrayItems = 0;
         struct avl_node *an;
         struct dev_node *dev;
 
-        if (lndev_arr_items != dev_ip_tree.items + 1) {
+        if (linkArrayItems != dev_ip_tree.items + 1) {
 
                 if (linkArray)
                         debugFree(linkArray, -300180);
 
-                lndev_arr_items = dev_ip_tree.items + 1;
-                linkArray = debugMalloc((lndev_arr_items * sizeof (LinkNode*)), -300182);
+                linkArrayItems = dev_ip_tree.items + 1;
+                linkArray = debugMalloc((linkArrayItems * sizeof (LinkNode*)), -300182);
         }
 
         for (an = NULL; (dev = avl_iterate_item(&dev_ip_tree, &an));)
@@ -915,7 +915,7 @@ void lndevs_prepare(void)
 
 
 STATIC_FUNC
-LinkNode **lndevs_get_unacked_ogm_neighbors(struct ogm_aggreg_node *oan)
+LinkNode **get_unacked_ogm_links(struct ogm_aggreg_node *oan)
 {
         TRACE_FUNCTION_CALL;
 
@@ -926,7 +926,7 @@ LinkNode **lndevs_get_unacked_ogm_neighbors(struct ogm_aggreg_node *oan)
 
         dbgf_all(DBGT_INFO, "aggreg_sqn %d ", oan->sqn);
 
-        lndevs_prepare();
+        linkArrayPrepare();
 
         memset(oan->ogm_dest_field, 0, sizeof (oan->ogm_dest_field));
         oan->ogm_dest_bytes = 0;
@@ -988,7 +988,7 @@ LinkNode **get_best_tp_links(struct local_node *except_local)
         struct local_node *local;
         uint16_t d = 0;
 
-        lndevs_prepare();
+        linkArrayPrepare();
 
         dbgf_all(DBGT_INFO, "NOT local_id=%d ", except_local ? except_local->local_id : 0);
 
@@ -1097,7 +1097,7 @@ void schedule_or_purge_ogm_aggregations(IDM_T purge_all)
 
                 } else if (oan->tx_attempt < ogm_adv_tx_iters) {
 
-                        LinkNode **array = lndevs_get_unacked_ogm_neighbors(oan);
+                        LinkNode **array = get_unacked_ogm_links(oan);
                         int d;
 
                         oan->tx_attempt = (array[0]) ? (oan->tx_attempt + 1) : ogm_adv_tx_iters;
@@ -3051,8 +3051,8 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
                                 on ? on->ogmSqn_rangeSize : 0);
 
                         if (!dhn) {
-                                dbgf_track(DBGT_INFO, "schedule frame_type=%d", FRAME_TYPE_HASH_REQ);
-                                schedule_tx_task(local->best_tp_link, FRAME_TYPE_HASH_REQ, SCHEDULE_MIN_MSG_SIZE, &neighIID4x, sizeof(IID_T));
+                                dbgf_track(DBGT_INFO, "schedule frame_type=%d", FRAME_TYPE_DHASH_REQ);
+                                schedule_tx_task(local->best_tp_link, FRAME_TYPE_DHASH_REQ, SCHEDULE_MIN_MSG_SIZE, &neighIID4x, sizeof(IID_T));
                         }
 
                 }
@@ -3171,11 +3171,18 @@ struct dhash_node *process_dhash_description_neighIID4x(struct packet_buff *pb, 
 			if (iid_set_neighIID4x(&neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
 				return(struct dhash_node *) FAILURE_PTR;
 
-			if (desc_adv_tx_unsolicited && !dhnOld) {
+			if (!dhnOld && desc_adv_tx_unsolicited) {
 				LinkNode **array;
 				for (array = get_best_tp_links(neigh->local); (*array); array++)
 					schedule_tx_task(*array, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
 			}
+
+			if (!dhnOld && dhash_adv_tx_unsolicited) {
+				LinkNode **array;
+				for (array = get_best_tp_links(NULL); (*array); array++)
+					schedule_tx_task(*array, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
+			}
+
 		}
         }
 
@@ -3311,7 +3318,7 @@ int32_t rx_msg_dhash_request(struct rx_frame_iterator *it)
 
         assertion(-500251, (dhn && dhn->myIID4orig == myIID4x));
 
-	schedule_tx_task(pb->i.link->k.linkDev->local->best_tp_link, FRAME_TYPE_HASH_ADV, SCHEDULE_MIN_MSG_SIZE, &myIID4x, sizeof(IID_T));
+	schedule_tx_task(pb->i.link->k.linkDev->local->best_tp_link, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &myIID4x, sizeof(IID_T));
 
         // most probably the requesting node is also interested in my metric to the requested node:
         if (on->curr_rt_link && on->ogmSqn_next == on->ogmSqn_send &&
@@ -3353,7 +3360,12 @@ int32_t rx_msg_description_request(struct rx_frame_iterator *it)
 		}
 
 		LinkNode *linkNode = pb->i.verifiedLink ? pb->i.link->k.linkDev->local->best_tp_link : &pb->i.link->k.myDev->dummyLink;
+
 		schedule_tx_task(linkNode, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &msg->dhash, sizeof(DHASH_T));
+
+		if (dhash_adv_tx_unsolicited)
+			schedule_tx_task(linkNode, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
+
 
 		// most probably the requesting node is also interested in my metric to the requested node:
 		if (on->curr_rt_link && on->ogmSqn_next == on->ogmSqn_send &&
@@ -4524,6 +4536,11 @@ void update_my_description_adv(void)
                 for (array = get_best_tp_links(NULL); (*array); array++)
                         schedule_tx_task(*array, FRAME_TYPE_DESC_ADVS, tx.frames_out_pos, &dhashNew, sizeof(dhashNew));
         }
+	if (dhash_adv_tx_unsolicited) {
+		LinkNode **array;
+		for (array = get_best_tp_links(NULL); (*array); array++)
+			schedule_tx_task(*array, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &myIID4me, sizeof(IID_T));
+	}
 
         my_description_changed = NO;
 
@@ -4992,7 +5009,7 @@ void init_msg( void )
         handl.tx_task_interval_min = DEF_TX_DHASH0_REQ_TO;
         handl.tx_msg_handler = tx_msg_dhash_request;
         handl.rx_msg_handler = rx_msg_dhash_request;
-        register_frame_handler(packet_frame_db, FRAME_TYPE_HASH_REQ, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_DHASH_REQ, &handl);
 
         handl.name = "DHASH_ADV";
         handl.tx_iterations = &dhash_adv_tx_iters;
@@ -5001,7 +5018,7 @@ void init_msg( void )
         handl.tx_task_interval_min = DEF_TX_DHASH0_ADV_TO;
         handl.tx_msg_handler = tx_msg_dhash_adv;
         handl.rx_msg_handler = rx_msg_dhash_adv;
-        register_frame_handler(packet_frame_db, FRAME_TYPE_HASH_ADV, &handl);
+        register_frame_handler(packet_frame_db, FRAME_TYPE_DHASH_ADV, &handl);
 
 
         handl.name = "LINK_VERSION_ADV";

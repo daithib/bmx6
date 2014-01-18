@@ -240,8 +240,8 @@
 #define FRAME_TYPE_HELLO_ADV    12 // most-simple BMX-NG hello (nb-discovery) advertisements
 #define FRAME_TYPE_RP_ADV       13
 
-#define FRAME_TYPE_HASH_REQ     18  // Hash-for-description-of-OG-ID requests
-#define FRAME_TYPE_HASH_ADV     19  // Hash-for-description-of-OG-ID advertisements
+#define FRAME_TYPE_DHASH_REQ    18  // Hash-for-description-of-OG-ID requests
+#define FRAME_TYPE_DHASH_ADV    19  // Hash-for-description-of-OG-ID advertisements
 
 #define FRAME_TYPE_OGM_ADV      22 // most simple BMX-NG (type 0) OGM advertisements
 #define FRAME_TYPE_OGM_ACK      23 // most simple BMX-NG (type 0) OGM advertisements
