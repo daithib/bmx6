@@ -416,9 +416,8 @@ struct tlv_hdr tlvSetBigEndian(int16_t type, int16_t length);
 
 
 struct msg_link_version_adv {
-    	LOCAL_ID_T local_id;         // 32
-	LINKADV_SQN_T link_adv_sqn;  // 16 used for processing: link_adv, lq_adv, rp_adv, ogm_adv, ogm_ack
-	DEVADV_IDX_T   dev_idx;      //  8
+	LINKADV_SQN_T link_adv_sqn;  // 2 used for processing: link_adv, lq_adv, rp_adv, ogm_adv, ogm_ack
+	DEVADV_IDX_T   dev_idx;      // 1
 } __attribute__((packed));
 
 
@@ -450,7 +449,7 @@ struct hdr_dev_adv { // 2 byte
 	struct msg_dev_adv msg[];
 } __attribute__((packed));
 
-struct msg_dev_req { // 4 byte
+struct msg_dev_req { // 20 byte
 	LOCAL_ID_T destination_local_id;
 } __attribute__((packed));
 
@@ -473,7 +472,7 @@ struct msg_dev_req { // 4 byte
 #define LINKADV_ADD_RP_4MIN 2
 #define LINKADV_ADD_RP_4MAX 3
 
-struct msg_link_adv { // 6 byte
+struct msg_link_adv { // 22 byte
 	DEVADV_IDX_T transmitter_dev_idx; // to be combined with dev_id from packet header to resolve transmitters dev_id of reported link
 	DEVADV_IDX_T peer_dev_idx;
 	LOCAL_ID_T peer_local_id;
@@ -485,7 +484,7 @@ struct hdr_link_adv { // 2 byte
 	struct msg_link_adv msg[];
 } __attribute__((packed));
 
-struct msg_link_req { // 4 byte
+struct msg_link_req { // 20 byte
 	LOCAL_ID_T destination_local_id;
 } __attribute__((packed));
 
@@ -552,7 +551,7 @@ struct msg_dhash_request { // 2 bytes
 	IID_T receiverIID4x;
 } __attribute__((packed));
 
-struct hdr_dhash_request { // 4 bytes
+struct hdr_dhash_request { // 20 bytes
 	LOCAL_ID_T destination_local_id;
 	struct msg_dhash_request msg[];
 } __attribute__((packed));
@@ -563,7 +562,7 @@ struct msg_description_request { // 2 bytes
 } __attribute__((packed));
 
 
-struct hdr_description_request { // 4 bytes
+struct hdr_description_request { // 20 bytes
 	LOCAL_ID_T destination_local_id;
 	struct msg_description_request msg[];
 } __attribute__((packed));

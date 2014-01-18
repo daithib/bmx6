@@ -251,16 +251,6 @@ typedef uint16_t LINKADV_SQN_T;
 
 
 
-typedef uint32_t LOCAL_ID_T;
-#define LOCAL_ID_BIT_SIZE (8*sizeof(LOCAL_ID_T))
-#define LOCAL_ID_INVALID 0
-#define LOCAL_ID_MIN 1
-#define LOCAL_ID_MAX ((LOCAL_ID_T)-1)
-#define LOCAL_ID_ITERATIONS_MAX 256
-#define LOCAL_ID_ITERATIONS_WARN (LOCAL_ID_ITERATIONS_MAX>>3)
-
-extern LOCAL_ID_T my_local_id;
-
 
 
 

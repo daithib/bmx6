@@ -2102,9 +2102,6 @@ void dev_activate( struct dev_node *dev )
                 if ((dev->llip_key.idx = get_free_devidx()) == DEVADV_IDX_INVALID)
                         goto error;
 
-                if (my_local_id == LOCAL_ID_INVALID && new_local_id(dev) == LOCAL_ID_INVALID)
-                        goto error;
-
                 sysctl_config(dev);
         }
 

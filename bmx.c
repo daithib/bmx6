@@ -744,7 +744,6 @@ struct bmx_status {
         IPX_T primaryIp;
         struct net_key *tun6Address;
         struct net_key *tun4Address;
-        LOCAL_ID_T myLocalId;
         char *uptime;
         char cpu[6];
         uint16_t nodes;
@@ -760,7 +759,6 @@ static const struct field_format bmx_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_IPX,               bmx_status, primaryIp,     1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_NETP,              bmx_status, tun6Address,   1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_NETP,              bmx_status, tun4Address,   1, FIELD_RELEVANCE_HIGH),
-        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_BINARY,     bmx_status, myLocalId,     1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      bmx_status, uptime,        1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       bmx_status, cpu,           1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              bmx_status, nodes,         1, FIELD_RELEVANCE_HIGH),
@@ -780,7 +778,6 @@ static int32_t bmx_status_creator(struct status_handl *handl, void *data)
         status->primaryIp = self->primary_ip;
         status->tun4Address = tin ? &tin->tunAddr46[1] : NULL;
         status->tun6Address = tin ? &tin->tunAddr46[0] : NULL;
-        status->myLocalId = my_local_id;
         status->uptime = get_human_uptime(0);
         sprintf(status->cpu, "%d.%1d", s_curr_avg_cpu_load / 10, s_curr_avg_cpu_load % 10);
         status->nodes = orig_tree.items;

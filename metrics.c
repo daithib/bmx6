@@ -763,8 +763,8 @@ void lndev_assign_best(struct local_node *onlyLocal, LinkNode *onlyLink )
         assertion(-501133, (IMPLIES(onlyLink, onlyLocal && onlyLocal == onlyLink->k.linkDev->local)));
         ASSERTION(-500792, (IMPLIES(onlyLink, onlyLink->k.linkDev == avl_find_item(&onlyLocal->linkDev_tree, &onlyLink->k.linkDev->key.dev_idx))));
 
-        dbgf_all(DBGT_INFO, "only_local=%X only_lndev.link=%s only_lndev.dev=%s",
-                onlyLocal ? ntohl(onlyLocal->local_id) : 0,
+        dbgf_all(DBGT_INFO, "only_local=%s only_lndev.link=%s only_lndev.dev=%s",
+                onlyLocal ? cryptShaAsString(&onlyLocal->local_id) : 0,
                 onlyLink ? ip6AsStr(&onlyLink->k.linkDev->link_ip) : DBG_NIL,
                 onlyLink ? onlyLink->k.myDev->label_cfg.str : DBG_NIL);
 
@@ -785,7 +785,7 @@ void lndev_assign_best(struct local_node *onlyLocal, LinkNode *onlyLink )
                         local->best_tp_link->timeaware_tx_probe = timeaware_tx_probe(local->best_tp_link);
 
 
-                dbgf_all(DBGT_INFO, "local_id=%X", ntohl(local->local_id));
+                dbgf_all(DBGT_INFO, "local_id=%s", cryptShaAsString(&local->local_id));
 
                 while ((onlyLink && (linkDev = onlyLink->k.linkDev)) || (linkDev = avl_iterate_item(&local->linkDev_tree, &link_an))) {
 

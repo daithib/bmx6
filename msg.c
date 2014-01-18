@@ -562,10 +562,10 @@ IDM_T tx_task_obsolete(struct tx_task_node *tx_task)
 
 
         dbgf_track(DBGT_INFO,
-                "%s type=%s dev=%s local_id=%X dev_idx=0x%X name=%s or send just %d ms ago",
+                "%s type=%s dev=%s local_id=%s dev_idx=0x%X name=%s or send just %d ms ago",
                 reason,
                 packet_frame_db->handls[tx_task->task.type].name, tx_task->task.dev->name_phy_cfg.str,
-                tx_task->task.linkDev ? ntohl(tx_task->task.linkDev->key.local_id) : 0,
+                tx_task->task.linkDev ? cryptShaAsString(&tx_task->task.linkDev->key.local_id) : 0,
                 tx_task->task.linkDev ? tx_task->task.linkDev->key.dev_idx : 0,
                 (dhn && dhn->on) ? cryptShaAsString(&dhn->on->nodeId) : "???", (bmx_time - tx_task->send_ts));
 
@@ -619,8 +619,8 @@ struct tx_task_node *tx_task_new(LinkNode *destLink, struct tx_task_node *test)
 
                 list_add_tail(&(destLink->tx_task_lists[ttn->task.type]), &ttn->list);
 
-                dbgf_track(DBGT_INFO, "added %s to lndev local_id=%X link_ip=%s dev=%s tx_tasks_list.items=%d",
-                        handl->name, ntohl(destLink->k.linkDev->key.local_id),
+                dbgf_track(DBGT_INFO, "added %s to lndev local_id=%s link_ip=%s dev=%s tx_tasks_list.items=%d",
+                        handl->name, cryptShaAsString(&destLink->k.linkDev->key.local_id),
                         ip6AsStr(&destLink->k.linkDev->link_ip),
                         destLink->k.myDev->label_cfg.str, destLink->tx_task_lists[ttn->task.type].items);
 
@@ -664,10 +664,10 @@ void schedule_tx_task(LinkNode *destLink, uint16_t frame_type, int16_t frame_msg
                 frame_type == FRAME_TYPE_LINK_REQ || frame_type == FRAME_TYPE_LINK_ADV ||
                 frame_type == FRAME_TYPE_DEV_REQ || frame_type == FRAME_TYPE_DEV_ADV)
                 ? DBGL_CHANGES : DBGL_ALL), DBGT_INFO,
-                 "%s to NB=%s local_id=0x%X via dev=%s frame_msgs_len=%d data=%s",
+                 "%s to NB=%s local_id=%s via dev=%s frame_msgs_len=%d data=%s",
                 handl->name,
                 destLink->k.linkDev ? ip6AsStr(&destLink->k.linkDev->link_ip) : DBG_NIL,
-                destLink->k.linkDev ? destLink->k.linkDev->local->local_id : 0,
+                destLink->k.linkDev ? cryptShaAsString(&destLink->k.linkDev->local->local_id) : 0,
                 destLink->k.myDev->label_cfg.str, frame_msgs_len, memAsHexString(data, dlen));
 
         if (handl->tx_tp_min && *(handl->tx_tp_min) > destLink->timeaware_tx_probe) {
@@ -948,9 +948,9 @@ LinkNode **get_unacked_ogm_links(struct ogm_aggreg_node *oan)
 			assertion(-500447, (bestLink->k.myDev->active));
 			assertion(-500444, (d <= dev_ip_tree.items));
 
-                        dbgf_all(DBGT_INFO, "  redundant=%d via dev=%s to local_id=%X dev_idx=0x%X",
+                        dbgf_all(DBGT_INFO, "  redundant=%d via dev=%s to local_id=%s dev_idx=0x%X",
                                 bestLink->k.myDev->tmp_flag_for_to_be_send_adv, bestLink->k.myDev->label_cfg.str,
-                                ntohl(bestLink->k.linkDev->key.local_id), bestLink->k.linkDev->key.dev_idx);
+                                cryptShaAsString(&bestLink->k.linkDev->key.local_id), bestLink->k.linkDev->key.dev_idx);
 
                         if (bestLink->k.myDev->tmp_flag_for_to_be_send_adv == NO) {
                                 linkArray[d++] = bestLink;
@@ -992,7 +992,7 @@ void schedule_best_tp_links(struct local_node *except_local, uint16_t frame_type
         for (an = NULL; (dev = avl_iterate_item(&dev_ip_tree, &an));)
                 dev->tmp_flag_for_to_be_send_adv = NO;
 
-        dbgf_all(DBGT_INFO, "NOT local_id=%d ", except_local ? except_local->local_id : 0);
+        dbgf_all(DBGT_INFO, "NOT local_id=%s ", except_local ? cryptShaAsString(&except_local->local_id) : 0);
 
         for (an = NULL; (local = avl_iterate_item(&local_tree, &an));) {
 
@@ -1004,8 +1004,8 @@ void schedule_best_tp_links(struct local_node *except_local, uint16_t frame_type
                         assertion(-500446, (bestLink->k.myDev));
                         assertion(-500447, (bestLink->k.myDev->active));
 
-                        dbgf_all(DBGT_INFO, "  via dev=%s to local_id=%X dev_idx=0x%X (redundant %d)",
-                                bestLink->k.myDev->label_cfg.str, ntohl(bestLink->k.linkDev->key.local_id),
+                        dbgf_all(DBGT_INFO, "  via dev=%s to local_id=%s dev_idx=0x%X (redundant %d)",
+                                bestLink->k.myDev->label_cfg.str, cryptShaAsString(&bestLink->k.linkDev->key.local_id),
                                 bestLink->k.linkDev->key.dev_idx, bestLink->k.myDev->tmp_flag_for_to_be_send_adv);
 
                         if (bestLink->k.myDev->tmp_flag_for_to_be_send_adv == NO) {
@@ -1123,7 +1123,6 @@ int32_t tx_msg_link_version_adv(struct tx_frame_iterator *it)
 
         struct msg_link_version_adv *adv = (struct msg_link_version_adv *) (tx_iterator_cache_msg_ptr(it));
 
-	adv->local_id = my_local_id;
 	adv->link_adv_sqn = htons(my_link_adv_sqn);
         adv->dev_idx = it->ttn->task.dev->llip_key.idx;
 
@@ -1141,7 +1140,7 @@ int32_t rx_msg_link_version_adv(struct rx_frame_iterator *it)
 		return TLV_RX_DATA_REJECTED;
 
 	//TODO: purge pb->i.link usage
-	if (!(pbi->verifiedLink = getLinkNode(pbi->iif, &pbi->llip, ntohs(msg->link_adv_sqn), msg->local_id, msg->dev_idx)))
+	if (!(pbi->verifiedLink = getLinkNode(pbi->iif, &pbi->llip, ntohs(msg->link_adv_sqn), &pbi->verifiedLinkDhn->on->nodeId, msg->dev_idx)))
 		return TLV_RX_DATA_FAILURE;
 
 	update_local_neigh(pbi->verifiedLink, pbi->verifiedLinkDhn);
@@ -1927,8 +1926,8 @@ int32_t tx_msg_dhash_request(struct tx_frame_iterator *it)
         struct dhash_node *dhn = (ttn->task.linkDev && ttn->task.linkDev->local->neigh) ?
                 iid_get_node_by_neighIID4x(ttn->task.linkDev->local->neigh, *neighIID4x, YES/*verbose*/) : NULL;
 
-        dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%X dev_idx=0x%X iterations=%d time=%d requesting %s",
-                it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, ntohl(ttn->task.linkDev->key.local_id),
+        dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%s dev_idx=0x%X iterations=%d time=%d requesting %s",
+                it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, cryptShaAsString(&ttn->task.linkDev->key.local_id),
                 ttn->task.linkDev->key.dev_idx, ttn->tx_iterations, ttn->considered_ts,
                 dhn ? "ALREADY RESOLVED (req cancelled)" : ttn->task.linkDev->local->neigh ? "ABOUT NB HIMSELF" : "ABOUT SOMEBODY");
 
@@ -1947,7 +1946,7 @@ int32_t tx_msg_dhash_request(struct tx_frame_iterator *it)
                 assertion(-500854, (is_zero(hdr, sizeof (*hdr))));
                 hdr->destination_local_id = ttn->task.linkDev->key.local_id;
         } else {
-                assertion(-500871, (hdr->destination_local_id == ttn->task.linkDev->key.local_id));
+                assertion(-500871, (cryptShasEqual(&hdr->destination_local_id, &ttn->task.linkDev->key.local_id)));
         }
 
         dbgf_track(DBGT_INFO, "creating msg=%d", ((int) ((((char*) msg) - ((char*) hdr) - sizeof ( *hdr)) / sizeof (*msg))));
@@ -1974,7 +1973,7 @@ int32_t tx_msg_description_request(struct tx_frame_iterator *it)
         assertion(-500858, (IMPLIES((dhn && dhn->on), dhn->desc_frame)));
 
         dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%X dev_idx=%d iterations=%d time=%d requesting dhash=%s %s llneigh=%d",
-                it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, ntohl(linkDev?linkDev->key.local_id:0),
+                it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, cryptShaAsString(linkDev? &linkDev->key.local_id : 0),
                 linkDev ? linkDev->key.dev_idx : -1, ttn->tx_iterations, ttn->considered_ts, cryptShaAsString(dhash),
                 dhn ? "ALREADY RESOLVED (req cancelled)" : "", (linkDev ? linkDev->local->neigh : 0));
 
@@ -1986,9 +1985,10 @@ int32_t tx_msg_description_request(struct tx_frame_iterator *it)
 
         if (hdr->msg == msg) {
                 assertion(-500854, (is_zero(hdr, sizeof (*hdr))));
-                hdr->destination_local_id = linkDev ? linkDev->key.local_id : 0;
+		if (linkDev)
+			hdr->destination_local_id = linkDev->key.local_id;
         } else {
-                assertion(-500871, (hdr->destination_local_id == (linkDev ? linkDev->key.local_id : 0)));
+                assertion(-500871, (linkDev ? cryptShasEqual(&hdr->destination_local_id, &linkDev->key.local_id) : is_zero(&hdr->destination_local_id, sizeof(LOCAL_ID_T))));
         }
 
         dbgf_track(DBGT_INFO, "creating msg=%d", ((int) ((((char*) msg) - ((char*) hdr) - sizeof ( *hdr)) / sizeof (*msg))));
@@ -2300,7 +2300,7 @@ int32_t rx_msg_dev_req( struct rx_frame_iterator *it)
         TRACE_FUNCTION_CALL;
         struct msg_dev_req* req = ((struct msg_dev_req*) it->msg);
 
-        if (req->destination_local_id == my_local_id)
+        if (cryptShasEqual(&req->destination_local_id, &self->nodeId))
                 schedule_tx_task(&it->pb->i.iif->dummyLink, FRAME_TYPE_DEV_ADV, SCHEDULE_UNKNOWN_MSGS_SIZE, 0, 0);
 
         return sizeof (struct msg_dev_req);
@@ -2318,8 +2318,8 @@ int32_t tx_msg_dev_req(struct tx_frame_iterator *it)
 
         assertion(-500986, (ttn->tx_iterations > 0 && ttn->considered_ts != bmx_time));
 
-        dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%X iterations=%d %s",
-                it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, ntohl(*local_id), ttn->tx_iterations,
+        dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%s iterations=%d %s",
+                it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, cryptShaAsString(local_id), ttn->tx_iterations,
                 !local ? "UNKNOWN" : (local->link_adv_sqn == local->packet_link_sqn_ref ? "SOLVED" : "UNSOLVED"));
 
 
@@ -2524,9 +2524,9 @@ int32_t rx_msg_link_req( struct rx_frame_iterator *it)
         TRACE_FUNCTION_CALL;
         struct msg_link_req* req = ((struct msg_link_req*) it->msg);
 
-        if (req->destination_local_id == my_local_id) {
+        if (cryptShasEqual(&req->destination_local_id, &self->nodeId))
 		schedule_tx_task(&it->pb->i.iif->dummyLink, FRAME_TYPE_LINK_ADV, (my_link_adv_msgs * sizeof(struct msg_link_adv)), 0, 0);
-        }
+ 
 
         return sizeof (struct msg_link_req);
 }
@@ -2543,8 +2543,8 @@ int32_t tx_msg_link_req(struct tx_frame_iterator *it)
 
         assertion(-500988, (ttn->tx_iterations > 0 && ttn->considered_ts != bmx_time));
 
-        dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%X iterations=%d %s",
-                it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, ntohl(*local_id), ttn->tx_iterations,
+        dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%s iterations=%d %s",
+                it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, cryptShaAsShortStr(local_id), ttn->tx_iterations,
                 !local ? "UNKNOWN" : (local->link_adv_sqn == local->packet_link_sqn_ref ? "SOLVED" : "UNSOLVED"));
 
 
@@ -2621,7 +2621,7 @@ int32_t rx_frame_link_adv( struct rx_frame_iterator *it)
                 uint16_t m;
                 for (m = 0; m < msgs; m++) {
 
-                        if (local->link_adv[m].peer_local_id == my_local_id) {
+			if (cryptShasEqual(&local->link_adv[m].peer_local_id, &self->nodeId)) {
                                 local->link_adv_msg_for_me = m;
                                 break;
                         }
@@ -2716,7 +2716,7 @@ int32_t rx_frame_rp_adv(struct rx_frame_iterator *it)
 
         for (m = 0; m < msgs; m++) {
 
-                if (local->link_adv[m].peer_local_id != my_local_id) 
+		if (!cryptShasEqual(&local->link_adv[m].peer_local_id, &self->nodeId))
                         continue;
 
 
@@ -3273,12 +3273,12 @@ int32_t rx_msg_dhash_request(struct rx_frame_iterator *it)
         struct msg_dhash_request *msg = (struct msg_dhash_request*) (it->msg);
         IID_T myIID4x = ntohs(msg->receiverIID4x);
 
-        if (hdr->destination_local_id != my_local_id)
+        if (!cryptShasEqual(&hdr->destination_local_id, &self->nodeId))
 		//TODO: consider that the received local_id might be a duplicate:
                 return sizeof ( struct msg_dhash_request);
 
-        dbgf_track(DBGT_INFO, "%s NB %s destination_local_id=0x%X myIID4x %d",
-                it->handl->name, pb->i.llip_str, ntohl(hdr->destination_local_id), myIID4x);
+        dbgf_track(DBGT_INFO, "%s NB %s destination_local_id=%s myIID4x %d",
+                it->handl->name, pb->i.llip_str, cryptShaAsShortStr(&hdr->destination_local_id), myIID4x);
 
         if (myIID4x <= IID_RSVD_MAX)
                 return TLV_RX_DATA_FAILURE;
@@ -3321,12 +3321,12 @@ int32_t rx_msg_description_request(struct rx_frame_iterator *it)
         struct hdr_description_request *hdr = (struct hdr_description_request*) (it->frame_data);
         struct msg_description_request *msg = (struct msg_description_request*) (it->msg);
 
-        if (hdr->destination_local_id ? 
-		(hdr->destination_local_id == my_local_id) :
-		(cryptShasEqual(&msg->dhash, &self->dhn->dhash))) {
+        if (is_zero(&hdr->destination_local_id, sizeof(LOCAL_ID_T)) ?
+		(cryptShasEqual(&msg->dhash, &self->dhn->dhash)) :
+		(cryptShasEqual(&hdr->destination_local_id, &self->nodeId))) {
 
-		dbgf_track(DBGT_INFO, "%s NB %s destination_local_id=0x%X dhash=%s",
-			it->handl->name, pb->i.llip_str, ntohl(hdr->destination_local_id), cryptShaAsString(&msg->dhash));
+		dbgf_track(DBGT_INFO, "%s NB %s destination_local_id=%s dhash=%s",
+			it->handl->name, pb->i.llip_str, cryptShaAsString(&hdr->destination_local_id), cryptShaAsString(&msg->dhash));
 
 		struct dhash_node *dhn = avl_find_item(&dhash_tree, &msg->dhash);
 		struct orig_node *on = dhn ? dhn->on : NULL;
@@ -4120,9 +4120,9 @@ void next_tx_task_list(struct dev_node *dev, struct tx_frame_iterator *it, struc
                                 it->tx_task_list = &(link->tx_task_lists[it->frame_type]);
 
                                 dbgf_track(DBGT_INFO,
-                                        "found %s   link nb: nb_local_id=%X nb_dev_idx=%d nbIP=%s   via lndev: my_dev=%s my_dev_idx=%d with lndev->tx_tasks_list[].items=%d",
+                                        "found %s   link nb: nb_local_id=%s nb_dev_idx=%d nbIP=%s   via lndev: my_dev=%s my_dev_idx=%d with lndev->tx_tasks_list[].items=%d",
                                         it->db->handls[it->frame_type].name,
-                                        ntohl(linkDev->key.local_id), linkDev->key.dev_idx, ip6AsStr(&linkDev->link_ip),
+                                        cryptShaAsString(&linkDev->key.local_id), linkDev->key.dev_idx, ip6AsStr(&linkDev->link_ip),
                                         dev->label_cfg.str, dev->llip_key.idx, it->tx_task_list->items);
 
                                 return;
@@ -4333,7 +4333,6 @@ void tx_packet(void *devp)
 
 				phdr->comp_version = my_compatibility;
 				phdr->dhash = self->dhn->dhash;
-				phdr->local_id = my_local_id;
 
 				cb_packet_hooks(&pb);
 

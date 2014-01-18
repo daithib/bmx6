@@ -233,6 +233,7 @@ typedef CRYPTSHA1_T RHASH_T;
 
 typedef CRYPTSHA1_T GLOBAL_ID_T;
 
+typedef CRYPTSHA1_T LOCAL_ID_T;
 
 typedef struct {
 	DEVADV_IDX_T dev_idx;
@@ -477,13 +478,10 @@ struct black_node {
 
 struct packet_header
 {
-	uint8_t    comp_version;     //  8
-	uint8_t    capabilities;     //  8  reserved
+	uint8_t    comp_version;     //  1
+	uint8_t    capabilities;     //  1  reserved
         
-        CRYPTSHA1_T dhash;
-
-        //TODO: remove:...
-	LOCAL_ID_T local_id;         // 32
+        CRYPTSHA1_T dhash;           // 20
 
 } __attribute__((packed,__may_alias__));
 
@@ -531,7 +529,6 @@ extern CRYPTKEY_T *my_PubKey;
 
 extern struct iid_repos my_iid_repos;
 
-extern TIME_T my_local_id_timestamp;
 
 extern struct avl_tree dhash_tree;
 extern struct avl_tree dhash_invalid_tree;
@@ -555,7 +552,7 @@ IID_NODE_T* iid_get_node_by_neighIID4x(IID_NEIGH_T *nn, IID_T neighIID4x, IDM_T 
 IID_NODE_T* iid_get_node_by_myIID4x( IID_T myIID4x );
 
 
-LinkNode *getLinkNode(struct dev_node *dev, IPX_T *llip, LINKADV_SQN_T link_sqn, LOCAL_ID_T local_id, DEVADV_IDX_T dev_idx);
+LinkNode *getLinkNode(struct dev_node *dev, IPX_T *llip, LINKADV_SQN_T link_sqn, LOCAL_ID_T *local_id, DEVADV_IDX_T dev_idx);
 
 void blacklist_neighbor(struct packet_buff *pb);
 
