@@ -4179,7 +4179,8 @@ void tx_packet(void *devp)
         };
 
         struct avl_node *linkDev_tree_it = NULL;
-	int8_t signatures_needed = 0;
+	int8_t unsigned_frames_finished = 0;
+	int8_t signed_frames_signed = 0;
 	int8_t last_send_frame_type = -1;
 
         while (it.frame_type < FRAME_TYPE_NOP) {
@@ -4192,17 +4193,18 @@ void tx_packet(void *devp)
                 uint16_t prev_frames_out_pos = it.frames_out_pos;
                 uint32_t item =0;
 
-		if (it.frame_type > FRAME_TYPE_LINK_VERSION && it.frames_out_pos > 0 && !signatures_needed) {
+		if (it.frame_type > FRAME_TYPE_LINK_VERSION && it.frames_out_pos > 0 && !unsigned_frames_finished) {
 
-			signatures_needed = 1;
+			unsigned_frames_finished = 1;
 			result = TLV_TX_DATA_FULL;
 
-		} else if (it.frame_type > FRAME_TYPE_LINK_VERSION && it.frames_out_pos == 0 && signatures_needed) {
+		} else if (it.frame_type > FRAME_TYPE_LINK_VERSION && it.frames_out_pos == 0 && !signed_frames_signed) {
 
 			schedule_tx_task(&dev->dummyLink, FRAME_TYPE_SIGNATURE_ADV, sizeof(struct dsc_msg_signature) + my_PubKey->rawKeyLen, 0, 0);
 //			schedule_tx_task(&dev->dummyLink, FRAME_TYPE_SIGNATURE_DUMMY, SCHEDULE_MIN_MSG_SIZE, 0, 0);
 			schedule_tx_task(&dev->dummyLink, FRAME_TYPE_LINK_VERSION, SCHEDULE_MIN_MSG_SIZE, 0, 0);
 
+			signed_frames_signed = 1;
 			it.frame_type = FRAME_TYPE_SIGNATURE_ADV;
 			linkDev_tree_it = NULL;
 			it.tx_task_list = NULL;
@@ -4354,6 +4356,7 @@ void tx_packet(void *devp)
 
                         it.frames_out_pos = 0;
                         it.frames_out_num = 0;
+			signed_frames_signed = 0;
 
                 }
 		dbgf_all(DBGT_INFO, "frame_type=%d last_send_frame_type=%d frames_out_pos=%d",
