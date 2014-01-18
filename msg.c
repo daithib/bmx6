@@ -980,15 +980,18 @@ LinkNode **get_unacked_ogm_links(struct ogm_aggreg_node *oan)
 }
 
 STATIC_FUNC
-LinkNode **get_best_tp_links(struct local_node *except_local)
+void schedule_best_tp_links(struct local_node *except_local, uint16_t frame_type, int16_t frame_msgs_len, void *data, uint32_t dlen)
 {
         TRACE_FUNCTION_CALL;
 
         struct avl_node *an;
+	struct dev_node *dev;
         struct local_node *local;
         uint16_t d = 0;
 
-        linkArrayPrepare();
+//        linkArrayPrepare();
+        for (an = NULL; (dev = avl_iterate_item(&dev_ip_tree, &an));)
+                dev->tmp_flag_for_to_be_send_adv = NO;
 
         dbgf_all(DBGT_INFO, "NOT local_id=%d ", except_local ? except_local->local_id : 0);
 
@@ -1007,7 +1010,8 @@ LinkNode **get_best_tp_links(struct local_node *except_local)
                                 bestLink->k.linkDev->key.dev_idx, bestLink->k.myDev->tmp_flag_for_to_be_send_adv);
 
                         if (bestLink->k.myDev->tmp_flag_for_to_be_send_adv == NO) {
-                                linkArray[d++] = bestLink;
+				schedule_tx_task(bestLink, frame_type, frame_msgs_len, data, dlen);
+//				linkArray[d++] = bestLink;
                                 bestLink->k.myDev->tmp_flag_for_to_be_send_adv = YES;
                         }
 
@@ -1015,10 +1019,8 @@ LinkNode **get_best_tp_links(struct local_node *except_local)
                 }
         }
 
-
-        linkArray[d] = NULL;
-
-        return linkArray;
+//	linkArray[d] = NULL;
+//	return linkArray;
 }
 
 STATIC_FUNC
@@ -1336,11 +1338,9 @@ void ref_node_use(struct desc_extension *dext, struct ref_node *refn, uint8_t f_
 
 		assertion(-501578, ((int32_t)ref_tree.items >= ref_tree_items_used));
 
-		if (dref_adv_tx_unsolicited && refn->dext_tree.items == 1) {
-			LinkNode **array;
-			for (array = get_best_tp_links(NULL); (*array); array++)
-				schedule_tx_task(*array, FRAME_TYPE_REF_ADV, refn->f_body_len, &refn->rhash, sizeof(SHA1_T));
-		}
+		if (dref_adv_tx_unsolicited && refn->dext_tree.items == 1)
+			schedule_best_tp_links(NULL, FRAME_TYPE_REF_ADV, refn->f_body_len, &refn->rhash, sizeof(SHA1_T));
+
 	}
 
 	assertion(-501619, (avl_find(&refn->dext_tree, &dext)));
@@ -3171,17 +3171,11 @@ struct dhash_node *process_dhash_description_neighIID4x(struct packet_buff *pb, 
 			if (iid_set_neighIID4x(&neigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
 				return(struct dhash_node *) FAILURE_PTR;
 
-			if (!dhnOld && desc_adv_tx_unsolicited) {
-				LinkNode **array;
-				for (array = get_best_tp_links(neigh->local); (*array); array++)
-					schedule_tx_task(*array, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
-			}
+			if (!dhnOld && desc_adv_tx_unsolicited)
+				schedule_best_tp_links(neigh->local, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
 
-			if (!dhnOld && dhash_adv_tx_unsolicited) {
-				LinkNode **array;
-				for (array = get_best_tp_links(NULL); (*array); array++)
-					schedule_tx_task(*array, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
-			}
+			if (!dhnOld && dhash_adv_tx_unsolicited)
+				schedule_best_tp_links(NULL, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
 
 		}
         }
@@ -4531,16 +4525,12 @@ void update_my_description_adv(void)
         myIID4me = self->dhn->myIID4orig;
         myIID4me_timestamp = bmx_time;
 
-        if (desc_adv_tx_unsolicited) {
-                LinkNode **array;
-                for (array = get_best_tp_links(NULL); (*array); array++)
-                        schedule_tx_task(*array, FRAME_TYPE_DESC_ADVS, tx.frames_out_pos, &dhashNew, sizeof(dhashNew));
-        }
-	if (dhash_adv_tx_unsolicited) {
-		LinkNode **array;
-		for (array = get_best_tp_links(NULL); (*array); array++)
-			schedule_tx_task(*array, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &myIID4me, sizeof(IID_T));
-	}
+        if (desc_adv_tx_unsolicited)
+		schedule_best_tp_links(NULL, FRAME_TYPE_DESC_ADVS, tx.frames_out_pos, &dhashNew, sizeof(dhashNew));
+
+	if (dhash_adv_tx_unsolicited)
+		schedule_best_tp_links(NULL, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &myIID4me, sizeof(IID_T));
+
 
         my_description_changed = NO;
 
