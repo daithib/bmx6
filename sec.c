@@ -195,7 +195,7 @@ finish:{
 
 	if (!dhnOld && dhn) {
 		if (desc_adv_tx_unsolicited)
-			schedule_best_tp_links(dhn->neigh->local, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
+			schedule_best_tp_links(NULL, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
 
 		if (dhash_adv_tx_unsolicited)
 			schedule_best_tp_links(NULL, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
