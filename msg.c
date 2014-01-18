@@ -66,10 +66,12 @@ static int32_t desc_req_tx_iters = DEF_DESC_REQ_TX_ITERS;
 static int32_t desc_adv_tx_iters = DEF_DESC_ADV_TX_ITERS;
 
 static int32_t desc_adv_tx_unsolicited = DEF_DESC_ADV_UNSOLICITED;
+
 static int32_t dref_adv_tx_unsolicited = DEF_DREF_ADV_UNSOLICITED;
 
 static int32_t dhash_req_tx_iters = DEF_DHASH_REQ_TX_ITERS;
 static int32_t dhash_adv_tx_iters = DEF_DHASH_ADV_TX_ITERS;
+static int32_t dhash_adv_tx_unsolicited = DEF_DHASH_ADV_UNSOLICITED;
 
 
 static int32_t dev_req_tx_iters = DEF_DEV_REQS_TX_ITERS;
@@ -978,7 +980,7 @@ LinkNode **lndevs_get_unacked_ogm_neighbors(struct ogm_aggreg_node *oan)
 }
 
 STATIC_FUNC
-LinkNode **lndevs_get_best_tp(struct local_node *except_local)
+LinkNode **get_best_tp_links(struct local_node *except_local)
 {
         TRACE_FUNCTION_CALL;
 
@@ -1335,11 +1337,9 @@ void ref_node_use(struct desc_extension *dext, struct ref_node *refn, uint8_t f_
 		assertion(-501578, ((int32_t)ref_tree.items >= ref_tree_items_used));
 
 		if (dref_adv_tx_unsolicited && refn->dext_tree.items == 1) {
-			LinkNode **array = lndevs_get_best_tp(NULL);
-			int d;
-
-			for (d = 0; (array[d]); d++)
-				schedule_tx_task(array[d], FRAME_TYPE_REF_ADV, refn->f_body_len, &refn->rhash, sizeof(SHA1_T));
+			LinkNode **array;
+			for (array = get_best_tp_links(NULL); (*array); array++)
+				schedule_tx_task(*array, FRAME_TYPE_REF_ADV, refn->f_body_len, &refn->rhash, sizeof(SHA1_T));
 		}
 	}
 
@@ -3172,12 +3172,9 @@ struct dhash_node *process_dhash_description_neighIID4x(struct packet_buff *pb, 
 				return(struct dhash_node *) FAILURE_PTR;
 
 			if (desc_adv_tx_unsolicited && !dhnOld) {
-
-				LinkNode **array = lndevs_get_best_tp(neigh->local);
-				int d;
-
-				for (d = 0; (array[d]); d++)
-					schedule_tx_task(array[d], FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
+				LinkNode **array;
+				for (array = get_best_tp_links(neigh->local); (*array); array++)
+					schedule_tx_task(*array, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
 			}
 		}
         }
@@ -4523,11 +4520,9 @@ void update_my_description_adv(void)
         myIID4me_timestamp = bmx_time;
 
         if (desc_adv_tx_unsolicited) {
-                LinkNode **array = lndevs_get_best_tp(NULL);
-                int d;
-
-                for (d = 0; (array[d]); d++)
-                        schedule_tx_task(array[d], FRAME_TYPE_DESC_ADVS, tx.frames_out_pos, &dhashNew, sizeof(dhashNew));
+                LinkNode **array;
+                for (array = get_best_tp_links(NULL); (*array); array++)
+                        schedule_tx_task(*array, FRAME_TYPE_DESC_ADVS, tx.frames_out_pos, &dhashNew, sizeof(dhashNew));
         }
 
         my_description_changed = NO;
@@ -4810,8 +4805,11 @@ struct opt_type msg_options[]=
         {ODI, 0, ARG_OGM_TX_ITERS,         0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &ogm_adv_tx_iters,MIN_OGM_TX_ITERS,MAX_OGM_TX_ITERS,DEF_OGM_TX_ITERS,0,       0,
 			ARG_VALUE_FORM,	"set maximum resend attempts for ogm aggregations"}
         ,
-        {ODI, 0, ARG_UNSOLICITED_DESC_ADVS,0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &desc_adv_tx_unsolicited,MIN_UNSOLICITED_DESC_ADVS,MAX_UNSOLICITED_DESC_ADVS,DEF_DESC_ADV_UNSOLICITED,0,0,
+        {ODI, 0, ARG_DESC_ADV_UNSOLICITED, 0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &desc_adv_tx_unsolicited,MIN_DESC_ADV_UNSOLICITED,MAX_DESC_ADV_UNSOLICITED,DEF_DESC_ADV_UNSOLICITED,0,0,
 			ARG_VALUE_FORM,	"send unsolicited description advertisements after receiving a new one"}
+        ,
+        {ODI, 0, ARG_DHASH_ADV_UNSOLICITED,0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &dhash_adv_tx_unsolicited,MIN_DHASH_ADV_UNSOLICITED,MAX_DHASH_ADV_UNSOLICITED,DEF_DHASH_ADV_UNSOLICITED,0,0,
+			ARG_VALUE_FORM,	"send unsolicited dhash advertisements after creating a new IID"}
         ,
         {ODI, 0, ARG_DREF_ADV_UNSOLICITED, 0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &dref_adv_tx_unsolicited,MIN_DREF_ADV_UNSOLICITED,MAX_DREF_ADV_UNSOLICITED,DEF_DREF_ADV_UNSOLICITED,0,0,
 			ARG_VALUE_FORM,	"send unsolicited description-reference advertisements after receiving a new one"}
@@ -4825,7 +4823,7 @@ struct opt_type msg_options[]=
         {ODI, 0, ARG_DSC0_ADVS_TX_ITERS,   0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &desc_adv_tx_iters,MIN_DSC0_ADVS_TX_ITERS,MAX_DSC0_ADVS_TX_ITERS,DEF_DESC_ADV_TX_ITERS,0,0,
 			ARG_VALUE_FORM,	"set tx iterations for descriptions"}
         ,
-        {ODI, 0, ARG_DHS0_ADVS_TX_ITERS,   0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &dhash_adv_tx_iters,MIN_DHS0_ADVS_TX_ITERS,MAX_DHS0_ADVS_TX_ITERS,DEF_DHASH_ADV_TX_ITERS,0,0,
+        {ODI, 0, ARG_DHASH_ADV_TX_ITERS,   0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &dhash_adv_tx_iters,MIN_DHASH_ADV_TX_ITERS,MAX_DHASH_ADV_TX_ITERS,DEF_DHASH_ADV_TX_ITERS,0,0,
 			ARG_VALUE_FORM,	"set tx iterations for description hashes"}
         ,
         {ODI, 0, ARG_OGM_ACK_TX_ITERS,     0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &ogm_ack_tx_iters,MIN_OGM_ACK_TX_ITERS,MAX_OGM_ACK_TX_ITERS,DEF_OGM_ACK_TX_ITERS,0,0,
