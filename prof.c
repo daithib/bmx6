@@ -141,7 +141,7 @@ void prof_update_all( void *unused) {
 
 	struct timeval tvAfterRunningPeriod;
 	upd_time(&tvAfterRunningPeriod);
-	uint64_t timeAfterRunningPeriod = (tvAfterRunningPeriod.tv_sec * 1000000) + tvAfterRunningPeriod.tv_usec;
+	uint64_t timeAfterRunningPeriod = (((uint64_t)tvAfterRunningPeriod.tv_sec) * 1000000) + tvAfterRunningPeriod.tv_usec;
 
 	durationPrevPeriod = (timeAfterRunningPeriod - timeAfterPrevPeriod);
 
