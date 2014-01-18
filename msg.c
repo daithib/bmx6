@@ -4919,7 +4919,7 @@ void init_msg( void )
         register_frame_handler(packet_frame_db, FRAME_TYPE_REF_ADV, &handl);
 
 
-        handl.name = "DESCRIPTION_REQ";
+        handl.name = "DESC_REQ";
 	handl.rx_processUnVerifiedLink = 1;
         handl.tx_iterations = &desc_req_tx_iters;
         handl.data_header_size = sizeof( struct hdr_description_request);
@@ -4965,7 +4965,7 @@ void init_msg( void )
 	handl.next_db = description_names_db;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_NAMES, &handl);
 
-	handl.name = "DESCRIPTION_ADV";
+	handl.name = "DESC_ADV";
 	handl.min_msg_size = (
 		sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) +
 		sizeof(struct tlv_hdr) + sizeof(struct dsc_msg_signature) +
@@ -4974,7 +4974,7 @@ void init_msg( void )
 	handl.rx_frame_handler = rx_frame_description_adv;
 	register_frame_handler(packet_desc_db, 0, &handl);
 
-	handl.name = "DESCRIPTION_ADV_FRAMES";
+	handl.name = "DESC_ADVS";
 	handl.rx_processUnVerifiedLink = 1;
 	handl.tx_iterations = &desc_adv_tx_iters;
 	handl.min_msg_size = sizeof (struct tlv_hdr) + packet_desc_db->handls[0].min_msg_size;
