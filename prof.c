@@ -41,16 +41,16 @@ static AVL_TREE(prof_tree, struct prof_ctx, k);
 
 void prof_init( struct prof_ctx *sp)
 {
-	assertion(-500000, (!sp->initialized));
-	assertion(-500000, (sp && sp->k.name && strlen(sp->k.name)< 100));
-	assertion(-500000, (!(sp->k.orig && sp->k.neigh)));
-	assertion(-500000, (!avl_find_item(&prof_tree, &sp->k)));
+	assertion(-502112, (!sp->initialized));
+	assertion(-502113, (sp && sp->k.name && strlen(sp->k.name)< 100));
+	assertion(-502114, (!(sp->k.orig && sp->k.neigh)));
+	assertion(-502115, (!avl_find_item(&prof_tree, &sp->k)));
 
 	if (sp->parent_name) {
 		struct prof_ctx_key pk = {.name=sp->parent_name};
 		struct prof_ctx *pp = avl_find_item(&prof_tree, &pk);
 
-		assertion(-500000, (pp));
+		assertion(-502116, (pp));
 
 		avl_insert(&pp->childs_tree, sp, -300000);
 		sp->parent = pp;
@@ -65,11 +65,11 @@ void prof_init( struct prof_ctx *sp)
 
 void prof_free( struct prof_ctx *p)
 {
-	assertion(-500000, (p));
-	assertion(-500000, (p->initialized));
-	assertion(-500000, (!(p->childs_tree.items)));
-	assertion(-500000, (avl_find_item(&prof_tree, &p->k)));
-//	assertion(-500000, !((*p)->timeBefore));
+	assertion(-502117, (p));
+	assertion(-502118, (p->initialized));
+	assertion(-502119, (!(p->childs_tree.items)));
+	assertion(-502120, (avl_find_item(&prof_tree, &p->k)));
+//	assertion(-502121, !((*p)->timeBefore));
 
 	p->initialized = 0;
 	
@@ -96,9 +96,9 @@ int prof_check(struct prof_ctx *p, int childs)
 
 void prof_start( struct prof_ctx *p)
 {
-	assertion(-500000, (!p->active_prof));
-	assertion(-500000, (!p->clockBeforePStart));
-	assertion(-500000, (!p->active_childs));
+	assertion(-502122, (!p->active_prof));
+	assertion(-502123, (!p->clockBeforePStart));
+	assertion(-502124, (!p->active_childs));
 
 	if (!p->initialized)
 		prof_init(p);
@@ -109,17 +109,17 @@ void prof_start( struct prof_ctx *p)
 	if (p->parent)
 		p->parent->active_childs++;
 
-	ASSERTION(-500000, (prof_check(p, 0) == SUCCESS));
+	ASSERTION(-502125, (prof_check(p, 0) == SUCCESS));
 }
 
 void prof_stop( struct prof_ctx *p)
 {
-	assertion(-500000, (p->active_prof));
-	ASSERTION(-500000, (prof_check(p, 0) == SUCCESS));
+	assertion(-502126, (p->active_prof));
+	ASSERTION(-502127, (prof_check(p, 0) == SUCCESS));
 
 	TIME_T clockAfter = clock();
 	TIME_T clockPeriod = (clockAfter - p->clockBeforePStart);
-	assertion(-500000, (clockPeriod < ((~((TIME_T)0))>>1)) ); //this wraps around some time..
+	assertion(-502128, (clockPeriod < ((~((TIME_T)0))>>1)) ); //this wraps around some time..
 
 	p->clockRunningPeriod += clockPeriod;
 
@@ -145,8 +145,8 @@ void prof_update_all( void *unused) {
 
 	durationPrevPeriod = (timeAfterRunningPeriod - timeAfterPrevPeriod);
 
-	assertion(-500000, (durationPrevPeriod > 0));
-	assertion(-500000, (durationPrevPeriod < 10*1000000));
+	assertion(-502129, (durationPrevPeriod > 0));
+	assertion(-502130, (durationPrevPeriod < 10*1000000));
 
 	prof_check_disabled = YES;
 
