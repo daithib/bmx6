@@ -259,7 +259,7 @@ IDM_T fmetric_cmp(FMETRIC_U16_T a, unsigned char cmp, FMETRIC_U16_T b);
 
 UMETRIC_T apply_metric_algo(UMETRIC_T *tr, UMETRIC_T *umetric_max, const UMETRIC_T *path, struct host_metricalgo *algo);
 
-void lndev_assign_best(struct local_node *onlyLocal, LinkNode *onlyLink );
+void lndev_assign_best(struct neigh_node *onlyLocal, LinkNode *onlyLink );
 void update_link_probe_record(LinkNode *link, HELLO_SQN_T sqn, uint8_t probe);
 
 IDM_T update_path_metrics(struct packet_buff *pb, struct orig_node *on, OGM_SQN_T in_sqn, UMETRIC_T *in_umetric);

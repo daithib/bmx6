@@ -852,7 +852,7 @@ static int32_t link_status_creator(struct status_handl *handl, void *data)
 {
         struct avl_node *linkDev_it, *local_it;
 	LinkDevNode *linkDev;
-        struct local_node *local;
+        struct neigh_node *local;
         uint32_t max_size = link_tree.items * sizeof (struct link_status);
         uint32_t i = 0;
 

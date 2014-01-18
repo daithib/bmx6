@@ -28,7 +28,7 @@
  * from iid.h:
  */
 typedef uint16_t IID_T;
-typedef struct local_node IID_NEIGH_T;
+typedef struct neigh_node IID_NEIGH_T;
 typedef struct dhash_node IID_NODE_T;
 
 
@@ -251,7 +251,7 @@ typedef struct {
 
 	HELLO_SQN_T hello_sqn_max;
 
-	struct local_node *local; // set immediately
+	struct neigh_node *local; // set immediately
 
 	struct list_head link_list; // list with one link_node_dev element per link
 } LinkDevNode;
@@ -277,28 +277,7 @@ typedef struct {
 } LinkNode;
 
 
-/*
 struct neigh_node {
-
-	struct neigh_node *nnkey;
-	struct dhash_node *dhn; // confirmed dhash
-
-	// filled in by ???:
-
-	IID_T neighIID4me;
-
-	struct iid_repos neighIID4x_repos;
-
-//	AGGREG_SQN_T ogm_aggregation_rcvd_set;
-        TIME_T ogm_new_aggregation_rcvd;
-	AGGREG_SQN_T ogm_aggregation_cleard_max;
-	uint8_t ogm_aggregations_not_acked[AGGREG_ARRAY_BYTE_SIZE];
-	uint8_t ogm_aggregations_rcvd[AGGREG_ARRAY_BYTE_SIZE];
-};
-*/
-
-
-struct local_node {
 
 	LOCAL_ID_T local_id;
 	struct avl_tree linkDev_tree;
@@ -351,7 +330,7 @@ struct router_node {
 
 //	struct link_dev_key key_2BRemoved;
 
-	struct local_node *local_key;
+	struct neigh_node *local_key;
 
 	struct metric_record mr;
 	OGM_SQN_T ogm_sqn_last;
@@ -472,7 +451,7 @@ struct dhash_node {
 
 	TIME_T referred_by_me_timestamp; // last time this dhn was referred
 
-        struct local_node *local;
+        struct neigh_node *local;
 	IID_T myIID4orig;
 
 
@@ -583,7 +562,7 @@ void init_self(void);
 SHA1_T *nodeIdFromDescAdv( uint8_t *desc_adv );
 char *nodeIdAsStringFromDescAdv( uint8_t *desc_adv );
 
-void purge_local_node(struct local_node *local);
+void purge_local_node(struct neigh_node *local);
 void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T only_expired);
 
 void update_neigh_dhash(struct orig_node *on, struct dhash_node *dhn);

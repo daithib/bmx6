@@ -903,7 +903,7 @@ extern struct frame_db *description_tlv_db;
   The core frame/message structures and handlers
 ************************************************************/
 
-void schedule_best_tp_links(struct local_node *except_local, uint16_t frame_type, int16_t frame_msgs_len, void *data, uint32_t dlen);
+void schedule_best_tp_links(struct neigh_node *except_local, uint16_t frame_type, int16_t frame_msgs_len, void *data, uint32_t dlen);
 OGM_SQN_T set_ogmSqn_toBeSend_and_aggregated(struct orig_node *on, UMETRIC_T um, OGM_SQN_T to_be_send, OGM_SQN_T aggregated);
 void update_my_description_adv( void );
 void update_my_dev_adv(void);

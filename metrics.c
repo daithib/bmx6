@@ -756,7 +756,7 @@ UMETRIC_T timeaware_tx_probe(LinkNode *link)
 }
 
 
-void lndev_assign_best(struct local_node *onlyLocal, LinkNode *onlyLink )
+void lndev_assign_best(struct neigh_node *onlyLocal, LinkNode *onlyLink )
 {
         TRACE_FUNCTION_CALL;
 
@@ -769,7 +769,7 @@ void lndev_assign_best(struct local_node *onlyLocal, LinkNode *onlyLink )
                 onlyLink ? onlyLink->k.myDev->label_cfg.str : DBG_NIL);
 
         struct avl_node *local_an = NULL;
-        struct local_node *local;
+        struct neigh_node *local;
 
         while ((local = onlyLocal) || (local = avl_iterate_item(&local_tree, &local_an))) {
 
@@ -919,7 +919,7 @@ void update_link_probe_record(LinkNode *link, HELLO_SQN_T sqn, uint8_t probe)
 
 
 STATIC_FUNC
-struct router_node * router_node_create(struct local_node *local, struct orig_node *on, OGM_SQN_T ogm_sqn_max)
+struct router_node * router_node_create(struct neigh_node *local, struct orig_node *on, OGM_SQN_T ogm_sqn_max)
 {
         struct router_node* rt = debugMallocReset(sizeof (struct router_node), -300222);
 
@@ -935,7 +935,7 @@ struct router_node * router_node_create(struct local_node *local, struct orig_no
 
 
 STATIC_FUNC
-UMETRIC_T lndev_best_via_router(struct local_node *local, struct orig_node *on, UMETRIC_T *ogm_metric, LinkNode **bestPathLink)
+UMETRIC_T lndev_best_via_router(struct neigh_node *local, struct orig_node *on, UMETRIC_T *ogm_metric, LinkNode **bestPathLink)
 {
 
         UMETRIC_T metric_best = 0;
@@ -996,7 +996,7 @@ IDM_T update_path_metrics(struct packet_buff *pb, struct orig_node *on, OGM_SQN_
                 return SUCCESS;
         }
 
-        struct local_node *local = pb->i.verifiedLink->k.linkDev->local;
+        struct neigh_node *local = pb->i.verifiedLink->k.linkDev->local;
         struct router_node *next_rt = NULL;
         struct router_node *prev_rt = on->curr_rt_local;
         IDM_T is_ogm_sqn_new = UXX_GT(OGM_SQN_MASK, ogmSqn, on->ogmSqn_maxRcvd);

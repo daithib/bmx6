@@ -856,7 +856,7 @@ void create_ogm_aggregation(void)
         uint16_t destinations = 0;
 
         struct avl_node *local_an = NULL;
-        struct local_node *local;
+        struct neigh_node *local;
 
         while ((local = avl_iterate_item(&local_tree, &local_an))) {
 
@@ -913,7 +913,7 @@ LinkNode **get_unacked_ogm_links(struct ogm_aggreg_node *oan)
         TRACE_FUNCTION_CALL;
 
         struct avl_node *local_an = NULL;
-        struct local_node *local;
+        struct neigh_node *local;
         uint16_t d = 0;
 
         dbgf_all(DBGT_INFO, "aggreg_sqn %d ", oan->sqn);
@@ -971,13 +971,13 @@ LinkNode **get_unacked_ogm_links(struct ogm_aggreg_node *oan)
         return linkArray;
 }
 
-void schedule_best_tp_links(struct local_node *except_local, uint16_t frame_type, int16_t frame_msgs_len, void *data, uint32_t dlen)
+void schedule_best_tp_links(struct neigh_node *except_local, uint16_t frame_type, int16_t frame_msgs_len, void *data, uint32_t dlen)
 {
         TRACE_FUNCTION_CALL;
 
         struct avl_node *an;
 	struct dev_node *dev;
-        struct local_node *local;
+        struct neigh_node *local;
         uint16_t d = 0;
 
 //        linkArrayPrepare();
@@ -1136,7 +1136,7 @@ int32_t rx_msg_link_version_adv(struct rx_frame_iterator *it)
 		return TLV_RX_DATA_FAILURE;
 
 
-	struct local_node *local = pbi->verifiedLink->k.linkDev->local;
+	struct neigh_node *local = pbi->verifiedLink->k.linkDev->local;
 
 	assertion(-500000, (local));
 
@@ -2305,7 +2305,7 @@ int32_t tx_msg_dev_req(struct tx_frame_iterator *it)
         struct tx_task_node *ttn = it->ttn;
         struct msg_dev_req *msg = ((struct msg_dev_req*) tx_iterator_cache_msg_ptr(it));
 	LOCAL_ID_T *local_id = ((LOCAL_ID_T*)ttn->task.data);
-        struct local_node *local = avl_find_item(&local_tree, local_id);
+        struct neigh_node *local = avl_find_item(&local_tree, local_id);
 
         assertion(-500986, (ttn->tx_iterations > 0 && ttn->considered_ts != bmx_time));
 
@@ -2341,7 +2341,7 @@ int32_t rx_frame_dev_adv( struct rx_frame_iterator *it)
 
         uint16_t msgs = it->frame_msgs_length / sizeof (struct msg_dev_adv);
 
-        struct local_node *local = it->pb->i.verifiedLink->k.linkDev->local;
+        struct neigh_node *local = it->pb->i.verifiedLink->k.linkDev->local;
 
         DEVADV_SQN_T dev_sqn = ntohs(hdr->dev_sqn);
 
@@ -2412,7 +2412,7 @@ void update_my_link_adv(uint32_t changes)
 
         struct avl_node *an;
         LinkNode *link;
-        struct local_node *local;
+        struct neigh_node *local;
         uint16_t msg = 0;
         static PKT_SQN_T last_link_packet_sqn = 0;
         static TIME_T last_link_adv_time = 0;
@@ -2530,7 +2530,7 @@ int32_t tx_msg_link_req(struct tx_frame_iterator *it)
         struct tx_task_node *ttn = it->ttn;
         struct msg_link_req *msg = ((struct msg_link_req*) tx_iterator_cache_msg_ptr(it));
 	LOCAL_ID_T *local_id = ((LOCAL_ID_T*)ttn->task.data);
-        struct local_node *local = avl_find_item(&local_tree, local_id);
+        struct neigh_node *local = avl_find_item(&local_tree, local_id);
 
         assertion(-500988, (ttn->tx_iterations > 0 && ttn->considered_ts != bmx_time));
 
@@ -2566,7 +2566,7 @@ int32_t rx_frame_link_adv( struct rx_frame_iterator *it)
 
         uint16_t msgs = it->frame_msgs_length  / sizeof (struct msg_link_adv);
 
-        struct local_node *local = it->pb->i.verifiedLink->k.linkDev->local;
+        struct neigh_node *local = it->pb->i.verifiedLink->k.linkDev->local;
 
 	LINKADV_SQN_T link_sqn = local->packet_link_sqn_ref;
         DEVADV_SQN_T dev_sqn_ref = ntohs(hdr->dev_sqn_ref);
@@ -2680,7 +2680,7 @@ int32_t rx_frame_rp_adv(struct rx_frame_iterator *it)
 	assertion(-500000, (it->pb->i.verifiedLink));
 
         struct msg_rp_adv* adv = (struct msg_rp_adv*) it->msg;
-	struct local_node *local = it->pb->i.verifiedLink->k.linkDev->local;
+	struct neigh_node *local = it->pb->i.verifiedLink->k.linkDev->local;
 	LINKADV_SQN_T link_sqn = local->packet_link_sqn_ref;
         struct avl_node *link_an = NULL;
 	LinkDevNode *linkDev;
@@ -2833,7 +2833,7 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
 
         struct hdr_ogm_adv *hdr = (struct hdr_ogm_adv *) it->frame_data;
         struct packet_buff *pb = it->pb;
-        struct local_node *local = pb->i.verifiedLink->k.linkDev->local;
+        struct neigh_node *local = pb->i.verifiedLink->k.linkDev->local;
 	LINKADV_SQN_T link_sqn = local->packet_link_sqn_ref;
         uint8_t *ogm_destination_field = it->msg;
         AGGREG_SQN_T aggregation_sqn = hdr->aggregation_sqn;
@@ -3059,7 +3059,7 @@ int32_t rx_frame_ogm_acks(struct rx_frame_iterator *it)
 	assertion(-500000, (it->pb->i.verifiedLink));
 
         struct packet_buff *pb = it->pb;
-        struct local_node *local = pb->i.verifiedLink->k.linkDev->local;
+        struct neigh_node *local = pb->i.verifiedLink->k.linkDev->local;
 	LINKADV_SQN_T link_sqn = local->packet_link_sqn_ref;
         uint16_t pos;
 
@@ -3113,7 +3113,7 @@ struct dhash_node *process_dhash_description_neighIID4x(struct packet_buff *pb, 
 
 	struct dhash_node *dhn = NULL, *dhnOld = NULL;
 
-	struct local_node *local = pb->i.verifiedLink->k.linkDev->local;
+	struct neigh_node *local = pb->i.verifiedLink->k.linkDev->local;
         struct description_cache_node *cache = NULL;
 	IDM_T is_transmitter = cryptShasEqual(dhash, &pb->p.hdr.dhash);
 

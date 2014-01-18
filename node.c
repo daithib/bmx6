@@ -69,7 +69,7 @@ AVL_TREE(link_tree, LinkNode, k);
 
 AVL_TREE(link_dev_tree, LinkDevNode, key);
 
-AVL_TREE(local_tree, struct local_node, local_id);
+AVL_TREE(local_tree, struct neigh_node, local_id);
 
 AVL_TREE(dhash_tree, struct dhash_node, dhash);
 AVL_TREE(dhash_invalid_tree, struct dhash_node, dhash);
@@ -477,7 +477,7 @@ void purge_dhash_iid(IID_T myIID4orig)
 {
         TRACE_FUNCTION_CALL;
         struct avl_node *an;
-        struct local_node *local;
+        struct neigh_node *local;
 
         //reset all neigh_node->oid_repos[x]=dhn->mid4o entries
         for (an = NULL; (local = avl_iterate_item(&local_tree, &an));) {
@@ -591,7 +591,7 @@ struct dhash_node* get_dhash_node(uint8_t *desc_frame, uint32_t desc_frame_len, 
 void update_neigh_dhash(struct orig_node *on, struct dhash_node *dhn)
 {
 
-        struct local_node *local = NULL;
+        struct neigh_node *local = NULL;
 
         if (on->dhn) {
                 local = on->dhn->local;
@@ -634,7 +634,7 @@ void purge_orig_router(struct orig_node *onlyOrig, LinkNode *onlyLink, IDM_T onl
         struct avl_node *an = NULL;
         while ((on = onlyOrig) || (on = avl_iterate_item( &orig_tree, &an))) {
 
-                struct local_node *local_key = NULL;
+                struct neigh_node *local_key = NULL;
                 struct router_node *rt;
 
                 while ((rt = avl_next_item(&on->rt_tree, &local_key)) && (local_key = rt->local_key)) {
@@ -699,7 +699,7 @@ void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T on
 
         while ((linkDev = (onlyLinkDev ? avl_find_item(&link_dev_tree, onlyLinkDev) : avl_next_item(&link_dev_tree, &linkDevKey)))) {
 
-                struct local_node *local = linkDev->local;
+                struct neigh_node *local = linkDev->local;
 
                 assertion(-500940, local);
                 assertion(-500941, local == avl_find_item(&local_tree, &linkDev->key.local_id));
@@ -801,7 +801,7 @@ void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T on
 
 }
 
-void purge_local_node(struct local_node *local)
+void purge_local_node(struct neigh_node *local)
 {
         TRACE_FUNCTION_CALL;
 
@@ -992,7 +992,7 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
 	if (dev_idx < DEVADV_IDX_MIN)
 		return NULL;
 
-        struct local_node *local = avl_find_item(&local_tree, local_id);
+        struct neigh_node *local = avl_find_item(&local_tree, local_id);
 
 
         if (local) {
@@ -1047,7 +1047,7 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
                 }
 
                 assertion(-500944, (!avl_find_item(&link_dev_tree, &linkDevKey)));
-                local = debugMallocReset(sizeof(struct local_node), -300336);
+                local = debugMallocReset(sizeof(struct neigh_node), -300336);
                 AVL_INIT_TREE(local->linkDev_tree, LinkDevNode, key.dev_idx);
                 local->local_id = *local_id;
                 local->link_adv_msg_for_me = LINKADV_MSG_IGNORED;
