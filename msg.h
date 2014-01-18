@@ -152,6 +152,7 @@
 #define MAX_DESC_ADV_UNSOLICITED 1
 #define DEF_DESC_ADV_UNSOLICITED 1
 #define ARG_DESC_ADV_UNSOLICITED "unsolicitedDescAdvs"
+extern int32_t desc_adv_tx_unsolicited;
 
 #define MIN_DREF_ADV_UNSOLICITED 0
 #define MAX_DREF_ADV_UNSOLICITED 1
@@ -173,6 +174,7 @@
 #define MAX_DHASH_ADV_UNSOLICITED 1
 #define DEF_DHASH_ADV_UNSOLICITED 1
 #define ARG_DHASH_ADV_UNSOLICITED "unsolicitedDHashAdvs"
+extern int32_t dhash_adv_tx_unsolicited;
 
 #define MIN_DHS0_REQS_TX_ITERS 1
 #define MAX_DHS0_REQS_TX_ITERS 100
@@ -902,7 +904,7 @@ extern struct frame_db *description_tlv_db;
   The core frame/message structures and handlers
 ************************************************************/
 
-
+void schedule_best_tp_links(struct local_node *except_local, uint16_t frame_type, int16_t frame_msgs_len, void *data, uint32_t dlen);
 OGM_SQN_T set_ogmSqn_toBeSend_and_aggregated(struct orig_node *on, UMETRIC_T um, OGM_SQN_T to_be_send, OGM_SQN_T aggregated);
 void update_my_description_adv( void );
 void update_my_dev_adv(void);

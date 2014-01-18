@@ -65,13 +65,13 @@ static int32_t ogm_ack_tx_iters = DEF_OGM_ACK_TX_ITERS;
 static int32_t desc_req_tx_iters = DEF_DESC_REQ_TX_ITERS;
 static int32_t desc_adv_tx_iters = DEF_DESC_ADV_TX_ITERS;
 
-static int32_t desc_adv_tx_unsolicited = DEF_DESC_ADV_UNSOLICITED;
+int32_t desc_adv_tx_unsolicited = DEF_DESC_ADV_UNSOLICITED;
 
 static int32_t dref_adv_tx_unsolicited = DEF_DREF_ADV_UNSOLICITED;
 
 static int32_t dhash_req_tx_iters = DEF_DHASH_REQ_TX_ITERS;
 static int32_t dhash_adv_tx_iters = DEF_DHASH_ADV_TX_ITERS;
-static int32_t dhash_adv_tx_unsolicited = DEF_DHASH_ADV_UNSOLICITED;
+int32_t dhash_adv_tx_unsolicited = DEF_DHASH_ADV_UNSOLICITED;
 
 
 static int32_t dev_req_tx_iters = DEF_DEV_REQS_TX_ITERS;
@@ -979,7 +979,6 @@ LinkNode **get_unacked_ogm_links(struct ogm_aggreg_node *oan)
         return linkArray;
 }
 
-STATIC_FUNC
 void schedule_best_tp_links(struct local_node *except_local, uint16_t frame_type, int16_t frame_msgs_len, void *data, uint32_t dlen)
 {
         TRACE_FUNCTION_CALL;
