@@ -70,7 +70,6 @@ AVL_TREE(link_tree, LinkNode, k);
 AVL_TREE(link_dev_tree, LinkDevNode, key);
 
 AVL_TREE(local_tree, struct local_node, local_id);
-AVL_TREE(neigh_tree, struct neigh_node, nnkey);
 
 AVL_TREE(dhash_tree, struct dhash_node, dhash);
 AVL_TREE(dhash_invalid_tree, struct dhash_node, dhash);
@@ -472,41 +471,18 @@ IDM_T blacklisted_neighbor(struct packet_buff *pb, DHASH_T *dhash)
 
 
 
-struct neigh_node *is_described_neigh( LinkDevNode *linkDev, DHASH_T *transmittersDhash)
-{
-        assertion(-500730, (linkDev));
-        assertion(-500958, (linkDev->local));
-        struct neigh_node *neigh = linkDev->local->neigh;
-
-        if (neigh && neigh->dhn && neigh->dhn->on &&
-		cryptShasEqual(&neigh->dhn->dhash, transmittersDhash)) {
-
-                assertion(-500938, (neigh->dhn->neigh == neigh));
-
-                return neigh;
-        }
-
-        return NULL;
-}
-
-
-
-
-
-
-
 
 STATIC_FUNC
 void purge_dhash_iid(IID_T myIID4orig)
 {
         TRACE_FUNCTION_CALL;
         struct avl_node *an;
-        struct neigh_node *neigh;
+        struct local_node *local;
 
         //reset all neigh_node->oid_repos[x]=dhn->mid4o entries
-        for (an = NULL; (neigh = avl_iterate_item(&neigh_tree, &an));) {
+        for (an = NULL; (local = avl_iterate_item(&local_tree, &an));) {
 
-                iid_free_neighIID4x_by_myIID4x(&neigh->neighIID4x_repos, myIID4orig);
+                iid_free_neighIID4x_by_myIID4x(&local->neighIID4x_repos, myIID4orig);
 
         }
 }
@@ -566,7 +542,7 @@ void invalidate_dhash( struct dhash_node *dhn, DHASH_T *dhash )
                 my_iid_repos.tot_used, dhash_invalid_tree.items+1, my_iid_repos.min_free, my_iid_repos.max_free);
 
         assertion( -500698, (!dhn->on));
-        assertion( -500699, (!dhn->neigh));
+        assertion( -500699, (!dhn->local));
 	assertion( -502088, !avl_find(&dhash_tree, &dhn->dhash));
 
         avl_insert(&dhash_invalid_tree, dhn, -300168);
@@ -585,7 +561,7 @@ void release_dhash( struct dhash_node *dhn )
                 "dhash %8X myIID4orig %d", dhn->dhash.h.u32[0], dhn->myIID4orig);
 
         assertion(-500961, (!dhn->on));
-        assertion(-500962, (!dhn->neigh));
+        assertion(-500962, (!dhn->local));
 
         avl_remove(&dhash_tree, &dhn->dhash, -300195);
 
@@ -615,12 +591,12 @@ struct dhash_node* get_dhash_node(uint8_t *desc_frame, uint32_t desc_frame_len, 
 void update_neigh_dhash(struct orig_node *on, struct dhash_node *dhn)
 {
 
-        struct neigh_node *neigh = NULL;
+        struct local_node *local = NULL;
 
         if (on->dhn) {
-                neigh = on->dhn->neigh;
+                local = on->dhn->local;
 
-                on->dhn->neigh = NULL;
+                on->dhn->local = NULL;
                 on->dhn->on = NULL;
 
 		avl_remove(&dhash_tree, &on->dhn->dhash, -300195);
@@ -637,130 +613,11 @@ void update_neigh_dhash(struct orig_node *on, struct dhash_node *dhn)
 
         dbgf_track(DBGT_INFO, "dhash %8X.. myIID4orig %d", dhn->dhash.h.u32[0], dhn->myIID4orig);
 
-        if (neigh) {
-                neigh->dhn = on->dhn;
-                on->dhn->neigh = neigh;
+        if (local) {
+                local->dhn = on->dhn;
+                on->dhn->local = local;
         }
 
-}
-
-
-
-STATIC_FUNC
-void free_neigh_node(struct neigh_node *neigh)
-{
-        TRACE_FUNCTION_CALL;
-
-        dbgf_track(DBGT_INFO, "freeing id=%s",
-                neigh && neigh->dhn && neigh->dhn->on ? cryptShaAsString(&neigh->dhn->on->nodeId) : DBG_NIL);
-
-        assertion(-500963, (neigh));
-        assertion(-500964, (neigh->dhn));
-        assertion(-500965, (neigh->dhn->neigh == neigh));
-        assertion(-500966, (neigh->local));
-        assertion(-500967, (neigh->local->neigh == neigh));
-
-        avl_remove(&neigh_tree, &neigh->nnkey, -300196);
-        iid_purge_repos(&neigh->neighIID4x_repos);
-
-        neigh->dhn->neigh = NULL;
-        neigh->dhn = NULL;
-        neigh->local->neigh = NULL;
-        neigh->local = NULL;
-
-        debugFree(neigh, -300129);
-}
-
-
-
-STATIC_FUNC
-void create_neigh_node(struct local_node *local, struct dhash_node * dhn)
-{
-        TRACE_FUNCTION_CALL;
-        assertion(-500400, (dhn && !dhn->neigh));
-
-        struct neigh_node *neigh = debugMallocReset(sizeof ( struct neigh_node), -300131);
-
-        local->neigh = neigh;
-        local->neigh->local = local;
-
-        neigh->dhn = dhn;
-        dhn->neigh = neigh->nnkey = neigh;
-        avl_insert(&neigh_tree, neigh, -300141);
-}
-
-
-
-void update_local_neigh(LinkNode *link, struct dhash_node *dhn)
-{
-        TRACE_FUNCTION_CALL;
-        struct local_node *local = link->k.linkDev->local;
-
-        dbgf_all(DBGT_INFO, "local_id=0x%X  dhn->id=%s", local->local_id, cryptShaAsString(&dhn->on->nodeId));
-
-        assertion(-500517, (dhn != self->dhn));
-        ASSERTION(-500392, (link->k.linkDev == avl_find_item(&local->linkDev_tree, &link->k.linkDev->key.dev_idx)));
-        assertion(-500390, (dhn && dhn->on && dhn->on->dhn == dhn));
-
-        if (!local->neigh && dhn->neigh) {
-
-                assertion(-500956, (dhn->neigh->dhn == dhn));
-                assertion(-500955, (dhn->neigh->local->neigh == dhn->neigh));
-
-                dbgf_track(DBGT_INFO, "CHANGED LOCAL=%d->%d <- neighIID4me=%d <- dhn->id=%s",
-                        dhn->neigh->local->local_id, local->local_id, dhn->neigh->neighIID4me,
-                        cryptShaAsString(&dhn->on->nodeId));
-
-                dhn->neigh->local->neigh = NULL;
-                local->neigh = dhn->neigh;
-                local->neigh->local = local;
-
-
-        } else if (!local->neigh && !dhn->neigh) {
-
-                create_neigh_node(local, dhn);
-
-                dbgf_track(DBGT_INFO, "NEW LOCAL=%d <-> NEIGHIID4me=%d <-> dhn->id=%s",
-                        local->local_id, local->neigh->neighIID4me,
-                        cryptShaAsString(&dhn->on->nodeId));
-
-        } else if (
-                dhn->neigh &&
-                dhn->neigh->dhn == dhn &&
-                dhn->neigh->local->neigh == dhn->neigh &&
-
-                local->neigh &&
-                local->neigh->local == local &&
-                local->neigh->dhn->neigh == local->neigh
-                ) {
-
-        } else {
-
-		dbgf_sys(DBGT_ERR, "NONMATCHING local=%d -> neighIID4me=%d -> dhn->id=%s",
-			local->local_id,
-			local->neigh ? local->neigh->neighIID4me : 0,
-			local->neigh && local->neigh->dhn->on ? cryptShaAsString(&local->neigh->dhn->on->nodeId) : DBG_NIL);
-		dbgf_sys(DBGT_ERR, "NONMATCHING local=%d <- neighIID4me=%d <- DHN=%s",
-			dhn->neigh && dhn->neigh->local ? dhn->neigh->local->local_id.h.u32[0] : 0,
-			dhn->neigh ? dhn->neigh->neighIID4me : 0,
-			cryptShaAsString(&dhn->on->nodeId));
-
-		if (dhn->neigh)
-			free_neigh_node(dhn->neigh);
-
-		if (local->neigh)
-			free_neigh_node(local->neigh);
-
-		cleanup_all(-502089);
-	}
-
-        assertion(-500954, (dhn->neigh));
-        assertion(-500953, (dhn->neigh->dhn == dhn));
-        assertion(-500952, (dhn->neigh->local->neigh == dhn->neigh));
-
-        assertion(-500951, (local->neigh));
-        assertion(-500050, (local->neigh->local == local));
-        assertion(-500949, (local->neigh->dhn->neigh == local->neigh));
 }
 
 
@@ -797,7 +654,7 @@ void purge_orig_router(struct orig_node *onlyOrig, LinkNode *onlyLink, IDM_T onl
                                 onlyLink ? onlyLink->k.myDev->label_cfg.str : DBG_NIL,
                                 only_useless,rt->mr.umetric,
                                 cryptShaAsString(&rt->local_key->local_id),
-                                rt->local_key && rt->local_key->neigh ? cryptShaAsString(&rt->local_key->neigh->dhn->on->nodeId) : "???");
+                                rt->local_key ? cryptShaAsString(&rt->local_key->dhn->on->nodeId) : "???");
 
                         if (on->best_rt_local == rt)
                                 on->best_rt_local = NULL;
@@ -909,8 +766,10 @@ void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T on
 
                                 dbgf_track(DBGT_INFO, "purging: local local_id=%X", cryptShaAsString(&linkDev->key.local_id));
 
-                                if (local->neigh)
-                                        free_neigh_node(local->neigh);
+				iid_purge_repos(&local->neighIID4x_repos);
+
+				local->dhn->local = NULL;
+				local->dhn = NULL;
 
                                 if (local->dev_adv)
                                         debugFree(local->dev_adv, -300339);
@@ -1000,8 +859,8 @@ void free_orig_node(struct orig_node *on)
         if ( on->dhn ) {
                 on->dhn->on = NULL;
 
-                if (on->dhn->neigh)
-                        free_neigh_node(on->dhn->neigh);
+                if (on->dhn->local)
+			purge_local_node(on->dhn->local);
 
                 release_dhash(on->dhn);
         }
@@ -1119,13 +978,16 @@ void init_self(void)
 
 
 STATIC_FUNC
-LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T link_sqn, LOCAL_ID_T *local_id, DEVADV_IDX_T dev_idx )
+LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T link_sqn, struct dhash_node *dhn, DEVADV_IDX_T dev_idx )
 {
         TRACE_FUNCTION_CALL;
+
+	LOCAL_ID_T *local_id = &dhn->on->nodeId;
 
 	dbgf_all(DBGT_INFO, "NB=%s local_id=%s dev_idx=0x%X", ip6AsStr(llip), cryptShaAsString(local_id), dev_idx);
 
 	assertion(-500000, (local_id && !is_zero(local_id, sizeof(LOCAL_ID_T))));
+	assertion(-500000, (dhn));
 
 	if (dev_idx < DEVADV_IDX_MIN)
 		return NULL;
@@ -1134,6 +996,10 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
 
 
         if (local) {
+		assertion(-500000, IMPLIES(dhn->local, dhn->local == local));
+		assertion(-500000, (cryptShasEqual(&local->local_id, &dhn->on->nodeId)));
+		assertion(-500517, (dhn != self->dhn));
+		assertion(-500390, (dhn && dhn->on && dhn->on->dhn == dhn));
 
                 if ((((LINKADV_SQN_T) (link_sqn - local->packet_link_sqn_ref)) > LINKADV_SQN_DAD_RANGE)) {
 
@@ -1145,7 +1011,7 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
 
                         assertion(-500984, (!avl_find_item(&local_tree, local_id)));
 
-                        return NULL;
+                        local = NULL;
                 }
         }
 
@@ -1169,9 +1035,11 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
                         purge_linkDevs(&linkDev->key, NULL, NO);
                         ASSERTION(-500213, !avl_find(&link_dev_tree, &linkDevKey));
                         linkDev = NULL;
+			local = avl_find_item(&local_tree, local_id);
                 }
+	}
 
-        } else {
+	if (!local) {
 
                 if (local_tree.items >= LOCALS_MAX) {
                         dbgf_sys(DBGT_WARN, "max number of locals reached");
@@ -1185,7 +1053,14 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
                 local->link_adv_msg_for_me = LINKADV_MSG_IGNORED;
                 local->link_adv_msg_for_him = LINKADV_MSG_IGNORED;
                 avl_insert(&local_tree, local, -300337);
-        }
+
+		assertion(-500000, (!dhn->local));
+		local->dhn = dhn;
+		dhn->local = local;
+
+		assertion(-500953, (dhn->local->dhn == dhn));
+		assertion(-500949, (local->dhn->local == local));
+	}
 
         local->packet_link_sqn_ref = link_sqn;
         local->packet_time = bmx_time;
@@ -1210,18 +1085,27 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
 
         linkDev->pkt_time_max = bmx_time;
 
+	assertion(-500000, (local));
+	assertion(-500000, (dhn->local == local));
+	assertion(-500000, (cryptShasEqual(&local->local_id, &dhn->on->nodeId)));
+        assertion(-500000, (dhn != self->dhn));
+        ASSERTION(-500000, (linkDev == avl_find_item(&local->linkDev_tree, &linkDev->key.dev_idx)));
+        assertion(-500000, (dhn && dhn->on && dhn->on->dhn == dhn));
+        assertion(-500000, (dhn->local->dhn == dhn));
+        assertion(-500000, (local->dhn->local == local));
+
         return linkDev;
 }
 
 
 
-LinkNode *getLinkNode(struct dev_node *dev, IPX_T *llip, LINKADV_SQN_T link_sqn, LOCAL_ID_T *local_id, DEVADV_IDX_T dev_idx)
+LinkNode *getLinkNode(struct dev_node *dev, IPX_T *llip, LINKADV_SQN_T link_sqn, struct dhash_node *verifiedLinkDhn, DEVADV_IDX_T dev_idx)
 {
         TRACE_FUNCTION_CALL;
 
         LinkNode *link = NULL;
 
-	LinkDevNode *linkDev = getLinkDevNode(dev, llip, link_sqn, local_id, dev_idx);
+	LinkDevNode *linkDev = getLinkDevNode(dev, llip, link_sqn, verifiedLinkDhn, dev_idx);
 
 	if (!linkDev)
 		return NULL;

@@ -28,7 +28,7 @@
  * from iid.h:
  */
 typedef uint16_t IID_T;
-typedef struct neigh_node IID_NEIGH_T;
+typedef struct local_node IID_NEIGH_T;
 typedef struct dhash_node IID_NODE_T;
 
 
@@ -277,6 +277,27 @@ typedef struct {
 } LinkNode;
 
 
+/*
+struct neigh_node {
+
+	struct neigh_node *nnkey;
+	struct dhash_node *dhn; // confirmed dhash
+
+	// filled in by ???:
+
+	IID_T neighIID4me;
+
+	struct iid_repos neighIID4x_repos;
+
+//	AGGREG_SQN_T ogm_aggregation_rcvd_set;
+        TIME_T ogm_new_aggregation_rcvd;
+	AGGREG_SQN_T ogm_aggregation_cleard_max;
+	uint8_t ogm_aggregations_not_acked[AGGREG_ARRAY_BYTE_SIZE];
+	uint8_t ogm_aggregations_rcvd[AGGREG_ARRAY_BYTE_SIZE];
+};
+*/
+
+
 struct local_node {
 
 	LOCAL_ID_T local_id;
@@ -284,7 +305,6 @@ struct local_node {
 	LinkNode *best_rp_link;
 	LinkNode *best_tp_link;
 	LinkNode *best_link;
-	struct neigh_node *neigh; // to be set when confirmed, use carefully
 
 	TIME_T packet_time;
 	LINKADV_SQN_T packet_link_sqn_ref; //indicating the maximum existing link_adv_sqn
@@ -307,6 +327,21 @@ struct local_node {
 	TIME_T rp_adv_time;
 	IDM_T rp_ogm_request_rcvd;
 	int32_t orig_routes;
+        
+        
+        
+        // the old neigh_node:
+	struct dhash_node *dhn;
+
+	IID_T neighIID4me;
+
+	struct iid_repos neighIID4x_repos;
+
+        TIME_T ogm_new_aggregation_rcvd;
+	AGGREG_SQN_T ogm_aggregation_cleard_max;
+	uint8_t ogm_aggregations_not_acked[AGGREG_ARRAY_BYTE_SIZE];
+	uint8_t ogm_aggregations_rcvd[AGGREG_ARRAY_BYTE_SIZE];
+        
 } __attribute__((packed));
 
 
@@ -328,26 +363,6 @@ struct router_node {
 
 
 
-
-struct neigh_node {
-
-	struct neigh_node *nnkey;
-	struct dhash_node *dhn; // confirmed dhash
-
-	struct local_node *local; // to be set when confirmed, use carefully
-
-	// filled in by ???:
-
-	IID_T neighIID4me;
-
-	struct iid_repos neighIID4x_repos;
-
-//	AGGREG_SQN_T ogm_aggregation_rcvd_set;
-        TIME_T ogm_new_aggregation_rcvd;
-	AGGREG_SQN_T ogm_aggregation_cleard_max;
-	uint8_t ogm_aggregations_not_acked[AGGREG_ARRAY_BYTE_SIZE];
-	uint8_t ogm_aggregations_rcvd[AGGREG_ARRAY_BYTE_SIZE];
-};
 
 
 
@@ -457,8 +472,7 @@ struct dhash_node {
 
 	TIME_T referred_by_me_timestamp; // last time this dhn was referred
 
-	struct neigh_node *neigh;
-
+        struct local_node *local;
 	IID_T myIID4orig;
 
 
@@ -535,7 +549,6 @@ extern struct avl_tree dhash_invalid_tree;
 extern struct avl_tree local_tree;
 extern struct avl_tree link_dev_tree;
 extern struct avl_tree link_tree;
-extern struct avl_tree neigh_tree;
 extern struct avl_tree orig_tree;
 
 
@@ -552,13 +565,12 @@ IID_NODE_T* iid_get_node_by_neighIID4x(IID_NEIGH_T *nn, IID_T neighIID4x, IDM_T 
 IID_NODE_T* iid_get_node_by_myIID4x( IID_T myIID4x );
 
 
-LinkNode *getLinkNode(struct dev_node *dev, IPX_T *llip, LINKADV_SQN_T link_sqn, LOCAL_ID_T *local_id, DEVADV_IDX_T dev_idx);
+LinkNode *getLinkNode(struct dev_node *dev, IPX_T *llip, LINKADV_SQN_T link_sqn, struct dhash_node *verifiedLinkDhn, DEVADV_IDX_T dev_idx);
 
 void blacklist_neighbor(struct packet_buff *pb);
 
 IDM_T blacklisted_neighbor(struct packet_buff *pb, DHASH_T *dhash);
 
-struct neigh_node *is_described_neigh(LinkDevNode *linkDev, DHASH_T *transmittersDhash);
 
 void purge_dhash_invalid_list( IDM_T force_purge_all );
 void invalidate_dhash( struct dhash_node *dhn, DHASH_T *dhash );
@@ -574,7 +586,6 @@ char *nodeIdAsStringFromDescAdv( uint8_t *desc_adv );
 void purge_local_node(struct local_node *local);
 void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T only_expired);
 
-void update_local_neigh(LinkNode *link, struct dhash_node *dhn);
 void update_neigh_dhash(struct orig_node *on, struct dhash_node *dhn);
 struct dhash_node* get_dhash_node(uint8_t *desc_frame, uint32_t desc_frame_len, struct desc_extension* dext, DHASH_T *dhash);
 

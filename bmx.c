@@ -861,9 +861,10 @@ static int32_t link_status_creator(struct status_handl *handl, void *data)
 
         for (local_it = NULL; (local = avl_iterate_item(&local_tree, &local_it));) {
 
-                struct orig_node *on = local->neigh ? local->neigh->dhn->on : NULL;
+                struct orig_node *on = local->dhn->on;
+		assertion(-500000, (on));
+                for (linkDev_it = NULL; (linkDev = avl_iterate_item(&local->linkDev_tree, &linkDev_it));) {
 
-                for (linkDev_it = NULL; on && (linkDev = avl_iterate_item(&local->linkDev_tree, &linkDev_it));) {
 			LinkNode *link = NULL;
 
                         while ((link = list_iterate(&linkDev->link_list, link))) {
@@ -885,7 +886,7 @@ static int32_t link_status_creator(struct status_handl *handl, void *data)
                                 status[i].lastHelloAdv = ((TIME_T) (bmx_time - linkDev->hello_time_max)) / 1000;
 
                                 status[i].nbLocalId = linkDev->key.local_id;
-                                status[i].nbIid4Me = local->neigh ? local->neigh->neighIID4me : 0;
+                                status[i].nbIid4Me = local->neighIID4me;
                                 status[i].linkAdv4Him = local->link_adv_msg_for_him;
                                 status[i].linkAdv4Me = local->link_adv_msg_for_me;
                                 status[i].devAdvSqn = local->dev_adv_sqn;

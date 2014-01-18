@@ -89,7 +89,7 @@ int prof_check(struct prof_ctx *p, int childs)
 		!p || (p->active_prof && p->active_childs == childs && prof_check(p->parent, 1) == SUCCESS))
 		return SUCCESS;
 
-	dbgf_sys(DBGT_ERR, "%s % %p", p->k.name, p->k.neigh, p->k.orig);
+	dbgf_sys(DBGT_ERR, "%s %p %p", p->k.name, p->k.neigh, p->k.orig);
 
 	return FAILURE;
 }
