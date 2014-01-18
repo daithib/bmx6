@@ -1400,7 +1400,7 @@ int32_t rx_msg_ref_request(struct rx_frame_iterator *it)
 	dbgf_sys(DBGT_INFO, "");
 
 	if (refn && refn->dext_tree.items)
-		schedule_tx_task(it->pb->i.link->k.linkDev->local->best_tp_link, FRAME_TYPE_REF_ADV, refn->f_body_len, &refn->rhash, sizeof(SHA1_T));
+		schedule_tx_task(&it->pb->i.iif->dummyLink, FRAME_TYPE_REF_ADV, refn->f_body_len, &refn->rhash, sizeof(SHA1_T));
 
 	return sizeof(struct msg_ref_req);
 }
@@ -1798,7 +1798,7 @@ resolve_ref_frame_error:
 struct dhash_node * process_description(struct packet_buff *pb, struct description_cache_node *cache, DHASH_T *dhash)
 {
         TRACE_FUNCTION_CALL;
-        assertion(-500262, (pb && pb->i.link->k.linkDev && cache && cache->desc_frame));
+        assertion(-500262, (pb && cache && cache->desc_frame));
         assertion(-500381, (!avl_find( &dhash_tree, dhash )));
 
 	// First check if dext is fully resolvable::
@@ -2346,10 +2346,11 @@ int32_t rx_frame_dev_adv( struct rx_frame_iterator *it)
         struct msg_dev_adv* adv = (struct msg_dev_adv*) it->msg;
 
         assertion(-500979, (adv == hdr->msg));
+	assertion(-500000, (it->pb->i.verifiedLink));
 
         uint16_t msgs = it->frame_msgs_length / sizeof (struct msg_dev_adv);
 
-        struct local_node *local = it->pb->i.link->k.linkDev->local;
+        struct local_node *local = it->pb->i.verifiedLink->k.linkDev->local;
 
         DEVADV_SQN_T dev_sqn = ntohs(hdr->dev_sqn);
 
@@ -2383,7 +2384,7 @@ int32_t rx_frame_dev_adv( struct rx_frame_iterator *it)
         } else if (local->dev_adv_sqn != dev_sqn) {
 
                 dbgf_track(DBGT_INFO, "new DEV_ADV from NB=%s local_id=0x%X dev=%s dev_sqn=%d->%d",
-                        it->pb->i.llip_str,  it->pb->i.link->k.linkDev->local->local_id , it->pb->i.iif->label_cfg.str,
+                        it->pb->i.llip_str,  local->local_id , it->pb->i.iif->label_cfg.str,
                         local->dev_adv_sqn, dev_sqn);
 
                 if (local->dev_adv)
@@ -2579,9 +2580,6 @@ int32_t rx_frame_link_adv( struct rx_frame_iterator *it)
 	LINKADV_SQN_T link_sqn = local->packet_link_sqn_ref;
         DEVADV_SQN_T dev_sqn_ref = ntohs(hdr->dev_sqn_ref);
 
-	assertion(-500000, (link_sqn == ntohs(it->pb->p.hdr.link_adv_sqn)));
-
-
 
         dbgf_all(DBGT_INFO, " ");
 
@@ -2692,11 +2690,7 @@ int32_t rx_frame_rp_adv(struct rx_frame_iterator *it)
 
         struct msg_rp_adv* adv = (struct msg_rp_adv*) it->msg;
 	struct local_node *local = it->pb->i.verifiedLink->k.linkDev->local;
-
 	LINKADV_SQN_T link_sqn = local->packet_link_sqn_ref;
-
-	assertion(-500000, (link_sqn == ntohs(it->pb->p.hdr.link_adv_sqn)));
-
         struct avl_node *link_an = NULL;
 	LinkDevNode *linkDev;
         LinkNode *link = NULL;
@@ -2851,9 +2845,6 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
         struct local_node *local = pb->i.verifiedLink->k.linkDev->local;
         struct neigh_node *neigh = pb->i.verifiedLink->k.linkDev->local->neigh;
 	LINKADV_SQN_T link_sqn = local->packet_link_sqn_ref;
-	
-	assertion(-500000, (link_sqn == ntohs(pb->p.hdr.link_adv_sqn)));
-
         uint8_t *ogm_destination_field = it->msg;
         AGGREG_SQN_T aggregation_sqn = hdr->aggregation_sqn;
         uint16_t ogm_dst_field_size = hdr->ogm_dst_field_size;
@@ -3080,12 +3071,7 @@ int32_t rx_frame_ogm_acks(struct rx_frame_iterator *it)
         struct packet_buff *pb = it->pb;
         struct local_node *local = pb->i.verifiedLink->k.linkDev->local;
         struct neigh_node *neigh = pb->i.verifiedLink->k.linkDev->local->neigh;
-
 	LINKADV_SQN_T link_sqn = local->packet_link_sqn_ref;
-
-	assertion(-500000, (link_sqn == ntohs(pb->p.hdr.link_adv_sqn)));
-
-
         uint16_t pos;
 
         if (!neigh)
@@ -3280,6 +3266,8 @@ int32_t rx_msg_dhash_request(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
+	assertion(-500000, (it->pb->i.verifiedLink));
+
         struct packet_buff *pb = it->pb;
         struct hdr_dhash_request *hdr = (struct hdr_dhash_request*) (it->frame_data);
         struct msg_dhash_request *msg = (struct msg_dhash_request*) (it->msg);
@@ -3311,7 +3299,7 @@ int32_t rx_msg_dhash_request(struct rx_frame_iterator *it)
 
         assertion(-500251, (dhn && dhn->myIID4orig == myIID4x));
 
-	schedule_tx_task(pb->i.link->k.linkDev->local->best_tp_link, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &myIID4x, sizeof(IID_T));
+	schedule_tx_task(pb->i.verifiedLink->k.linkDev->local->best_tp_link, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &myIID4x, sizeof(IID_T));
 
         // most probably the requesting node is also interested in my metric to the requested node:
         if (on->curr_rt_link && on->ogmSqn_next == on->ogmSqn_send &&
@@ -3352,7 +3340,7 @@ int32_t rx_msg_description_request(struct rx_frame_iterator *it)
 			return sizeof(struct msg_description_request);
 		}
 
-		LinkNode *linkNode = pb->i.verifiedLink ? pb->i.link->k.linkDev->local->best_tp_link : &pb->i.link->k.myDev->dummyLink;
+		LinkNode *linkNode = pb->i.verifiedLink ? pb->i.verifiedLink->k.linkDev->local->best_tp_link : &pb->i.iif->dummyLink;
 
 		schedule_tx_task(linkNode, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &msg->dhash, sizeof(DHASH_T));
 
@@ -3376,12 +3364,15 @@ STATIC_FUNC
 int32_t rx_msg_hello_adv(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-        struct packet_buff *pb = it->pb;
+	assertion(-500000, (it->pb->i.verifiedLink));
+
+	LinkNode *link = it->pb->i.verifiedLink;
         struct msg_hello_adv *msg = (struct msg_hello_adv*) (it->msg);
         HELLO_SQN_T hello_sqn = ntohs(msg->hello_sqn);
 
+
         dbgf_all(DBGT_INFO, "NB=%s via dev=%s SQN=%d",
-                pb->i.llip_str, pb->i.iif->label_cfg.str, hello_sqn);
+                it->pb->i.llip_str, it->pb->i.iif->label_cfg.str, hello_sqn);
 
         if (it->msg != it->frame_data) {
                 dbgf_sys(DBGT_WARN, "rcvd %d %s messages in frame_msgs_length=%d",
@@ -3389,15 +3380,15 @@ int32_t rx_msg_hello_adv(struct rx_frame_iterator *it)
                         packet_frame_db->handls[FRAME_TYPE_HELLO_ADV].name, it->frame_msgs_length);
         }
 
-        update_link_probe_record(pb->i.link, hello_sqn, 1);
+        update_link_probe_record(link, hello_sqn, 1);
 
 	// check if this link is currently ignored in our link_adv frames but
 	// is actually a reasonable good link which should be included so that
 	// also link_rp msgs could be send:
-        if (pb->i.link->link_adv_msg == LINKADV_MSG_IGNORED && (
-                pb->i.link == pb->i.link->k.linkDev->local->best_rp_link || // its our best link or
-                (pb->i.link->timeaware_rx_probe * LINKADV_ADD_RP_4DIF >= // its reasonable good compared to our best link
-                pb->i.link->k.linkDev->local->best_rp_link->timeaware_rx_probe * LINKADV_ADD_RP_4MAX)
+        if (link->link_adv_msg == LINKADV_MSG_IGNORED && (
+                link == link->k.linkDev->local->best_rp_link || // its our best link or
+                (link->timeaware_rx_probe * LINKADV_ADD_RP_4DIF >= // its reasonable good compared to our best link
+                link->k.linkDev->local->best_rp_link->timeaware_rx_probe * LINKADV_ADD_RP_4MAX)
                 )) {
 		// then: create new link_adv frame which includes this link.
                 update_my_link_adv(LINKADV_CHANGES_NEW);
@@ -3597,30 +3588,30 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                         dbgf_all(DBGT_INFO, "%s - type=%d process_filter=%d : IGNORED", it->caller, f_type, it->process_filter);
                         return TLV_RX_DATA_PROCESSED;
 
-                } else if (pb && f_handl->rx_tp_min &&
-                        (!pb->i.link || pb->i.link->timeaware_tx_probe < *(f_handl->rx_tp_min))) {
-
-                        dbg_mute(60, DBGL_CHANGES, DBGT_WARN, "%s - non-sufficient link %s - %s (tp=%ju), skipping type=%s",
-                                it->caller, pb->i.iif->ip_llocal_str, pb->i.llip_str,
-                                pb->i.link ? pb->i.link->timeaware_tx_probe : 0, f_handl->name);
-
-                        return TLV_RX_DATA_PROCESSED;
-
-                } else if (pb && f_handl->rx_rp_min &&
-                        (!pb->i.link || pb->i.link->timeaware_rx_probe < *(f_handl->rx_rp_min))) {
-
-                        dbg_mute(60, DBGL_CHANGES, DBGT_WARN, "%s - non-sufficient link %s - %s (rp=%ju), skipping type=%s",
-                                it->caller, pb->i.iif->ip_llocal_str, pb->i.llip_str,
-                                pb->i.link ? pb->i.link->timeaware_rx_probe : 0, f_handl->name);
-
-                        return TLV_RX_DATA_PROCESSED;
-
 		} else if (!(f_handl->rx_processUnVerifiedLink || it->db->rx_processUnVerifiedLink) && !pb->i.verifiedLink) {
 
 			dbgf_sys(DBGT_INFO, "%s - NON-VERIFIED link to dhash=%s neigh=%s, needed for frame type=%s db=%s",
 				it->caller, cryptShaAsString(&pb->p.hdr.dhash), pb->i.llip_str, f_handl->name, it->db->name);
 
 			return TLV_RX_DATA_PROCESSED;
+
+                } else if (pb && f_handl->rx_tp_min &&
+                        (!pb->i.verifiedLink || pb->i.verifiedLink->timeaware_tx_probe < *(f_handl->rx_tp_min))) {
+
+                        dbg_mute(60, DBGL_CHANGES, DBGT_WARN, "%s - non-sufficient link %s - %s (tp=%ju), skipping type=%s",
+                                it->caller, pb->i.iif->ip_llocal_str, pb->i.llip_str,
+                                pb->i.verifiedLink ? pb->i.verifiedLink->timeaware_tx_probe : 0, f_handl->name);
+
+                        return TLV_RX_DATA_PROCESSED;
+
+                } else if (pb && f_handl->rx_rp_min &&
+                        (!pb->i.verifiedLink || pb->i.verifiedLink->timeaware_rx_probe < *(f_handl->rx_rp_min))) {
+
+                        dbg_mute(60, DBGL_CHANGES, DBGT_WARN, "%s - non-sufficient link %s - %s (rp=%ju), skipping type=%s",
+                                it->caller, pb->i.iif->ip_llocal_str, pb->i.llip_str,
+                                pb->i.verifiedLink ? pb->i.verifiedLink->timeaware_rx_probe : 0, f_handl->name);
+
+                        return TLV_RX_DATA_PROCESSED;
 
                 } else if (it->op >= TLV_OP_PLUGIN_MIN && it->op <= TLV_OP_PLUGIN_MAX) {
 
@@ -4342,9 +4333,7 @@ void tx_packet(void *devp)
 
 				phdr->comp_version = my_compatibility;
 				phdr->dhash = self->dhn->dhash;
-				phdr->link_adv_sqn = htons(my_link_adv_sqn);
 				phdr->local_id = my_local_id;
-				phdr->dev_idx = dev->llip_key.idx;
 
 				cb_packet_hooks(&pb);
 
@@ -4740,12 +4729,6 @@ void rx_packet( struct packet_buff *pb )
         if (drop_all_frames)
                 goto finish;
 
-
-
-	
-	//TODO: purge pb->i.link usage
-        if (!(pb->i.link = getLinkNode(pb->i.iif, &pb->i.llip, ntohs(pb->p.hdr.link_adv_sqn), pb->p.hdr.local_id, pb->p.hdr.dev_idx )))
-                goto finish;
 
         dbgf_all(DBGT_INFO, "via %s %s %s size %d", iif->label_cfg.str, iif->ip_llocal_str, pb->i.llip_str, pb->i.length);
 

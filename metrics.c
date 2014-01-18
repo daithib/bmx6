@@ -977,6 +977,7 @@ IDM_T update_path_metrics(struct packet_buff *pb, struct orig_node *on, OGM_SQN_
         assertion(-500876, (!on->blocked));
         assertion(-500734, (on->path_metricalgo));
         assertion(-501052, ((((OGM_SQN_MASK)&(ogmSqn - on->ogmSqn_rangeMin)) < on->ogmSqn_rangeSize)));
+	assertion(-500000, (pb->i.verifiedLink));
 
         OGM_SQN_T ogm_sqn_max = UXX_GET_MAX(OGM_SQN_MASK, on->ogmSqn_maxRcvd, ogmSqn);
 
@@ -995,7 +996,7 @@ IDM_T update_path_metrics(struct packet_buff *pb, struct orig_node *on, OGM_SQN_
                 return SUCCESS;
         }
 
-        struct local_node *local = pb->i.link->k.linkDev->local;
+        struct local_node *local = pb->i.verifiedLink->k.linkDev->local;
         struct router_node *next_rt = NULL;
         struct router_node *prev_rt = on->curr_rt_local;
         IDM_T is_ogm_sqn_new = UXX_GT(OGM_SQN_MASK, ogmSqn, on->ogmSqn_maxRcvd);

@@ -484,8 +484,6 @@ struct packet_header
 
         //TODO: remove:...
 	LOCAL_ID_T local_id;         // 32
-	LINKADV_SQN_T link_adv_sqn;  // 16 used for processing: link_adv, lq_adv, rp_adv, ogm_adv, ogm_ack
-	DEVADV_IDX_T   dev_idx;      //  8
 
 } __attribute__((packed,__may_alias__));
 
@@ -508,8 +506,6 @@ struct packet_buff {
 		IPX_T llip;
 		char llip_str[INET6_ADDRSTRLEN];
                 
-                //remove:
-		LinkNode *link;
                 struct dhash_node *verifiedLinkDhn;
                 LinkNode *verifiedLink;
 //              LinkDevNode *linkDev;
