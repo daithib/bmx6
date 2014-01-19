@@ -54,6 +54,8 @@ static int32_t packetSigning = DEF_PACKET_SIGN;
 CRYPTKEY_T *my_PubKey = NULL;
 CRYPTKEY_T *my_PktKey = NULL;
 
+static int32_t my_PktKeyBitLen = 512;
+
 
 
 STATIC_FUNC
@@ -248,25 +250,32 @@ STATIC_FUNC
 int create_dsc_tlv_pktkey(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
+
+	if ((int) (sizeof(struct dsc_msg_pubkey) + (my_PktKeyBitLen/8)) > tx_iterator_cache_data_space_pref(it))
+		return TLV_TX_DATA_FULL;
+
 	static struct prof_ctx prof_create_dsc_tlv_pkt_pubkey = {.k={.name=__FUNCTION__}, .parent_name = "update_my_description"};
+	
 	prof_start(&prof_create_dsc_tlv_pkt_pubkey);
+
 	struct dsc_msg_pubkey *msg = ((struct dsc_msg_pubkey*) tx_iterator_cache_msg_ptr(it));
 
 	if (my_PktKey)
 		cryptKeyFree(&my_PktKey);
 
-	my_PktKey = cryptKeyMake(512);
+	my_PktKey = cryptKeyMake(my_PktKeyBitLen);
 
 	assertion(-502097, (my_PktKey));
 
-	if ((int) (sizeof(struct dsc_msg_pubkey) +my_PktKey->rawKeyLen) > tx_iterator_cache_data_space_pref(it))
-		return TLV_TX_DATA_FULL;
 
 	msg->type = my_PktKey->rawKeyType;
 
 	memcpy(msg->key, my_PktKey->rawKey, my_PktKey->rawKeyLen);
+
 	dbgf_track(DBGT_INFO, "added description rsa packet pubkey len=%d", my_PktKey->rawKeyLen);
+	
 	prof_stop(&prof_create_dsc_tlv_pkt_pubkey);
+	
 	return(sizeof(struct dsc_msg_pubkey) +my_PktKey->rawKeyLen);
 }
 
