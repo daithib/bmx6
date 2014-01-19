@@ -1258,7 +1258,7 @@ void bmx(void)
 
 	frequent_timeout = seldom_timeout = bmx_time;
 	
-        update_my_description_adv();
+        update_my_description();
 	
 	task_register(rand_num(bmx_time ? 0 : DEF_TX_DELAY), tx_packets, NULL, -300350);
 

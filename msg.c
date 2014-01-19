@@ -3225,7 +3225,7 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 		tlvHdr.u.tlv.length != sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) )
 		goto_error(finish, TLV_RX_DATA_FAILURE);
 
-	if (rhashHdr->compression || rhashHdr->reserved || rhashHdr->expanded_type != BMX_DSC_TLV_PUBKEY)
+	if (rhashHdr->compression || rhashHdr->reserved || rhashHdr->expanded_type != BMX_DSC_TLV_DSC_PUBKEY)
 		goto_error(finish, TLV_RX_DATA_FAILURE);
 
 	DHASH_T dhash;
@@ -4362,7 +4362,7 @@ void tx_packets( void *unused ) {
         // description may have changed (relevantly for ogm_aggregation)
         // during current call of task_next() in bmx() main loop
         if (my_description_changed)
-                update_my_description_adv();
+                update_my_description();
 
 	self->dhn->referred_by_me_timestamp = bmx_time;
 
@@ -4420,9 +4420,12 @@ void schedule_my_originator_message( void* unused )
 
 
 
-void update_my_description_adv(void)
+void update_my_description(void)
 {
         TRACE_FUNCTION_CALL;
+
+	static struct prof_ctx prof_update_my_description = {.k={.name=__FUNCTION__}, .parent_name = "main"};
+	prof_start(&prof_update_my_description);
 
 	assertion(-502082, (!terminating));
 
@@ -4514,6 +4517,7 @@ void update_my_description_adv(void)
 	assertion(-500000, (self == avl_find_item(&orig_tree, &self->nodeId)));
 
 	debugFree(frame_cache_array, -300585);
+	prof_stop(&prof_update_my_description);
 }
 
 

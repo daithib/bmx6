@@ -51,6 +51,11 @@ static int32_t descVerification = DEF_DESC_VERIFY;
 static int32_t packetVerification = DEF_PACKET_VERIFY;
 static int32_t packetSigning = DEF_PACKET_SIGN;
 
+CRYPTKEY_T *my_PubKey = NULL;
+CRYPTKEY_T *my_PktKey = NULL;
+
+
+
 STATIC_FUNC
 int create_packet_signature(struct tx_frame_iterator *it)
 {
@@ -136,41 +141,52 @@ int process_packet_signature(struct rx_frame_iterator *it)
 	char *goto_error_code = NULL;
 	int32_t sign_len = it->frame_data_length - sizeof(struct dsc_msg_signature);
 	struct dsc_msg_signature *msg = (struct dsc_msg_signature*)(it->frame_data);
-
 	uint8_t *data = it->frame_data + it->frame_data_length;
 	int32_t dataLen = it->frames_length - it->frames_pos;
-	CRYPTSHA1_T packetSha;
-
-	struct dsc_msg_pubkey *pkey_msg = dext_dptr(dhn->dext, BMX_DSC_TLV_PUBKEY);
-	CRYPTKEY_T *pkey_crypt = NULL;
+	CRYPTSHA1_T packetSha = {.h.u32={0}};
+	CRYPTKEY_T *pkey = NULL;
+	struct dsc_msg_pubkey *pkey_msg = NULL;
 
 	if ( !cryptKeyTypeAsString(msg->type) || cryptKeyLenByType(msg->type) != sign_len )
 		goto_error( finish, "1");
-
-	if ( !pkey_msg || !cryptKeyTypeAsString(pkey_msg->type) || cryptKeyLenByType(pkey_msg->type) != sign_len )
+	
+	if ( dataLen <= (int)sizeof(struct tlv_hdr))
 		goto_error( finish, "2");
 
-	if ( dataLen <= (int)sizeof(struct tlv_hdr))
+	if ( sign_len > (packetVerification/8) )
 		goto_error( finish, "3");
 
-	if ( sign_len > (packetVerification/8) )
+
+	if (dhn->local && dhn->local->pubKey) {
+		
+		pkey = dhn->local->pubKey;
+		
+	} else if ((pkey_msg = dext_dptr(dhn->dext, BMX_DSC_TLV_DSC_PUBKEY))) {
+
+		pkey = cryptPubKeyFromRaw(pkey_msg->key, cryptKeyLenByType(pkey_msg->type));
+	}
+
+	if (!pkey)
+		goto_error( finish, "3");
+
+	if ( cryptKeyLenByType(pkey->rawKeyLen) != sign_len )
 		goto_error( finish, "4");
+
+	assertion(-500000, (pkey && cryptPubKeyCheck(pkey)));
 
 	cryptShaNew(&it->pb->i.llip, sizeof(IPX_T));
 	cryptShaUpdate(data, dataLen);
 	cryptShaFinal(&packetSha);
 
-	pkey_crypt = cryptPubKeyFromRaw(pkey_msg->key, sign_len);
-
-	if (cryptVerify(msg->signature, sign_len, &packetSha, pkey_crypt) != SUCCESS )
-		goto_error( finish, "5");
+	if (cryptVerify(msg->signature, sign_len, &packetSha, pkey) != SUCCESS )
+		goto_error( finish, "6");
 
 	it->pb->i.verifiedLinkDhn = dhn;
 
 
 
 finish:{
-		dbgf(goto_error_code ? DBGL_SYS : DBGL_ALL, goto_error_code ? DBGT_ERR : DBGT_INFO,
+	dbgf(goto_error_code ? DBGL_SYS : DBGL_ALL, goto_error_code ? DBGT_ERR : DBGT_INFO,
 		"%s verifying  data_len=%d data_sha=%s \n"
 		"sign_len=%d signature=%s\n"
 		"pkey_type=%s pkey_len=%d pkey=%s \n"
@@ -178,10 +194,11 @@ finish:{
 		goto_error_code?"Failed":"Succeeded", dataLen, cryptShaAsString(&packetSha),
 		sign_len, memAsHexString(msg->signature, sign_len),
 		pkey_msg ? cryptKeyTypeAsString(pkey_msg->type) : "---", pkey_msg ? cryptKeyLenByType(pkey_msg->type) : 0,
-		pkey_crypt ? memAsHexString(pkey_crypt->rawKey, pkey_crypt->rawKeyLen) : "---",
+		pkey ? memAsHexString(pkey->rawKey, pkey->rawKeyLen) : "---",
 		goto_error_code);
 
-	cryptKeyFree(&pkey_crypt);
+	if (pkey && (!dhn->local || dhn->local->pubKey))
+			cryptKeyFree(&pkey);
 
 	if (goto_error_code) {
 
@@ -214,42 +231,103 @@ int create_dsc_tlv_pubkey(struct tx_frame_iterator *it)
 
 	assertion(-502097, (my_PubKey));
 
-        if ((int)(sizeof(struct dsc_msg_pubkey) + my_PubKey->rawKeyLen) > tx_iterator_cache_data_space_pref(it))
-		return TLV_TX_DATA_FULL;
-
 	struct dsc_msg_pubkey *msg = ((struct dsc_msg_pubkey*) tx_iterator_cache_msg_ptr(it));
+
+	if ((int) (sizeof(struct dsc_msg_pubkey) +my_PubKey->rawKeyLen) > tx_iterator_cache_data_space_pref(it))
+		return TLV_TX_DATA_FULL;
 
 	msg->type = my_PubKey->rawKeyType;
 
 	memcpy(msg->key, my_PubKey->rawKey, my_PubKey->rawKeyLen);
-	dbgf_track(DBGT_INFO, "added description rsa pubkey len=%d", my_PubKey->rawKeyLen);
+	dbgf_track(DBGT_INFO, "added description rsa description pubkey len=%d", my_PubKey->rawKeyLen);
 
-	return (sizeof(struct dsc_msg_pubkey) + my_PubKey->rawKeyLen);
+	return(sizeof(struct dsc_msg_pubkey) +my_PubKey->rawKeyLen);
 }
+
+STATIC_FUNC
+int create_dsc_tlv_pktkey(struct tx_frame_iterator *it)
+{
+        TRACE_FUNCTION_CALL;
+	static struct prof_ctx prof_create_dsc_tlv_pkt_pubkey = {.k={.name=__FUNCTION__}, .parent_name = "update_my_description"};
+	prof_start(&prof_create_dsc_tlv_pkt_pubkey);
+	struct dsc_msg_pubkey *msg = ((struct dsc_msg_pubkey*) tx_iterator_cache_msg_ptr(it));
+
+	if (my_PktKey)
+		cryptKeyFree(&my_PktKey);
+
+	my_PktKey = cryptKeyMake(512);
+
+	assertion(-502097, (my_PktKey));
+
+	if ((int) (sizeof(struct dsc_msg_pubkey) +my_PktKey->rawKeyLen) > tx_iterator_cache_data_space_pref(it))
+		return TLV_TX_DATA_FULL;
+
+	msg->type = my_PktKey->rawKeyType;
+
+	memcpy(msg->key, my_PktKey->rawKey, my_PktKey->rawKeyLen);
+	dbgf_track(DBGT_INFO, "added description rsa packet pubkey len=%d", my_PktKey->rawKeyLen);
+	prof_stop(&prof_create_dsc_tlv_pkt_pubkey);
+	return(sizeof(struct dsc_msg_pubkey) +my_PktKey->rawKeyLen);
+}
+
+
 
 STATIC_FUNC
 int process_dsc_tlv_pubkey(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-//	return TLV_RX_DATA_IGNORED;
-
 	char *goto_error_code = NULL;
-	
-	if (it->op != TLV_OP_TEST )
+	CRYPTKEY_T *pkey = NULL;
+	int32_t key_len = -1;
+	struct dsc_msg_pubkey *msg = NULL;
+	if (it->op == TLV_OP_TEST ) {
+
+		key_len = it->frame_data_length - sizeof(struct dsc_msg_pubkey);
+		msg = (struct dsc_msg_pubkey*) (it->frame_data);
+
+		if (!cryptKeyTypeAsString(msg->type) || cryptKeyLenByType(msg->type) != key_len)
+			goto_error(finish, "1");
+
+		if ((pkey = cryptPubKeyFromRaw(msg->key, key_len)))
+			goto_error(finish, "2");
+
+		if (!cryptPubKeyCheck(pkey))
+			goto_error(finish, "3");
+
+	} else if (it->op == TLV_OP_DEL && it->frame_type == BMX_DSC_TLV_PKT_PUBKEY &&
+		it->onOld && it->onOld->dhn->local) {
+
+		if (it->onOld->dhn->local->pubKey)
+			cryptKeyFree(&it->onOld->dhn->local->pubKey);
+
 		return it->frame_data_length;
 
-	int32_t key_len = it->frame_data_length - sizeof(struct dsc_msg_pubkey);
-	struct dsc_msg_pubkey *msg = (struct dsc_msg_pubkey*)(it->frame_data);
+	} else if (it->op == TLV_OP_NEW && it->frame_type == BMX_DSC_TLV_PKT_PUBKEY &&
+		it->onOld && it->onOld->dhn->local) {
 
-	if ( !cryptKeyTypeAsString(msg->type) || cryptKeyLenByType(msg->type) != key_len )
-		goto_error( finish, "1");
+		assertion(-500000, (!it->onOld->dhn->local->pubKey));
+
+		struct dsc_msg_pubkey *msg = dext_dptr(it->onOld->dhn->dext, BMX_DSC_TLV_PKT_PUBKEY);
+
+		assertion(-500000, (msg));
+
+		it->onOld->dhn->local->pubKey = cryptPubKeyFromRaw(msg->key, cryptKeyLenByType(msg->type));
+
+		return it->frame_data_length;
+	} else {
+
+		return it->frame_data_length;
+	}
 
 finish: {
 	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
-		"%s %s verifying msg_type=%s msg_key_len=%d == key_len=%d problem?=%s",
-		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", cryptKeyTypeAsString(msg->type),
-		cryptKeyLenByType(msg->type), key_len, goto_error_code);
+		"%s %s verifying %s type=%s msg_key_len=%d == key_len=%d problem?=%s",
+		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", it->handl->name,
+		cryptKeyTypeAsString(msg->type), cryptKeyLenByType(msg->type), key_len, goto_error_code);
+
+	if (pkey)
+		cryptKeyFree(&pkey);
 
 	if (goto_error_code)
 		return TLV_RX_DATA_FAILURE;
@@ -266,7 +344,7 @@ int create_dsc_tlv_signature(struct tx_frame_iterator *it)
 	static struct dsc_msg_signature *desc_msg = NULL;
 	static int32_t dataOffset = 0;
 
-	if (it->frame_type==BMX_DSC_TLV_SIGNATURE) {
+	if (it->frame_type==BMX_DSC_TLV_DSC_SIGNATURE) {
 
 		assertion(-502098, (!desc_msg && !dataOffset));
 
@@ -280,7 +358,7 @@ int create_dsc_tlv_signature(struct tx_frame_iterator *it)
 		assertion(-502099, (it->frame_type == BMX_DSC_TLV_SIGNATURE_DUMMY));
 		assertion(-502100, (desc_msg && dataOffset));
 		assertion(-502101, (it->frames_out_pos > dataOffset));
-		assertion(-502102, (dext_dptr(it->dext, BMX_DSC_TLV_SIGNATURE)));
+		assertion(-502102, (dext_dptr(it->dext, BMX_DSC_TLV_DSC_SIGNATURE)));
 
 		int32_t dataLen = it->frames_out_pos - dataOffset;
 		uint8_t *data = it->frames_out_ptr + dataOffset;
@@ -289,7 +367,7 @@ int create_dsc_tlv_signature(struct tx_frame_iterator *it)
 		cryptShaAtomic(data, dataLen, &dataSha);
 		size_t keySpace = my_PubKey->rawKeyLen;
 
-		struct dsc_msg_signature *dext_msg = dext_dptr(it->dext, BMX_DSC_TLV_SIGNATURE);
+		struct dsc_msg_signature *dext_msg = dext_dptr(it->dext, BMX_DSC_TLV_DSC_SIGNATURE);
 
 		dext_msg->type = my_PubKey->rawKeyType;
 		cryptSign(&dataSha, dext_msg->signature, keySpace);
@@ -329,8 +407,8 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 	uint8_t *data = (uint8_t*)it->dhnNew->desc_frame + dataOffset;
 	int32_t dataLen = it->dhnNew->desc_frame_len - dataOffset;
 	CRYPTSHA1_T desc_sha;
-	CRYPTKEY_T *pkey_crypt = NULL;
-	struct dsc_msg_pubkey *pkey_msg = dext_dptr(it->dhnNew->dext, BMX_DSC_TLV_PUBKEY);
+	CRYPTKEY_T *pkey = NULL;
+	struct dsc_msg_pubkey *pkey_msg = dext_dptr(it->dhnNew->dext, BMX_DSC_TLV_DSC_PUBKEY);
 
 	if ( !cryptKeyTypeAsString(msg->type) || cryptKeyLenByType(msg->type) != sign_len )
 		goto_error( finish, "1");
@@ -346,17 +424,22 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 
 	cryptShaAtomic(data, dataLen, &desc_sha);
 
-	pkey_crypt = cryptPubKeyFromRaw(pkey_msg->key, sign_len);
+	if ((pkey = cryptPubKeyFromRaw(pkey_msg->key, sign_len)))
+		goto_error(finish, "5");
 
-	if (cryptVerify(msg->signature, sign_len, &desc_sha, pkey_crypt) != SUCCESS )
-		goto_error( finish, "5");
+	assertion(-500000, (pkey && cryptPubKeyCheck(pkey)));
+
+	if (!pkey)
+
+	if (cryptVerify(msg->signature, sign_len, &desc_sha, pkey) != SUCCESS )
+		goto_error( finish, "7");
 	
 	clock_t clock_after = (TIME_T)clock();
 	static clock_t clock_total;
 	clock_t clock_diff = (clock_after - clock_before);
 	clock_total += clock_diff
 	dbgf_sys(DBGT_INFO, "verified %s description signature in time=%d verified_total=%d total=%d",
-		cryptKeyTypeAsString(pkey_crypt->rawKeyType), clock_diff, clock_total, clock_after);
+		cryptKeyTypeAsString(pkey->rawKeyType), clock_diff, clock_total, clock_after);
 	
 finish: {
 	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
@@ -367,10 +450,10 @@ finish: {
 		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", dataLen, cryptShaAsString(&desc_sha),
 		sign_len, memAsHexString(msg->signature, sign_len),
 		pkey_msg ? cryptKeyTypeAsString(pkey_msg->type) : "---", pkey_msg ? cryptKeyLenByType(pkey_msg->type) : 0,
-		pkey_crypt ? memAsHexString(pkey_crypt->rawKey, pkey_crypt->rawKeyLen) : "---",
+		pkey ? memAsHexString(pkey->rawKey, pkey->rawKeyLen) : "---",
 		goto_error_code);
 	
-	cryptKeyFree(&pkey_crypt);
+	cryptKeyFree(&pkey);
 	
 	if (goto_error_code && sign_len > (descVerification/8))
 		return TLV_RX_DATA_REJECTED;
@@ -616,7 +699,7 @@ void init_sec( void )
         handl.tx_frame_handler = create_dsc_tlv_pubkey;
         handl.rx_frame_handler = process_dsc_tlv_pubkey;
 	handl.msg_format = pubkey_format;
-        register_frame_handler(description_tlv_db, BMX_DSC_TLV_PUBKEY, &handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_DSC_PUBKEY, &handl);
 
         handl.name = "DSC_SIGNATURE";
 	handl.is_mandatory = 1;
@@ -627,7 +710,7 @@ void init_sec( void )
         handl.tx_frame_handler = create_dsc_tlv_signature;
         handl.rx_frame_handler = process_dsc_tlv_signature;
 	handl.msg_format = signature_format;
-        register_frame_handler(description_tlv_db, BMX_DSC_TLV_SIGNATURE, &handl);
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_DSC_SIGNATURE, &handl);
 
         handl.name = "DSC_SIGNATURE_DUMMY";
 	handl.rx_processUnVerifiedLink = 1;
@@ -652,6 +735,18 @@ void init_sec( void )
         handl.tx_frame_handler = create_dsc_tlv_sha;
         handl.rx_frame_handler = process_dsc_tlv_sha;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_SHA_DUMMY, &handl);
+
+
+        handl.name = "DSC_PKT_PUBKEY";
+	handl.is_mandatory = 0;
+        handl.min_msg_size = sizeof(struct dsc_msg_pubkey);
+        handl.fixed_msg_size = 0;
+	handl.dextReferencing = (int32_t*)&never_fref;
+	handl.dextCompression = (int32_t*)&never_fzip;
+        handl.tx_frame_handler = create_dsc_tlv_pktkey;
+        handl.rx_frame_handler = process_dsc_tlv_pubkey;
+	handl.msg_format = pubkey_format;
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_PKT_PUBKEY, &handl);
 }
 
 void cleanup_sec( void )

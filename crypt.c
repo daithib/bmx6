@@ -551,10 +551,10 @@ CRYPTKEY_T *cryptPubKeyFromRaw( uint8_t *rawKey, uint16_t rawKeyLen ) {
 
 	if (
 		(mpi_read_binary(&rsa->N, rawKey, rawKeyLen)) ||
-		(mpi_read_binary(&rsa->E, (uint8_t*)&e, sizeof(e))) ||
-		(rsa_check_pubkey( rsa )) ) {
+		(mpi_read_binary(&rsa->E, (uint8_t*)&e, sizeof(e)))
+		 ) {
 		cryptKeyFree(&cryptKey);
-		cleanup_all(-500000);
+		return NULL;
 	}
 
 	rsa->len = rawKeyLen;
@@ -565,6 +565,16 @@ CRYPTKEY_T *cryptPubKeyFromRaw( uint8_t *rawKey, uint16_t rawKeyLen ) {
 	memcpy(cryptKey->rawKey, rawKey, rawKeyLen);
 
 	return cryptKey;
+}
+
+int cryptPubKeyCheck( CRYPTKEY_T *pubKey) {
+	assertion(-500000, (pubKey->backendKey));
+	rsa_context *rsa = (rsa_context*)pubKey->backendKey;
+
+	if (rsa->len != pubKey->rawKeyLen || rsa_check_pubkey((rsa_context*)pubKey->backendKey))
+		return FAILURE;
+
+	return SUCCESS;
 }
 
 STATIC_FUNC

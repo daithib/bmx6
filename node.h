@@ -311,6 +311,7 @@ struct neigh_node {
         
         // the old neigh_node:
 	struct dhash_node *dhn;
+        CRYPTKEY_T *pubKey;
 
 	IID_T neighIID4me;
 
@@ -516,9 +517,6 @@ struct packet_buff {
 
 
 extern struct orig_node *self;
-
-extern CRYPTKEY_T *my_PubKey;
-
 
 extern struct iid_repos my_iid_repos;
 

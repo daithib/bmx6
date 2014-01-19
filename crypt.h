@@ -90,6 +90,8 @@ CRYPTKEY_T *cryptKeyMake( int32_t keyBitSize );
 
 CRYPTKEY_T *cryptKeyFromDer( char *tmp_path );
 CRYPTKEY_T *cryptPubKeyFromRaw( uint8_t *rawKey, uint16_t rawKeyLen );
+int cryptPubKeyCheck( CRYPTKEY_T *pubKey);
+
 void cryptKeyFree( CRYPTKEY_T **key );
 
 int cryptEncrypt( uint8_t *in, size_t inLen, uint8_t *out, size_t *outLen, CRYPTKEY_T *pubKey);

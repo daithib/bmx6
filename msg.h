@@ -585,10 +585,11 @@ struct msg_ref_req {
 
 
 #define BMX_DSC_TLV_RHASH           0x00
-#define BMX_DSC_TLV_PUBKEY          0x01
-#define BMX_DSC_TLV_SIGNATURE       0x02
+#define BMX_DSC_TLV_DSC_PUBKEY      0x01
+#define BMX_DSC_TLV_DSC_SIGNATURE   0x02
 #define BMX_DSC_TLV_VERSION         0x03
 #define BMX_DSC_TLV_SHA             0x04
+#define BMX_DSC_TLV_PKT_PUBKEY      0x05
 
 #define BMX_DSC_TLV_NAMES           0x07
 #define BMX_DSC_TLV_METRIC          0x08
@@ -905,7 +906,7 @@ extern struct frame_db *description_tlv_db;
 
 void schedule_best_tp_links(struct neigh_node *except_local, uint16_t frame_type, int16_t frame_msgs_len, void *data, uint32_t dlen);
 OGM_SQN_T set_ogmSqn_toBeSend_and_aggregated(struct orig_node *on, UMETRIC_T um, OGM_SQN_T to_be_send, OGM_SQN_T aggregated);
-void update_my_description_adv( void );
+void update_my_description( void );
 void update_my_dev_adv(void);
 void update_my_link_adv(uint32_t changes);
 

@@ -56,8 +56,6 @@ IDM_T my_description_changed = YES;
 
 struct orig_node *self = NULL;
 
-CRYPTKEY_T *my_PubKey = NULL;
-
 
 
 
@@ -771,6 +769,9 @@ void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T on
 				local->dhn->local = NULL;
 				local->dhn = NULL;
 
+				if (local->pubKey)
+					cryptKeyFree(&local->pubKey);
+
                                 if (local->dev_adv)
                                         debugFree(local->dev_adv, -300339);
 
@@ -929,7 +930,7 @@ SHA1_T *nodeIdFromDescAdv( uint8_t *desc_adv )
 
 	assertion( -502091, (tlvHdr.u.tlv.type == BMX_DSC_TLV_RHASH ));
 	assertion( -502092, (tlvHdr.u.tlv.length == sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) ));
-	assertion( -502093, (!rhashHdr->compression && !rhashHdr->reserved && rhashHdr->expanded_type == BMX_DSC_TLV_PUBKEY));
+	assertion( -502093, (!rhashHdr->compression && !rhashHdr->reserved && rhashHdr->expanded_type == BMX_DSC_TLV_DSC_PUBKEY));
 
 	return &rhashHdr->msg->rframe_hash;
 }
@@ -1057,6 +1058,11 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
 		assertion(-500000, (!dhn->local));
 		local->dhn = dhn;
 		dhn->local = local;
+
+		struct dsc_msg_pubkey *pkey_msg = dext_dptr(dhn->dext, BMX_DSC_TLV_PKT_PUBKEY);
+
+		if (pkey_msg)
+			local->pubKey = cryptPubKeyFromRaw(pkey_msg->key, cryptKeyLenByType(pkey_msg->type));
 
 		assertion(-500953, (dhn->local->dhn == dhn));
 		assertion(-500949, (local->dhn->local == local));
