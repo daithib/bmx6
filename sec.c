@@ -322,7 +322,7 @@ int process_dsc_tlv_pubkey(struct rx_frame_iterator *it)
 
 		assertion(-500000, (!it->onOld->dhn->local->pktKey));
 
-		msg = dext_dptr(it->onOld->dhn->dext, BMX_DSC_TLV_PKT_PUBKEY);
+		msg = dext_dptr(it->dhnNew->dext, BMX_DSC_TLV_PKT_PUBKEY);
 		assertion(-500000, (msg));
 
 		it->onOld->dhn->local->pktKey = cryptPubKeyFromRaw(msg->key, cryptKeyLenByType(msg->type));
