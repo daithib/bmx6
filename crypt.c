@@ -609,7 +609,7 @@ void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
 	dbgf_sys(DBGT_INFO, "mpi_size=%d rawLen=%d rawBuff:\n%s",
 		mpi_size( &rsa->N ), rawLen, memAsHexStringSep(rawStart, rawLen, 16, "\n"));
 
-	cryptKey->rawKey = debugMalloc(rawLen, -300000);
+	cryptKey->rawKey = debugMalloc(rawLen, -300641);
 	memcpy(cryptKey->rawKey, rawStart, rawLen);
 	cryptKey->rawKeyLen = rawLen;
 	cryptKey->rawKeyType = cryptKeyTypeByLen(rawLen);
@@ -747,9 +747,9 @@ CRYPTKEY_T *cryptKeyMake( int32_t keyBitSize ) {
 
 	int ret = 0;
 	char *goto_error_code = NULL;
-	CRYPTKEY_T *key = debugMallocReset(sizeof(CRYPTKEY_T), -300000);
+	CRYPTKEY_T *key = debugMallocReset(sizeof(CRYPTKEY_T), -300642);
 
-	rsa_context *rsa = debugMallocReset(sizeof(rsa_context), -300000);
+	rsa_context *rsa = debugMallocReset(sizeof(rsa_context), -300643);
 	rsa_init(rsa, RSA_PKCS_V15, 0);
 
         if ((ret = rsa_gen_key( rsa, ctr_drbg_random, &ctr_drbg, keyBitSize, CRYPT_KEY_E_VAL )))

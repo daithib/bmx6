@@ -52,13 +52,13 @@ void prof_init( struct prof_ctx *sp)
 
 		assertion(-502116, (pp));
 
-		avl_insert(&pp->childs_tree, sp, -300000);
+		avl_insert(&pp->childs_tree, sp, -300644);
 		sp->parent = pp;
 	}
 
 	AVL_INIT_TREE(sp->childs_tree, struct prof_ctx, k);
 
-	avl_insert(&prof_tree, sp, -300000);
+	avl_insert(&prof_tree, sp, -300645);
 	sp->initialized = 1;
 
 }
@@ -73,10 +73,10 @@ void prof_free( struct prof_ctx *p)
 
 	p->initialized = 0;
 	
-	avl_remove(&prof_tree, &p->k, -300000);
+	avl_remove(&prof_tree, &p->k, -300646);
 
 	if (p->parent)
-		avl_remove(&(p->parent->childs_tree), &p->k, -300000);
+		avl_remove(&(p->parent->childs_tree), &p->k, -300647);
 
 }
 
@@ -172,7 +172,7 @@ void prof_update_all( void *unused) {
 
 	timeAfterPrevPeriod = timeAfterRunningPeriod;
 
-	task_register(5000, prof_update_all, NULL, -300000);
+	task_register(5000, prof_update_all, NULL, -300648);
 }
 
 
@@ -291,7 +291,7 @@ void init_prof( void )
 {
 	register_status_handl(sizeof (struct prof_status), 1, prof_status_format, "cpu", prof_status_creator);
 
-	task_register(5000, prof_update_all, NULL, -300000);
+	task_register(5000, prof_update_all, NULL, -300649);
 
 }
 
@@ -303,8 +303,8 @@ void cleanup_prof(void)
 
 	for (it = NULL; (pn = avl_iterate_item(&prof_tree, &it));) {
 		pn->parent = NULL;
-		while ((avl_remove_first_item(&(pn->childs_tree), -300000)));
+		while ((avl_remove_first_item(&(pn->childs_tree), -300650)));
         }
 
-	while ((avl_remove_first_item(&prof_tree, -300000)));
+	while ((avl_remove_first_item(&prof_tree, -300651)));
 }
