@@ -86,10 +86,11 @@ STATIC_FUNC
 int prof_check(struct prof_ctx *p, int childs)
 {
 	if (prof_check_disabled ||
-		!p || (p->active_prof && p->active_childs == childs && prof_check(p->parent, 1) == SUCCESS))
+		!p || (p->active_prof && !!p->active_childs == childs && prof_check(p->parent, 1) == SUCCESS))
 		return SUCCESS;
 
-	dbgf_sys(DBGT_ERR, "%s %s %p %p %p", p->k.func, p->name, p->parent_func, p->k.neigh, p->k.orig);
+	dbgf_sys(DBGT_ERR, "func=%p name=%s parent_func=%p neigh=%p orig=%p parent_active_childs=%d childs=%d",
+		p->k.func, p->name, p->parent_func, p->k.neigh, p->k.orig, p->active_childs, childs);
 
 	return FAILURE;
 }
