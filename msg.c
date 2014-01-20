@@ -3211,7 +3211,7 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
         assertion(-500550, (it->frame_msgs_length >= ((int) sizeof (struct dsc_msg_version))));
 
 	int32_t goto_error_code;
-	static struct prof_ctx prof_rx_frame_description_adv = { .k={.name="rx_frame_description_adv"}, .parent_name="rx_packet"};
+	static struct prof_ctx prof_rx_frame_description_adv = { .k={.func=(void(*)(void))rx_frame_description_adv}, .name=__FUNCTION__, .parent_func=(void (*) (void))rx_packet};
 
 	prof_start(&prof_rx_frame_description_adv);
 
@@ -4132,8 +4132,8 @@ void tx_packet(void *devp)
         static uint8_t cache_data_array[PKT_FRAMES_SIZE_MAX - sizeof(struct tlv_hdr)] = {0};
         static struct packet_buff pb;
         struct dev_node *dev = devp;
-
-	static struct prof_ctx prof_tx_packet = { .k = {.name="tx_packet"}, .parent_name="main"};
+	extern int main(int argc, char *argv[]);
+	static struct prof_ctx prof_tx_packet = { .k = {.func=(void(*)(void))tx_packet}, .name=__FUNCTION__, .parent_func=(void (*) (void))main};
 	prof_start(&prof_tx_packet);
 
         assertion(-500204, (dev));
@@ -4423,8 +4423,8 @@ void schedule_my_originator_message( void* unused )
 void update_my_description(void)
 {
         TRACE_FUNCTION_CALL;
-
-	static struct prof_ctx prof_update_my_description = {.k={.name=__FUNCTION__}, .parent_name = "main"};
+	extern int main(int argc, char *argv[]);
+	static struct prof_ctx prof_update_my_description = {.k={.func=(void(*)(void))update_my_description}, .name=__FUNCTION__, .parent_func = (void (*) (void))main};
 	prof_start(&prof_update_my_description);
 
 	assertion(-502082, (!terminating));
@@ -4673,7 +4673,9 @@ void rx_packet( struct packet_buff *pb )
 {
         TRACE_FUNCTION_CALL;
 
-	static struct prof_ctx prof_rx_packet = { .k={.name="rx_packet"}, .parent_name="main"};
+
+	extern int main(int argc, char *argv[]);
+	static struct prof_ctx prof_rx_packet = { .k={.func=(void(*)(void))rx_packet}, .name=__FUNCTION__, .parent_func= (void (*) (void))main};
 	prof_start(&prof_rx_packet);
 
         struct dev_node *iif = pb->i.iif;

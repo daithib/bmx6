@@ -42,12 +42,12 @@ static AVL_TREE(prof_tree, struct prof_ctx, k);
 void prof_init( struct prof_ctx *sp)
 {
 	assertion(-502112, (!sp->initialized));
-	assertion(-502113, (sp && sp->k.name && strlen(sp->k.name)< 100));
+	assertion(-502113, (sp && sp->k.func && sp->name && strlen(sp->name)< 100));
 	assertion(-502114, (!(sp->k.orig && sp->k.neigh)));
 	assertion(-502115, (!avl_find_item(&prof_tree, &sp->k)));
 
-	if (sp->parent_name) {
-		struct prof_ctx_key pk = {.name=sp->parent_name};
+	if (sp->parent_func) {
+		struct prof_ctx_key pk = {.func=sp->parent_func};
 		struct prof_ctx *pp = avl_find_item(&prof_tree, &pk);
 
 		assertion(-502116, (pp));
@@ -89,7 +89,7 @@ int prof_check(struct prof_ctx *p, int childs)
 		!p || (p->active_prof && p->active_childs == childs && prof_check(p->parent, 1) == SUCCESS))
 		return SUCCESS;
 
-	dbgf_sys(DBGT_ERR, "%s %p %p", p->k.name, p->k.neigh, p->k.orig);
+	dbgf_sys(DBGT_ERR, "%s %s %p %p %p", p->k.func, p->name, p->parent_func, p->k.neigh, p->k.orig);
 
 	return FAILURE;
 }
@@ -154,7 +154,7 @@ void prof_update_all( void *unused) {
 
 		uint8_t active = pn->active_prof;
 
-		dbgf_all(DBGT_INFO, "updating %s active=%d", pn->k.name, active);
+		dbgf_all(DBGT_INFO, "updating %s active=%d", pn->name, active);
 
 		if (active)
 			prof_stop(pn);
@@ -205,12 +205,12 @@ static const struct field_format prof_status_format[] = {
 STATIC_FUNC
 struct prof_status *prof_status_iterate(struct prof_ctx *pn, struct prof_status *status)
 {
-	dbgf_all(DBGT_INFO, "dbg pn=%s status=%p", pn->k.name, status);
+	dbgf_all(DBGT_INFO, "dbg pn=%s status=%p", pn->name, status);
 
 	status->neighId = pn->k.neigh ? &pn->k.neigh->dhn->on->nodeId : NULL;
 	status->origId = &pn->k.orig ? &pn->k.orig->nodeId : NULL;
-	status->parent = pn->parent ? pn->parent->k.name : NULL;
-	status->name = pn->k.name;
+	status->parent = pn->parent ? pn->parent->name : NULL;
+	status->name = pn->name;
 	sprintf(status->sysCurrCpu, DBG_NIL);
 	sprintf(status->relCurrCpu, DBG_NIL);
 	sprintf(status->sysAvgCpu, DBG_NIL);

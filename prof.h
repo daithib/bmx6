@@ -18,13 +18,14 @@
 struct prof_ctx_key {
     struct neigh_node *neigh;
     struct orig_node *orig;
-    const char *name;
+    void (* func) (void);
 } __attribute__((packed));
 
 struct prof_ctx {
     // must be initialized:
     struct prof_ctx_key k;
-    char *parent_name;
+    const char *name;
+    void (* parent_func) (void);
     // updated by first prof_start() -> prof_init():
     struct prof_ctx *parent;
     struct avl_tree childs_tree;

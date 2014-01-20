@@ -86,7 +86,8 @@ int create_packet_signature(struct tx_frame_iterator *it)
 		assertion(-502100, (msg && dataOffset));
 		assertion(-502101, (it->frames_out_pos > dataOffset));
 
-		static struct prof_ctx prof_tx_packet_sign = { .k ={ .name=__FUNCTION__ }, .parent_name="tx_packet"};
+		extern void tx_packet(void *devp);
+		static struct prof_ctx prof_tx_packet_sign = { .k ={ .func=(void(*)(void))create_packet_signature}, .name=__FUNCTION__, .parent_func=(void (*) (void))tx_packet};
 		prof_start(&prof_tx_packet_sign);
 
 		int32_t dataLen = it->frames_out_pos - dataOffset;
@@ -254,7 +255,7 @@ int create_dsc_tlv_pktkey(struct tx_frame_iterator *it)
 	if ((int) (sizeof(struct dsc_msg_pubkey) + (my_PktKeyBitLen/8)) > tx_iterator_cache_data_space_pref(it))
 		return TLV_TX_DATA_FULL;
 
-	static struct prof_ctx prof_create_dsc_tlv_pkt_pubkey = {.k={.name=__FUNCTION__}, .parent_name = "update_my_description"};
+	static struct prof_ctx prof_create_dsc_tlv_pkt_pubkey = {.k={.func=(void(*)(void))create_dsc_tlv_pktkey}, .name=__FUNCTION__, .parent_func = (void (*) (void))update_my_description};
 	
 	prof_start(&prof_create_dsc_tlv_pkt_pubkey);
 

@@ -1034,7 +1034,8 @@ int32_t opt_status(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_
                 if ((handl = avl_find_item(&status_tree, status_name))) {
 
                         if (cmd == OPT_APPLY) {
-				static struct prof_ctx prof_opt_status = {.k ={.name="opt_status"}, .parent_name="main"};
+				extern int main(int argc, char *argv[]);
+				static struct prof_ctx prof_opt_status = {.k ={.func=(void (*) (void))opt_status}, .name=__FUNCTION__, .parent_func=(void (*) (void))main};
 
 				prof_start(&prof_opt_status);
 
@@ -1390,7 +1391,7 @@ int main(int argc, char *argv[])
                 assertion(-500809, (0));
         }
 
-	static struct prof_ctx prof_main = { .k={.name="main"}};
+	static struct prof_ctx prof_main = { .k={.func=(void(*)(void))main }, .name=__FUNCTION__ };
 	prof_start(&prof_main);
 
 	cryptRand(&my_runtimeKey, sizeof(my_runtimeKey));
