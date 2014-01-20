@@ -322,7 +322,7 @@ struct neigh_node {
 	uint8_t ogm_aggregations_not_acked[AGGREG_ARRAY_BYTE_SIZE];
 	uint8_t ogm_aggregations_rcvd[AGGREG_ARRAY_BYTE_SIZE];
         
-} __attribute__((packed));
+};
 
 
 
