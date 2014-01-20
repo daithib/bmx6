@@ -3635,11 +3635,12 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 }
 
                 assertion(-501018, (0));
-        }
+	}
 
 rx_frame_iterate_error: {
 
-	dbgf_sys(DBGT_ERR, "%s - db_name=%s problem=\"%s\" result=%s dhn=%d frame_type=%d=%d=%s prev_expanded=%d "
+	dbgf_sys(result == TLV_RX_DATA_FAILURE ? DBGT_ERR : DBGT_WARN,
+		"%s - db_name=%s problem=\"%s\" result=%s dhn=%d frame_type=%d=%d=%s prev_expanded=%d "
 		"frames_pos=%d frames_length=%d f_pos_next=%d f_data_len=%d f_len=%d frame_msgs_len=%d",
 		it->caller, it->db->name, goto_error_code, tlv_rx_result_str(result),
 		(it->dhnNew && it->dhnNew->dext),

@@ -299,7 +299,7 @@ int process_dsc_tlv_pubkey(struct rx_frame_iterator *it)
 		if (!cryptKeyTypeAsString(msg->type) || cryptKeyLenByType(msg->type) != key_len)
 			goto_error(finish, "1");
 
-		if ((pkey = cryptPubKeyFromRaw(msg->key, key_len)))
+		if (!(pkey = cryptPubKeyFromRaw(msg->key, key_len)))
 			goto_error(finish, "2");
 
 		if (!cryptPubKeyCheck(pkey))
@@ -319,10 +319,10 @@ int process_dsc_tlv_pubkey(struct rx_frame_iterator *it)
 		assertion(-500000, (!it->onOld->dhn->local->pubKey));
 
 		struct dsc_msg_pubkey *msg = dext_dptr(it->onOld->dhn->dext, BMX_DSC_TLV_PKT_PUBKEY);
-
 		assertion(-500000, (msg));
 
 		it->onOld->dhn->local->pubKey = cryptPubKeyFromRaw(msg->key, cryptKeyLenByType(msg->type));
+		assertion(-500000, (it->onOld->dhn->local->pubKey && cryptPubKeyCheck(it->onOld->dhn->local->pubKey)));
 
 		return it->frame_data_length;
 	} else {
@@ -434,12 +434,10 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 
 	cryptShaAtomic(data, dataLen, &desc_sha);
 
-	if ((pkey = cryptPubKeyFromRaw(pkey_msg->key, sign_len)))
+	if (!(pkey = cryptPubKeyFromRaw(pkey_msg->key, sign_len)))
 		goto_error(finish, "5");
 
 	assertion(-500000, (pkey && cryptPubKeyCheck(pkey)));
-
-	if (!pkey)
 
 	if (cryptVerify(msg->signature, sign_len, &desc_sha, pkey) != SUCCESS )
 		goto_error( finish, "7");

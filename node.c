@@ -1064,6 +1064,7 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
 		if (pkey_msg)
 			local->pubKey = cryptPubKeyFromRaw(pkey_msg->key, cryptKeyLenByType(pkey_msg->type));
 
+		assertion(-500000, IMPLIES(pkey_msg, local->pubKey && cryptPubKeyCheck(local->pubKey)));
 		assertion(-500953, (dhn->local->dhn == dhn));
 		assertion(-500949, (local->dhn->local == local));
 	}
