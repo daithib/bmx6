@@ -293,14 +293,62 @@ int create_dsc_tlv_pktkey(struct tx_frame_iterator *it)
 
 
 STATIC_FUNC
-int process_dsc_tlv_pubkey(struct rx_frame_iterator *it)
+int process_dsc_tlv_pubKey(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-
+	extern int32_t rx_frame_description_adv(struct rx_frame_iterator *it);
+	static struct prof_ctx prof_process_dsc_tlv_pubKey = {.k={.func=(void(*)(void))process_dsc_tlv_pubKey}, .name=__FUNCTION__, .parent_func = (void(*)(void))rx_frame_description_adv };
+	prof_start(&prof_process_dsc_tlv_pubKey);
 	char *goto_error_code = NULL;
 	CRYPTKEY_T *pkey = NULL;
 	int32_t key_len = -1;
 	struct dsc_msg_pubkey *msg = NULL;
+
+	if (it->op == TLV_OP_TEST ) {
+
+		key_len = it->frame_data_length - sizeof(struct dsc_msg_pubkey);
+		msg = (struct dsc_msg_pubkey*) (it->frame_data);
+
+		if (!cryptKeyTypeAsString(msg->type) || cryptKeyLenByType(msg->type) != key_len)
+			goto_error(finish, "1");
+
+		if (!(pkey = cryptPubKeyFromRaw(msg->key, key_len)))
+			goto_error(finish, "2");
+
+		if (cryptPubKeyCheck(pkey) != SUCCESS)
+			goto_error(finish, "3");
+	}
+
+finish:{
+	dbgf(goto_error_code ? DBGL_SYS : DBGL_ALL, goto_error_code ? DBGT_ERR : DBGT_INFO,
+		"%s %s verifying %s type=%s msg_key_len=%d == key_len=%d problem?=%s",
+		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", it->handl->name,
+		cryptKeyTypeAsString(msg->type), cryptKeyLenByType(msg->type), key_len, goto_error_code);
+
+	if (pkey)
+		cryptKeyFree(&pkey);
+
+	prof_stop(&prof_process_dsc_tlv_pubKey);
+
+	if (goto_error_code)
+		return TLV_RX_DATA_FAILURE;
+	else
+		return it->frame_data_length;
+}
+}
+
+STATIC_FUNC
+int process_dsc_tlv_pktKey(struct rx_frame_iterator *it)
+{
+        TRACE_FUNCTION_CALL;
+
+	static struct prof_ctx prof_process_dsc_tlv_pktKey = {.k={.func=(void(*)(void))process_dsc_tlv_pktKey}, .name=__FUNCTION__, .parent_func = (void(*)(void))rx_packet  };
+	prof_start(&prof_process_dsc_tlv_pktKey);
+	char *goto_error_code = NULL;
+	CRYPTKEY_T *pkey = NULL;
+	int32_t key_len = -1;
+	struct dsc_msg_pubkey *msg = NULL;
+
 	if (it->op == TLV_OP_TEST ) {
 
 		key_len = it->frame_data_length - sizeof(struct dsc_msg_pubkey);
@@ -315,16 +363,12 @@ int process_dsc_tlv_pubkey(struct rx_frame_iterator *it)
 		if (cryptPubKeyCheck(pkey) != SUCCESS)
 			goto_error(finish, "3");
 
-	} else if (it->op == TLV_OP_DEL && it->frame_type == BMX_DSC_TLV_PKT_PUBKEY &&
-		it->onOld && it->onOld->dhn && it->onOld->dhn->local) {
+	} else if (it->op == TLV_OP_DEL &&  it->onOld && it->onOld->dhn && it->onOld->dhn->local) {
 
 		if (it->onOld->dhn->local->pktKey)
 			cryptKeyFree(&it->onOld->dhn->local->pktKey);
 
-		return it->frame_data_length;
-
-	} else if (it->op == TLV_OP_NEW && it->frame_type == BMX_DSC_TLV_PKT_PUBKEY &&
-		it->onOld && it->onOld->dhn && it->onOld->dhn->local) {
+	} else if (it->op == TLV_OP_NEW && it->onOld && it->onOld->dhn && it->onOld->dhn->local) {
 
 		if (it->onOld->dhn->local->pktKey)
 			cryptKeyFree(&it->onOld->dhn->local->pktKey);
@@ -334,15 +378,10 @@ int process_dsc_tlv_pubkey(struct rx_frame_iterator *it)
 
 		it->onOld->dhn->local->pktKey = cryptPubKeyFromRaw(msg->key, cryptKeyLenByType(msg->type));
 		assertion(-500000, (it->onOld->dhn->local->pktKey && cryptPubKeyCheck(it->onOld->dhn->local->pktKey) == SUCCESS));
-
-		return it->frame_data_length;
-	} else {
-
-		return it->frame_data_length;
 	}
 
 finish: {
-	dbgf_sys(goto_error_code?DBGT_ERR:DBGT_INFO, 
+	dbgf(goto_error_code ? DBGL_SYS : DBGL_ALL, goto_error_code ? DBGT_ERR : DBGT_INFO,
 		"%s %s verifying %s type=%s msg_key_len=%d == key_len=%d problem?=%s",
 		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", it->handl->name,
 		cryptKeyTypeAsString(msg->type), cryptKeyLenByType(msg->type), key_len, goto_error_code);
@@ -350,12 +389,15 @@ finish: {
 	if (pkey)
 		cryptKeyFree(&pkey);
 
+	prof_stop(&prof_process_dsc_tlv_pktKey);
+
 	if (goto_error_code)
 		return TLV_RX_DATA_FAILURE;
 	else
 		return it->frame_data_length;
 }
 }
+
 
 STATIC_FUNC
 int create_dsc_tlv_signature(struct tx_frame_iterator *it)
@@ -718,7 +760,7 @@ void init_sec( void )
 	handl.dextReferencing = (int32_t*)&always_fref;
 	handl.dextCompression = (int32_t*)&never_fzip;
         handl.tx_frame_handler = create_dsc_tlv_pubkey;
-        handl.rx_frame_handler = process_dsc_tlv_pubkey;
+        handl.rx_frame_handler = process_dsc_tlv_pubKey;
 	handl.msg_format = pubkey_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_DSC_PUBKEY, &handl);
 
@@ -765,7 +807,7 @@ void init_sec( void )
 	handl.dextReferencing = (int32_t*)&never_fref;
 	handl.dextCompression = (int32_t*)&never_fzip;
         handl.tx_frame_handler = create_dsc_tlv_pktkey;
-        handl.rx_frame_handler = process_dsc_tlv_pubkey;
+        handl.rx_frame_handler = process_dsc_tlv_pktKey;
 	handl.msg_format = pubkey_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_PKT_PUBKEY, &handl);
 }
