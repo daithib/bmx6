@@ -326,7 +326,8 @@ int process_dsc_tlv_pubkey(struct rx_frame_iterator *it)
 	} else if (it->op == TLV_OP_NEW && it->frame_type == BMX_DSC_TLV_PKT_PUBKEY &&
 		it->onOld && it->onOld->dhn && it->onOld->dhn->local) {
 
-		assertion(-500000, (!it->onOld->dhn->local->pktKey));
+		if (it->onOld->dhn->local->pktKey)
+			cryptKeyFree(&it->onOld->dhn->local->pktKey);
 
 		msg = dext_dptr(it->dhnNew->dext, BMX_DSC_TLV_PKT_PUBKEY);
 		assertion(-500000, (msg));
