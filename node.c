@@ -769,8 +769,8 @@ void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T on
 				local->dhn->local = NULL;
 				local->dhn = NULL;
 
-				if (local->pubKey)
-					cryptKeyFree(&local->pubKey);
+				if (local->pktKey)
+					cryptKeyFree(&local->pktKey);
 
                                 if (local->dev_adv)
                                         debugFree(local->dev_adv, -300339);
@@ -1062,9 +1062,9 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
 		struct dsc_msg_pubkey *pkey_msg = dext_dptr(dhn->dext, BMX_DSC_TLV_PKT_PUBKEY);
 
 		if (pkey_msg)
-			local->pubKey = cryptPubKeyFromRaw(pkey_msg->key, cryptKeyLenByType(pkey_msg->type));
+			local->pktKey = cryptPubKeyFromRaw(pkey_msg->key, cryptKeyLenByType(pkey_msg->type));
 
-		assertion(-500000, IMPLIES(pkey_msg, local->pubKey && cryptPubKeyCheck(local->pubKey) == SUCCESS));
+		assertion(-500000, IMPLIES(pkey_msg, local->pktKey && cryptPubKeyCheck(local->pktKey) == SUCCESS));
 		assertion(-500953, (dhn->local->dhn == dhn));
 		assertion(-500949, (local->dhn->local == local));
 	}

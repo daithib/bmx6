@@ -311,7 +311,7 @@ struct neigh_node {
         
         // the old neigh_node:
 	struct dhash_node *dhn;
-        CRYPTKEY_T *pubKey;
+        CRYPTKEY_T *pktKey;
 
 	IID_T neighIID4me;
 

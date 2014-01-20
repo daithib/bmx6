@@ -160,9 +160,9 @@ int process_packet_signature(struct rx_frame_iterator *it)
 		goto_error( finish, "3");
 
 
-	if (dhn->local && dhn->local->pubKey) {
+	if (dhn->local && dhn->local->pktKey) {
 		
-		pkey = dhn->local->pubKey;
+		pkey = dhn->local->pktKey;
 		
 	} else if ((pkey_msg = dext_dptr(dhn->dext, BMX_DSC_TLV_DSC_PUBKEY))) {
 
@@ -200,7 +200,7 @@ finish:{
 		pkey ? memAsHexString(pkey->rawKey, pkey->rawKeyLen) : "---",
 		goto_error_code);
 
-	if (pkey && (!dhn->local || dhn->local->pubKey))
+	if (pkey && (!dhn->local || dhn->local->pktKey))
 			cryptKeyFree(&pkey);
 
 	if (goto_error_code) {
@@ -306,23 +306,23 @@ int process_dsc_tlv_pubkey(struct rx_frame_iterator *it)
 			goto_error(finish, "3");
 
 	} else if (it->op == TLV_OP_DEL && it->frame_type == BMX_DSC_TLV_PKT_PUBKEY &&
-		it->onOld && it->onOld->dhn->local) {
+		it->onOld && it->onOld->dhn && it->onOld->dhn->local) {
 
-		if (it->onOld->dhn->local->pubKey)
-			cryptKeyFree(&it->onOld->dhn->local->pubKey);
+		if (it->onOld->dhn->local->pktKey)
+			cryptKeyFree(&it->onOld->dhn->local->pktKey);
 
 		return it->frame_data_length;
 
 	} else if (it->op == TLV_OP_NEW && it->frame_type == BMX_DSC_TLV_PKT_PUBKEY &&
-		it->onOld && it->onOld->dhn->local) {
+		it->onOld && it->onOld->dhn && it->onOld->dhn->local) {
 
-		assertion(-500000, (!it->onOld->dhn->local->pubKey));
+		assertion(-500000, (!it->onOld->dhn->local->pktKey));
 
 		struct dsc_msg_pubkey *msg = dext_dptr(it->onOld->dhn->dext, BMX_DSC_TLV_PKT_PUBKEY);
 		assertion(-500000, (msg));
 
-		it->onOld->dhn->local->pubKey = cryptPubKeyFromRaw(msg->key, cryptKeyLenByType(msg->type));
-		assertion(-500000, (it->onOld->dhn->local->pubKey && cryptPubKeyCheck(it->onOld->dhn->local->pubKey) == SUCCESS));
+		it->onOld->dhn->local->pktKey = cryptPubKeyFromRaw(msg->key, cryptKeyLenByType(msg->type));
+		assertion(-500000, (it->onOld->dhn->local->pktKey && cryptPubKeyCheck(it->onOld->dhn->local->pktKey) == SUCCESS));
 
 		return it->frame_data_length;
 	} else {
