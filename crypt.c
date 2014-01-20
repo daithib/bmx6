@@ -572,7 +572,9 @@ CRYPTKEY_T *cryptPubKeyFromRaw( uint8_t *rawKey, uint16_t rawKeyLen ) {
 }
 
 int cryptPubKeyCheck( CRYPTKEY_T *pubKey) {
+	assertion(-500000, (pubKey));
 	assertion(-500000, (pubKey->backendKey));
+
 	rsa_context *rsa = (rsa_context*)pubKey->backendKey;
 
 	if (rsa->len != pubKey->rawKeyLen || rsa_check_pubkey((rsa_context*)pubKey->backendKey))

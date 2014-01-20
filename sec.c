@@ -177,8 +177,9 @@ int process_packet_signature(struct rx_frame_iterator *it)
 		if ( pkey->rawKeyType != msg->type )
 			goto_error( finish, "6");
 
-	} else
+	} else  {
 		goto_error( finish, "7");
+	}
 
 	assertion(-500000, (pkey && cryptPubKeyCheck(pkey) == SUCCESS));
 
