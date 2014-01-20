@@ -163,17 +163,21 @@ int process_packet_signature(struct rx_frame_iterator *it)
 	if (dhn->local && dhn->local->pktKey) {
 		
 		pkey = dhn->local->pktKey;
+
+		if ( cryptKeyLenByType(pkey->rawKeyLen) != sign_len )
+			goto_error( finish, "4");
 		
 	} else if ((pkey_msg = dext_dptr(dhn->dext, BMX_DSC_TLV_PKT_PUBKEY))) {
 
 		pkey = cryptPubKeyFromRaw(pkey_msg->key, cryptKeyLenByType(pkey_msg->type));
-	}
 
-	if (!pkey)
-		goto_error( finish, "3");
+		if (!pkey)
+			goto_error( finish, "5");
+		if ( cryptKeyLenByType(pkey->rawKeyLen) != sign_len )
+			goto_error( finish, "6");
 
-	if ( cryptKeyLenByType(pkey->rawKeyLen) != sign_len )
-		goto_error( finish, "4");
+	} else
+		goto_error( finish, "7");
 
 	assertion(-500000, (pkey && cryptPubKeyCheck(pkey) == SUCCESS));
 
@@ -182,7 +186,7 @@ int process_packet_signature(struct rx_frame_iterator *it)
 	cryptShaFinal(&packetSha);
 
 	if (cryptVerify(msg->signature, sign_len, &packetSha, pkey) != SUCCESS )
-		goto_error( finish, "6");
+		goto_error( finish, "8");
 
 	it->pb->i.verifiedLinkDhn = dhn;
 
