@@ -773,4 +773,7 @@ void cleanup_sec( void )
 {
         cryptKeyFree(&my_PubKey);
 
+	if (my_PktKey)
+		cryptKeyFree(&my_PktKey);
+
 }
