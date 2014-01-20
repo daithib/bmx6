@@ -210,7 +210,7 @@ finish:{
 		pkey ? cryptKeyTypeAsString(pkey->rawKeyType) : "---", pkey ? memAsHexString(pkey->rawKey, pkey->rawKeyLen) : "---",
 		goto_error_code);
 
-	if (pkey && (!dhn->local || dhn->local->pktKey))
+	if (pkey && !(dhn->local && dhn->local->pktKey))
 			cryptKeyFree(&pkey);
 
 	if (goto_error_code) {
