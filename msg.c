@@ -3211,9 +3211,9 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
         assertion(-500550, (it->frame_msgs_length >= ((int) sizeof (struct dsc_msg_version))));
 
 	int32_t goto_error_code;
-	static struct prof_ctx prof_rx_frame_description_adv = { .k={.func=(void(*)(void))rx_frame_description_adv}, .name=__FUNCTION__, .parent_func=(void (*) (void))rx_packet};
+	static struct prof_ctx prof = { .k={.func=(void(*)(void))rx_frame_description_adv}, .name=__FUNCTION__, .parent_func=(void (*) (void))rx_packet};
 
-	prof_start(&prof_rx_frame_description_adv);
+	prof_start(&prof);
 
 	if (it->frame_data_length > (int)MAX_DESC_SIZE)
 		goto_error(finish, TLV_RX_DATA_FAILURE);
@@ -3244,7 +3244,7 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
         goto_error(finish, it->frame_data_length);
 
 finish:
-	prof_stop(&prof_rx_frame_description_adv);
+	prof_stop(&prof);
 
 	return goto_error_code;
 }
@@ -4134,8 +4134,8 @@ void tx_packet(void *devp)
         static struct packet_buff pb;
         struct dev_node *dev = devp;
 	extern int main(int argc, char *argv[]);
-	static struct prof_ctx prof_tx_packet = { .k = {.func=(void(*)(void))tx_packet}, .name=__FUNCTION__, .parent_func=(void (*) (void))main};
-	prof_start(&prof_tx_packet);
+	static struct prof_ctx prof = { .k = {.func=(void(*)(void))tx_packet}, .name=__FUNCTION__, .parent_func=(void (*) (void))main};
+	prof_start(&prof);
 
         assertion(-500204, (dev));
 
@@ -4344,7 +4344,7 @@ void tx_packet(void *devp)
         }
 
         assertion(-500797, (!it.frames_out_pos));
-	prof_stop(&prof_tx_packet);
+	prof_stop(&prof);
 }
 
 void tx_packets( void *unused ) {
@@ -4425,8 +4425,8 @@ void update_my_description(void)
 {
         TRACE_FUNCTION_CALL;
 	extern int main(int argc, char *argv[]);
-	static struct prof_ctx prof_update_my_description = {.k={.func=(void(*)(void))update_my_description}, .name=__FUNCTION__, .parent_func = (void (*) (void))main};
-	prof_start(&prof_update_my_description);
+	static struct prof_ctx prof = {.k={.func=(void(*)(void))update_my_description}, .name=__FUNCTION__, .parent_func = (void (*) (void))main};
+	prof_start(&prof);
 
 	assertion(-502082, (!terminating));
 
@@ -4518,7 +4518,7 @@ void update_my_description(void)
 	assertion(-500000, (self == avl_find_item(&orig_tree, &self->nodeId)));
 
 	debugFree(frame_cache_array, -300585);
-	prof_stop(&prof_update_my_description);
+	prof_stop(&prof);
 }
 
 
@@ -4676,8 +4676,8 @@ void rx_packet( struct packet_buff *pb )
 
 
 	extern int main(int argc, char *argv[]);
-	static struct prof_ctx prof_rx_packet = { .k={.func=(void(*)(void))rx_packet}, .name=__FUNCTION__, .parent_func= (void (*) (void))main};
-	prof_start(&prof_rx_packet);
+	static struct prof_ctx prof = { .k={.func=(void(*)(void))rx_packet}, .name=__FUNCTION__, .parent_func= (void (*) (void))main};
+	prof_start(&prof);
 
         struct dev_node *iif = pb->i.iif;
 	struct packet_header *phdr = &pb->p.hdr;
@@ -4748,7 +4748,7 @@ process_packet_error:
         blacklist_neighbor(pb);
 
 finish:
-	prof_stop(&prof_rx_packet);
+	prof_stop(&prof);
 	return;
 }
 

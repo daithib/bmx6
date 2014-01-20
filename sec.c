@@ -87,8 +87,8 @@ int create_packet_signature(struct tx_frame_iterator *it)
 		assertion(-502101, (it->frames_out_pos > dataOffset));
 
 		extern void tx_packet(void *devp);
-		static struct prof_ctx prof_tx_packet_sign = { .k ={ .func=(void(*)(void))create_packet_signature}, .name=__FUNCTION__, .parent_func=(void (*) (void))tx_packet};
-		prof_start(&prof_tx_packet_sign);
+		static struct prof_ctx prof = { .k ={ .func=(void(*)(void))create_packet_signature}, .name=__FUNCTION__, .parent_func=(void (*) (void))tx_packet};
+		prof_start(&prof);
 
 		int32_t dataLen = it->frames_out_pos - dataOffset;
 		uint8_t *data = it->frames_out_ptr + dataOffset;
@@ -109,7 +109,7 @@ int create_packet_signature(struct tx_frame_iterator *it)
 		msg = NULL;
 		dataOffset = 0;
 
-		prof_stop(&prof_tx_packet_sign);
+		prof_stop(&prof);
 		return TLV_TX_DATA_DONE;
 	}
 }
@@ -265,9 +265,9 @@ int create_dsc_tlv_pktkey(struct tx_frame_iterator *it)
 	if ((int) (sizeof(struct dsc_msg_pubkey) + (my_PktKeyBitLen/8)) > tx_iterator_cache_data_space_pref(it))
 		return TLV_TX_DATA_FULL;
 
-	static struct prof_ctx prof_create_dsc_tlv_pkt_pubkey = {.k={.func=(void(*)(void))create_dsc_tlv_pktkey}, .name=__FUNCTION__, .parent_func = (void (*) (void))update_my_description};
+	static struct prof_ctx prof = {.k={.func=(void(*)(void))create_dsc_tlv_pktkey}, .name=__FUNCTION__, .parent_func = (void (*) (void))update_my_description};
 	
-	prof_start(&prof_create_dsc_tlv_pkt_pubkey);
+	prof_start(&prof);
 
 	struct dsc_msg_pubkey *msg = ((struct dsc_msg_pubkey*) tx_iterator_cache_msg_ptr(it));
 
@@ -285,7 +285,7 @@ int create_dsc_tlv_pktkey(struct tx_frame_iterator *it)
 
 	dbgf_track(DBGT_INFO, "added description rsa packet pubkey len=%d", my_PktKey->rawKeyLen);
 	
-	prof_stop(&prof_create_dsc_tlv_pkt_pubkey);
+	prof_stop(&prof);
 	
 	return(sizeof(struct dsc_msg_pubkey) +my_PktKey->rawKeyLen);
 }
@@ -297,8 +297,8 @@ int process_dsc_tlv_pubKey(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 	extern int32_t rx_frame_description_adv(struct rx_frame_iterator *it);
-	static struct prof_ctx prof_process_dsc_tlv_pubKey = {.k={.func=(void(*)(void))process_dsc_tlv_pubKey}, .name=__FUNCTION__, .parent_func = (void(*)(void))rx_frame_description_adv };
-	prof_start(&prof_process_dsc_tlv_pubKey);
+	static struct prof_ctx prof = {.k={.func=(void(*)(void))process_dsc_tlv_pubKey}, .name=__FUNCTION__, .parent_func = (void(*)(void))rx_frame_description_adv };
+	prof_start(&prof);
 	char *goto_error_code = NULL;
 	CRYPTKEY_T *pkey = NULL;
 	int32_t key_len = -1;
@@ -328,7 +328,7 @@ finish:{
 	if (pkey)
 		cryptKeyFree(&pkey);
 
-	prof_stop(&prof_process_dsc_tlv_pubKey);
+	prof_stop(&prof);
 
 	if (goto_error_code)
 		return TLV_RX_DATA_FAILURE;
@@ -342,8 +342,8 @@ int process_dsc_tlv_pktKey(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	static struct prof_ctx prof_process_dsc_tlv_pktKey = {.k={.func=(void(*)(void))process_dsc_tlv_pktKey}, .name=__FUNCTION__, .parent_func = (void(*)(void))rx_packet  };
-	prof_start(&prof_process_dsc_tlv_pktKey);
+	static struct prof_ctx prof = {.k={.func=(void(*)(void))process_dsc_tlv_pktKey}, .name=__FUNCTION__, .parent_func = (void(*)(void))rx_packet  };
+	prof_start(&prof);
 	char *goto_error_code = NULL;
 	CRYPTKEY_T *pkey = NULL;
 	int32_t key_len = -1;
@@ -389,7 +389,7 @@ finish: {
 	if (pkey)
 		cryptKeyFree(&pkey);
 
-	prof_stop(&prof_process_dsc_tlv_pktKey);
+	prof_stop(&prof);
 
 	if (goto_error_code)
 		return TLV_RX_DATA_FAILURE;

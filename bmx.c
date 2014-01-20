@@ -1035,16 +1035,16 @@ int32_t opt_status(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_
 
                         if (cmd == OPT_APPLY) {
 				extern int main(int argc, char *argv[]);
-				static struct prof_ctx prof_opt_status = {.k ={.func=(void (*) (void))opt_status}, .name=__FUNCTION__, .parent_func=(void (*) (void))main};
+				static struct prof_ctx prof = {.k ={.func=(void (*) (void))opt_status}, .name=__FUNCTION__, .parent_func=(void (*) (void))main};
 
-				prof_start(&prof_opt_status);
+				prof_start(&prof);
 
 				if ((data_len = ((*(handl->frame_creator))(handl, NULL)))) {
 					dbg_printf(cn, "%s:\n", handl->status_name);
 					fields_dbg_table(cn, relevance, data_len, handl->data, handl->min_msg_size, handl->format);
 				}
 
-				prof_stop(&prof_opt_status);
+				prof_stop(&prof);
                         }
 
                 } else {
@@ -1391,8 +1391,8 @@ int main(int argc, char *argv[])
                 assertion(-500809, (0));
         }
 
-	static struct prof_ctx prof_main = { .k={.func=(void(*)(void))main }, .name=__FUNCTION__ };
-	prof_start(&prof_main);
+	static struct prof_ctx prof = { .k={.func=(void(*)(void))main }, .name=__FUNCTION__ };
+	prof_start(&prof);
 
 	cryptRand(&my_runtimeKey, sizeof(my_runtimeKey));
 
