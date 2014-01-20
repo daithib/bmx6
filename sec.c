@@ -164,7 +164,7 @@ int process_packet_signature(struct rx_frame_iterator *it)
 		
 		pkey = dhn->local->pktKey;
 		
-	} else if ((pkey_msg = dext_dptr(dhn->dext, BMX_DSC_TLV_DSC_PUBKEY))) {
+	} else if ((pkey_msg = dext_dptr(dhn->dext, BMX_DSC_TLV_PKT_PUBKEY))) {
 
 		pkey = cryptPubKeyFromRaw(pkey_msg->key, cryptKeyLenByType(pkey_msg->type));
 	}
@@ -318,7 +318,7 @@ int process_dsc_tlv_pubkey(struct rx_frame_iterator *it)
 
 		assertion(-500000, (!it->onOld->dhn->local->pktKey));
 
-		struct dsc_msg_pubkey *msg = dext_dptr(it->onOld->dhn->dext, BMX_DSC_TLV_PKT_PUBKEY);
+		msg = dext_dptr(it->onOld->dhn->dext, BMX_DSC_TLV_PKT_PUBKEY);
 		assertion(-500000, (msg));
 
 		it->onOld->dhn->local->pktKey = cryptPubKeyFromRaw(msg->key, cryptKeyLenByType(msg->type));
