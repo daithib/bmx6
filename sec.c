@@ -77,9 +77,9 @@ int create_packet_signature(struct tx_frame_iterator *it)
 
 		msg = (struct dsc_msg_signature*) (it->frames_out_ptr + it->frames_out_pos + sizeof(struct tlv_hdr));
 
-		dataOffset = it->frames_out_pos + sizeof(struct tlv_hdr) + sizeof(struct dsc_msg_signature) + my_PubKey->rawKeyLen;
+		dataOffset = it->frames_out_pos + sizeof(struct tlv_hdr) + sizeof(struct dsc_msg_signature) + my_PktKey->rawKeyLen;
 
-		return sizeof(struct dsc_msg_signature) + my_PubKey->rawKeyLen;
+		return sizeof(struct dsc_msg_signature) + my_PktKey->rawKeyLen;
 
 	} else {
 		assertion(-502099, (it->frame_type > FRAME_TYPE_LINK_VERSION));
@@ -97,10 +97,10 @@ int create_packet_signature(struct tx_frame_iterator *it)
 		cryptShaNew(&it->ttn->task.dev->if_llocal_addr->ip_addr, sizeof(IP6_T));
 		cryptShaUpdate(data, dataLen);
 		cryptShaFinal(&packetSha);
-		size_t keySpace = my_PubKey->rawKeyLen;
+		size_t keySpace = my_PktKey->rawKeyLen;
 
-		msg->type = my_PubKey->rawKeyType;
-		cryptSign(&packetSha, msg->signature, keySpace);
+		msg->type = my_PktKey->rawKeyType;
+		cryptSign(&packetSha, msg->signature, keySpace, my_PktKey);
 
 		dbgf_all(DBGT_INFO, "fixed RSA%d type=%d signature=%s of dataSha=%s over dataLen=%d data=%s (dataOffset=%d)",
 			(keySpace*8), msg->type, memAsHexString(msg->signature, keySpace),
@@ -384,7 +384,7 @@ int create_dsc_tlv_signature(struct tx_frame_iterator *it)
 		struct dsc_msg_signature *dext_msg = dext_dptr(it->dext, BMX_DSC_TLV_DSC_SIGNATURE);
 
 		dext_msg->type = my_PubKey->rawKeyType;
-		cryptSign(&dataSha, dext_msg->signature, keySpace);
+		cryptSign(&dataSha, dext_msg->signature, keySpace, NULL);
 
 		desc_msg->type = dext_msg->type;
 		memcpy( desc_msg->signature, dext_msg->signature, keySpace);
@@ -596,7 +596,7 @@ int32_t rsa_load( char *tmp_path ) {
 
 	cryptShaAtomic(in, inLen, &inSha);
 
-	if (cryptSign(&inSha, enc, my_PubKey->rawKeyLen) != SUCCESS) {
+	if (cryptSign(&inSha, enc, my_PubKey->rawKeyLen, NULL) != SUCCESS) {
 		dbgf_sys(DBGT_ERR, "Failed Sign inLen=%d outLen=%d inData=%s outData=%s",
 			inLen, encLen, memAsHexString((char*)in, inLen), memAsHexString((char*)enc, my_PubKey->rawKeyLen));
 		return FAILURE;

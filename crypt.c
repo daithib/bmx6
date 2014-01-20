@@ -404,11 +404,15 @@ int cryptDecrypt(uint8_t *in, size_t inLen, uint8_t *out, size_t *outLen) {
 	return SUCCESS;
 }
 
-int cryptSign( CRYPTSHA1_T *inSha, uint8_t *out, size_t outLen) {
+int cryptSign( CRYPTSHA1_T *inSha, uint8_t *out, size_t outLen, CRYPTKEY_T *cryptKey) {
 
-	assertion(-500000, (outLen = my_PrivKey->rawKeyLen));
+	if (!cryptKey)
+		cryptKey = my_PrivKey;
 
-	if ((RsaSSL_Sign((uint8_t*)inSha, sizeof(CRYPTSHA1_T), out, outLen, (RsaKey *)my_PrivKey->backendKey, &cryptRng)) < 0)
+	if (outLen != cryptKey->rawKeyLen)
+		return FAILURE;
+
+	if ((RsaSSL_Sign((uint8_t*)inSha, sizeof(CRYPTSHA1_T), out, outLen, (RsaKey *)cryptKey->backendKey, &cryptRng)) < 0)
 		return FAILURE;
 
 	return SUCCESS;
@@ -802,11 +806,15 @@ int cryptDecrypt(uint8_t *in, size_t inLen, uint8_t *out, size_t *outLen) {
 	return SUCCESS;
 }
 
-int cryptSign( CRYPTSHA1_T *inSha, uint8_t *out, size_t outLen) {
+int cryptSign( CRYPTSHA1_T *inSha, uint8_t *out, size_t outLen, CRYPTKEY_T *cryptKey) {
 
-	rsa_context *pk = my_PrivKey->backendKey;
+	if (!cryptKey)
+		cryptKey = my_PrivKey;
 
-	assertion( -500000, (outLen >= my_PrivKey->rawKeyLen));
+	rsa_context *pk = cryptKey->backendKey;
+
+	if (outLen < cryptKey->rawKeyLen)
+		return FAILURE;
 
 #if CRYPTLIB <= POLARSSL_1_2_9
 	if (rsa_pkcs1_sign(pk, ctr_drbg_random, &ctr_drbg, RSA_PRIVATE, SIG_RSA_SHA1, sizeof(CRYPTSHA1_T), (uint8_t*)inSha, out))
