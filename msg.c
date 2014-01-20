@@ -3211,9 +3211,6 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
         assertion(-500550, (it->frame_msgs_length >= ((int) sizeof (struct dsc_msg_version))));
 
 	int32_t goto_error_code;
-	static struct prof_ctx prof = { .k={.func=(void(*)(void))rx_frame_description_adv}, .name=__FUNCTION__, .parent_func=(void (*) (void))rx_packet};
-
-	prof_start(&prof);
 
 	if (it->frame_data_length > (int)MAX_DESC_SIZE)
 		goto_error(finish, TLV_RX_DATA_FAILURE);
@@ -3244,8 +3241,6 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
         goto_error(finish, it->frame_data_length);
 
 finish:
-	prof_stop(&prof);
-
 	return goto_error_code;
 }
 

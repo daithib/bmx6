@@ -119,8 +119,9 @@ int process_packet_signature(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	assertion(-502104, (it->frame_data_length == it->frame_msgs_length && it->frame_data == it->msg));
-
+	char *goto_error_code = NULL;
+	static struct prof_ctx prof = { .k ={ .func=(void(*)(void))process_packet_signature}, .name=__FUNCTION__, .parent_func=(void (*) (void))rx_packet};
+	prof_start(&prof);
 	DHASH_T *dhash = &it->pb->p.hdr.dhash;
         struct description_cache_node *cache = NULL;
 	struct dhash_node *dhn, *dhnOld;
@@ -134,14 +135,13 @@ int process_packet_signature(struct rx_frame_iterator *it)
 		if (!cache)
 			schedule_tx_task(&it->pb->i.iif->dummyLink, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, dhash, sizeof(DHASH_T));
 
+		prof_stop(&prof);
 		return TLV_RX_DATA_REJECTED;
-
 	}
 
 	assertion(-500000, (dhn));
 	assertion(-500000, (dhn->on));
 
-	char *goto_error_code = NULL;
 	int32_t sign_len = it->frame_data_length - sizeof(struct dsc_msg_signature);
 	struct dsc_msg_signature *msg = (struct dsc_msg_signature*)(it->frame_data);
 	uint8_t *data = it->frame_data + it->frame_data_length;
@@ -213,23 +213,23 @@ finish:{
 	if (pkey && !(dhn->local && dhn->local->pktKey))
 			cryptKeyFree(&pkey);
 
-	if (goto_error_code) {
-
-		EXITERROR(-500000, (0));
-
-		if (!dhnOld && dhn) //TODO: DO not block myIID4x reserved for this node! It was never used!
-			free_orig_node(dhn->on);
-
-		return TLV_RX_DATA_REJECTED;
-	}
-
-	if (!dhnOld && dhn) {
+	if (!goto_error_code && !dhnOld && dhn) {
 		if (desc_adv_tx_unsolicited)
 			schedule_best_tp_links(NULL, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
 
 		if (dhash_adv_tx_unsolicited)
 			schedule_best_tp_links(NULL, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
+	}
 
+	prof_stop(&prof);
+
+	if (goto_error_code) {
+
+		if (!dhnOld && dhn) //TODO: DO not block myIID4x reserved for this node! It was never used!
+			free_orig_node(dhn->on);
+
+		EXITERROR(-500000, (0));
+		return TLV_RX_DATA_REJECTED;
 	}
 
 	return TLV_RX_DATA_PROCESSED;
@@ -266,7 +266,6 @@ int create_dsc_tlv_pktkey(struct tx_frame_iterator *it)
 		return TLV_TX_DATA_FULL;
 
 	static struct prof_ctx prof = {.k={.func=(void(*)(void))create_dsc_tlv_pktkey}, .name=__FUNCTION__, .parent_func = (void (*) (void))update_my_description};
-	
 	prof_start(&prof);
 
 	struct dsc_msg_pubkey *msg = ((struct dsc_msg_pubkey*) tx_iterator_cache_msg_ptr(it));
@@ -296,54 +295,7 @@ STATIC_FUNC
 int process_dsc_tlv_pubKey(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-	extern int32_t rx_frame_description_adv(struct rx_frame_iterator *it);
-	static struct prof_ctx prof = {.k={.func=(void(*)(void))process_dsc_tlv_pubKey}, .name=__FUNCTION__, .parent_func = (void(*)(void))rx_frame_description_adv };
-	prof_start(&prof);
-	char *goto_error_code = NULL;
-	CRYPTKEY_T *pkey = NULL;
-	int32_t key_len = -1;
-	struct dsc_msg_pubkey *msg = NULL;
 
-	if (it->op == TLV_OP_TEST ) {
-
-		key_len = it->frame_data_length - sizeof(struct dsc_msg_pubkey);
-		msg = (struct dsc_msg_pubkey*) (it->frame_data);
-
-		if (!cryptKeyTypeAsString(msg->type) || cryptKeyLenByType(msg->type) != key_len)
-			goto_error(finish, "1");
-
-		if (!(pkey = cryptPubKeyFromRaw(msg->key, key_len)))
-			goto_error(finish, "2");
-
-		if (cryptPubKeyCheck(pkey) != SUCCESS)
-			goto_error(finish, "3");
-	}
-
-finish:{
-	dbgf(goto_error_code ? DBGL_SYS : DBGL_ALL, goto_error_code ? DBGT_ERR : DBGT_INFO,
-		"%s %s verifying %s type=%s msg_key_len=%d == key_len=%d problem?=%s",
-		tlv_op_str(it->op), goto_error_code?"Failed":"Succeeded", it->handl->name,
-		cryptKeyTypeAsString(msg->type), cryptKeyLenByType(msg->type), key_len, goto_error_code);
-
-	if (pkey)
-		cryptKeyFree(&pkey);
-
-	prof_stop(&prof);
-
-	if (goto_error_code)
-		return TLV_RX_DATA_FAILURE;
-	else
-		return it->frame_data_length;
-}
-}
-
-STATIC_FUNC
-int process_dsc_tlv_pktKey(struct rx_frame_iterator *it)
-{
-        TRACE_FUNCTION_CALL;
-
-	static struct prof_ctx prof = {.k={.func=(void(*)(void))process_dsc_tlv_pktKey}, .name=__FUNCTION__, .parent_func = (void(*)(void))rx_packet  };
-	prof_start(&prof);
 	char *goto_error_code = NULL;
 	CRYPTKEY_T *pkey = NULL;
 	int32_t key_len = -1;
@@ -363,12 +315,14 @@ int process_dsc_tlv_pktKey(struct rx_frame_iterator *it)
 		if (cryptPubKeyCheck(pkey) != SUCCESS)
 			goto_error(finish, "3");
 
-	} else if (it->op == TLV_OP_DEL &&  it->onOld && it->onOld->dhn && it->onOld->dhn->local) {
+	} else if (it->op == TLV_OP_DEL && it->frame_type == BMX_DSC_TLV_PKT_PUBKEY &&
+		it->onOld && it->onOld->dhn && it->onOld->dhn->local) {
 
 		if (it->onOld->dhn->local->pktKey)
 			cryptKeyFree(&it->onOld->dhn->local->pktKey);
 
-	} else if (it->op == TLV_OP_NEW && it->onOld && it->onOld->dhn && it->onOld->dhn->local) {
+	} else if (it->op == TLV_OP_NEW && it->frame_type == BMX_DSC_TLV_PKT_PUBKEY &&
+		it->onOld && it->onOld->dhn && it->onOld->dhn->local) {
 
 		if (it->onOld->dhn->local->pktKey)
 			cryptKeyFree(&it->onOld->dhn->local->pktKey);
@@ -388,8 +342,6 @@ finish: {
 
 	if (pkey)
 		cryptKeyFree(&pkey);
-
-	prof_stop(&prof);
 
 	if (goto_error_code)
 		return TLV_RX_DATA_FAILURE;
@@ -462,8 +414,10 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 	if (it->op != TLV_OP_TEST)
 		return TLV_RX_DATA_PROCESSED;
 
-	clock_t clock_before = (TIME_T)clock();
 	char *goto_error_code = NULL;
+	static struct prof_ctx prof = { .k ={ .func=(void(*)(void))process_dsc_tlv_signature}, .name=__FUNCTION__, .parent_func=(void (*) (void))rx_packet};
+	prof_start(&prof);
+	clock_t clock_before = (TIME_T)clock();
 	int32_t sign_len = it->frame_data_length - sizeof(struct dsc_msg_signature);
 	struct dsc_msg_signature *msg = (struct dsc_msg_signature*)(it->frame_data);
 	uint32_t dataOffset = (2*sizeof(struct tlv_hdr)) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) + it->frame_data_length;
@@ -515,8 +469,10 @@ finish: {
 		pkey ? cryptKeyTypeAsString(pkey->rawKeyType) : "---", pkey ? memAsHexString(pkey->rawKey, pkey->rawKeyLen) : "---",
 		goto_error_code);
 
-	
-	cryptKeyFree(&pkey);
+	if (pkey)
+		cryptKeyFree(&pkey);
+
+	prof_stop(&prof);
 	
 	if (goto_error_code && sign_len > (descVerification/8))
 		return TLV_RX_DATA_REJECTED;
@@ -807,7 +763,7 @@ void init_sec( void )
 	handl.dextReferencing = (int32_t*)&never_fref;
 	handl.dextCompression = (int32_t*)&never_fzip;
         handl.tx_frame_handler = create_dsc_tlv_pktkey;
-        handl.rx_frame_handler = process_dsc_tlv_pktKey;
+        handl.rx_frame_handler = process_dsc_tlv_pubKey;
 	handl.msg_format = pubkey_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_PKT_PUBKEY, &handl);
 }
