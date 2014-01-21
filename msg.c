@@ -1128,10 +1128,8 @@ int32_t rx_msg_link_version_adv(struct rx_frame_iterator *it)
         struct packet_buff_info *pbi = &it->pb->i;
         struct msg_link_version_adv *msg = (struct msg_link_version_adv*) (it->msg);
 
-	if (!pbi->verifiedLinkDhn)
-		return TLV_RX_DATA_REJECTED;
+	assertion(-500000, (pbi->verifiedLinkDhn)); //
 
-	//TODO: purge pb->i.link usage
 	if (!(pbi->verifiedLink = getLinkNode(pbi->iif, &pbi->llip, ntohs(msg->link_adv_sqn), pbi->verifiedLinkDhn, msg->dev_idx)))
 		return TLV_RX_DATA_FAILURE;
 
@@ -3113,9 +3111,9 @@ struct dhash_node *process_dhash_description_neighIID4x(struct packet_buff *pb, 
 
 	struct dhash_node *dhn = NULL, *dhnOld = NULL;
 
-	struct neigh_node *local = pb->i.verifiedLink->k.linkDev->local;
+	struct neigh_node *viaNeigh = pb->i.verifiedLink->k.linkDev->local;
         struct description_cache_node *cache = NULL;
-	IDM_T is_transmitter = cryptShasEqual(dhash, &pb->p.hdr.dhash);
+	IDM_T is_transmitter = cryptShasEqual(dhash, &viaNeigh->dhn->dhash);
 
         assertion(-500689, (!(is_transmitter && cryptShasEqual(dhash, &(self->dhn->dhash))))); // cant be transmitter' and myselfs'
 
@@ -3136,17 +3134,17 @@ struct dhash_node *process_dhash_description_neighIID4x(struct packet_buff *pb, 
 		} else if (dhn == FAILURE_PTR || dhn == UNRESOLVED_PTR) {
 
 		} else {
-			assertion(-500000, IMPLIES(is_transmitter, dhn == local->dhn));
-			assertion(-500000, IMPLIES(!is_transmitter, dhn != local->dhn));
+			assertion(-500000, IMPLIES(is_transmitter, dhn == viaNeigh->dhn));
+			assertion(-500000, IMPLIES(!is_transmitter, dhn != viaNeigh->dhn));
 
 			if (dhn == self->dhn)
-				local->neighIID4me = neighIID4x;
+				viaNeigh->neighIID4me = neighIID4x;
 
-			if (iid_set_neighIID4x(&local->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
+			if (iid_set_neighIID4x(&viaNeigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
 				return(struct dhash_node *) FAILURE_PTR;
 
 			if (!dhnOld && desc_adv_tx_unsolicited)
-				schedule_best_tp_links(local, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
+				schedule_best_tp_links(viaNeigh, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
 
 			if (!dhnOld && dhash_adv_tx_unsolicited)
 				schedule_best_tp_links(NULL, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
@@ -3439,8 +3437,12 @@ int8_t missed_mandatory_frames(struct rx_frame_iterator *it, int8_t f_start, int
 
 	int8_t f;
 	for (f = f_start; f <= f_end; f++) {
-		if (it->db->handls[f].is_mandatory) {
+		if (it->db->handls[f].alwaysMandatory) {
 			dbgf_sys(DBGT_WARN,"frame_type=%s",it->db->handls[f].name);
+			return YES;
+		}
+		if (it->db->handls[f].positionMandatory && f_end < it->db->handl_max) {
+			dbgf_sys(DBGT_WARN,"positionMandatory frame_type=%s pos=%d", it->db->handls[f].name, f);
 			return YES;
 		}
 	}
@@ -3549,9 +3551,8 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 it->frame_msgs_fixed = (f_handl->fixed_msg_size && f_handl->min_msg_size) ? (it->frame_msgs_length / f_handl->min_msg_size) : 0;
                 it->msg = f_data + f_handl->data_header_size;
             
-                dbgf_track(DBGT_INFO, "%s - pkt_dhash=%s type=%s frame_length=%d frame_data_length=%d frame_msgs_length=%d",
-                        it->caller, it->pb ? cryptShaAsString(&it->pb->p.hdr.dhash) : "---",
-			f_handl->name, f_len, f_data_len, it->frame_msgs_length);
+                dbgf_track(DBGT_INFO, "%s - type=%s frame_length=%d frame_data_length=%d frame_msgs_length=%d",
+			it->caller, f_handl->name, f_len, f_data_len, it->frame_msgs_length);
 
 
                 if (f_handl->rx_msg_handler ? // only frame_handler support zero messages per frame!
@@ -3574,8 +3575,8 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 
 		} else if (!(f_handl->rx_processUnVerifiedLink || it->db->rx_processUnVerifiedLink) && !pb->i.verifiedLink) {
 
-			dbgf_sys(DBGT_INFO, "%s - NON-VERIFIED link to dhash=%s neigh=%s, needed for frame type=%s db=%s",
-				it->caller, cryptShaAsString(&pb->p.hdr.dhash), pb->i.llip_str, f_handl->name, it->db->name);
+			dbgf_sys(DBGT_INFO, "%s - NON-VERIFIED link to neigh=%s, needed for frame type=%s db=%s",
+				it->caller, pb->i.llip_str, f_handl->name, it->db->name);
 
 			return TLV_RX_DATA_PROCESSED;
 
@@ -4178,7 +4179,7 @@ void tx_packet(void *devp)
 
 		} else if (it.frame_type > FRAME_TYPE_LINK_VERSION && it.frames_out_pos == 0 && !signed_frames_signed) {
 
-			schedule_tx_task(&dev->dummyLink, FRAME_TYPE_SIGNATURE_ADV, sizeof(struct dsc_msg_signature) + my_PubKey->rawKeyLen, 0, 0);
+			schedule_tx_task(&dev->dummyLink, FRAME_TYPE_SIGNATURE_ADV, sizeof(struct frame_msg_signature) + (my_PktKey ? my_PktKey->rawKeyLen : 0), 0, 0);
 //			schedule_tx_task(&dev->dummyLink, FRAME_TYPE_SIGNATURE_DUMMY, SCHEDULE_MIN_MSG_SIZE, 0, 0);
 			schedule_tx_task(&dev->dummyLink, FRAME_TYPE_LINK_VERSION, SCHEDULE_MIN_MSG_SIZE, 0, 0);
 
@@ -4299,7 +4300,7 @@ void tx_packet(void *devp)
 
 			if (last_send_frame_type < FRAME_TYPE_SIGNATURE_ADV || last_send_frame_type > FRAME_TYPE_LINK_VERSION) {
 
-				if (last_send_frame_type > FRAME_TYPE_LINK_VERSION) {
+				if (last_send_frame_type > FRAME_TYPE_LINK_VERSION && my_PktKey && my_PktKey->rawKeyLen) {
 					it.db->handls[FRAME_TYPE_SIGNATURE_ADV].tx_frame_handler(&it);
 				}
 
@@ -4317,7 +4318,6 @@ void tx_packet(void *devp)
 				memset(phdr, 0, sizeof(struct packet_header));
 
 				phdr->comp_version = my_compatibility;
-				phdr->dhash = self->dhn->dhash;
 
 				cb_packet_hooks(&pb);
 
@@ -4700,18 +4700,12 @@ void rx_packet( struct packet_buff *pb )
 	if ((anyIf = avl_closest_item(&dev_ip_tree, &any_key)) && is_ip_equal(&pb->i.llip, &anyIf->llip_key.ip))
                 goto finish;
 
-	if (cryptShasEqual(&phdr->dhash, &self->dhn->dhash))
-		goto finish;
-
 	cb_packet_hooks(pb);
 
 	if (!is_ip_net_equal(&pb->i.llip, &IP6_LINKLOCAL_UC_PREF, IP6_LINKLOCAL_UC_PLEN, AF_INET6)) {
 		dbgf_all(DBGT_ERR, "non-link-local IPv6 source address %s", ip6AsStr(&pb->i.llip));
 		goto finish;
 	}
-
-	if (avl_find_item(&dhash_invalid_tree, &phdr->dhash))
-		goto finish;
 
         if (blacklisted_neighbor(pb, NULL))
                 goto finish;
@@ -4722,8 +4716,8 @@ void rx_packet( struct packet_buff *pb )
 
         dbgf_all(DBGT_INFO, "via %s %s %s size %d", iif->label_cfg.str, iif->ip_llocal_str, pb->i.llip_str, pb->i.length);
 
-        dbgf_all(DBGT_INFO, "version=%i, reserved=%X, size=%i dhash=%s rcvd udp_len=%d via NB %s %s %s",
-                phdr->comp_version, phdr->capabilities, pb->i.length, cryptShaAsString(&phdr->dhash),
+        dbgf_all(DBGT_INFO, "version=%i, reserved=%X, size=%i rcvd udp_len=%d via NB %s %s %s",
+                phdr->comp_version, phdr->reserved, pb->i.length,
                 pb->i.length, pb->i.llip_str, iif->label_cfg.str, pb->i.unicast ? "UNICAST" : "BRC");
 
 
@@ -4735,10 +4729,8 @@ void rx_packet( struct packet_buff *pb )
 process_packet_error:
 
         dbgf_sys(DBGT_WARN,
-                "Drop (remaining) problematic packet: via NB=%s dev=%s len=%d my_version=%d "
-                "dhash=%s version=%i capabilities=%d",
-                pb->i.llip_str, iif->label_cfg.str, pb->i.length, my_compatibility,
-		cryptShaAsString(&phdr->dhash), phdr->comp_version, phdr->capabilities);
+                "Drop (remaining) problematic packet: via NB=%s dev=%s len=%d my_version=%d version=%i capabilities=%d",
+		pb->i.llip_str, iif->label_cfg.str, pb->i.length, my_compatibility, phdr->comp_version, phdr->reserved);
 
         blacklist_neighbor(pb);
 
@@ -4910,7 +4902,7 @@ void init_msg( void )
 
 	static const struct field_format version_format[] = VERSION_MSG_FORMAT;
         handl.name = "DSC_VERSION";
-	handl.is_mandatory = 1;
+	handl.alwaysMandatory = 1;
 	handl.min_msg_size = sizeof (struct dsc_msg_version);
         handl.fixed_msg_size = 1;
 	handl.dextReferencing = (int32_t*)&never_fref;
@@ -4984,6 +4976,7 @@ void init_msg( void )
 
 
         handl.name = "LINK_VERSION_ADV";
+	handl.positionMandatory = 1;
 	handl.rx_processUnVerifiedLink = 1;
         handl.min_msg_size = sizeof (struct msg_link_version_adv);
         handl.fixed_msg_size = 1;

@@ -28,17 +28,31 @@
 #define ARG_KEY_PATH "keyPath"
 #define DEF_KEY_PATH "/etc/bmx6/rsa.der"
 
-#define ARG_DESC_VERIFY "descVerification"
+#define ARG_DESC_VERIFY "descVerificationLen"
 #define MIN_DESC_VERIFY 512
 #define MAX_DESC_VERIFY 4096
 #define DEF_DESC_VERIFY 4096
 #define HLP_DESC_VERIFY "verify description signatures up-to given RSA key length"
 
-#define ARG_PACKET_SIGN "packetSigning"
+#define ARG_PACKET_SIGN "packetSignLen"
 #define MIN_PACKET_SIGN 0
 #define MAX_PACKET_SIGN 1024
 #define DEF_PACKET_SIGN 512
 #define HLP_PACKET_SIGN "sign outgoing packets with given RSA key length"
+
+
+// http://my.opera.com/securitygroup/blog/2009/09/29/512-bit-rsa-key-breaking-developments
+// assuming 70 days to crack RSA512 keys (2009!) with a single dual-core machine,
+// means can be cracked in
+// ~6000 secs with ~1000 machines, or
+// ~600 secs with ~10000 machines, or 
+// ~60 secs with ~100000 machines
+#define MIN_PACKET_SIGN_LT (60)    // one minute, needs ~100000 machines to crack before end of life
+#define DEF_PACKET_SIGN_LT (600)   // 10 minutes, needs ~10000 machines to crack before end of life
+#define MAX_PACKET_SIGN_LT (24*60*60) // one day, needs ~70 machines to crack before end of life
+#define ARG_PACKET_SIGN_LT "packetSignLifetime"
+
+
 
 #define ARG_PACKET_VERIFY "packetVerification"
 #define MIN_PACKET_VERIFY 0
@@ -59,7 +73,7 @@ struct dsc_msg_pubkey {
 
 
 #define DESCRIPTION_MSG_SIGNATURE_FORMAT { \
-{FIELD_TYPE_UINT,          -1, 8*sizeof(struct dsc_msg_signature),  1, FIELD_RELEVANCE_HIGH,  "type"}, \
+{FIELD_TYPE_UINT,          -1, 8*sizeof(uint8_t),                   1, FIELD_RELEVANCE_HIGH,  "type"}, \
 {FIELD_TYPE_STRING_BINARY, -1, 0,                                   1, FIELD_RELEVANCE_HIGH,  "signature" }, \
 FIELD_FORMAT_END }
 
@@ -68,6 +82,17 @@ struct dsc_msg_signature {
         uint8_t signature[];
 } __attribute__((packed));
 
+#define FRAME_MSG_SIGNATURE_FORMAT { \
+{FIELD_TYPE_STRING_BINARY, -1, 8*sizeof(CRYPTSHA1_T),               1, FIELD_RELEVANCE_HIGH,  "dhash"},  \
+{FIELD_TYPE_UINT,          -1, 8*sizeof(uint8_t),                   1, FIELD_RELEVANCE_HIGH,  "type"}, \
+{FIELD_TYPE_STRING_BINARY, -1, 0,                                   1, FIELD_RELEVANCE_HIGH,  "signature" }, \
+FIELD_FORMAT_END }
+
+struct frame_msg_signature {
+    CRYPTSHA1_T dhash;
+    uint8_t type;
+    uint8_t signature[];
+} __attribute__((packed));
 
 #define DESCRIPTION_MSG_SHA_FORMAT { \
 {FIELD_TYPE_UINT,          -1, 32,                        0, FIELD_RELEVANCE_HIGH,  "dataLen"}, \
@@ -79,6 +104,8 @@ struct dsc_msg_sha {
         CRYPTSHA1_T dataSha;
 } __attribute__((packed));
 
+
+extern int32_t packetSigning;
 
 extern CRYPTKEY_T *my_PubKey;
 extern CRYPTKEY_T *my_PktKey;

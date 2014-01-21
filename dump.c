@@ -136,9 +136,9 @@ void dump(struct packet_buff *pb)
 
 
         dbgf_dump(DBGT_NONE,
-                "%s       headerVersion=%-2d reserved=%-2X dhash=%s headerSize=%-4zu",
+                "%s       headerVersion=%-2d reserved=%-2X headerSize=%-4zu",
                 direction == DUMP_DIRECTION_IN ? "in " : "out",
-                phdr->comp_version, phdr->capabilities, cryptShaAsString(&phdr->dhash), sizeof (struct packet_header));
+                phdr->comp_version, phdr->reserved, sizeof (struct packet_header));
 
         (*dev_plugin_data)->tmp_all[direction][DUMP_TYPE_PACKET_HEADER] += (sizeof (struct packet_header) << IMPROVE_ROUNDOFF);
 

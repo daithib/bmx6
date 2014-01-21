@@ -979,28 +979,29 @@ void init_self(void)
 
 
 STATIC_FUNC
-LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T link_sqn, struct dhash_node *dhn, DEVADV_IDX_T dev_idx )
+LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T link_sqn, struct dhash_node *verifiedLinkDhn, DEVADV_IDX_T dev_idx )
 {
         TRACE_FUNCTION_CALL;
 
-	LOCAL_ID_T *local_id = &dhn->on->nodeId;
-
-	dbgf_all(DBGT_INFO, "NB=%s local_id=%s dev_idx=0x%X", ip6AsStr(llip), cryptShaAsString(local_id), dev_idx);
-
-	assertion(-500000, (local_id && !is_zero(local_id, sizeof(LOCAL_ID_T))));
-	assertion(-500000, (dhn));
+	assertion(-500000, (verifiedLinkDhn));
 
 	if (dev_idx < DEVADV_IDX_MIN)
 		return NULL;
 
+	LOCAL_ID_T *local_id = &verifiedLinkDhn->on->nodeId;
         struct neigh_node *local = avl_find_item(&local_tree, local_id);
+
+	dbgf_all(DBGT_INFO, "NB=%s local_id=%s dev_idx=0x%X", ip6AsStr(llip), cryptShaAsString(local_id), dev_idx);
+
+	assertion(-500000, (local_id && !is_zero(local_id, sizeof(LOCAL_ID_T))));
+
 
 
         if (local) {
-		assertion(-500000, IMPLIES(dhn->local, dhn->local == local));
-		assertion(-500000, (cryptShasEqual(&local->local_id, &dhn->on->nodeId)));
-		assertion(-500517, (dhn != self->dhn));
-		assertion(-500390, (dhn && dhn->on && dhn->on->dhn == dhn));
+		assertion(-500000, IMPLIES(verifiedLinkDhn->local, verifiedLinkDhn->local == local));
+		assertion(-500000, (cryptShasEqual(&local->local_id, &verifiedLinkDhn->on->nodeId)));
+		assertion(-500517, (verifiedLinkDhn != self->dhn));
+		assertion(-500390, (verifiedLinkDhn && verifiedLinkDhn->on && verifiedLinkDhn->on->dhn == verifiedLinkDhn));
 
                 if ((((LINKADV_SQN_T) (link_sqn - local->packet_link_sqn_ref)) > LINKADV_SQN_DAD_RANGE)) {
 
@@ -1055,17 +1056,17 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
                 local->link_adv_msg_for_him = LINKADV_MSG_IGNORED;
                 avl_insert(&local_tree, local, -300337);
 
-		assertion(-500000, (!dhn->local));
-		local->dhn = dhn;
-		dhn->local = local;
+		assertion(-500000, (!verifiedLinkDhn->local));
+		local->dhn = verifiedLinkDhn;
+		verifiedLinkDhn->local = local;
 
-		struct dsc_msg_pubkey *pkey_msg = dext_dptr(dhn->dext, BMX_DSC_TLV_PKT_PUBKEY);
+		struct dsc_msg_pubkey *pkey_msg = dext_dptr(verifiedLinkDhn->dext, BMX_DSC_TLV_PKT_PUBKEY);
 
 		if (pkey_msg)
 			local->pktKey = cryptPubKeyFromRaw(pkey_msg->key, cryptKeyLenByType(pkey_msg->type));
 
 		assertion(-500000, IMPLIES(pkey_msg, local->pktKey && cryptPubKeyCheck(local->pktKey) == SUCCESS));
-		assertion(-500953, (dhn->local->dhn == dhn));
+		assertion(-500953, (verifiedLinkDhn->local->dhn == verifiedLinkDhn));
 		assertion(-500949, (local->dhn->local == local));
 	}
 
@@ -1093,12 +1094,12 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
         linkDev->pkt_time_max = bmx_time;
 
 	assertion(-500000, (local));
-	assertion(-500000, (dhn->local == local));
-	assertion(-500000, (cryptShasEqual(&local->local_id, &dhn->on->nodeId)));
-        assertion(-500000, (dhn != self->dhn));
+	assertion(-500000, (verifiedLinkDhn->local == local));
+	assertion(-500000, (cryptShasEqual(&local->local_id, &verifiedLinkDhn->on->nodeId)));
+        assertion(-500000, (verifiedLinkDhn != self->dhn));
         ASSERTION(-500000, (linkDev == avl_find_item(&local->linkDev_tree, &linkDev->key.dev_idx)));
-        assertion(-500000, (dhn && dhn->on && dhn->on->dhn == dhn));
-        assertion(-500000, (dhn->local->dhn == dhn));
+        assertion(-500000, (verifiedLinkDhn && verifiedLinkDhn->on && verifiedLinkDhn->on->dhn == verifiedLinkDhn));
+        assertion(-500000, (verifiedLinkDhn->local->dhn == verifiedLinkDhn));
         assertion(-500000, (local->dhn->local == local));
 
         return linkDev;
@@ -1110,8 +1111,9 @@ LinkNode *getLinkNode(struct dev_node *dev, IPX_T *llip, LINKADV_SQN_T link_sqn,
 {
         TRACE_FUNCTION_CALL;
 
-        LinkNode *link = NULL;
+	assertion(-500000, (verifiedLinkDhn));
 
+        LinkNode *link = NULL;
 	LinkDevNode *linkDev = getLinkDevNode(dev, llip, link_sqn, verifiedLinkDhn, dev_idx);
 
 	if (!linkDev)

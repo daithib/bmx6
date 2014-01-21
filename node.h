@@ -472,11 +472,9 @@ struct black_node {
 
 struct packet_header
 {
-	uint8_t    comp_version;     //  1
-	uint8_t    capabilities;     //  1  reserved
+	uint8_t    comp_version;
+	uint8_t    reserved;
         
-        CRYPTSHA1_T dhash;           // 20
-
 } __attribute__((packed,__may_alias__));
 
 

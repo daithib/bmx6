@@ -820,7 +820,8 @@ struct tx_frame_iterator {
 
 
 struct frame_handl {
-        uint8_t is_mandatory;
+        uint8_t alwaysMandatory;
+        uint8_t positionMandatory;
 	int32_t *dextCompression;
 	int32_t *dextReferencing;
         uint8_t rx_processUnVerifiedLink;

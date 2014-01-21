@@ -45,22 +45,22 @@
 
 #define CRYPT_SHA1_LEN 20
 
-#define CRYPT_RSA_MIN_TYPE 0
+#define CRYPT_RSA_MIN_TYPE 1
 #define CRYPT_RSA_MIN_LEN  64
 #define CRYPT_RSA_MIN_NAME "RSA512"
-#define CRYPT_RSA512_TYPE  0
+#define CRYPT_RSA512_TYPE  1
 #define CRYPT_RSA512_LEN   64
 #define CRYPT_RSA512_NAME  "RSA512"
-#define CRYPT_RSA1024_TYPE 1
+#define CRYPT_RSA1024_TYPE 2
 #define CRYPT_RSA1024_LEN  128
 #define CRYPT_RSA1024_NAME "RSA1024"
-#define CRYPT_RSA2048_TYPE 2
+#define CRYPT_RSA2048_TYPE 3
 #define CRYPT_RSA2048_LEN  256
 #define CRYPT_RSA2048_NAME "RSA2048"
-#define CRYPT_RSA4096_TYPE 3
+#define CRYPT_RSA4096_TYPE 4
 #define CRYPT_RSA4096_LEN  512
 #define CRYPT_RSA4096_NAME "RSA4096"
-#define CRYPT_RSA_MAX_TYPE 3
+#define CRYPT_RSA_MAX_TYPE 4
 #define CRYPT_RSA_MAX_LEN  512
 #define CRYPT_RSA_MAX_NAME "RSA4096"
 
@@ -74,6 +74,7 @@ typedef struct CRYPTSHA1_T {
 
 
 typedef struct CRYPTKEY_T {
+    TIME_SEC_T endOfLife;
     void *backendKey;
     uint16_t rawKeyLen;
     uint8_t nativeBackendKey;
