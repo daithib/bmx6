@@ -49,7 +49,7 @@
 // ~60 secs with ~100000 machines
 #define MIN_PACKET_SIGN_LT (60)    // one minute, needs ~100000 machines to crack before end of life
 #define DEF_PACKET_SIGN_LT (600)   // 10 minutes, needs ~10000 machines to crack before end of life
-#define MAX_PACKET_SIGN_LT (24*60*60) // one day, needs ~70 machines to crack before end of life
+#define MAX_PACKET_SIGN_LT (REGISTER_TASK_TIMEOUT_MAX/1000)
 #define ARG_PACKET_SIGN_LT "packetSignLifetime"
 
 

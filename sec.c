@@ -726,7 +726,7 @@ int32_t opt_packetSigning(uint8_t cmd, uint8_t _save, struct opt_type *opt, stru
 
 		} else if (!strcmp(opt->name, ARG_PACKET_SIGN_LT)) {
 
-			if (val!=0 && (val<MIN_PACKET_SIGN_LT || val > MAX_PACKET_SIGN_LT))
+			if (val!=0 && (val<MIN_PACKET_SIGN_LT || val > (int32_t)MAX_PACKET_SIGN_LT))
 				return FAILURE;
 
 			if ( cmd == OPT_APPLY ){
