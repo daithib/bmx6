@@ -977,7 +977,7 @@ IDM_T update_path_metrics(struct packet_buff *pb, struct orig_node *on, OGM_SQN_
         assertion(-500876, (!on->blocked));
         assertion(-500734, (on->path_metricalgo));
         assertion(-501052, ((((OGM_SQN_MASK)&(ogmSqn - on->ogmSqn_rangeMin)) < on->ogmSqn_rangeSize)));
-	assertion(-500000, (pb->i.verifiedLink));
+	assertion(-502150, (pb->i.verifiedLink));
 
         OGM_SQN_T ogm_sqn_max = UXX_GET_MAX(OGM_SQN_MASK, on->ogmSqn_maxRcvd, ogmSqn);
 

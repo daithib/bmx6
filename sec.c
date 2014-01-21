@@ -89,7 +89,7 @@ int create_packet_signature(struct tx_frame_iterator *it)
 	} else {
 		assertion(-502099, (it->frame_type > FRAME_TYPE_LINK_VERSION));
 		assertion(-502100, (msg && dataOffset));
-		assertion(-500000, (my_PktKey && my_PktKey->rawKeyLen && my_PktKey->rawKeyType));
+		assertion(-502197, (my_PktKey && my_PktKey->rawKeyLen && my_PktKey->rawKeyType));
 		assertion(-502101, (it->frames_out_pos > dataOffset));
 
 		extern void tx_packet(void *devp);
@@ -152,8 +152,8 @@ int process_packet_signature(struct rx_frame_iterator *it)
 		return TLV_RX_DATA_REJECTED;
 	}
 
-	assertion(-500000, (dhn));
-	assertion(-500000, (dhn->on));
+	assertion(-502198, (dhn));
+	assertion(-502199, (dhn->on));
 
 	int32_t sign_len = it->frame_data_length - sizeof(struct frame_msg_signature);
 	uint8_t *data = it->frame_data + it->frame_data_length;
@@ -182,8 +182,8 @@ int process_packet_signature(struct rx_frame_iterator *it)
 			goto_error( finish, "4");
 	}
 
-	assertion(-500000, (!!pkey == !!dext_dptr(dhn->dext, BMX_DSC_TLV_PKT_PUBKEY)));
-	assertion(-500000, IMPLIES(pkey, cryptPubKeyCheck(pkey) == SUCCESS));
+	assertion(-502200, (!!pkey == !!dext_dptr(dhn->dext, BMX_DSC_TLV_PKT_PUBKEY)));
+	assertion(-502201, IMPLIES(pkey, cryptPubKeyCheck(pkey) == SUCCESS));
 
 	if ( !!pkey != !!msg->type )
 		goto_error( finish, "5");
@@ -234,7 +234,7 @@ finish:{
 		if (!dhnOld && dhn) //TODO: DO not block myIID4x reserved for this node! It was never used!
 			free_orig_node(dhn->on);
 
-		EXITERROR(-500000, (0));
+		EXITERROR(-502202, (0));
 		return TLV_RX_DATA_REJECTED;
 	}
 
@@ -274,7 +274,7 @@ int create_dsc_tlv_pktkey(struct tx_frame_iterator *it)
 
 	if (!packetSigning) {
 
-		assertion(-500000, (!my_PktKey));
+		assertion(-502203, (!my_PktKey));
 
 		return TLV_TX_DATA_DONE;
 	}
@@ -289,7 +289,7 @@ int create_dsc_tlv_pktkey(struct tx_frame_iterator *it)
 
 	if (my_PktKey && packetSignLifetime) {
 
-		assertion(-500000, (my_PktKey->endOfLife));
+		assertion(-502204, (my_PktKey->endOfLife));
 
 		if (((TIME_SEC_T) (my_PktKey->endOfLife - (bmx_time_sec+1))) >= MAX_PACKET_SIGN_LT) {
 			task_remove(update_dsc_tlv_pktkey, NULL);
@@ -357,10 +357,10 @@ int process_dsc_tlv_pubKey(struct rx_frame_iterator *it)
 			cryptKeyFree(&it->onOld->dhn->local->pktKey);
 
 		msg = dext_dptr(it->dhnNew->dext, BMX_DSC_TLV_PKT_PUBKEY);
-		assertion(-500000, (msg));
+		assertion(-502205, (msg));
 
 		it->onOld->dhn->local->pktKey = cryptPubKeyFromRaw(msg->key, cryptKeyLenByType(msg->type));
-		assertion(-500000, (it->onOld->dhn->local->pktKey && cryptPubKeyCheck(it->onOld->dhn->local->pktKey) == SUCCESS));
+		assertion(-502206, (it->onOld->dhn->local->pktKey && cryptPubKeyCheck(it->onOld->dhn->local->pktKey) == SUCCESS));
 	}
 
 finish: {
@@ -473,7 +473,7 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 	if (!(pkey = cryptPubKeyFromRaw(pkey_msg->key, sign_len)))
 		goto_error(finish, "5");
 
-	assertion(-500000, (pkey && cryptPubKeyCheck(pkey) == SUCCESS));
+	assertion(-502207, (pkey && cryptPubKeyCheck(pkey) == SUCCESS));
 
 	if (cryptVerify(msg->signature, sign_len, &dataSha, pkey) != SUCCESS )
 		goto_error( finish, "7");

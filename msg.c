@@ -481,8 +481,8 @@ int purge_tx_task_list(struct list_head *tx_task_lists, LinkDevNode *onlyLinkDev
                 {
                         struct tx_task_node * tx_task = list_entry(lpos, struct tx_task_node, list);
 
-//			assertion(-500000, IMPLIES(only_dev, only_dev == tx_task->task.dev));
-//			assertion(-500000, (only_dev = tx_task->task.dev));
+//			assertion(-502151, IMPLIES(only_dev, only_dev == tx_task->task.dev));
+//			assertion(-502152, (only_dev = tx_task->task.dev));
 
                         if ((!onlyLinkDev || onlyLinkDev == tx_task->task.linkDev) &&
                                 (!only_dev || only_dev == tx_task->task.dev)) {
@@ -579,7 +579,7 @@ STATIC_FUNC
 struct tx_task_node *tx_task_new(LinkNode *destLink, struct tx_task_node *test)
 {
         assertion(-500909, (destLink));
-	assertion(-500000, (destLink->k.myDev == test->task.dev));
+	assertion(-502153, (destLink->k.myDev == test->task.dev));
 
         struct frame_handl *handl = &packet_frame_db->handls[test->task.type];
         struct tx_task_node *ttn = NULL;
@@ -1128,7 +1128,7 @@ int32_t rx_msg_link_version_adv(struct rx_frame_iterator *it)
         struct packet_buff_info *pbi = &it->pb->i;
         struct msg_link_version_adv *msg = (struct msg_link_version_adv*) (it->msg);
 
-	assertion(-500000, (pbi->verifiedLinkDhn)); //
+	assertion(-502154, (pbi->verifiedLinkDhn)); //
 
 	if (!(pbi->verifiedLink = getLinkNode(pbi->iif, &pbi->llip, ntohs(msg->link_adv_sqn), pbi->verifiedLinkDhn, msg->dev_idx)))
 		return TLV_RX_DATA_FAILURE;
@@ -1136,7 +1136,7 @@ int32_t rx_msg_link_version_adv(struct rx_frame_iterator *it)
 
 	struct neigh_node *local = pbi->verifiedLink->k.linkDev->local;
 
-	assertion(-500000, (local));
+	assertion(-502155, (local));
 
 	if (msg_dev_req_enabled && UXX_LT(DEVADV_SQN_MAX, local->dev_adv_sqn, local->link_adv_dev_sqn_ref)) {
 
@@ -1883,8 +1883,8 @@ process_desc0_error:
 
 	if (result==TLV_RX_DATA_REBOOTED) {
 
-		assertion(-500000, (on));
-		assertion(-500000, (on != self));
+		assertion(-502156, (on));
+		assertion(-502157, (on != self));
 		free_orig_node(on);
 		return (struct dhash_node *) UNRESOLVED_PTR;
 
@@ -1893,7 +1893,7 @@ process_desc0_error:
 		return (struct dhash_node *) REJECTED_PTR;
 
 	} else {
-		assertion(-500000, (result==TLV_RX_DATA_FAILURE));
+		assertion(-502158, (result==TLV_RX_DATA_FAILURE));
 		blacklist_neighbor(pb);
 		return (struct dhash_node *) FAILURE_PTR;
 	}
@@ -2055,7 +2055,7 @@ int32_t process_dsc_tlv_version(struct rx_frame_iterator *it)
 				dbgf_sys(DBGT_ERR, "WTF: rcvd my nodeId=%s (%s) with different runtimeKey=%X (%X) and greater descSqn=%d (%d)",
 					nodeIdAsStringFromDescAdv(it->dhnNew->desc_frame), cryptShaAsString(&self->nodeId),
 					ntohl(new->runtimeKey), ntohl(old->runtimeKey), ntohl(new->descSqn), ntohl(old->descSqn));
-				EXITERROR(-500000, (0));
+				EXITERROR(-502159, (0));
 				return TLV_RX_DATA_REJECTED;
 			}
 
@@ -2139,7 +2139,7 @@ int32_t tx_frame_description_adv(struct tx_frame_iterator *it)
 	if (!dhn || !dhn->on) {
 		dbgf_sys(DBGT_WARN, "%s dhash=%s!", dhn ? "INVALID" : "UNKNOWN", cryptShaAsString(dhash));
                 assertion(-500977, (!dhn)); // a meanwhile invalidated dhn migh have been scheduled when it was still valid
-		assertion(-500000, (avl_find(&dhash_invalid_tree, dhash)));
+		assertion(-502160, (avl_find(&dhash_invalid_tree, dhash)));
                 return TLV_TX_DATA_DONE;
         }
 
@@ -2336,7 +2336,7 @@ int32_t rx_frame_dev_adv( struct rx_frame_iterator *it)
         struct msg_dev_adv* adv = (struct msg_dev_adv*) it->msg;
 
         assertion(-500979, (adv == hdr->msg));
-	assertion(-500000, (it->pb->i.verifiedLink));
+	assertion(-502161, (it->pb->i.verifiedLink));
 
         uint16_t msgs = it->frame_msgs_length / sizeof (struct msg_dev_adv);
 
@@ -2558,7 +2558,7 @@ int32_t rx_frame_link_adv( struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	assertion(-500000, (it->pb->i.verifiedLink));
+	assertion(-502162, (it->pb->i.verifiedLink));
 
         struct hdr_link_adv* hdr = (struct hdr_link_adv*) it->frame_data;;
         struct msg_link_adv* adv = (struct msg_link_adv*) it->msg;
@@ -2676,7 +2676,7 @@ int32_t rx_frame_rp_adv(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	assertion(-500000, (it->pb->i.verifiedLink));
+	assertion(-502163, (it->pb->i.verifiedLink));
 
         struct msg_rp_adv* adv = (struct msg_rp_adv*) it->msg;
 	struct neigh_node *local = it->pb->i.verifiedLink->k.linkDev->local;
@@ -2828,7 +2828,7 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	assertion(-500000, (it->pb->i.verifiedLink));
+	assertion(-502164, (it->pb->i.verifiedLink));
 
         struct hdr_ogm_adv *hdr = (struct hdr_ogm_adv *) it->frame_data;
         struct packet_buff *pb = it->pb;
@@ -3055,7 +3055,7 @@ int32_t rx_frame_ogm_acks(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	assertion(-500000, (it->pb->i.verifiedLink));
+	assertion(-502165, (it->pb->i.verifiedLink));
 
         struct packet_buff *pb = it->pb;
         struct neigh_node *local = pb->i.verifiedLink->k.linkDev->local;
@@ -3114,7 +3114,7 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
         IID_T neighIID4x = ntohs(adv->transmitterIID4x);
 
         dbgf_track(DBGT_INFO, "dhash=%s via NB: %s", cryptShaAsString(dhash), pb->i.llip_str);
-	assertion(-500000, (it->pb->i.verifiedLink));
+	assertion(-502166, (it->pb->i.verifiedLink));
         assertion(-500689, (!cryptShasEqual(&pb->i.verifiedLink->k.linkDev->local->dhn->dhash, &(self->dhn->dhash)))); // cant be transmitter' and myselfs'
 
 	struct neigh_node *viaNeigh = pb->i.verifiedLink->k.linkDev->local;
@@ -3146,8 +3146,8 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
 			
 		} else {
 			assertion(-500690, (dhn && dhn->on)); // UNDESCRIBED or fully described
-			assertion(-500000, IMPLIES(is_transmitter, dhn == viaNeigh->dhn));
-			assertion(-500000, IMPLIES(!is_transmitter, dhn != viaNeigh->dhn));
+			assertion(-502167, IMPLIES(is_transmitter, dhn == viaNeigh->dhn));
+			assertion(-502168, IMPLIES(!is_transmitter, dhn != viaNeigh->dhn));
 
 			if (dhn == self->dhn)
 				viaNeigh->neighIID4me = neighIID4x;
@@ -3229,7 +3229,7 @@ int32_t rx_msg_dhash_request(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	assertion(-500000, (it->pb->i.verifiedLink));
+	assertion(-502169, (it->pb->i.verifiedLink));
 
         struct packet_buff *pb = it->pb;
         struct hdr_dhash_request *hdr = (struct hdr_dhash_request*) (it->frame_data);
@@ -3306,8 +3306,8 @@ int32_t rx_msg_description_request(struct rx_frame_iterator *it)
 			return sizeof(struct msg_description_request);
 		}
 
-		assertion(-500000, (!pb->i.verifiedLink));
-		assertion(-500000, (pb->i.iif));
+		assertion(-502170, (!pb->i.verifiedLink));
+		assertion(-502171, (pb->i.iif));
 
 		schedule_tx_task(&pb->i.iif->dummyLink, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &msg->dhash, sizeof(DHASH_T));
 
@@ -3331,7 +3331,7 @@ STATIC_FUNC
 int32_t rx_msg_hello_adv(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-	assertion(-500000, (it->pb->i.verifiedLink));
+	assertion(-502172, (it->pb->i.verifiedLink));
 
 	LinkNode *link = it->pb->i.verifiedLink;
         struct msg_hello_adv *msg = (struct msg_hello_adv*) (it->msg);
@@ -3414,8 +3414,8 @@ void process_description_tlvs_del( struct orig_node *on, uint8_t ft_start, uint8
 STATIC_FUNC
 int8_t missed_mandatory_frames(struct rx_frame_iterator *it, int8_t f_start, int8_t f_end)
 {
-	assertion(-500000, (f_start >= 0));
-	assertion(-500000, (f_end <= it->db->handl_max));
+	assertion(-502173, (f_start >= 0));
+	assertion(-502174, (f_end <= it->db->handl_max));
 
 	if (it->process_filter != FRAME_TYPE_PROCESS_ALL || f_start > f_end)
 		return NO;
@@ -4412,14 +4412,14 @@ void update_my_description(void)
 
 	DHASH_T dhashOld = {.h.u32={0}};
 	if (!initializing) {
-		assertion(-500000, (self->dhn));
+		assertion(-502175, (self->dhn));
 		dhashOld = self->dhn->dhash;
-		assertion(-500000, IMPLIES(!initializing, !avl_find(&dhash_invalid_tree, &dhashOld)));
+		assertion(-502176, IMPLIES(!initializing, !avl_find(&dhash_invalid_tree, &dhashOld)));
 	}
 
 	update_neigh_dhash( self, dhnNew );
 
-	assertion(-500000, IMPLIES(!initializing, avl_find(&dhash_invalid_tree, &dhashOld)));
+	assertion(-502177, IMPLIES(!initializing, avl_find(&dhash_invalid_tree, &dhashOld)));
 
 	dbgf_sys(DBGT_INFO, "dhashOld=%s dhashNew=%s for nodeId=%s",
 		cryptShaAsString(&dhashOld), cryptShaAsString(&dhashNew), cryptShaAsString(&self->nodeId));
@@ -4464,8 +4464,8 @@ void update_my_description(void)
 
         my_description_changed = NO;
 
-	assertion(-500000, (self->dhn && self->dhn == avl_find_item(&dhash_tree, &self->dhn->dhash)));
-	assertion(-500000, (self == avl_find_item(&orig_tree, &self->nodeId)));
+	assertion(-502178, (self->dhn && self->dhn == avl_find_item(&dhash_tree, &self->dhn->dhash)));
+	assertion(-502179, (self == avl_find_item(&orig_tree, &self->nodeId)));
 
 	debugFree(frame_cache_array, -300585);
 	prof_stop(&prof);

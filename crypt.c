@@ -572,8 +572,8 @@ CRYPTKEY_T *cryptPubKeyFromRaw( uint8_t *rawKey, uint16_t rawKeyLen ) {
 }
 
 int cryptPubKeyCheck( CRYPTKEY_T *pubKey) {
-	assertion(-500000, (pubKey));
-	assertion(-500000, (pubKey->backendKey));
+	assertion(-502141, (pubKey));
+	assertion(-502142, (pubKey->backendKey));
 
 	rsa_context *rsa = (rsa_context*)pubKey->backendKey;
 
@@ -597,14 +597,14 @@ void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
 
 	if ((ret=mpi_write_binary(&rsa->N, rawBuff, sizeof(rawBuff) ))) {
 		dbgf_sys(DBGT_ERR, "failed mpi_write_binary ret=%d", ret);
-		cleanup_all(-500000);
+		cleanup_all(-502143);
 	}
 
 	for (rawStart = rawBuff; (!(*rawStart) && rawStart < (rawBuff + sizeof(rawBuff))); rawStart++);
 
 	uint32_t rawLen = ((rawBuff + sizeof(rawBuff)) - rawStart);
 
-	assertion(-500000, (cryptKeyTypeByLen(rawLen) != FAILURE));
+	assertion(-502144, (cryptKeyTypeByLen(rawLen) != FAILURE));
 
 	dbgf_sys(DBGT_INFO, "mpi_size=%d rawLen=%d rawBuff:\n%s",
 		mpi_size( &rsa->N ), rawLen, memAsHexStringSep(rawStart, rawLen, 16, "\n"));
@@ -778,7 +778,7 @@ int cryptEncrypt( uint8_t *in, size_t inLen, uint8_t *out, size_t *outLen, CRYPT
 
 	rsa_context *pk = pubKey->backendKey;
 
-	assertion(-500000, (*outLen >= pubKey->rawKeyLen));
+	assertion(-502145, (*outLen >= pubKey->rawKeyLen));
 
 	if (rsa_pkcs1_encrypt(pk, ctr_drbg_random, &ctr_drbg, RSA_PUBLIC, inLen, in, out))
 		return FAILURE;
@@ -793,7 +793,7 @@ int cryptDecrypt(uint8_t *in, size_t inLen, uint8_t *out, size_t *outLen) {
 
 	rsa_context *pk = my_PrivKey->backendKey;
 
-	assertion(-500000, (inLen >= my_PrivKey->rawKeyLen));
+	assertion(-502146, (inLen >= my_PrivKey->rawKeyLen));
 #if CRYPTLIB == POLARSSL_1_2_5
 	if (rsa_pkcs1_decrypt(pk, RSA_PRIVATE, &inLen, in, out, *outLen))
 		return FAILURE;
@@ -835,7 +835,7 @@ int cryptVerify(uint8_t *sign, size_t signLen, CRYPTSHA1_T *plainSha, CRYPTKEY_T
 
 	rsa_context *pk = pubKey->backendKey;
 
-	assertion(-500000, (signLen == pubKey->rawKeyLen));
+	assertion(-502147, (signLen == pubKey->rawKeyLen));
 
 #if CRYPTLIB == POLARSSL_1_2_5
 	if (rsa_pkcs1_verify(pk, RSA_PUBLIC, SIG_RSA_SHA1, sizeof(CRYPTSHA1_T), (uint8_t*)plainSha, sign))
@@ -860,7 +860,7 @@ int cryptVerify(uint8_t *sign, size_t signLen, CRYPTSHA1_T *plainSha, CRYPTKEY_T
 void cryptRand( void *out, int32_t outLen) {
 
 	if (entropy_func( &entropy_ctx, out, outLen) != 0)
-		cleanup_all(-500000);
+		cleanup_all(-502148);
 }
 
 STATIC_FUNC
@@ -872,7 +872,7 @@ void cryptRngInit( void ) {
 	entropy_init( &entropy_ctx );
 
 	if( (ret = ctr_drbg_init( &ctr_drbg, entropy_func, &entropy_ctx, NULL, 0)) != 0 )
-		cleanup_all(-500000);
+		cleanup_all(-502149);
 
 	int test=0;
 

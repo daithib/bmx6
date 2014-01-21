@@ -848,7 +848,7 @@ void free_orig_node(struct orig_node *on)
 /*	if (on==self)
 		return;
 */
-	assertion(-500000, IMPLIES(!terminating, on != self));
+	assertion(-502180, IMPLIES(!terminating, on != self));
 
         purge_orig_router(on, NULL, NO);
 
@@ -983,7 +983,7 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
 {
         TRACE_FUNCTION_CALL;
 
-	assertion(-500000, (verifiedLinkDhn));
+	assertion(-502181, (verifiedLinkDhn));
 
 	if (dev_idx < DEVADV_IDX_MIN)
 		return NULL;
@@ -993,13 +993,13 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
 
 	dbgf_all(DBGT_INFO, "NB=%s local_id=%s dev_idx=0x%X", ip6AsStr(llip), cryptShaAsString(local_id), dev_idx);
 
-	assertion(-500000, (local_id && !is_zero(local_id, sizeof(LOCAL_ID_T))));
+	assertion(-502182, (local_id && !is_zero(local_id, sizeof(LOCAL_ID_T))));
 
 
 
         if (local) {
-		assertion(-500000, IMPLIES(verifiedLinkDhn->local, verifiedLinkDhn->local == local));
-		assertion(-500000, (cryptShasEqual(&local->local_id, &verifiedLinkDhn->on->nodeId)));
+		assertion(-502183, IMPLIES(verifiedLinkDhn->local, verifiedLinkDhn->local == local));
+		assertion(-502184, (cryptShasEqual(&local->local_id, &verifiedLinkDhn->on->nodeId)));
 		assertion(-500517, (verifiedLinkDhn != self->dhn));
 		assertion(-500390, (verifiedLinkDhn && verifiedLinkDhn->on && verifiedLinkDhn->on->dhn == verifiedLinkDhn));
 
@@ -1056,7 +1056,7 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
                 local->link_adv_msg_for_him = LINKADV_MSG_IGNORED;
                 avl_insert(&local_tree, local, -300337);
 
-		assertion(-500000, (!verifiedLinkDhn->local));
+		assertion(-502185, (!verifiedLinkDhn->local));
 		local->dhn = verifiedLinkDhn;
 		verifiedLinkDhn->local = local;
 
@@ -1065,7 +1065,7 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
 		if (pkey_msg)
 			local->pktKey = cryptPubKeyFromRaw(pkey_msg->key, cryptKeyLenByType(pkey_msg->type));
 
-		assertion(-500000, IMPLIES(pkey_msg, local->pktKey && cryptPubKeyCheck(local->pktKey) == SUCCESS));
+		assertion(-502186, IMPLIES(pkey_msg, local->pktKey && cryptPubKeyCheck(local->pktKey) == SUCCESS));
 		assertion(-500953, (verifiedLinkDhn->local->dhn == verifiedLinkDhn));
 		assertion(-500949, (local->dhn->local == local));
 	}
@@ -1093,14 +1093,14 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
 
         linkDev->pkt_time_max = bmx_time;
 
-	assertion(-500000, (local));
-	assertion(-500000, (verifiedLinkDhn->local == local));
-	assertion(-500000, (cryptShasEqual(&local->local_id, &verifiedLinkDhn->on->nodeId)));
-        assertion(-500000, (verifiedLinkDhn != self->dhn));
-        ASSERTION(-500000, (linkDev == avl_find_item(&local->linkDev_tree, &linkDev->key.dev_idx)));
-        assertion(-500000, (verifiedLinkDhn && verifiedLinkDhn->on && verifiedLinkDhn->on->dhn == verifiedLinkDhn));
-        assertion(-500000, (verifiedLinkDhn->local->dhn == verifiedLinkDhn));
-        assertion(-500000, (local->dhn->local == local));
+	assertion(-502187, (local));
+	assertion(-502188, (verifiedLinkDhn->local == local));
+	assertion(-502189, (cryptShasEqual(&local->local_id, &verifiedLinkDhn->on->nodeId)));
+        assertion(-502190, (verifiedLinkDhn != self->dhn));
+        ASSERTION(-502191, (linkDev == avl_find_item(&local->linkDev_tree, &linkDev->key.dev_idx)));
+        assertion(-502192, (verifiedLinkDhn && verifiedLinkDhn->on && verifiedLinkDhn->on->dhn == verifiedLinkDhn));
+        assertion(-502193, (verifiedLinkDhn->local->dhn == verifiedLinkDhn));
+        assertion(-502194, (local->dhn->local == local));
 
         return linkDev;
 }
@@ -1111,7 +1111,7 @@ LinkNode *getLinkNode(struct dev_node *dev, IPX_T *llip, LINKADV_SQN_T link_sqn,
 {
         TRACE_FUNCTION_CALL;
 
-	assertion(-500000, (verifiedLinkDhn));
+	assertion(-502195, (verifiedLinkDhn));
 
         LinkNode *link = NULL;
 	LinkDevNode *linkDev = getLinkDevNode(dev, llip, link_sqn, verifiedLinkDhn, dev_idx);
@@ -1153,7 +1153,7 @@ LinkNode *getLinkNode(struct dev_node *dev, IPX_T *llip, LINKADV_SQN_T link_sqn,
 
         }
 
-	assertion(-500000, (link->k.linkDev == linkDev));
+	assertion(-502196, (link->k.linkDev == linkDev));
 
         link->pkt_time_max = bmx_time;
 
