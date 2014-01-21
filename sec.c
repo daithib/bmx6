@@ -205,7 +205,7 @@ int process_packet_signature(struct rx_frame_iterator *it)
 	it->pb->i.verifiedLinkDhn = dhn;
 
 finish:{
-	dbgf(goto_error_code ? DBGL_SYS : DBGL_SYS, goto_error_code ? DBGT_ERR : DBGT_INFO,
+	dbgf(goto_error_code ? DBGL_SYS : DBGL_ALL, goto_error_code ? DBGT_ERR : DBGT_INFO,
 		"%s verifying  data_len=%d data_sha=%s \n"
 		"sign_len=%d signature=%s\n"
 		"pkey_msg_type=%s pkey_msg_len=%d pkey_type=%s pkey=%s \n"
