@@ -290,7 +290,7 @@ int create_dsc_tlv_pktkey(struct tx_frame_iterator *it)
 
 		assertion(-500000, (my_PktKey->endOfLife));
 
-		if (((TIME_SEC_T) (my_PktKey->endOfLife - bmx_time_sec)) >= MAX_PACKET_SIGN_LT) {
+		if (((TIME_SEC_T) (my_PktKey->endOfLife - (bmx_time_sec+1))) >= MAX_PACKET_SIGN_LT) {
 			task_remove(update_dsc_tlv_pktkey, NULL);
 			cryptKeyFree(&my_PktKey);
 		}
@@ -718,10 +718,9 @@ int32_t opt_packetSigning(uint8_t cmd, uint8_t _save, struct opt_type *opt, stru
 			if ( cmd == OPT_APPLY )
 				my_description_changed = YES;
 
-			if (!val) {
-				task_remove(update_dsc_tlv_pktkey, NULL);
-				cryptKeyFree(&my_PktKey);
-			}
+			task_remove(update_dsc_tlv_pktkey, NULL);
+			cryptKeyFree(&my_PktKey);
+
 
 
 		} else if (!strcmp(opt->name, ARG_PACKET_SIGN_LT)) {
