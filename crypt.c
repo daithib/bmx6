@@ -533,7 +533,7 @@ void cryptKeyFree( CRYPTKEY_T **cryptKey ) {
 
 	debugFree( (*cryptKey), -300614);
 
-	cryptKey = NULL;
+	*cryptKey = NULL;
 }
 
 
