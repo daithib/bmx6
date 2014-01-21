@@ -72,11 +72,12 @@ int create_packet_signature(struct tx_frame_iterator *it)
 
 	if (it->frame_type==FRAME_TYPE_SIGNATURE_ADV) {
 
-		msg = (struct frame_msg_signature*) (it->frames_out_ptr + it->frames_out_pos + sizeof(struct tlv_hdr));
+		msg = (struct frame_msg_signature*)tx_iterator_cache_msg_ptr(it);
 		msg->dhash = self->dhn->dhash;
 		msg->type = my_PktKey ? my_PktKey->rawKeyType : 0;
 
 		if (msg->type) {
+			msg = (struct frame_msg_signature*) (it->frames_out_ptr + it->frames_out_pos + sizeof(struct tlv_hdr));
 			dataOffset = it->frames_out_pos + sizeof(struct tlv_hdr) + sizeof(struct frame_msg_signature) + my_PktKey->rawKeyLen;
 			return sizeof(struct frame_msg_signature) + my_PktKey->rawKeyLen;
 		} else {

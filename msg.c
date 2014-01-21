@@ -3303,12 +3303,13 @@ int32_t rx_msg_description_request(struct rx_frame_iterator *it)
         struct hdr_description_request *hdr = (struct hdr_description_request*) (it->frame_data);
         struct msg_description_request *msg = (struct msg_description_request*) (it->msg);
 
+	dbgf_track(DBGT_INFO, "%s NB %s destination_local_id=%s dhash=%s",
+		it->handl->name, pb->i.llip_str, cryptShaAsString(&hdr->destination_local_id), cryptShaAsString(&msg->dhash));
+
         if (is_zero(&hdr->destination_local_id, sizeof(LOCAL_ID_T)) ?
 		(cryptShasEqual(&msg->dhash, &self->dhn->dhash)) :
 		(cryptShasEqual(&hdr->destination_local_id, &self->nodeId))) {
 
-		dbgf_track(DBGT_INFO, "%s NB %s destination_local_id=%s dhash=%s",
-			it->handl->name, pb->i.llip_str, cryptShaAsString(&hdr->destination_local_id), cryptShaAsString(&msg->dhash));
 
 		struct dhash_node *dhn = avl_find_item(&dhash_tree, &msg->dhash);
 		struct orig_node *on = dhn ? dhn->on : NULL;
