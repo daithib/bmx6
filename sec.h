@@ -36,8 +36,8 @@
 
 #define ARG_PACKET_SIGN "packetSignLen"
 #define MIN_PACKET_SIGN 0
-#define MAX_PACKET_SIGN 1024
-#define DEF_PACKET_SIGN 512
+#define MAX_PACKET_SIGN 2048
+#define DEF_PACKET_SIGN 768
 #define HLP_PACKET_SIGN "sign outgoing packets with given RSA key length"
 
 
