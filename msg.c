@@ -2138,7 +2138,8 @@ int32_t tx_frame_description_adv(struct tx_frame_iterator *it)
 
 	if (!dhn || !dhn->on) {
 		dbgf_sys(DBGT_WARN, "%s dhash=%s!", dhn ? "INVALID" : "UNKNOWN", cryptShaAsString(dhash));
-                assertion(-500977, (dhn && !dhn->on)); // a meanwhile invalidated dhn migh have been scheduled when it was still valid
+                assertion(-500977, (!dhn)); // a meanwhile invalidated dhn migh have been scheduled when it was still valid
+		assertion(-500000, (avl_find(&dhash_invalid_tree, dhash)));
                 return TLV_TX_DATA_DONE;
         }
 
