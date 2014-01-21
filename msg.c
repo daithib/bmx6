@@ -3325,6 +3325,9 @@ int32_t rx_msg_description_request(struct rx_frame_iterator *it)
 			return sizeof(struct msg_description_request);
 		}
 
+		assertion(-500000, (!pb->i.verifiedLink));
+		assertion(-500000, (pb->i.iif));
+
 		LinkNode *linkNode = pb->i.verifiedLink ? pb->i.verifiedLink->k.linkDev->local->best_tp_link : &pb->i.iif->dummyLink;
 
 		schedule_tx_task(linkNode, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &msg->dhash, sizeof(DHASH_T));
