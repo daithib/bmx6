@@ -3101,23 +3101,29 @@ int32_t rx_frame_ogm_acks(struct rx_frame_iterator *it)
 
 
 
+
 STATIC_FUNC
-struct dhash_node *process_dhash_description_neighIID4x(struct packet_buff *pb, DHASH_T *dhash, IID_T neighIID4x)
+int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
-        assertion(-500688, (dhash));
-	assertion(-500000, (pb->i.verifiedLink));
-	assertion(-500000, (neighIID4x > IID_RSVD_MAX));
 
-	struct dhash_node *dhn = NULL, *dhnOld = NULL;
+        struct packet_buff *pb = it->pb;
+        struct msg_dhash_adv *adv = (struct msg_dhash_adv*) (it->msg);
+	DHASH_T *dhash = &adv->dhash;
+        IID_T neighIID4x = ntohs(adv->transmitterIID4x);
+
+        dbgf_track(DBGT_INFO, "dhash=%s via NB: %s", cryptShaAsString(dhash), pb->i.llip_str);
+	assertion(-500000, (it->pb->i.verifiedLink));
+        assertion(-500689, (!cryptShasEqual(&pb->i.verifiedLink->k.linkDev->local->dhn->dhash, &(self->dhn->dhash)))); // cant be transmitter' and myselfs'
 
 	struct neigh_node *viaNeigh = pb->i.verifiedLink->k.linkDev->local;
         struct description_cache_node *cache = NULL;
 	IDM_T is_transmitter = cryptShasEqual(dhash, &viaNeigh->dhn->dhash);
+	struct dhash_node *dhn = NULL, *dhnOld = NULL;
 
-        assertion(-500689, (!(is_transmitter && cryptShasEqual(dhash, &(self->dhn->dhash))))); // cant be transmitter' and myselfs'
 
-	dbgf_sys(DBGT_INFO, "dhash=%s", cryptShaAsString(dhash));
+        if (neighIID4x <= IID_RSVD_MAX)
+                return TLV_RX_DATA_FAILURE;
 
 	if (avl_find(&dhash_invalid_tree, dhash)) {
 
@@ -3128,21 +3134,23 @@ struct dhash_node *process_dhash_description_neighIID4x(struct packet_buff *pb, 
 		(dhn = process_description(pb, cache, dhash)) ) ) {
 
 		if (dhn == REJECTED_PTR) {
-				
+
 			invalidate_dhash(NULL, dhash);
-			
+
 		} else if (dhn == FAILURE_PTR || dhn == UNRESOLVED_PTR) {
 
+		} else if (iid_set_neighIID4x(&viaNeigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE) {
+
+			dhn = (struct dhash_node*)FAILURE_PTR;
+			
 		} else {
+			assertion(-500690, (dhn && dhn->on)); // UNDESCRIBED or fully described
 			assertion(-500000, IMPLIES(is_transmitter, dhn == viaNeigh->dhn));
 			assertion(-500000, IMPLIES(!is_transmitter, dhn != viaNeigh->dhn));
 
 			if (dhn == self->dhn)
 				viaNeigh->neighIID4me = neighIID4x;
-
-			if (iid_set_neighIID4x(&viaNeigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE)
-				return(struct dhash_node *) FAILURE_PTR;
-
+			
 			if (!dhnOld && desc_adv_tx_unsolicited)
 				schedule_best_tp_links(viaNeigh, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
 
@@ -3150,7 +3158,10 @@ struct dhash_node *process_dhash_description_neighIID4x(struct packet_buff *pb, 
 				schedule_best_tp_links(NULL, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
 
 		}
-        }
+        } else {
+		schedule_tx_task(viaNeigh->best_tp_link, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, &adv->dhash, sizeof(adv->dhash));
+
+	}
 
 	dbgf_track(DBGT_INFO, "via dev=%s NB=%s dhash=%8X..  cache=%s dhn=%s neighIID4x=%d is_transmitter=%d (on)nodeId=%s",
                 pb->i.iif->label_cfg.str, pb->i.llip_str, dhash->h.u32[0],
@@ -3161,43 +3172,12 @@ struct dhash_node *process_dhash_description_neighIID4x(struct packet_buff *pb, 
 		((dhn && dhn!=FAILURE_PTR && dhn!=UNRESOLVED_PTR && dhn!=REJECTED_PTR && dhn->on) ?
 			cryptShaAsString(&dhn->on->nodeId) : DBG_NIL));
 
-        return dhn;
-}
 
 
-STATIC_FUNC
-int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
-{
-        TRACE_FUNCTION_CALL;
-        struct packet_buff *pb = it->pb;
-        struct msg_dhash_adv *adv = (struct msg_dhash_adv*) (it->msg);
-        IID_T neighIID4x = ntohs(adv->transmitterIID4x);
-        struct dhash_node *dhn;
-
-        dbgf_track(DBGT_INFO, "via NB: %s", pb->i.llip_str);
-
-	assertion(-500000, (pb->i.verifiedLink));
-
-        if (neighIID4x <= IID_RSVD_MAX)
-                return TLV_RX_DATA_FAILURE;
-
-	if ((dhn = process_dhash_description_neighIID4x(pb, &adv->dhash, neighIID4x)) == FAILURE_PTR) {
-                
+	if (dhn == FAILURE_PTR)
 		return TLV_RX_DATA_FAILURE;
-
-	} else if (dhn == UNRESOLVED_PTR || dhn == REJECTED_PTR) {
-
-	} else if (dhn == NULL) {
-
-		schedule_tx_task(pb->i.verifiedLink->k.linkDev->local->best_tp_link, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, &adv->dhash, sizeof(adv->dhash));
-
-	} else {
-
-		assertion(-500690, (dhn && dhn->on)); // UNDESCRIBED or fully described
-		//if rcvd transmitters' description then it must have become a described neighbor:
-	}
-
-        return sizeof (struct msg_dhash_adv);
+	else
+		return sizeof (struct msg_dhash_adv);
 }
 
 
@@ -3328,12 +3308,10 @@ int32_t rx_msg_description_request(struct rx_frame_iterator *it)
 		assertion(-500000, (!pb->i.verifiedLink));
 		assertion(-500000, (pb->i.iif));
 
-		LinkNode *linkNode = pb->i.verifiedLink ? pb->i.verifiedLink->k.linkDev->local->best_tp_link : &pb->i.iif->dummyLink;
-
-		schedule_tx_task(linkNode, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &msg->dhash, sizeof(DHASH_T));
+		schedule_tx_task(&pb->i.iif->dummyLink, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &msg->dhash, sizeof(DHASH_T));
 
 		if (dhash_adv_tx_unsolicited)
-			schedule_tx_task(linkNode, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
+			schedule_tx_task(&pb->i.iif->dummyLink, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
 
 
 		// most probably the requesting node is also interested in my metric to the requested node:
