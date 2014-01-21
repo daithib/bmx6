@@ -3310,6 +3310,8 @@ int32_t rx_msg_description_request(struct rx_frame_iterator *it)
 		(cryptShasEqual(&msg->dhash, &self->dhn->dhash)) :
 		(cryptShasEqual(&hdr->destination_local_id, &self->nodeId))) {
 
+		dbgf_track(DBGT_INFO, "%s NB %s destination_local_id=%s dhash=%s",
+			it->handl->name, pb->i.llip_str, cryptShaAsString(&hdr->destination_local_id), cryptShaAsString(&msg->dhash));
 
 		struct dhash_node *dhn = avl_find_item(&dhash_tree, &msg->dhash);
 		struct orig_node *on = dhn ? dhn->on : NULL;
