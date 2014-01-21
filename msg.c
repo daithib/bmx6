@@ -4124,7 +4124,6 @@ void next_tx_task_list(struct dev_node *dev, struct tx_frame_iterator *it, struc
         return;
 }
 
-STATIC_FUNC
 void tx_packet(void *devp)
 {
         TRACE_FUNCTION_CALL;
