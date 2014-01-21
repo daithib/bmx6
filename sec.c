@@ -777,8 +777,6 @@ void init_sec( void )
 	handl.rx_processUnVerifiedLink = 1;
 	handl.min_msg_size = sizeof(struct frame_msg_signature);
         handl.fixed_msg_size = 0;
-	handl.dextReferencing = (int32_t*)&always_fref;
-	handl.dextCompression = (int32_t*)&never_fzip;
         handl.tx_frame_handler = create_packet_signature;
         handl.rx_frame_handler = process_packet_signature;
 	handl.msg_format = frame_signature_format;
@@ -838,7 +836,7 @@ void init_sec( void )
 	handl.alwaysMandatory = 0;
         handl.min_msg_size = sizeof(struct dsc_msg_pubkey);
         handl.fixed_msg_size = 0;
-	handl.dextReferencing = (int32_t*)&never_fref;
+	handl.dextReferencing = (int32_t*)&always_fref;
 	handl.dextCompression = (int32_t*)&never_fzip;
         handl.tx_frame_handler = create_dsc_tlv_pktkey;
         handl.rx_frame_handler = process_dsc_tlv_pubKey;
