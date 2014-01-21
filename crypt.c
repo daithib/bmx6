@@ -994,28 +994,37 @@ int cryptShasEqual( CRYPTSHA1_T *sha1, CRYPTSHA1_T *sha2)
 int cryptKeyTypeByLen(int len) {
 	return 	len == CRYPT_RSA512_LEN ? CRYPT_RSA512_TYPE : (
 		len == CRYPT_RSA768_LEN ? CRYPT_RSA768_TYPE : (
+		len == CRYPT_RSA896_LEN ? CRYPT_RSA896_TYPE : (
 		len == CRYPT_RSA1024_LEN ? CRYPT_RSA1024_TYPE : (
+		len == CRYPT_RSA1536_LEN ? CRYPT_RSA1536_TYPE : (
 		len == CRYPT_RSA2048_LEN ? CRYPT_RSA2048_TYPE : (
+		len == CRYPT_RSA3072_LEN ? CRYPT_RSA3072_TYPE : (
 		len == CRYPT_RSA4096_LEN ? CRYPT_RSA4096_TYPE : (
-		FAILURE )))));
+		FAILURE ))))))));
 }
 
 int cryptKeyLenByType(int type) {
 	return 	type == CRYPT_RSA512_TYPE ? CRYPT_RSA512_LEN : (
 		type == CRYPT_RSA768_TYPE ? CRYPT_RSA768_LEN : (
+		type == CRYPT_RSA896_TYPE ? CRYPT_RSA896_LEN : (
 		type == CRYPT_RSA1024_TYPE ? CRYPT_RSA1024_LEN : (
+		type == CRYPT_RSA1536_TYPE ? CRYPT_RSA1536_LEN : (
 		type == CRYPT_RSA2048_TYPE ? CRYPT_RSA2048_LEN : (
+		type == CRYPT_RSA3072_TYPE ? CRYPT_RSA3072_LEN : (
 		type == CRYPT_RSA4096_TYPE ? CRYPT_RSA4096_LEN : (
-		FAILURE )))));
+		FAILURE ))))))));
 }
 
 char *cryptKeyTypeAsString(int type) {
 	return 	type == CRYPT_RSA512_TYPE ? CRYPT_RSA512_NAME : (
 		type == CRYPT_RSA768_TYPE ? CRYPT_RSA768_NAME : (
+		type == CRYPT_RSA896_TYPE ? CRYPT_RSA896_NAME : (
 		type == CRYPT_RSA1024_TYPE ? CRYPT_RSA1024_NAME : (
+		type == CRYPT_RSA1536_TYPE ? CRYPT_RSA1536_NAME : (
 		type == CRYPT_RSA2048_TYPE ? CRYPT_RSA2048_NAME : (
+		type == CRYPT_RSA3072_TYPE ? CRYPT_RSA3072_NAME : (
 		type == CRYPT_RSA4096_TYPE ? CRYPT_RSA4096_NAME : (
-		NULL )))));
+		NULL ))))))));
 }
 
 void init_crypt(void) {
