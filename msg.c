@@ -3656,35 +3656,6 @@ rx_frame_iterate_error: {
 
 
 
-IDM_T rx_frames(struct packet_buff *pb)
-{
-        TRACE_FUNCTION_CALL;
-        int32_t result;
-
-        struct rx_frame_iterator it = {
-                .caller = __FUNCTION__, .onOld = NULL, .op = 0, .pb = pb,
-                .db = packet_frame_db, .process_filter = FRAME_TYPE_PROCESS_ALL,
-                .frame_type = -1, .frames_in = (pb->p.data + sizeof (struct packet_header)),
-                .frames_length = (pb->i.length - sizeof (struct packet_header)),
-		.dhnNew = NULL
-	};
-
-        while ((result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE);
-
-        if (result <= TLV_RX_DATA_FAILURE) {
-                dbgf_sys(DBGT_WARN, "problematic frame_type=%s data_length=%d result=%s pos=%d ",
-                        it.db->handls[it.frame_type].name, it.frame_data_length, tlv_rx_result_str(result), it.frames_pos);
-                return FAILURE;
-        }
-
-
-        return SUCCESS;
-}
-
-
-
-
-
 
 STATIC_FUNC
 int8_t send_udp_packet(struct packet_buff *pb, struct sockaddr_storage *dst, int32_t send_sock)
@@ -4670,6 +4641,34 @@ int32_t opt_update_dext_method(uint8_t cmd, uint8_t _save, struct opt_type *opt,
 	return SUCCESS;
 }
 
+
+STATIC_FUNC
+IDM_T rx_frames(struct packet_buff *pb)
+{
+        TRACE_FUNCTION_CALL;
+        int32_t result;
+
+        struct rx_frame_iterator it = {
+                .caller = __FUNCTION__, .onOld = NULL, .op = 0, .pb = pb,
+                .db = packet_frame_db, .process_filter = FRAME_TYPE_PROCESS_ALL,
+                .frame_type = -1, .frames_in = (pb->p.data + sizeof (struct packet_header)),
+                .frames_length = (pb->i.length - sizeof (struct packet_header)),
+		.dhnNew = NULL
+	};
+
+        while ((result = rx_frame_iterate(&it)) > TLV_RX_DATA_DONE);
+
+        if (result <= TLV_RX_DATA_FAILURE) {
+                dbgf_sys(DBGT_WARN, "problematic frame_type=%s data_length=%d result=%s pos=%d ",
+                        it.db->handls[it.frame_type].name, it.frame_data_length, tlv_rx_result_str(result), it.frames_pos);
+                return FAILURE;
+        }
+
+
+        return SUCCESS;
+}
+
+
 void rx_packet( struct packet_buff *pb )
 {
         TRACE_FUNCTION_CALL;
@@ -4679,22 +4678,21 @@ void rx_packet( struct packet_buff *pb )
 	static struct prof_ctx prof = { .k={.func=(void(*)(void))rx_packet}, .name=__FUNCTION__, .parent_func= (void (*) (void))main};
 	prof_start(&prof);
 
-        struct dev_node *iif = pb->i.iif;
-	struct packet_header *phdr = &pb->p.hdr;
-
+	pb->i.verifiedLink = NULL;
+	pb->i.verifiedLinkDhn = NULL;
 	pb->i.llip = (*((struct sockaddr_in6*) &(pb->i.addr))).sin6_addr;
         ip6ToStr(&pb->i.llip, pb->i.llip_str);
 
 	struct dev_ip_key any_key = { .ip = pb->i.llip, .idx = 0 };
 	struct dev_node *anyIf;
 
-        assertion(-500841, ((iif->active && iif->if_llocal_addr)));
+        assertion(-500841, ((pb->i.iif->active && pb->i.iif->if_llocal_addr)));
 
         if (drop_all_packets)
                 goto finish;
 
-	if (pb->i.length < (int)sizeof(phdr->comp_version) ||
-		phdr->comp_version < (my_compatibility - 1) || phdr->comp_version > (my_compatibility + 1))
+	if (pb->i.length < (int)sizeof(pb->p.hdr.comp_version) ||
+		pb->p.hdr.comp_version < (my_compatibility - 1) || pb->p.hdr.comp_version > (my_compatibility + 1))
                 goto process_packet_error;
 
 	if ((pb->i.length != (int) (sizeof(struct packet_header)) &&
@@ -4719,11 +4717,12 @@ void rx_packet( struct packet_buff *pb )
                 goto finish;
 
 
-        dbgf_all(DBGT_INFO, "via %s %s %s size %d", iif->label_cfg.str, iif->ip_llocal_str, pb->i.llip_str, pb->i.length);
+        dbgf_all(DBGT_INFO, "via %s %s %s size %d", 
+		pb->i.iif->label_cfg.str, pb->i.iif->ip_llocal_str, pb->i.llip_str, pb->i.length);
 
         dbgf_all(DBGT_INFO, "version=%i, reserved=%X, size=%i rcvd udp_len=%d via NB %s %s %s",
-                phdr->comp_version, phdr->reserved, pb->i.length,
-                pb->i.length, pb->i.llip_str, iif->label_cfg.str, pb->i.unicast ? "UNICAST" : "BRC");
+                pb->p.hdr.comp_version, pb->p.hdr.reserved, pb->i.length,
+                pb->i.length, pb->i.llip_str, pb->i.iif->label_cfg.str, pb->i.unicast ? "UNICAST" : "BRC");
 
 
 
@@ -4735,7 +4734,7 @@ process_packet_error:
 
         dbgf_sys(DBGT_WARN,
                 "Drop (remaining) problematic packet: via NB=%s dev=%s len=%d my_version=%d version=%i capabilities=%d",
-		pb->i.llip_str, iif->label_cfg.str, pb->i.length, my_compatibility, phdr->comp_version, phdr->reserved);
+		pb->i.llip_str, pb->i.iif->label_cfg.str, pb->i.length, my_compatibility, pb->p.hdr.comp_version, pb->p.hdr.reserved);
 
         blacklist_neighbor(pb);
 

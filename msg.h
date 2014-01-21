@@ -929,7 +929,6 @@ SHA1_T *ref_node_key(uint8_t *f_body, uint32_t f_body_len, uint8_t compression, 
 void ref_node_purge (IDM_T all_unused);
 
 void tx_packets( void *unused );
-IDM_T rx_frames(struct packet_buff *pb);
 int32_t rx_frame_iterate(struct rx_frame_iterator* it);
 
 void rx_packet( struct packet_buff *pb );
