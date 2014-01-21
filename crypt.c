@@ -85,7 +85,7 @@ uint8_t * mp_int_get_raw( mp_int *in, uint16_t *rawLen) {
 
 	int s = XKEY_DP_SZ;
 	int u = in->used;
-	*rawLen = ( ( ((s*u*8)-((u)*4)) / CRYPT_KEY_N_MIN ) * CRYPT_KEY_N_MIN) / 8;
+	*rawLen = ( ( ((s*u*8)-((u)*4)) / CRYPT_KEY_N_MOD ) * CRYPT_KEY_N_MOD) / 8;
 	int w = ((*rawLen*8) / ((s*8)-4)) + (((*rawLen*8) % ((s*8)-4)) ? 1 : 0);
 	int zeros = (s*u)-(*rawLen);
 
@@ -125,7 +125,7 @@ uint8_t * mp_int_get_raw( mp_int *in, uint16_t *rawLen) {
 	
 	dbgf_sys(DBGT_INFO, "raw:\n%s", memAsHexStringSep( raw, *rawLen, 16, "\n"));
 
-	assertion(-502020, (*rawLen >= (CRYPT_KEY_N_MIN/8))); // too small key!?
+	assertion(-502020, (*rawLen >= (CRYPT_KEY_N_MOD/8))); // too small key!?
 	assertion(-502021, (!is_zero( begin, 4))); // strange key with 4 leading octets!
 	assertion(-502022, (is_zero(tmp, zeros)));
 
