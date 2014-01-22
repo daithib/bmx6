@@ -3273,6 +3273,8 @@ int32_t rx_msg_dhash_request(struct rx_frame_iterator *it)
 
         assertion(-500251, (dhn && dhn->myIID4orig == myIID4x));
 
+	dhn->referred_by_me_timestamp = bmx_time;
+
 	schedule_tx_task(pb->i.verifiedLink->k.linkDev->local->best_tp_link, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &myIID4x, sizeof(IID_T));
 
         // most probably the requesting node is also interested in my metric to the requested node:
@@ -3318,6 +3320,8 @@ int32_t rx_msg_description_request(struct rx_frame_iterator *it)
 
 			return sizeof(struct msg_description_request);
 		}
+
+		dhn->referred_by_me_timestamp = bmx_time;
 
 		schedule_tx_task(&pb->i.iif->dummyLink, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &msg->dhash, sizeof(DHASH_T));
 
