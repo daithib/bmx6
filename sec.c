@@ -138,13 +138,19 @@ int process_packet_signature(struct rx_frame_iterator *it)
 
 	prof_start(&prof);
 
+	if (!(dhnOld = dhn = get_dhash_tree_node(&msg->dhash))) {
+		prof_stop(&prof);
+		return TLV_RX_DATA_DONE;
+	}
+
+	/*
 	if (((dhnOld = dhn = get_dhash_tree_node(&msg->dhash)) || (dhn = process_description(it->pb, &msg->dhash)) || !dhn) &&
 		(dhn == NULL || dhn == UNRESOLVED_PTR || dhn == REJECTED_PTR || dhn == FAILURE_PTR)) {
 
 		prof_stop(&prof);
 		return TLV_RX_DATA_DONE;
 	}
-
+	*/
 	assertion(-502198, (dhn));
 	assertion(-502199, (dhn->on));
 
@@ -221,7 +227,7 @@ finish:{
 	}
 
 	if (goto_error_code && !dhnOld && dhn) {
-		IDM_T TODO_DO_not_invalidate_previous_existing_orig_nor_block_myIID4x_reserved_for_this_node_because_It_was_never_used;
+		IDM_T TODO_unknown_descriptions_packet_signature_must_be_checked_with_only_tested_process_description_to_not_leave_blocked_myIID4x;
 		free_orig_node(dhn->on);
 	}
 

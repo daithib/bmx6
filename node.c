@@ -451,10 +451,14 @@ void iid_free_neighIID4x_by_myIID4x( struct iid_repos *rep, IID_T myIID4x)
  Data Infrastructure
  ************************************************************/
 
-void blacklist_neighbor(struct packet_buff *pb)
+void blacklist_neighbor_if_verified(struct packet_buff *pb)
 {
         TRACE_FUNCTION_CALL;
-        dbgf_sys(DBGT_ERR, "%s via %s", pb->i.llip_str, pb->i.iif->label_cfg.str);
+        dbgf_sys(DBGT_ERR, "%s via %s verifiedLinkDhn=%d", pb->i.llip_str, pb->i.iif->label_cfg.str, pb->i.verifiedLinkDhn);
+
+	if (pb->i.verifiedLinkDhn) {
+		//TODO: only blacklist neighbor if verifiedLinkDhn
+	}
 
         EXITERROR(-500697, (0));
 }

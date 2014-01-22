@@ -542,7 +542,7 @@ IID_NODE_T* iid_get_node_by_myIID4x( IID_T myIID4x );
 
 LinkNode *getLinkNode(struct dev_node *dev, IPX_T *llip, LINKADV_SQN_T link_sqn, struct dhash_node *verifiedLinkDhn, DEVADV_IDX_T dev_idx);
 
-void blacklist_neighbor(struct packet_buff *pb);
+void blacklist_neighbor_if_verified(struct packet_buff *pb);
 
 IDM_T blacklisted_neighbor(struct packet_buff *pb, DHASH_T *dhash);
 

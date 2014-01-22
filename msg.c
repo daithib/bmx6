@@ -85,6 +85,8 @@ static int32_t link_adv_tx_unsolicited = DEF_LINK_ADV_UNSOLICITED;
 static int32_t dextReferencing = DEF_FREF;
 static int32_t dextCompression = DEF_FZIP;
 
+static int32_t processDescriptionsViaUnverifiedLink = 1;
+
 union schedule_hello_info {
         uint8_t u8[2];
         uint16_t u16;
@@ -1780,7 +1782,7 @@ struct dhash_node * process_description(struct packet_buff *pb, DHASH_T *dhash)
         ASSERTION(-500381, (!get_dhash_tree_node( dhash )));
 	ASSERTION(-500000, (!avl_find_item(&dhash_invalid_tree, dhash)));
 
-	struct description_cache_node *cache = (struct description_cache_node *)avl_find_item(&description_cache_tree, dhash);
+	struct description_cache_node *cache = avl_find_item(&description_cache_tree, dhash);
 
 	if (!cache) {
 		LinkNode *link = pb->i.verifiedLink ? pb->i.verifiedLink->k.linkDev->local->best_tp_link : &pb->i.iif->dummyLink;
@@ -1888,7 +1890,7 @@ process_desc0_error:
 
 	} else {
 		assertion(-502158, (result==TLV_RX_DATA_FAILURE));
-		blacklist_neighbor(pb);
+		blacklist_neighbor_if_verified(pb);
 		return (struct dhash_node *) FAILURE_PTR;
 	}
 }
@@ -3139,7 +3141,7 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
 			dhn = (struct dhash_node*)FAILURE_PTR;
 			
 		} else {
-			assertion(-500690, (dhn && dhn->on)); // UNDESCRIBED or fully described
+			ASSERTION(-500000, (dhn == get_dhash_tree_node(dhash)));
 			assertion(-502167, IMPLIES(is_transmitter, dhn == viaNeigh->dhn));
 			assertion(-502168, IMPLIES(!is_transmitter, dhn != viaNeigh->dhn));
 
@@ -3194,18 +3196,37 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 	if (rhashHdr->compression || rhashHdr->reserved || rhashHdr->expanded_type != BMX_DSC_TLV_DSC_PUBKEY)
 		goto_error(finish, TLV_RX_DATA_FAILURE);
 
+	struct dhash_node *dhn = NULL;
 	DHASH_T dhash;
-	struct packet_buff *pb = it->pb;
 
 	cryptShaAtomic(it->frame_data, it->frame_data_length, &dhash);
 
 	dbgf_sys( DBGT_INFO, "rcvd dhash=%s nodeId=%s via_dev=%s via_ip=%s",
 		memAsHexString(&dhash, sizeof(SHA1_T)),
 		nodeIdAsStringFromDescAdv(it->frame_data),
-		pb->i.iif->label_cfg.str, pb->i.llip_str);
+		it->pb->i.iif->label_cfg.str, it->pb->i.llip_str);
 
-	if (!avl_find(&dhash_invalid_tree, &dhash) && !get_dhash_tree_node(&dhash))
+	if (avl_find(&dhash_invalid_tree, &dhash) && !(dhn=get_dhash_tree_node(&dhash)))
 		cache_description(it->frame_data, it->frame_data_length, &dhash);
+
+	if (processDescriptionsViaUnverifiedLink && !dhn && (dhn = process_description(it->pb, &dhash))) {
+
+		if (dhn == FAILURE_PTR) {
+
+			goto_error(finish, TLV_RX_DATA_FAILURE);
+
+		} else if (dhn != REJECTED_PTR && dhn != UNRESOLVED_PTR) {
+
+			ASSERTION(-500000, (dhn == get_dhash_tree_node(&dhash)));
+
+			if (desc_adv_tx_unsolicited)
+				schedule_best_tp_links(NULL, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
+
+			if (dhash_adv_tx_unsolicited)
+				schedule_best_tp_links(NULL, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
+		}
+	}
+
 	
         goto_error(finish, it->frame_data_length);
 
@@ -4704,7 +4725,7 @@ process_packet_error:
                 "Drop (remaining) problematic packet: via NB=%s dev=%s len=%d my_version=%d version=%i capabilities=%d",
 		pb->i.llip_str, pb->i.iif->label_cfg.str, pb->i.length, my_compatibility, pb->p.hdr.comp_version, pb->p.hdr.reserved);
 
-        blacklist_neighbor(pb);
+        blacklist_neighbor_if_verified(pb);
 
 finish:
 	prof_stop(&prof);
