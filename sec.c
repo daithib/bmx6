@@ -138,21 +138,21 @@ int process_packet_signature(struct rx_frame_iterator *it)
 
 	prof_start(&prof);
 
-	if (!(dhnOld = dhn = get_dhash_tree_node(&msg->dhash))) {
-		prof_stop(&prof);
-		return TLV_RX_DATA_DONE;
-	}
-
-	/*
 	if (((dhnOld = dhn = get_dhash_tree_node(&msg->dhash)) || (dhn = process_description(it->pb, &msg->dhash)) || !dhn) &&
 		(dhn == NULL || dhn == UNRESOLVED_PTR || dhn == REJECTED_PTR || dhn == FAILURE_PTR)) {
 
 		prof_stop(&prof);
-		return TLV_RX_DATA_DONE;
+
+		if (dhn==FAILURE_PTR)
+			return TLV_RX_DATA_FAILURE;
+		else
+			return TLV_RX_DATA_DONE;
 	}
-	*/
-	assertion(-502198, (dhn));
-	assertion(-502199, (dhn->on));
+
+
+
+
+	assertion(-502198, (dhn && dhn == get_dhash_tree_node(&msg->dhash)));
 
 	int32_t sign_len = it->frame_data_length - sizeof(struct frame_msg_signature);
 	uint8_t *data = it->frame_data + it->frame_data_length;
@@ -226,7 +226,7 @@ finish:{
 			schedule_best_tp_links(NULL, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
 	}
 
-	if (goto_error_code && !dhnOld && dhn) {
+	if (goto_error_code && !dhnOld && dhn && !processDescriptionsViaUnverifiedLink) {
 		IDM_T TODO_unknown_descriptions_packet_signature_must_be_checked_with_only_tested_process_description_to_not_leave_blocked_myIID4x;
 		free_orig_node(dhn->on);
 	}
@@ -235,7 +235,7 @@ finish:{
 
 	if (goto_error_code) {
 		EXITERROR(-502202, (0));
-		return TLV_RX_DATA_DONE;
+		return TLV_RX_DATA_FAILURE;
 	}
 
 	return TLV_RX_DATA_PROCESSED;

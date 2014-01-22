@@ -85,7 +85,7 @@ static int32_t link_adv_tx_unsolicited = DEF_LINK_ADV_UNSOLICITED;
 static int32_t dextReferencing = DEF_FREF;
 static int32_t dextCompression = DEF_FZIP;
 
-static int32_t processDescriptionsViaUnverifiedLink = 1;
+int32_t processDescriptionsViaUnverifiedLink = 1;
 
 union schedule_hello_info {
         uint8_t u8[2];
