@@ -298,15 +298,6 @@ void register_frame_handler(struct frame_db *db, int pos, struct frame_handl *ha
 
 
 
-
-
-struct description_cache_node * get_cached_description(DHASH_T *dhash)
-{
-        TRACE_FUNCTION_CALL;
-
-        return (struct description_cache_node *)avl_find_item(&description_cache_tree, dhash);
-}
-
 STATIC_FUNC
 void del_cached_description(DHASH_T *dhash)
 {
@@ -1782,11 +1773,20 @@ resolve_ref_frame_error:
 }
 
 
-struct dhash_node * process_description(struct packet_buff *pb, struct description_cache_node *cache, DHASH_T *dhash)
+struct dhash_node * process_description(struct packet_buff *pb, DHASH_T *dhash)
 {
         TRACE_FUNCTION_CALL;
-        assertion(-500262, (pb && cache && cache->desc_frame));
-        assertion(-500381, (!avl_find( &dhash_tree, dhash )));
+        assertion(-500262, (pb));
+        ASSERTION(-500381, (!get_dhash_tree_node( dhash )));
+	ASSERTION(-500000, (!avl_find_item(&dhash_invalid_tree, dhash)));
+
+	struct description_cache_node *cache = (struct description_cache_node *)avl_find_item(&description_cache_tree, dhash);
+
+	if (!cache) {
+		LinkNode *link = pb->i.verifiedLink ? pb->i.verifiedLink->k.linkDev->local->best_tp_link : &pb->i.iif->dummyLink;
+		schedule_tx_task(link, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, dhash, sizeof(DHASH_T));
+		return NULL;
+	}
 
 	// First check if dext is fully resolvable::
         struct desc_extension *dext = dext_resolve(pb, cache, NULL);
@@ -1816,7 +1816,7 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 		cleanup_all(-502052);
 
 
-	dhnNew = get_dhash_node(cache->desc_frame, cache->desc_frame_len, dext, dhash);
+	dhnNew = create_dext_dhash(cache->desc_frame, cache->desc_frame_len, dext, dhash);
 	on = avl_find_item(&orig_tree, nodeIdFromDescAdv(cache->desc_frame));
 	assertion(-502053, IMPLIES(on, on->dhn && on->dhn->desc_frame && on->dhn->dext));
 
@@ -1857,13 +1857,7 @@ struct dhash_node * process_description(struct packet_buff *pb, struct descripti
 
         del_cached_description(&dhnNew->dhash);
 
-        update_neigh_dhash(on, dhnNew);
-
-	assertion(-502057, (on->dhn == dhnNew));
-        assertion(-500970, (dhnNew->on == on));
-        assertion(-500309, (dhnNew == avl_find_item(&dhash_tree, &on->dhn->dhash)));
-        assertion(-500310, (on == avl_find_item(&orig_tree, nodeIdFromDescAdv(on->dhn->desc_frame))));
-	assertion(-502058, (dhnNew->desc_frame));
+        update_orig_dhash(on, dhnNew);
 
 	cb_plugin_hooks(PLUGIN_CB_DESCRIPTION_CREATED, on);
 
@@ -1954,7 +1948,7 @@ int32_t tx_msg_description_request(struct tx_frame_iterator *it)
         struct hdr_description_request *hdr = ((struct hdr_description_request*) tx_iterator_cache_hdr_ptr(it));
         struct msg_description_request *msg = ((struct msg_description_request*) tx_iterator_cache_msg_ptr(it));
 	DHASH_T *dhash = (DHASH_T*)ttn->task.data;
-        struct dhash_node *dhn = avl_find_item(&dhash_tree, dhash);
+        struct dhash_node *dhn = get_dhash_tree_node(dhash);
 	LinkDevNode *linkDev = ttn->task.linkDev;
 
         assertion(-500855, (tx_iterator_cache_data_space_pref(it) >= ((int) (sizeof (struct msg_description_request)))));
@@ -2134,12 +2128,15 @@ int32_t tx_frame_description_adv(struct tx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 	DHASH_T *dhash = (DHASH_T*)it->ttn->task.data;
-        struct dhash_node *dhn = avl_find_item(&dhash_tree, dhash);
+        struct dhash_node *dhn = get_dhash_tree_node(dhash);
 
-	if (!dhn || !dhn->on) {
-		dbgf_sys(DBGT_WARN, "%s dhash=%s!", dhn ? "INVALID" : "UNKNOWN", cryptShaAsString(dhash));
-                assertion(-500977, (!dhn)); // a meanwhile invalidated dhn migh have been scheduled when it was still valid
+	if (!dhn) {
+		dbgf_sys(DBGT_WARN, "UNKNOWN dhash=%s!", cryptShaAsString(dhash));
+		// a meanwhile invalidated dhn migh have been scheduled when it was still valid
+
+		IDM_T TODO_this_one_crashes;
 		assertion(-502160, (avl_find(&dhash_invalid_tree, dhash)));
+
                 return TLV_TX_DATA_DONE;
         }
 
@@ -3118,7 +3115,6 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
         assertion(-500689, (!cryptShasEqual(&pb->i.verifiedLink->k.linkDev->local->dhn->dhash, &(self->dhn->dhash)))); // cant be transmitter' and myselfs'
 
 	struct neigh_node *viaNeigh = pb->i.verifiedLink->k.linkDev->local;
-        struct description_cache_node *cache = NULL;
 	IDM_T is_transmitter = cryptShasEqual(dhash, &viaNeigh->dhn->dhash);
 	struct dhash_node *dhn = NULL, *dhnOld = NULL;
 
@@ -3130,13 +3126,11 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
 
 		dhn = (struct dhash_node*)REJECTED_PTR;
 
-	} else if ((dhn = dhnOld = avl_find_item(&dhash_tree, dhash)) || (
-		(cache = get_cached_description(dhash)) &&
-		(dhn = process_description(pb, cache, dhash)) ) ) {
+	} else if ((dhn = dhnOld = get_dhash_tree_node(dhash)) || (dhn = process_description(pb, dhash))) {
 
 		if (dhn == REJECTED_PTR) {
 
-			invalidate_dhash(NULL, dhash);
+			invalidate_dhash_iid(NULL, dhash);
 
 		} else if (dhn == FAILURE_PTR || dhn == UNRESOLVED_PTR) {
 
@@ -3159,14 +3153,10 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
 				schedule_best_tp_links(NULL, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
 
 		}
-        } else {
-		schedule_tx_task(viaNeigh->best_tp_link, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, &adv->dhash, sizeof(adv->dhash));
+        }
 
-	}
-
-	dbgf_track(DBGT_INFO, "via dev=%s NB=%s dhash=%8X..  cache=%s dhn=%s neighIID4x=%d is_transmitter=%d (on)nodeId=%s",
+	dbgf_track(DBGT_INFO, "via dev=%s NB=%s dhash=%8X..  dhn=%s neighIID4x=%d is_transmitter=%d (on)nodeId=%s",
                 pb->i.iif->label_cfg.str, pb->i.llip_str, dhash->h.u32[0],
-		(cache ? "CACHED" : "-"),
                 (dhn ? (dhn==FAILURE_PTR?"FAILURE":
                         (dhn==UNRESOLVED_PTR?"UNRESOLVED":(dhn==REJECTED_PTR?"REJECTED":"RESOLVED"))):"UNKNOWN"),
                 neighIID4x, is_transmitter,
@@ -3214,7 +3204,7 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 		nodeIdAsStringFromDescAdv(it->frame_data),
 		pb->i.iif->label_cfg.str, pb->i.llip_str);
 
-	if (!avl_find(&dhash_invalid_tree, &dhash) && !avl_find_item(&dhash_tree, &dhash))
+	if (!avl_find(&dhash_invalid_tree, &dhash) && !get_dhash_tree_node(&dhash))
 		cache_description(it->frame_data, it->frame_data_length, &dhash);
 	
         goto_error(finish, it->frame_data_length);
@@ -3287,6 +3277,9 @@ int32_t rx_msg_description_request(struct rx_frame_iterator *it)
 	dbgf_track(DBGT_INFO, "%s NB %s destination_local_id=%s dhash=%s",
 		it->handl->name, pb->i.llip_str, cryptShaAsString(&hdr->destination_local_id), cryptShaAsString(&msg->dhash));
 
+	assertion(-502170, (!pb->i.verifiedLink));
+	assertion(-502171, (pb->i.iif));
+
         if (is_zero(&hdr->destination_local_id, sizeof(LOCAL_ID_T)) ?
 		(cryptShasEqual(&msg->dhash, &self->dhn->dhash)) :
 		(cryptShasEqual(&hdr->destination_local_id, &self->nodeId))) {
@@ -3294,20 +3287,16 @@ int32_t rx_msg_description_request(struct rx_frame_iterator *it)
 		dbgf_track(DBGT_INFO, "%s NB %s destination_local_id=%s dhash=%s",
 			it->handl->name, pb->i.llip_str, cryptShaAsString(&hdr->destination_local_id), cryptShaAsString(&msg->dhash));
 
-		struct dhash_node *dhn = avl_find_item(&dhash_tree, &msg->dhash);
+		struct dhash_node *dhn = get_dhash_tree_node(&msg->dhash);
 		struct orig_node *on = dhn ? dhn->on : NULL;
-		assertion(-500270, (IMPLIES(dhn && on, (dhn->desc_frame))));
 
-		if (!dhn || !on || ((TIME_T) (bmx_time - dhn->referred_by_me_timestamp)) > DEF_DESC0_REFERRED_TO) {
+		if (!dhn || ((TIME_T) (bmx_time - dhn->referred_by_me_timestamp)) > DEF_DESC0_REFERRED_TO) {
 
-			dbgf_track(DBGT_WARN, "%s from %s requesting %s %s dhn=%d on=%d",
-				it->handl->name, pb->i.llip_str, !!dhn, !!on);
+			dbgf_track(DBGT_WARN, "%s from %s requesting UNKNOWN dhash=%s dhn=%p",
+				it->handl->name, pb->i.llip_str, cryptShaAsString(&msg->dhash), dhn);
 
 			return sizeof(struct msg_description_request);
 		}
-
-		assertion(-502170, (!pb->i.verifiedLink));
-		assertion(-502171, (pb->i.iif));
 
 		schedule_tx_task(&pb->i.iif->dummyLink, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &msg->dhash, sizeof(DHASH_T));
 
@@ -3598,7 +3587,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                         if (it->msg == it->frame_data + it->frame_data_length) {
 				return TLV_RX_DATA_PROCESSED;
 			} else {
-				assertion(-502072, (result == TLV_RX_DATA_BLOCKED || result == TLV_RX_DATA_FAILURE || result == TLV_RX_DATA_REJECTED || result == TLV_RX_DATA_REBOOTED));
+				assertion(-502072, (result == TLV_RX_DATA_BLOCKED || result == TLV_RX_DATA_DONE || result == TLV_RX_DATA_FAILURE || result == TLV_RX_DATA_REJECTED || result == TLV_RX_DATA_REBOOTED));
 				goto_error(rx_frame_iterate_error, "failed rx_msg_handler");
                         }
 
@@ -3610,7 +3599,7 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 			if ( result == it->frame_msgs_length || result == TLV_RX_DATA_PROCESSED) {
 				return TLV_RX_DATA_PROCESSED;
 			} else {
-				assertion(-502073, (result == TLV_RX_DATA_BLOCKED || result == TLV_RX_DATA_FAILURE || result == TLV_RX_DATA_REJECTED || result == TLV_RX_DATA_REBOOTED));
+				assertion(-502073, (result == TLV_RX_DATA_BLOCKED || result == TLV_RX_DATA_DONE || result == TLV_RX_DATA_FAILURE || result == TLV_RX_DATA_REJECTED || result == TLV_RX_DATA_REBOOTED));
 				goto_error(rx_frame_iterate_error, "failed rx_frame_handler");
                         }
                 }
@@ -4408,7 +4397,7 @@ void update_my_description(void)
 
         DHASH_T dhashNew;
 	cryptShaAtomic(tx.frames_out_ptr, tx.frames_out_pos, &dhashNew);
-	struct dhash_node *dhnNew = get_dhash_node(tx.frames_out_ptr, tx.frames_out_pos, tx.dext, &dhashNew);
+	struct dhash_node *dhnNew = create_dext_dhash(tx.frames_out_ptr, tx.frames_out_pos, tx.dext, &dhashNew);
 
 	DHASH_T dhashOld = {.h.u32={0}};
 	if (!initializing) {
@@ -4417,7 +4406,7 @@ void update_my_description(void)
 		assertion(-502176, IMPLIES(!initializing, !avl_find(&dhash_invalid_tree, &dhashOld)));
 	}
 
-	update_neigh_dhash( self, dhnNew );
+	update_orig_dhash( self, dhnNew );
 
 	assertion(-502177, IMPLIES(!initializing, avl_find(&dhash_invalid_tree, &dhashOld)));
 
@@ -4464,7 +4453,7 @@ void update_my_description(void)
 
         my_description_changed = NO;
 
-	assertion(-502178, (self->dhn && self->dhn == avl_find_item(&dhash_tree, &self->dhn->dhash)));
+	assertion(-502178, (self->dhn && self->dhn == get_dhash_tree_node(&self->dhn->dhash)));
 	assertion(-502179, (self == avl_find_item(&orig_tree, &self->nodeId)));
 
 	debugFree(frame_cache_array, -300585);

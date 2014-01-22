@@ -126,7 +126,7 @@ int process_packet_signature(struct rx_frame_iterator *it)
 	struct frame_msg_signature *msg = (struct frame_msg_signature*)(it->frame_data);
 
 	if (cryptShasEqual(&msg->dhash, &self->dhn->dhash))
-		return TLV_RX_DATA_REJECTED;
+		return TLV_RX_DATA_DONE;
 
 	if (avl_find_item(&dhash_invalid_tree, &msg->dhash))
 		return TLV_RX_DATA_REJECTED;
@@ -134,22 +134,15 @@ int process_packet_signature(struct rx_frame_iterator *it)
 
 	char *goto_error_code = NULL;
 	static struct prof_ctx prof = { .k ={ .func=(void(*)(void))process_packet_signature}, .name=__FUNCTION__, .parent_func=(void (*) (void))rx_packet};
-        struct description_cache_node *cache = NULL;
 	struct dhash_node *dhn, *dhnOld;
 
 	prof_start(&prof);
 
-	if ((
-		(dhnOld = dhn = avl_find_item(&dhash_tree, &msg->dhash)) ||
-		((cache = get_cached_description(&msg->dhash)) && (dhn = process_description(it->pb, cache, &msg->dhash))) ||
-		!dhn
-		) && (dhn == NULL || dhn == UNRESOLVED_PTR || dhn == REJECTED_PTR || dhn == FAILURE_PTR)) {
-
-		if (!cache)
-			schedule_tx_task(&it->pb->i.iif->dummyLink, FRAME_TYPE_DESC_REQ, SCHEDULE_MIN_MSG_SIZE, &msg->dhash, sizeof(DHASH_T));
+	if (((dhnOld = dhn = get_dhash_tree_node(&msg->dhash)) || (dhn = process_description(it->pb, &msg->dhash)) || !dhn) &&
+		(dhn == NULL || dhn == UNRESOLVED_PTR || dhn == REJECTED_PTR || dhn == FAILURE_PTR)) {
 
 		prof_stop(&prof);
-		return TLV_RX_DATA_REJECTED;
+		return TLV_RX_DATA_DONE;
 	}
 
 	assertion(-502198, (dhn));
@@ -227,15 +220,16 @@ finish:{
 			schedule_best_tp_links(NULL, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
 	}
 
+	if (goto_error_code && !dhnOld && dhn) {
+		IDM_T TODO_DO_not_invalidate_previous_existing_orig_nor_block_myIID4x_reserved_for_this_node_because_It_was_never_used;
+		free_orig_node(dhn->on);
+	}
+
 	prof_stop(&prof);
 
 	if (goto_error_code) {
-
-		if (!dhnOld && dhn) //TODO: DO not block myIID4x reserved for this node! It was never used!
-			free_orig_node(dhn->on);
-
 		EXITERROR(-502202, (0));
-		return TLV_RX_DATA_REJECTED;
+		return TLV_RX_DATA_DONE;
 	}
 
 	return TLV_RX_DATA_PROCESSED;

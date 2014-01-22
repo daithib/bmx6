@@ -912,14 +912,13 @@ void update_my_dev_adv(void);
 void update_my_link_adv(uint32_t changes);
 
 
-struct description_cache_node * get_cached_description(DHASH_T *dhash);
 
 extern const void* REJECTED_PTR;
 extern const void* UNRESOLVED_PTR;
 extern const void* FAILURE_PTR;
 
 
-struct dhash_node * process_description(struct packet_buff *pb, struct description_cache_node *cache, DHASH_T *dhash);
+struct dhash_node * process_description(struct packet_buff *pb, DHASH_T *dhash);
 
 void dext_free(struct desc_extension **dext);
 IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *on, struct dhash_node *dhn, uint8_t op, uint8_t filter);

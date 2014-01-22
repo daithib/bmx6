@@ -518,7 +518,7 @@ void purge_dhash_invalid_list( IDM_T force_purge_all ) {
 }
 
 
-void invalidate_dhash( struct dhash_node *dhn, DHASH_T *dhash )
+void invalidate_dhash_iid( struct dhash_node *dhn, DHASH_T *dhash )
 {
         TRACE_FUNCTION_CALL;
 
@@ -550,7 +550,7 @@ void invalidate_dhash( struct dhash_node *dhn, DHASH_T *dhash )
 
 // called to not leave blocked dhash values:
 STATIC_FUNC
-void release_dhash( struct dhash_node *dhn )
+void free_dhash( struct dhash_node *dhn )
 {
         TRACE_FUNCTION_CALL;
         static uint32_t blocked_counter = 1;
@@ -570,10 +570,10 @@ void release_dhash( struct dhash_node *dhn )
         memset(&dhn->dhash, 0, sizeof ( DHASH_T));
         dhn->dhash.h.u32[(sizeof ( DHASH_T) / sizeof (uint32_t)) - 1] = blocked_counter++;
 
-	invalidate_dhash(dhn, NULL);
+	invalidate_dhash_iid(dhn, NULL);
 }
 
-struct dhash_node* get_dhash_node(uint8_t *desc_frame, uint32_t desc_frame_len, struct desc_extension* dext, DHASH_T *dhash)
+struct dhash_node* create_dext_dhash(uint8_t *desc_frame, uint32_t desc_frame_len, struct desc_extension* dext, DHASH_T *dhash)
 {
 
         dext->dhn = debugMallocReset(sizeof ( struct dhash_node), -300001);
@@ -586,20 +586,41 @@ struct dhash_node* get_dhash_node(uint8_t *desc_frame, uint32_t desc_frame_len, 
 }
 
 
-void update_neigh_dhash(struct orig_node *on, struct dhash_node *dhn)
-{
+struct dhash_node *get_dhash_tree_node(DHASH_T *dhash) {
+	struct dhash_node *dhn = avl_find_item(&dhash_tree, dhash);
 
-        struct neigh_node *local = NULL;
+	if (dhn) {
+		assertion(-500000, (dhn->on));
+		assertion(-500000, (dhn->on->dhn));
+		assertion(-500000, (dhn->on->dhn == dhn));
+		assertion(-500000, (dhn->dext));
+		assertion(-500000, (dhn->dext->dhn));
+		assertion(-500000, (dhn->dext->dhn == dhn));
+		assertion(-500000, (dhn->desc_frame));
+		assertion(-500000, (dhn->desc_frame_len));
+		ASSERTION(-500000, (!avl_find(&dhash_invalid_tree, &dhn->dhash)));
+		ASSERTION(-500310, (dhn->on == avl_find_item(&orig_tree, nodeIdFromDescAdv(dhn->desc_frame))));
+	}
+
+	return dhn;
+}
+
+void update_orig_dhash(struct orig_node *on, struct dhash_node *dhn)
+{
+	assertion(-500000, (on));
+	assertion(-500000, (dhn));
+
+        struct neigh_node *neigh = NULL;
 
         if (on->dhn) {
-                local = on->dhn->local;
+                neigh = on->dhn->local;
 
                 on->dhn->local = NULL;
                 on->dhn->on = NULL;
 
 		avl_remove(&dhash_tree, &on->dhn->dhash, -300195);
 
-                invalidate_dhash(on->dhn, NULL);
+                invalidate_dhash_iid(on->dhn, NULL);
         }
 
         dhn->myIID4orig = iid_new_myIID4x(dhn);
@@ -611,11 +632,12 @@ void update_neigh_dhash(struct orig_node *on, struct dhash_node *dhn)
 
         dbgf_track(DBGT_INFO, "dhash %8X.. myIID4orig %d", dhn->dhash.h.u32[0], dhn->myIID4orig);
 
-        if (local) {
-                local->dhn = on->dhn;
-                on->dhn->local = local;
+        if (neigh) {
+                neigh->dhn = on->dhn;
+                on->dhn->local = neigh;
         }
 
+	ASSERTION(-500000, (get_dhash_tree_node(&dhn->dhash)));
 }
 
 
@@ -863,7 +885,7 @@ void free_orig_node(struct orig_node *on)
                 if (on->dhn->local)
 			purge_local_node(on->dhn->local);
 
-                release_dhash(on->dhn);
+                free_dhash(on->dhn);
         }
 
         avl_remove(&orig_tree, &on->nodeId, -300200);

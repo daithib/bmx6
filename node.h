@@ -519,7 +519,7 @@ extern struct orig_node *self;
 extern struct iid_repos my_iid_repos;
 
 
-extern struct avl_tree dhash_tree;
+//extern struct avl_tree dhash_tree;
 extern struct avl_tree dhash_invalid_tree;
 extern struct avl_tree local_tree;
 extern struct avl_tree link_dev_tree;
@@ -548,7 +548,7 @@ IDM_T blacklisted_neighbor(struct packet_buff *pb, DHASH_T *dhash);
 
 
 void purge_dhash_invalid_list( IDM_T force_purge_all );
-void invalidate_dhash( struct dhash_node *dhn, DHASH_T *dhash );
+void invalidate_dhash_iid( struct dhash_node *dhn, DHASH_T *dhash );
 void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired, struct orig_node *except_on);
 void block_orig_node(IDM_T block, struct orig_node *on);
 void free_orig_node(struct orig_node *on);
@@ -561,8 +561,9 @@ char *nodeIdAsStringFromDescAdv( uint8_t *desc_adv );
 void purge_local_node(struct neigh_node *local);
 void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T only_expired);
 
-void update_neigh_dhash(struct orig_node *on, struct dhash_node *dhn);
-struct dhash_node* get_dhash_node(uint8_t *desc_frame, uint32_t desc_frame_len, struct desc_extension* dext, DHASH_T *dhash);
+struct dhash_node *get_dhash_tree_node(DHASH_T *dhash);
+void update_orig_dhash(struct orig_node *on, struct dhash_node *dhn);
+struct dhash_node* create_dext_dhash(uint8_t *desc_frame, uint32_t desc_frame_len, struct desc_extension* dext, DHASH_T *dhash);
 
 LOCAL_ID_T new_local_id(struct dev_node *dev);
 
