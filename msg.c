@@ -3206,7 +3206,7 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 		nodeIdAsStringFromDescAdv(it->frame_data),
 		it->pb->i.iif->label_cfg.str, it->pb->i.llip_str);
 
-	if (avl_find(&dhash_invalid_tree, &dhash) && !(dhn=get_dhash_tree_node(&dhash)))
+	if (!avl_find(&dhash_invalid_tree, &dhash) && !(dhn=get_dhash_tree_node(&dhash)))
 		cache_description(it->frame_data, it->frame_data_length, &dhash);
 
 	if (processDescriptionsViaUnverifiedLink && !dhn && (dhn = process_description(it->pb, &dhash))) {
