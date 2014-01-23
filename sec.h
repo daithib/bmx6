@@ -25,6 +25,12 @@
 #include <netinet/in.h>
 #include <linux/if.h>
 
+//#define DEF_PERSISTENT_PATH "/etc/bmx6"
+#define DEF_TRUST_DIR_POLLING_INTERVAL 5000
+
+#define DEF_TRUSTED_NODES_DIR "/etc/bmx6/trustedNodes"
+#define ARG_TRUSTED_NODES_DIR "trustedNodesDir"
+
 #define ARG_KEY_PATH "keyPath"
 #define DEF_KEY_PATH "/etc/bmx6/rsa.der"
 
@@ -39,6 +45,7 @@
 #define MAX_PACKET_SIGN 2048
 #define DEF_PACKET_SIGN 768
 #define HLP_PACKET_SIGN "sign outgoing packets with given RSA key length"
+extern int32_t packetSigning;
 
 
 // http://my.opera.com/securitygroup/blog/2009/09/29/512-bit-rsa-key-breaking-developments
@@ -59,6 +66,10 @@
 #define MAX_PACKET_VERIFY 4096
 #define DEF_PACKET_VERIFY 1024
 #define HLP_PACKET_VERIFY "verify incoming packet signature up-to given RSA key length"
+
+
+extern CRYPTKEY_T *my_PubKey;
+extern CRYPTKEY_T *my_PktKey;
 
 
 #define DESCRIPTION_MSG_PUBKEY_FORMAT { \
@@ -105,10 +116,22 @@ struct dsc_msg_sha {
 } __attribute__((packed));
 
 
-extern int32_t packetSigning;
 
-extern CRYPTKEY_T *my_PubKey;
-extern CRYPTKEY_T *my_PktKey;
+#define DESCRIPTION_MSG_TRUST_FORMAT { \
+{FIELD_TYPE_STRING_BINARY, -1, 8*sizeof(CRYPTSHA1_T),               1, FIELD_RELEVANCE_HIGH,  "globalId"},  \
+{FIELD_TYPE_UINT,          -1, 8*sizeof(uint16_t),                   1, FIELD_RELEVANCE_HIGH,  "reserved"}, \
+FIELD_FORMAT_END }
+
+struct dsc_msg_trust {
+    CRYPTSHA1_T globalId;
+    uint16_t reserved;
+} __attribute__((packed));
+
+void free_internalNeighId(OGM_DEST_T ini);
+OGM_DEST_T allocate_internalNeighId(struct neigh_node *nn);
+
+uint32_t *init_neighTrust(struct orig_node *on);
+IDM_T verify_neighTrust(struct orig_node *on, struct neigh_node *neigh);
 
 
 void init_sec( void );

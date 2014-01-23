@@ -592,9 +592,15 @@ struct msg_ref_req {
 #define BMX_DSC_TLV_PKT_PUBKEY      0x05
 
 #define BMX_DSC_TLV_NAMES           0x07
-#define BMX_DSC_TLV_METRIC          0x08
 
-#define BMX_DSC_TLV_HNA6            0x09
+#define BMX_DSC_TLV_BOYCOTS         0x08
+#define BMX_DSC_TLV_SUPPORTS        0x09
+#define BMX_DSC_TLV_TRUSTS          0x0A
+#define BMX_DSC_TLV_DISTRUSTS       0x0B
+
+#define BMX_DSC_TLV_METRIC          0x0D
+
+#define BMX_DSC_TLV_HNA6            0x0F
 
 #define BMX_DSC_TLV_TUN6_MIN        0x10
 #define BMX_DSC_TLV_TUN6            0x11

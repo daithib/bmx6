@@ -37,9 +37,9 @@
 #include "control.h"
 #include "bmx.h"
 #include "crypt.h"
-#include "sec.h"
 #include "avl.h"
 #include "node.h"
+#include "sec.h"
 #include "metrics.h"
 #include "msg.h"
 #include "ip.h"
@@ -648,9 +648,7 @@ void update_orig_dhash(struct orig_node *on, struct dhash_node *dhn)
 
 
 
-
-
-void purge_orig_router(struct orig_node *onlyOrig, LinkNode *onlyLink, IDM_T only_useless)
+void purge_orig_router(struct orig_node *onlyOrig, struct neigh_node *onlyNeigh, LinkNode *onlyLink, IDM_T only_useless)
 {
         TRACE_FUNCTION_CALL;
         struct orig_node *on;
@@ -664,6 +662,9 @@ void purge_orig_router(struct orig_node *onlyOrig, LinkNode *onlyLink, IDM_T onl
 
                         if (only_useless && (rt->mr.umetric >= UMETRIC_ROUTABLE))
                                 continue;
+
+			if (onlyNeigh && (rt->local_key != onlyNeigh))
+				continue;
 
                         if (onlyLink && (rt->local_key != onlyLink->k.linkDev->local))
                                 continue;
@@ -739,7 +740,7 @@ void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T on
                                 dbgf_track(DBGT_INFO, "purging lndev link=%s dev=%s",
                                         ip6AsStr( &linkDev->link_ip), link->k.myDev->label_cfg.str);
 
-                                purge_orig_router(NULL, link, NO);
+                                purge_orig_router(NULL, NULL, link, NO);
 
                                 purge_tx_task_list(link->tx_task_lists, NULL, NULL);
 
@@ -799,6 +800,8 @@ void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T on
 
                                 if (local->link_adv)
                                         debugFree(local->link_adv, -300347);
+
+				free_internalNeighId(local->internalNeighId);
 
                                 assertion(-501135, (!local->orig_routes));
 
@@ -877,7 +880,7 @@ void free_orig_node(struct orig_node *on)
 */
 	assertion(-502180, IMPLIES(!terminating, on != self));
 
-        purge_orig_router(on, NULL, NO);
+        purge_orig_router(on, NULL, NULL, NO);
 
         if (on->added) {
 		assertion(-502090, (on->dhn && on->dhn->desc_frame));
@@ -892,6 +895,9 @@ void free_orig_node(struct orig_node *on)
 
                 free_dhash(on->dhn);
         }
+
+	if (on->trustedNeighsBitArray)
+		debugFree(on->trustedNeighsBitArray, -300653);
 
         avl_remove(&orig_tree, &on->nodeId, -300200);
         cb_plugin_hooks(PLUGIN_CB_STATUS, NULL);
@@ -942,7 +948,7 @@ void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired, 
 
                         } else if (only_expired) {
 
-                                purge_orig_router(dhn->on, NULL, YES /*only_useless*/);
+                                purge_orig_router(dhn->on, NULL, NULL, YES /*only_useless*/);
                         }
                 }
         }
@@ -977,6 +983,8 @@ struct orig_node *init_orig_node(GLOBAL_ID_T *id)
         on->nodeId = *id;
 
         AVL_INIT_TREE(on->rt_tree, struct router_node, local_key);
+
+	on->trustedNeighsBitArray = init_neighTrust(on);
 
         avl_insert(&orig_tree, on, -300148);
 
@@ -1083,6 +1091,7 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
                 local->local_id = *local_id;
                 local->neighLinkId = LINKADV_ID_IGNORED;
                 local->myLinkId = LINKADV_ID_IGNORED;
+		local->internalNeighId = allocate_internalNeighId(local);
                 avl_insert(&local_tree, local, -300337);
 
 		assertion(-502185, (!verifiedLinkDhn->local));

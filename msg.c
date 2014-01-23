@@ -31,9 +31,9 @@
 #include "control.h"
 #include "bmx.h"
 #include "crypt.h"
-#include "sec.h"
 #include "avl.h"
 #include "node.h"
+#include "sec.h"
 #include "metrics.h"
 #include "msg.h"
 #include "z.h"
@@ -2989,6 +2989,14 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
 
                                 continue;
                         }
+
+			if (verify_neighTrust(on, local) != SUCCESS) {
+
+				dbgf_sys(DBGT_INFO, "DISTRUSTED neigh=%s for orig=%s",
+					cryptShaAsShortStr(&local->local_id), cryptShaAsShortStr(&on->nodeId) );
+
+				continue;
+			}
 
                         FMETRIC_U16_T fm = fmetric(ogm.u.o.mtcMantissa, ogm.u.o.mtcExponent);
                         IDM_T valid_metric = is_fmetric_valid(fm);

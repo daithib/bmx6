@@ -24,6 +24,9 @@
 #include <errno.h>
 #include <stdint.h>
 #include <time.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <sys/inotify.h>
 
 #include "list.h"
 #include "control.h"
@@ -31,15 +34,16 @@
 #include "crypt.h"
 #include "avl.h"
 #include "node.h"
+#include "sec.h"
 #include "metrics.h"
 #include "msg.h"
 //#include "schedule.h"
 #include "tools.h"
 #include "plugin.h"
 #include "prof.h"
-#include "sec.h"
 #include "ip.h"
 #include "schedule.h"
+#include "allocate.h"
 
 //#include "ip.h"
 
@@ -57,6 +61,18 @@ int32_t packetSigning = DEF_PACKET_SIGN;
 CRYPTKEY_T *my_PubKey = NULL;
 CRYPTKEY_T *my_PktKey = NULL;
 
+static char *trustedNodesDir = NULL;
+static int inotify_fd = -1;
+static int inotify_wd = -1;
+
+struct trust_node {
+	GLOBAL_ID_T global_id;
+	uint8_t depth;
+	uint8_t max;
+	uint8_t updated;
+};
+
+static AVL_TREE(trusted_nodes_tree, struct trust_node, global_id);
 
 
 
@@ -302,7 +318,7 @@ int create_dsc_tlv_pktkey(struct tx_frame_iterator *it)
 		my_PktKey->endOfLife = (packetSignLifetime ? bmx_time_sec + packetSignLifetime : 0);
 
 		if (packetSignLifetime)
-			task_register(packetSignLifetime*1000, update_dsc_tlv_pktkey, NULL, -300000);
+			task_register(packetSignLifetime*1000, update_dsc_tlv_pktkey, NULL, -300655);
 	}
 	assertion(-502097, (my_PktKey));
 
@@ -748,6 +764,375 @@ int32_t opt_packetSigning(uint8_t cmd, uint8_t _save, struct opt_type *opt, stru
 	return SUCCESS;
 }
 
+
+
+static struct neigh_node *internalNeighId_array[LOCALS_MAX];
+static int16_t internalNeighId_max = -1;
+static uint8_t internalNeighId_u32s = 0;
+
+
+STATIC_FUNC
+void update_neighTrust(struct orig_node *on, struct dhash_node *dhnNew, struct neigh_node *nn)
+{
+	struct dsc_msg_trust *trustList = dhnNew ? dext_dptr(dhnNew->dext, BMX_DSC_TLV_TRUSTS) : NULL;
+	uint32_t m =0, msgs = dhnNew ? (dhnNew->dext->dtd[BMX_DSC_TLV_TRUSTS].len / sizeof(struct dsc_msg_trust)) : 0;
+
+	if (trustList) {
+		for (m = 0; m < msgs; m++) {
+
+			if (cryptShasEqual(&nn->local_id, &trustList[m].globalId))
+				break;
+		}
+	}
+
+	if (!trustList || m < msgs) {
+
+		bit_set((uint8_t*) on->trustedNeighsBitArray, internalNeighId_u32s * 32, nn->internalNeighId, 1);
+
+	} else {
+
+		if (bit_get((uint8_t*) on->trustedNeighsBitArray, internalNeighId_u32s * 32, nn->internalNeighId)) {
+
+			bit_set((uint8_t*) on->trustedNeighsBitArray, internalNeighId_u32s * 32, nn->internalNeighId, 0);
+
+			purge_orig_router(on, nn, NULL, NO);
+		}
+	}
+}
+
+uint32_t *init_neighTrust(struct orig_node *on) {
+
+	on->trustedNeighsBitArray = debugMallocReset(internalNeighId_u32s*4, -300654);
+
+	struct avl_node *an = NULL;
+	struct neigh_node *nn;
+
+	while ((nn = avl_iterate_item(&local_tree, &an))) {
+		update_neighTrust(on, NULL, nn);
+	}
+
+	return on->trustedNeighsBitArray;
+}
+
+IDM_T verify_neighTrust(struct orig_node *on, struct neigh_node *neigh){
+
+	if (bit_get((uint8_t*)on->trustedNeighsBitArray, (internalNeighId_u32s * 32), neigh->internalNeighId ))
+		return SUCCESS;
+	else
+		return FAILURE;
+}
+
+OGM_DEST_T allocate_internalNeighId(struct neigh_node *nn) {
+
+	int16_t ini;
+	struct orig_node *on;
+	struct avl_node *an = NULL;
+
+	for (ini=0; ini<LOCALS_MAX && internalNeighId_array[ini]; ini++);
+
+	assertion(-502228, (ini < LOCALS_MAX && ini <= (int)local_tree.items));
+	internalNeighId_array[ini] = nn;
+	nn->internalNeighId = ini;
+
+	if (ini > internalNeighId_max) {
+
+		uint8_t u32s_needed = (((ini+1)/32) + (!!((ini+1)%32)));
+		uint8_t u32s_allocated = internalNeighId_u32s;
+
+		internalNeighId_u32s = u32s_needed;
+		internalNeighId_max = ini;
+
+		if (u32s_needed > u32s_allocated) {
+
+			assertion(-502229, (u32s_needed == u32s_allocated + 1));
+			
+			for (an = NULL; (on = avl_iterate_item(&orig_tree, &an));) {
+				on->trustedNeighsBitArray = debugRealloc(on->trustedNeighsBitArray, (u32s_needed * 4), -300656);
+				on->trustedNeighsBitArray[u32s_allocated] = 0;
+			}
+
+		}
+
+	}
+
+	for (an = NULL; (on = avl_iterate_item(&orig_tree, &an));)
+		update_neighTrust(on, on->dhn, nn);
+
+
+	return ini;
+}
+
+
+void free_internalNeighId(OGM_DEST_T ini) {
+
+
+	struct orig_node *on;
+	struct avl_node *an = NULL;
+
+	while ((on = avl_iterate_item(&orig_tree, &an)))
+		bit_set((uint8_t*)on->trustedNeighsBitArray, internalNeighId_u32s * 32, ini, 0);
+
+	internalNeighId_array[ini] = NULL;
+
+}
+
+
+
+STATIC_FUNC
+int process_dsc_tlv_trusts(struct rx_frame_iterator *it)
+{
+	if ((it->op == TLV_OP_NEW || it->op == TLV_OP_DEL) && 
+		(!it->onOld->dhn || !it->onOld->dhn->dext || desc_frame_changed( it, it->frame_type ))) {
+
+		struct avl_node *an = NULL;
+		struct neigh_node *nn;
+
+		while ((nn = avl_iterate_item(&local_tree, &an))) {
+			update_neighTrust(it->onOld, it->dhnNew, nn);
+		}
+	}
+
+
+	return TLV_RX_DATA_PROCESSED;
+}
+
+
+STATIC_FUNC
+int create_dsc_tlv_trusts(struct tx_frame_iterator *it)
+{
+        struct avl_node *an = NULL;
+        struct trust_node *tn;
+        struct dsc_msg_trust *msg = (struct dsc_msg_trust *)tx_iterator_cache_msg_ptr(it);
+        int32_t max_size = tx_iterator_cache_data_space_pref(it);
+        int pos = 0;
+
+	if (trustedNodesDir) {
+
+		while ((tn = avl_iterate_item(&trusted_nodes_tree, &an))) {
+
+			if (pos + (int) sizeof(struct dsc_msg_trust) > max_size) {
+				dbgf_sys(DBGT_ERR, "Failed adding %s=%s", it->handl->name, cryptShaAsString(&tn->global_id));
+				return TLV_TX_DATA_FULL;
+			}
+
+			msg->globalId = tn->global_id;
+			msg++;
+			pos += sizeof(struct dsc_msg_trust);
+
+			dbgf_sys(DBGT_ERR, "adding %s=%s", it->handl->name, cryptShaAsString(&tn->global_id));
+		}
+
+		return pos;
+	}
+
+        return TLV_TX_DATA_IGNORED;
+}
+
+
+
+STATIC_FUNC
+void check_trusted_nodes(void *unused)
+{
+
+	DIR *dir;
+
+	if (inotify_fd == -1) {
+                task_remove(check_trusted_nodes, NULL);
+                task_register(DEF_TRUST_DIR_POLLING_INTERVAL, check_trusted_nodes, NULL, -300657);
+        }
+
+	if ((dir = opendir(trustedNodesDir))) {
+
+		struct dirent *dirEntry;
+		struct trust_node *tn;
+		int8_t changed = NO;
+		GLOBAL_ID_T globalId;
+
+		while ((dirEntry = readdir(dir)) != NULL) {
+			
+			char globalIdString[(2*sizeof(GLOBAL_ID_T))+1] = {0};
+			struct trust_node *tn;
+
+			if (
+				(strlen(dirEntry->d_name) >= (2*sizeof(GLOBAL_ID_T))) &&
+				(strncpy(globalIdString, dirEntry->d_name, 2*sizeof(GLOBAL_ID_T))) &&
+				(hexStrToMem(globalIdString, (uint8_t*)&globalId, sizeof(GLOBAL_ID_T)) == SUCCESS)
+				) {
+
+				if ((tn = avl_find_item(&trusted_nodes_tree, &globalId))) {
+
+					dbgf(tn->updated ? DBGL_SYS : DBGL_ALL, tn->updated ? DBGT_ERR : DBGT_INFO,
+						"file=%s prefix found %d times!",dirEntry->d_name, tn->updated);
+
+				} else {
+					tn = debugMallocReset(sizeof(struct trust_node), -300658);
+					tn->global_id = globalId;
+					changed = YES;
+					avl_insert(&trusted_nodes_tree, tn, -300659);
+					dbgf_sys(DBGT_INFO, "file=%s defines new trusted nodeId=%s!",
+						dirEntry->d_name, cryptShaAsString(&globalId));
+				}
+
+				tn->updated++;
+
+			} else {
+				dbgf_sys(DBGT_ERR, "file=%s... has illegal format!",dirEntry->d_name);
+			}
+		}
+		closedir(dir);
+
+		memset(&globalId, 0, sizeof(globalId));
+		while ((tn = avl_next_item(&trusted_nodes_tree, &globalId))) {
+			globalId = tn->global_id;
+			if (!tn->updated && !cryptShasEqual(&tn->global_id, &self->nodeId)) {
+				changed = YES;
+				avl_remove(&trusted_nodes_tree, &globalId, -300660);
+				debugFree(tn, -300000);
+			} else {
+				tn->updated = 0;
+			}
+		}
+
+
+		if (changed) {
+			my_description_changed = YES;
+			changed = NO;
+		}
+
+
+	} else {
+		cleanup_all(-502230);
+	}
+}
+
+STATIC_FUNC
+void inotify_event_hook(int fd)
+{
+        TRACE_FUNCTION_CALL;
+
+        dbgf_sys(DBGT_INFO, "detected changes in directory: %s", trustedNodesDir);
+
+        assertion(-501278, (fd > -1 && fd == inotify_fd));
+
+        int ilen = 1024;
+        char *ibuff = debugMalloc(ilen, -300375);
+        int rcvd;
+        int processed = 0;
+
+        while ((rcvd = read(fd, ibuff, ilen)) == 0 || rcvd == EINVAL) {
+
+                ibuff = debugRealloc(ibuff, (ilen = ilen * 2), -300376);
+                assertion(-501279, (ilen <= (1024 * 16)));
+        }
+
+        if (rcvd > 0) {
+
+                while (processed < rcvd) {
+
+                        struct inotify_event *ievent = (struct inotify_event *) &ibuff[processed];
+
+                        processed += (sizeof (struct inotify_event) +ievent->len);
+
+                        if (ievent->mask & (IN_DELETE_SELF)) {
+                                dbgf_sys(DBGT_ERR, "directory %s has been removed \n", trustedNodesDir);
+                                cleanup_all(-500000);
+                        }
+                }
+
+        } else {
+                dbgf_sys(DBGT_ERR, "read()=%d: %s \n", rcvd, strerror(errno));
+        }
+
+        debugFree(ibuff, -300377);
+
+        check_trusted_nodes(NULL);
+}
+
+
+STATIC_FUNC
+void cleanup_trusted_nodes(void)
+{
+
+        if (inotify_fd > -1) {
+
+                if( inotify_wd > -1) {
+                        inotify_rm_watch(inotify_fd, inotify_wd);
+                        inotify_wd = -1;
+                }
+
+                set_fd_hook(inotify_fd, inotify_event_hook, DEL);
+
+                close(inotify_fd);
+                inotify_fd = -1;
+        } else {
+                task_remove(check_trusted_nodes, NULL);
+        }
+
+	while( trusted_nodes_tree.items)
+		debugFree(avl_remove_first_item(&trusted_nodes_tree, -300661), -300664);
+
+	trustedNodesDir = NULL;
+}
+
+
+STATIC_FUNC
+int32_t opt_trusted_node_dir(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
+{
+
+        if (cmd == OPT_CHECK && check_dir(patch->val, NO/*create*/, NO/*writable*/) == FAILURE)
+			return FAILURE;
+        
+        if (cmd == OPT_APPLY) {
+
+		if (patch->diff == DEL || (patch->diff == ADD && trustedNodesDir))
+			cleanup_trusted_nodes();
+
+
+		if (patch->diff == ADD) {
+
+			assertion(-501286, (patch->val));
+
+			trustedNodesDir = patch->val;
+
+			if ((inotify_fd = inotify_init()) < 0) {
+
+				dbg_sys(DBGT_WARN, "failed init inotify socket: %s! Using %d ms polling instead! You should enable inotify support in your kernel!",
+					strerror(errno), DEF_TRUST_DIR_POLLING_INTERVAL);
+				inotify_fd = -1;
+
+			} else if (fcntl(inotify_fd, F_SETFL, O_NONBLOCK) < 0) {
+
+				dbgf_sys(DBGT_ERR, "failed setting inotify non-blocking: %s", strerror(errno));
+				return FAILURE;
+
+			} else if ((inotify_wd = inotify_add_watch(inotify_fd, trustedNodesDir,
+				IN_CREATE | IN_DELETE | IN_DELETE_SELF | IN_MODIFY | IN_MOVE_SELF | IN_MOVED_FROM | IN_MOVED_TO)) < 0) {
+
+				dbgf_sys(DBGT_ERR, "failed adding watch for dir=%s: %s \n", trustedNodesDir, strerror(errno));
+				return FAILURE;
+
+			} else {
+
+				set_fd_hook(inotify_fd, inotify_event_hook, ADD);
+			}
+
+			struct trust_node *tn = debugMallocReset(sizeof(struct trust_node), -300662);
+			tn->global_id = self->nodeId;
+			avl_insert(&trusted_nodes_tree, tn, -300663);
+
+			check_trusted_nodes(NULL);
+		}
+
+		my_description_changed = YES;
+        }
+
+
+        return SUCCESS;
+}
+
+
+
+
 STATIC_FUNC
 struct opt_type sec_options[]=
 {
@@ -760,6 +1145,8 @@ struct opt_type sec_options[]=
 			ARG_VALUE_FORM, HLP_PACKET_VERIFY},
 	{ODI,0,ARG_PACKET_SIGN_LT,      0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY, &packetSignLifetime,0,MAX_PACKET_SIGN_LT,DEF_PACKET_SIGN_LT,0, opt_packetSigning,
 			ARG_VALUE_FORM, HLP_PACKET_VERIFY},
+	{ODI,0,ARG_TRUSTED_NODES_DIR,   0,  9,2,A_PM1N,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,DEF_TRUSTED_NODES_DIR, opt_trusted_node_dir,
+			ARG_DIR_FORM,"directory with global-id hashes of this node's trusted other nodes"},
 
 };
 
@@ -842,6 +1229,20 @@ void init_sec( void )
         handl.rx_frame_handler = process_dsc_tlv_pubKey;
 	handl.msg_format = pubkey_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_PKT_PUBKEY, &handl);
+
+	static const struct field_format trust_format[] = DESCRIPTION_MSG_TRUST_FORMAT;
+        handl.name = "DSC_TRUSTS";
+	handl.alwaysMandatory = 0;
+        handl.min_msg_size = sizeof(struct dsc_msg_trust);
+        handl.fixed_msg_size = 1;
+	handl.dextReferencing = (int32_t*)&always_fref;
+	handl.dextCompression = (int32_t*)&never_fzip;
+        handl.tx_frame_handler = create_dsc_tlv_trusts;
+        handl.rx_frame_handler = process_dsc_tlv_trusts;
+	handl.msg_format = trust_format;
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_TRUSTS, &handl);
+
+
 }
 
 void cleanup_sec( void )
@@ -853,4 +1254,5 @@ void cleanup_sec( void )
 		cryptKeyFree(&my_PktKey);
 	}
 
+	cleanup_trusted_nodes();
 }
