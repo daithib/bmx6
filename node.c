@@ -822,6 +822,11 @@ void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T on
         if (removed_link_adv)
                 update_my_link_adv(LINKADV_CHANGES_REMOVED);
 
+	assertion(-500000, IMPLIES(!only_dev && !onlyLinkDev && !only_expired, !local_tree.items));
+	assertion(-500000, IMPLIES(!only_dev && !onlyLinkDev && !only_expired, !link_tree.items));
+	assertion(-500000, IMPLIES(!only_dev && !onlyLinkDev && !only_expired, !link_dev_tree.items));
+
+
 }
 
 void purge_local_node(struct neigh_node *local)
@@ -863,7 +868,7 @@ void block_orig_node(IDM_T block, struct orig_node *on)
 void free_orig_node(struct orig_node *on)
 {
         TRACE_FUNCTION_CALL;
-        dbgf_all(DBGT_INFO, "id=%s ip=%s", cryptShaAsString(&on->nodeId), on->primary_ip_str);
+        dbgf_sys(DBGT_INFO, "id=%s ip=%s", cryptShaAsString(&on->nodeId), on->primary_ip_str);
 
         //cb_route_change_hooks(DEL, on, 0, &on->ort.rt_key.llip);
 
@@ -941,6 +946,8 @@ void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired, 
                         }
                 }
         }
+
+	assertion(-500000, IMPLIES(!only_dev && !only_expired, orig_tree.items == (except_on ? 1 : 0)));
 }
 
 
