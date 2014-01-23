@@ -49,8 +49,8 @@
 static char *smsTx_dir = NULL;
 static char *smsRx_dir = NULL;
 
-static int extensions_fd = -1;
-static int extensions_wd = -1;
+static int inotify_fd = -1;
+static int inotify_wd = -1;
 
 
 static AVL_TREE(sms_tree, struct sms_node, name );
@@ -78,9 +78,9 @@ void check_for_changed_sms(void *unused)
 
         dbgf_all(DBGT_INFO, "checking...");
 
-        if (extensions_fd == -1) {
+        if (inotify_fd == -1) {
                 task_remove(check_for_changed_sms, NULL);
-                task_register(SMS_POLLING_INTERVAL, check_for_changed_sms, NULL, 300579);
+                task_register(SMS_POLLING_INTERVAL, check_for_changed_sms, NULL, -300579);
         }
 
 
@@ -163,13 +163,13 @@ void check_for_changed_sms(void *unused)
 
 
 STATIC_FUNC
-void json_inotify_event_hook(int fd)
+void inotify_event_hook(int fd)
 {
         TRACE_FUNCTION_CALL;
 
         dbgf_track(DBGT_INFO, "detected changes in directory: %s", smsTx_dir);
 
-        assertion(-501278, (fd > -1 && fd == extensions_fd));
+        assertion(-501278, (fd > -1 && fd == inotify_fd));
 
         int ilen = 1024;
         char *ibuff = debugMalloc(ilen, -300375);
@@ -302,7 +302,7 @@ int process_description_sms(struct rx_frame_iterator *it)
 
 
 STATIC_FUNC
-int32_t opt_json_sms(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
+int32_t opt_sms(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
 {
 
         // this function is used to initialize all json directories
@@ -346,18 +346,18 @@ int32_t opt_json_sms(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
                 if (rm_dir_content(smsRx_dir, NULL) == FAILURE)
                         return FAILURE;
 
-                if ((extensions_fd = inotify_init()) < 0) {
+                if ((inotify_fd = inotify_init()) < 0) {
 
                         dbg_sys(DBGT_WARN, "failed init inotify socket: %s! Using %d ms polling instead! You should enable inotify support in your kernel!",
                                 strerror(errno), SMS_POLLING_INTERVAL);
-                        extensions_fd = -1;
+                        inotify_fd = -1;
 
-                } else if (fcntl(extensions_fd, F_SETFL, O_NONBLOCK) < 0) {
+                } else if (fcntl(inotify_fd, F_SETFL, O_NONBLOCK) < 0) {
 
                         dbgf_sys(DBGT_ERR, "failed setting inotify non-blocking: %s", strerror(errno));
                         return FAILURE;
 
-                } else if ((extensions_wd = inotify_add_watch(extensions_fd, smsTx_dir,
+                } else if ((inotify_wd = inotify_add_watch(inotify_fd, smsTx_dir,
                         IN_CREATE | IN_DELETE | IN_DELETE_SELF | IN_MODIFY | IN_MOVE_SELF | IN_MOVED_FROM | IN_MOVED_TO)) < 0) {
 
                         dbgf_sys(DBGT_ERR, "failed adding watch for dir=%s: %s \n", smsTx_dir, strerror(errno));
@@ -365,7 +365,7 @@ int32_t opt_json_sms(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
 
                 } else {
 
-                        set_fd_hook(extensions_fd, json_inotify_event_hook, ADD);
+                        set_fd_hook(inotify_fd, inotify_event_hook, ADD);
                 }
         }
 
@@ -403,7 +403,7 @@ int32_t opt_json_sms(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
 static struct opt_type sms_options[]= {
 //        ord parent long_name          shrt Attributes				*ival		min		max		default		*func,*syntax,*help
 	
-	{ODI,0,ARG_SMS,	                0,  9,2,A_PM1N,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,0,		opt_json_sms,
+	{ODI,0,ARG_SMS,	                0,  9,2,A_PM1N,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,0,		opt_sms,
 			ARG_FILE_FORM,"add arbitrary file-data to description"},
 	{ODI,0,ARG_SMS_FREF,       0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	&sms_fref,      MIN_FREF,       MAX_FREF,       DEF_SMS_FREF,0, opt_update_description,
 			ARG_VALUE_FORM, HLP_FREF},
@@ -416,17 +416,17 @@ static void sms_cleanup( void )
 {
 
 
-        if (extensions_fd > -1) {
+        if (inotify_fd > -1) {
 
-                if( extensions_wd > -1) {
-                        inotify_rm_watch(extensions_fd, extensions_wd);
-                        extensions_wd = -1;
+                if( inotify_wd > -1) {
+                        inotify_rm_watch(inotify_fd, inotify_wd);
+                        inotify_wd = -1;
                 }
 
-                set_fd_hook(extensions_fd, json_inotify_event_hook, DEL);
+                set_fd_hook(inotify_fd, inotify_event_hook, DEL);
 
-                close(extensions_fd);
-                extensions_fd = -1;
+                close(inotify_fd);
+                inotify_fd = -1;
         } else {
                 task_remove(check_for_changed_sms, NULL);
         }
