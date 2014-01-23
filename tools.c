@@ -28,6 +28,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <ctype.h>
 
 
 #include "list.h"
@@ -89,6 +90,10 @@ IDM_T hexStrToMem(char *s, uint8_t *m, uint16_t mLen)
         while (p < l) {
 
                 char *endptr;
+
+		if (s[p] != toupper(s[p]))
+			return FAILURE;
+
                 char c[2] = {s[p], 0};
                 //c[0] = s[o];
                 long int i = strtol(c, &endptr, 16);
