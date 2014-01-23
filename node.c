@@ -650,7 +650,6 @@ void update_orig_dhash(struct orig_node *on, struct dhash_node *dhn)
 
 
 
-STATIC_FUNC
 void purge_orig_router(struct orig_node *onlyOrig, LinkNode *onlyLink, IDM_T only_useless)
 {
         TRACE_FUNCTION_CALL;
@@ -744,7 +743,7 @@ void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T on
 
                                 purge_tx_task_list(link->tx_task_lists, NULL, NULL);
 
-                                if (link->link_adv_msg != LINKADV_MSG_IGNORED)
+                                if (link->myLinkId != LINKADV_ID_IGNORED)
                                         removed_link_adv = YES; // delay update_my_link_adv() until trees are clean again!
 
                                 if (link == local->best_link)
@@ -1075,8 +1074,8 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
                 local = debugMallocReset(sizeof(struct neigh_node), -300336);
                 AVL_INIT_TREE(local->linkDev_tree, LinkDevNode, key.dev_idx);
                 local->local_id = *local_id;
-                local->link_adv_msg_for_me = LINKADV_MSG_IGNORED;
-                local->link_adv_msg_for_him = LINKADV_MSG_IGNORED;
+                local->neighLinkId = LINKADV_ID_IGNORED;
+                local->myLinkId = LINKADV_ID_IGNORED;
                 avl_insert(&local_tree, local, -300337);
 
 		assertion(-502185, (!verifiedLinkDhn->local));
@@ -1154,7 +1153,7 @@ LinkNode *getLinkNode(struct dev_node *dev, IPX_T *llip, LINKADV_SQN_T link_sqn,
 
                 link->k.myDev = dev;
                 link->k.linkDev = linkDev;
-                link->link_adv_msg = LINKADV_MSG_IGNORED;
+                link->myLinkId = LINKADV_ID_IGNORED;
 
 
                 int i;

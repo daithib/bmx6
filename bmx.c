@@ -806,10 +806,9 @@ struct link_status {
         HELLO_SQN_T lastHelloSqn;
         TIME_T lastHelloAdv;
 
-        LOCAL_ID_T nbLocalId;
         IID_T nbIid4Me;
-        uint8_t linkAdv4Him;
-        uint8_t linkAdv4Me;
+        uint8_t myLinkId;
+        uint8_t neighLinkId;
         DEVADV_SQN_T devAdvSqn;
         DEVADV_SQN_T devAdvSqnDiff;
         LINKADV_SQN_T linkAdvSqn;
@@ -835,10 +834,9 @@ static const struct field_format link_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, lastHelloSqn,     1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, lastHelloAdv,     1, FIELD_RELEVANCE_MEDI),
 
-        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_BINARY,     link_status, nbLocalId,        1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, nbIid4Me,         1, FIELD_RELEVANCE_MEDI),
-        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, linkAdv4Him,      1, FIELD_RELEVANCE_MEDI),
-        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, linkAdv4Me,       1, FIELD_RELEVANCE_MEDI),
+        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, myLinkId,         1, FIELD_RELEVANCE_MEDI),
+        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, neighLinkId,      1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, devAdvSqn,        1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, devAdvSqnDiff,    1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, linkAdvSqn,       1, FIELD_RELEVANCE_MEDI),
@@ -885,10 +883,9 @@ static int32_t link_status_creator(struct status_handl *handl, void *data)
                                 status[i].lastHelloSqn = linkDev->hello_sqn_max;
                                 status[i].lastHelloAdv = ((TIME_T) (bmx_time - linkDev->hello_time_max)) / 1000;
 
-                                status[i].nbLocalId = linkDev->key.local_id;
                                 status[i].nbIid4Me = local->neighIID4me;
-                                status[i].linkAdv4Him = local->link_adv_msg_for_him;
-                                status[i].linkAdv4Me = local->link_adv_msg_for_me;
+                                status[i].myLinkId = local->myLinkId;
+                                status[i].neighLinkId = local->neighLinkId;
                                 status[i].devAdvSqn = local->dev_adv_sqn;
                                 status[i].devAdvSqnDiff = ((DEVADV_SQN_T) (local->link_adv_dev_sqn_ref - local->dev_adv_sqn));
                                 status[i].linkAdvSqn = local->link_adv_sqn;

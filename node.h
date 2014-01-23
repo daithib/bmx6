@@ -272,7 +272,7 @@ typedef struct {
 	UMETRIC_T timeaware_rx_probe;
 
 	struct list_head tx_task_lists[FRAME_TYPE_ARRSZ]; // scheduled frames and messages
-	int16_t link_adv_msg;
+	int16_t myLinkId;
 	TIME_T pkt_time_max;
 } LinkNode;
 
@@ -292,8 +292,8 @@ struct neigh_node {
 	LINKADV_SQN_T link_adv_sqn;
 	TIME_T link_adv_time;
 	uint16_t link_adv_msgs;
-	int16_t link_adv_msg_for_me;
-	int16_t link_adv_msg_for_him;
+	int16_t neighLinkId;
+	int16_t myLinkId;
 	struct msg_link_adv *link_adv;
 	DEVADV_SQN_T link_adv_dev_sqn_ref;
 
@@ -548,6 +548,7 @@ IDM_T blacklisted_neighbor(struct packet_buff *pb, DHASH_T *dhash);
 
 void purge_dhash_invalid_list( IDM_T force_purge_all );
 void invalidate_dhash_iid( struct dhash_node *dhn, DHASH_T *dhash );
+void purge_orig_router(struct orig_node *onlyOrig, LinkNode *onlyLink, IDM_T only_useless);
 void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired, struct orig_node *except_on);
 void block_orig_node(IDM_T block, struct orig_node *on);
 void free_orig_node(struct orig_node *on);

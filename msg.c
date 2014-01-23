@@ -853,7 +853,7 @@ void create_ogm_aggregation(void)
 
         while ((local = avl_iterate_item(&local_tree, &local_an))) {
 
-                if (local->link_adv_msg_for_him != LINKADV_MSG_IGNORED && local->rp_ogm_request_rcvd) {
+                if (local->myLinkId != LINKADV_ID_IGNORED && local->rp_ogm_request_rcvd) {
 
                         destinations++;
 
@@ -920,7 +920,7 @@ LinkNode **get_unacked_ogm_links(struct ogm_aggreg_node *oan)
                
                 assertion(-500971, (IMPLIES(local, local->best_tp_link)));
 
-                if (local->link_adv_msg_for_him == LINKADV_MSG_IGNORED || !local->rp_ogm_request_rcvd)
+                if (local->myLinkId == LINKADV_ID_IGNORED || !local->rp_ogm_request_rcvd)
                         bit_set(local->ogm_aggregations_not_acked, AGGREG_SQN_CACHE_RANGE, oan->sqn, 0);
                 
                 IDM_T not_acked = bit_get(local->ogm_aggregations_not_acked, AGGREG_SQN_CACHE_RANGE, oan->sqn);
@@ -943,9 +943,9 @@ LinkNode **get_unacked_ogm_links(struct ogm_aggreg_node *oan)
                         }
 
                         if (not_acked) {
-                                assertion(-501138, (local->link_adv_msg_for_him < OGM_DEST_ARRAY_BIT_SIZE));
-                                oan->ogm_dest_bytes = XMAX(oan->ogm_dest_bytes, ((local->link_adv_msg_for_him / 8) + 1));
-                                bit_set(oan->ogm_dest_field, OGM_DEST_ARRAY_BIT_SIZE, local->link_adv_msg_for_him, 1);
+                                assertion(-501138, (local->myLinkId < OGM_DEST_ARRAY_BIT_SIZE));
+                                oan->ogm_dest_bytes = XMAX(oan->ogm_dest_bytes, ((local->myLinkId / 8) + 1));
+                                bit_set(oan->ogm_dest_field, OGM_DEST_ARRAY_BIT_SIZE, local->myLinkId, 1);
                         }
 
 
@@ -2393,15 +2393,16 @@ int32_t rx_frame_dev_adv( struct rx_frame_iterator *it)
 
 
 STATIC_FUNC
-void set_link_adv_msg(uint16_t msg, LinkNode *link)
+void set_link_adv_msg(uint16_t myLinkId, LinkNode *link)
 {
-        my_link_adv_buff[msg].transmitter_dev_idx = link->k.myDev->llip_key.idx;
-        my_link_adv_buff[msg].peer_dev_idx = link->k.linkDev->key.dev_idx;
-        my_link_adv_buff[msg].peer_local_id = link->k.linkDev->key.local_id;
-        link->link_adv_msg = msg;
+        my_link_adv_buff[myLinkId].transmitter_dev_idx = link->k.myDev->llip_key.idx;
+        my_link_adv_buff[myLinkId].peer_dev_idx = link->k.linkDev->key.dev_idx;
+        my_link_adv_buff[myLinkId].peer_local_id = link->k.linkDev->key.local_id;
+
+        link->myLinkId = myLinkId;
         
-        if (link->k.linkDev->local->link_adv_msg_for_him == LINKADV_MSG_IGNORED)
-                link->k.linkDev->local->link_adv_msg_for_him = msg;
+        if (link->k.linkDev->local->myLinkId == LINKADV_ID_IGNORED)
+                link->k.linkDev->local->myLinkId = myLinkId;
 }
 
 void update_my_link_adv(uint32_t changes)
@@ -2411,7 +2412,7 @@ void update_my_link_adv(uint32_t changes)
         struct avl_node *an;
         LinkNode *link;
         struct neigh_node *local;
-        uint16_t msg = 0;
+        uint16_t myLinkId = 0;
         static PKT_SQN_T last_link_packet_sqn = 0;
         static TIME_T last_link_adv_time = 0;
         static uint32_t my_link_adv_changes = LINKADV_CHANGES_NONE;
@@ -2449,36 +2450,36 @@ void update_my_link_adv(uint32_t changes)
                 my_link_adv_buff = debugMallocReset(link_tree.items * sizeof (struct msg_link_adv), -300343);
 
         for (an = NULL; (link = avl_iterate_item(&link_tree, &an));){
-                link->link_adv_msg = LINKADV_MSG_IGNORED;
-                link->k.linkDev->local->link_adv_msg_for_him = LINKADV_MSG_IGNORED;
+                link->myLinkId = LINKADV_ID_IGNORED;
+                link->k.linkDev->local->myLinkId = LINKADV_ID_IGNORED;
         }
 
         for (an = NULL; (local = avl_iterate_item(&local_tree, &an));)
-                set_link_adv_msg(msg++, local->best_rp_link);
+                set_link_adv_msg(myLinkId++, local->best_rp_link);
 
-        assertion(-501140, (msg <= LOCALS_MAX));
+        assertion(-501140, (myLinkId <= LOCALS_MAX));
 
 
         for (an = NULL; (link = avl_iterate_item(&link_tree, &an));) {
 
-                if (link->link_adv_msg > LINKADV_MSG_IGNORED)
+                if (link->myLinkId > LINKADV_ID_IGNORED)
                         continue;
 
                 //TODO: sort out lndevs with reasonable worse rq than best_rqlndev: if (lndev->key.link->local->best_lndev)
                 if (link->timeaware_rx_probe * LINKADV_ADD_RP_4DIF >=
                         link->k.linkDev->local->best_rp_link->timeaware_rx_probe * LINKADV_ADD_RP_4MIN)
-                        set_link_adv_msg(msg++, link);
+                        set_link_adv_msg(myLinkId++, link);
 
         }
 
-        my_link_adv_msgs = msg;
+        my_link_adv_msgs = myLinkId;
 
         if (link_adv_tx_unsolicited) {
 
                 struct dev_node *dev;
 
                 for (an = NULL; (dev = avl_iterate_item(&dev_ip_tree, &an));)
-                        schedule_tx_task(&dev->dummyLink, FRAME_TYPE_LINK_ADV, (msg * sizeof (struct msg_link_adv)), 0, 0);
+                        schedule_tx_task(&dev->dummyLink, FRAME_TYPE_LINK_ADV, (myLinkId * sizeof (struct msg_link_adv)), 0, 0);
 
         }
 
@@ -2605,13 +2606,13 @@ int32_t rx_frame_link_adv( struct rx_frame_iterator *it)
                 local->link_adv_time = bmx_time;
                 local->link_adv_dev_sqn_ref = dev_sqn_ref;
                 local->link_adv_msgs = msgs;
-                local->link_adv_msg_for_me = LINKADV_MSG_IGNORED;
+                local->neighLinkId = LINKADV_ID_IGNORED;
 
                 uint16_t m;
                 for (m = 0; m < msgs; m++) {
 
 			if (cryptShasEqual(&local->link_adv[m].peer_local_id, &self->nodeId)) {
-                                local->link_adv_msg_for_me = m;
+                                local->neighLinkId = m;
                                 break;
                         }
                 }
@@ -2641,21 +2642,21 @@ int32_t tx_frame_rp_adv(struct tx_frame_iterator *it)
 
         for (an = NULL; (link = avl_iterate_item(&link_tree, &an));) {
 
-                if (link->link_adv_msg == LINKADV_MSG_IGNORED)
+                if (link->myLinkId == LINKADV_ID_IGNORED)
                         continue;
 
-                assertion(-501040, (link->link_adv_msg < my_link_adv_msgs ));
+                assertion(-501040, (link->myLinkId < my_link_adv_msgs ));
                 assertion(-501041, (link->rx_probe_record.hello_umetric <= UMETRIC_MAX));
 
                 if (link->timeaware_rx_probe * LINKADV_ADD_RP_4DIF <
                         link->k.linkDev->local->best_rp_link->timeaware_rx_probe * LINKADV_ADD_RP_4MAX)
                         continue;
 
-                msg[link->link_adv_msg].rp_127range = (link->timeaware_rx_probe * 127) / UMETRIC_MAX;
+                msg[link->myLinkId].rp_127range = (link->timeaware_rx_probe * 127) / UMETRIC_MAX;
 
-                msg[link->link_adv_msg].ogm_request = link->k.linkDev->local->orig_routes ? YES : NO;
+                msg[link->myLinkId].ogm_request = link->k.linkDev->local->orig_routes ? YES : NO;
 
-                msg_max = XMAX(msg_max, link->link_adv_msg);
+                msg_max = XMAX(msg_max, link->myLinkId);
 
                 msgs++;
         }
@@ -2809,7 +2810,7 @@ int32_t tx_msg_ogm_ack(struct tx_frame_iterator *it)
 
         //ack->transmitterIID4x = htons(ttn->task.myIID4x);
         ack->aggregation_sqn = *((AGGREG_SQN_T*)ttn->task.data);
-        ack->ogm_destination = ttn->task.linkDev->local->link_adv_msg_for_him;
+        ack->ogm_destination = ttn->task.linkDev->local->myLinkId;
 
         dbgf_all(DBGT_INFO, " aggreg_sqn=%d to ogm_destination=%d", ack->aggregation_sqn, ack->ogm_destination);
 
@@ -2861,13 +2862,13 @@ int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
 
         IDM_T only_process_sender_and_refresh_all = !local->orig_routes;
 
-        IDM_T ack_sender = (local->link_adv_msg_for_me != LINKADV_MSG_IGNORED &&
-                local->link_adv_msg_for_me < (ogm_dst_field_size * 8) &&
-                bit_get(ogm_destination_field, (ogm_dst_field_size * 8), local->link_adv_msg_for_me));
+        IDM_T ack_sender = (local->neighLinkId != LINKADV_ID_IGNORED &&
+                local->neighLinkId < (ogm_dst_field_size * 8) &&
+                bit_get(ogm_destination_field, (ogm_dst_field_size * 8), local->neighLinkId));
 
         if (only_process_sender_and_refresh_all || !ack_sender) {
                 dbgf_all(DBGT_INFO, "not wanted: link_adv_msg_for_me=%d ogm_destination_bytes=%d orig_routes=%d",
-                        local->link_adv_msg_for_me, ogm_dst_field_size, local->orig_routes);
+                        local->neighLinkId, ogm_dst_field_size, local->orig_routes);
         }
 
 
@@ -3064,10 +3065,10 @@ int32_t rx_frame_ogm_acks(struct rx_frame_iterator *it)
         if (!local)
                 return it->frame_msgs_length;
 
-        if (link_sqn != local->link_adv_sqn || local->link_adv_msg_for_me == LINKADV_MSG_IGNORED) {
+        if (link_sqn != local->link_adv_sqn || local->neighLinkId == LINKADV_ID_IGNORED) {
 
                 dbgf_track(DBGT_INFO, "rcvd link_sqn=%d != local->link_adv_sqn=%d or ignored link_adv_msg_for_me=%d",
-                        link_sqn, local->link_adv_sqn, local->link_adv_msg_for_me);
+                        link_sqn, local->link_adv_sqn, local->neighLinkId);
 
                 return it->frame_msgs_length;
         }
@@ -3076,7 +3077,7 @@ int32_t rx_frame_ogm_acks(struct rx_frame_iterator *it)
 
                 struct msg_ogm_ack *ack = (struct msg_ogm_ack *) (it->frame_data + pos);
 
-                if (local->link_adv_msg_for_me != ack->ogm_destination)
+                if (local->neighLinkId != ack->ogm_destination)
                         continue;
 
                 AGGREG_SQN_T aggregation_sqn = ack->aggregation_sqn;
@@ -3366,7 +3367,7 @@ int32_t rx_msg_hello_adv(struct rx_frame_iterator *it)
 	// check if this link is currently ignored in our link_adv frames but
 	// is actually a reasonable good link which should be included so that
 	// also link_rp msgs could be send:
-        if (link->link_adv_msg == LINKADV_MSG_IGNORED && (
+        if (link->myLinkId == LINKADV_ID_IGNORED && (
                 link == link->k.linkDev->local->best_rp_link || // its our best link or
                 (link->timeaware_rx_probe * LINKADV_ADD_RP_4DIF >= // its reasonable good compared to our best link
                 link->k.linkDev->local->best_rp_link->timeaware_rx_probe * LINKADV_ADD_RP_4MAX)

@@ -465,7 +465,7 @@ struct msg_dev_req { // 20 byte
 #define LINKADV_INTERVAL_REMOVED 10000
 #define LINKADV_INTERVAL_NEW     2000
 
-#define LINKADV_MSG_IGNORED -1 // used to identify links that are currently not announed via link_adv msgs
+#define LINKADV_ID_IGNORED -1 // used to identify links that are currently not announed via link_adv msgs
 
 // used to calculate the relevance of a link compared to the best current link:
 #define LINKADV_ADD_RP_4DIF 4
