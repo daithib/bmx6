@@ -3385,18 +3385,17 @@ IDM_T desc_frame_changed(  struct rx_frame_iterator *it, uint8_t type )
 	assertion(-502063, (it->dhnNew));
 	assertion(-502064, (it->dhnNew->dext));
 	assertion(-502065, (it->onOld));
-	assertion(-502066, (it->onOld->dhn));
-	assertion(-502067, (it->onOld->dhn->dext));
+	assertion(-502067, IMPLIES(it->onOld->dhn, it->onOld->dhn->dext));
 	
-	struct desc_extension *dOld = it->onOld->dhn->dext;
+	struct desc_extension *dOld = it->onOld->dhn ? it->onOld->dhn->dext : NULL;
 	struct desc_extension *dNew = it->dhnNew->dext;
 
-	uint8_t changed = (dOld->dtd[type].len != dNew->dtd[type].len ||
-		memcmp(dext_dptr(dOld, type), dext_dptr(dNew, type), dNew->dtd[type].len));
+	uint8_t changed = ((dOld ? dOld->dtd[type].len : 0) != dNew->dtd[type].len ||
+		(dOld && dOld->dtd[type].len && memcmp(dext_dptr(dOld, type), dext_dptr(dNew, type), dNew->dtd[type].len)));
 
 	dbgf_track(DBGT_INFO, "orig=%s %s type=%d (%s) old_len=%d new_len=%d",
-	           cryptShaAsString(&it->onOld->nodeId), changed ? "  CHANGED" : "UNCHANGED",
-	           type, it->db->handls[type].name, dOld->dtd[type].len, dNew->dtd[type].len);
+		cryptShaAsString(&it->onOld->nodeId), changed ? "  CHANGED" : "UNCHANGED",
+		type, it->db->handls[type].name, (dOld ? dOld->dtd[type].len : 0), dNew->dtd[type].len);
 
 	if (changed)
 		return YES;
