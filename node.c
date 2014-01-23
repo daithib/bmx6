@@ -680,9 +680,6 @@ void purge_orig_router(struct orig_node *onlyOrig, LinkNode *onlyLink, IDM_T onl
                                 cryptShaAsString(&rt->local_key->local_id),
                                 rt->local_key ? cryptShaAsString(&rt->local_key->dhn->on->nodeId) : "???");
 
-                        if (on->best_rt_local == rt)
-                                on->best_rt_local = NULL;
-
                         if (on->curr_rt_local == rt) {
 
                                 set_ogmSqn_toBeSend_and_aggregated(on, on->ogmMetric_next, on->ogmSqn_maxRcvd, on->ogmSqn_maxRcvd);

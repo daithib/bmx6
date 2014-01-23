@@ -435,7 +435,6 @@ struct orig_node {
 
 	struct avl_tree rt_tree;
 
-	struct router_node *best_rt_local;  // TODO: remove
 	struct router_node *curr_rt_local;   // the currently used local neighbor for routing
 	LinkNode *curr_rt_link; // the configured route in the kernel!
 
