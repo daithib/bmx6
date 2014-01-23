@@ -594,15 +594,15 @@ struct dhash_node *get_dhash_tree_node(DHASH_T *dhash) {
 	struct dhash_node *dhn = avl_find_item(&dhash_tree, dhash);
 
 	if (dhn) {
-		assertion(-500000, (dhn->on));
-		assertion(-500000, (dhn->on->dhn));
-		assertion(-500000, (dhn->on->dhn == dhn));
-		assertion(-500000, (dhn->dext));
-		assertion(-500000, (dhn->dext->dhn));
-		assertion(-500000, (dhn->dext->dhn == dhn));
-		assertion(-500000, (dhn->desc_frame));
-		assertion(-500000, (dhn->desc_frame_len));
-		ASSERTION(-500000, (!avl_find(&dhash_invalid_tree, &dhn->dhash)));
+		assertion(-502216, (dhn->on));
+		assertion(-502217, (dhn->on->dhn));
+		assertion(-502218, (dhn->on->dhn == dhn));
+		assertion(-502219, (dhn->dext));
+		assertion(-502220, (dhn->dext->dhn));
+		assertion(-502221, (dhn->dext->dhn == dhn));
+		assertion(-502222, (dhn->desc_frame));
+		assertion(-502223, (dhn->desc_frame_len));
+		ASSERTION(-502224, (!avl_find(&dhash_invalid_tree, &dhn->dhash)));
 		ASSERTION(-500310, (dhn->on == avl_find_item(&orig_tree, nodeIdFromDescAdv(dhn->desc_frame))));
 	}
 
@@ -611,8 +611,8 @@ struct dhash_node *get_dhash_tree_node(DHASH_T *dhash) {
 
 void update_orig_dhash(struct orig_node *on, struct dhash_node *dhn)
 {
-	assertion(-500000, (on));
-	assertion(-500000, (dhn));
+	assertion(-502225, (on));
+	assertion(-502226, (dhn));
 
         struct neigh_node *neigh = NULL;
 
@@ -641,7 +641,7 @@ void update_orig_dhash(struct orig_node *on, struct dhash_node *dhn)
                 on->dhn->local = neigh;
         }
 
-	ASSERTION(-500000, (get_dhash_tree_node(&dhn->dhash)));
+	ASSERTION(-502227, (get_dhash_tree_node(&dhn->dhash)));
 }
 
 

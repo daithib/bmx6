@@ -1854,7 +1854,7 @@ void dev_deactivate( struct dev_node *dev )
                 struct avl_node *an;
 		LinkNode *link;
                 for (an = NULL; (link = avl_iterate_item(&link_tree, &an));) {
-                        assertion(-500000, (!purge_tx_task_list(link->tx_task_lists, NULL, dev)));
+                        assertion(-502212, (!purge_tx_task_list(link->tx_task_lists, NULL, dev)));
                 }
 
 

@@ -1780,7 +1780,7 @@ struct dhash_node * process_description(struct packet_buff *pb, DHASH_T *dhash)
         TRACE_FUNCTION_CALL;
         assertion(-500262, (pb));
         ASSERTION(-500381, (!get_dhash_tree_node( dhash )));
-	ASSERTION(-500000, (!avl_find_item(&dhash_invalid_tree, dhash)));
+	ASSERTION(-502213, (!avl_find_item(&dhash_invalid_tree, dhash)));
 
 	struct description_cache_node *cache = avl_find_item(&description_cache_tree, dhash);
 
@@ -3142,7 +3142,7 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
 			dhn = (struct dhash_node*)FAILURE_PTR;
 			
 		} else {
-			ASSERTION(-500000, (dhn == get_dhash_tree_node(dhash)));
+			ASSERTION(-502214, (dhn == get_dhash_tree_node(dhash)));
 			assertion(-502167, IMPLIES(is_transmitter, dhn == viaNeigh->dhn));
 			assertion(-502168, IMPLIES(!is_transmitter, dhn != viaNeigh->dhn));
 
@@ -3218,7 +3218,7 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 
 		} else if (dhn != REJECTED_PTR && dhn != UNRESOLVED_PTR) {
 
-			ASSERTION(-500000, (dhn == get_dhash_tree_node(&dhash)));
+			ASSERTION(-502215, (dhn == get_dhash_tree_node(&dhash)));
 
 			if (desc_adv_tx_unsolicited)
 				schedule_best_tp_links(NULL, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
