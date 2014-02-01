@@ -351,6 +351,8 @@ void cache_description(uint8_t *desc, uint16_t desc_len, DHASH_T *dhash)
         TRACE_FUNCTION_CALL;
         struct description_cache_node *dcn;
 
+	IDM_T TODO_only_chache_if_signature_and_sqn_match;
+
         if ((dcn = avl_find_item(&description_cache_tree, dhash))) {
                 dcn->timestamp = bmx_time;
                 return;
@@ -3188,54 +3190,70 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-        assertion(-500550, (it->frame_msgs_length >= ((int) sizeof (struct dsc_msg_version))));
-
 	int32_t goto_error_code;
 
-	if (it->frame_data_length > (int)MAX_DESC_SIZE)
+	if ((it->frame_data_length > (int) MAX_DESC_SIZE))
 		goto_error(finish, TLV_RX_DATA_FAILURE);
 
-	struct tlv_hdr tlvHdr = { .u.u16 = ntohs(((struct tlv_hdr*)it->frame_data)->u.u16) };
-	struct desc_hdr_rhash *rhashHdr = ((struct desc_hdr_rhash*)(it->frame_data + sizeof(struct tlv_hdr)));
+	struct tlv_hdr pKTlvHdr = { .u.u16 = ntohs(((struct tlv_hdr*)it->frame_data)->u.u16) };
 
-	if (tlvHdr.u.tlv.type != BMX_DSC_TLV_RHASH ||
-		tlvHdr.u.tlv.length != sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) )
+	if (pKTlvHdr.u.tlv.type != BMX_DSC_TLV_RHASH ||
+		pKTlvHdr.u.tlv.length != sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) )
 		goto_error(finish, TLV_RX_DATA_FAILURE);
 
-	if (rhashHdr->compression || rhashHdr->reserved || rhashHdr->expanded_type != BMX_DSC_TLV_DSC_PUBKEY)
+	struct desc_hdr_rhash *pKeyRHashHdr = ((struct desc_hdr_rhash*)(it->frame_data + sizeof(struct tlv_hdr)));
+
+	if (pKeyRHashHdr->compression || pKeyRHashHdr->reserved || pKeyRHashHdr->expanded_type != BMX_DSC_TLV_DSC_PUBKEY)
 		goto_error(finish, TLV_RX_DATA_FAILURE);
 
-	struct dhash_node *dhn = NULL;
+	struct tlv_hdr sigTlvHdr = { .u.u16 = ntohs(((struct tlv_hdr*)(it->frame_data + pKTlvHdr.u.tlv.length))->u.u16) };
+
+
 	DHASH_T dhash;
-
 	cryptShaAtomic(it->frame_data, it->frame_data_length, &dhash);
 
-	dbgf_sys( DBGT_INFO, "rcvd dhash=%s nodeId=%s via_dev=%s via_ip=%s",
-		memAsHexString(&dhash, sizeof(SHA1_T)),
+	struct dhash_node *dhnInvalid = avl_find_item(&dhash_invalid_tree, &dhash);
+	struct dhash_node *dhn = !dhnInvalid ? get_dhash_tree_node(&dhash) : NULL;
+	uint8_t supported = supported_pubkey(&pKeyRHashHdr->msg->rframe_hash);
+	struct ref_node *pubKeyRef = ref_node_get(&pKeyRHashHdr->msg->rframe_hash);
+	int signature = pubKeyRef && pubKeyRef->f_body ?
+		process_signature(sigTlvHdr.u.tlv.length - sizeof(struct tlv_hdr), 
+		((struct dsc_msg_signature*)(it->frame_data + pKTlvHdr.u.tlv.length + sizeof(struct tlv_hdr))),
+		it->frame_data, it->frame_data_length, ((struct dsc_msg_pubkey*)pubKeyRef->f_body)) : TLV_RX_DATA_FAILURE;
+
+	dbgf_sys( DBGT_INFO, "rcvd supportedKey=%d availableKey=%d invalidated=%d signature=%d known=%d dhash=%s nodeId=%s via_dev=%s via_ip=%s",
+		supported, !!pubKeyRef, !!dhnInvalid, signature, !!dhn, memAsHexString(&dhash, sizeof(SHA1_T)),
 		nodeIdAsStringFromDescAdv(it->frame_data),
 		it->pb->i.iif->label_cfg.str, it->pb->i.llip_str);
 
-	if (!avl_find(&dhash_invalid_tree, &dhash) && !(dhn=get_dhash_tree_node(&dhash)))
+	assertion(-500000, IMPLIES(dhn, supported));
+	assertion(-500000, IMPLIES(dhn, pubKeyRef));
+
+	if (!dhnInvalid && !dhn && supported && !pubKeyRef)
+		schedule_tx_task(&it->pb->i.iif->dummyLink, FRAME_TYPE_REF_REQ, SCHEDULE_MIN_MSG_SIZE, &pKeyRHashHdr->msg->rframe_hash, sizeof(SHA1_T));
+
+	if (!dhnInvalid && !dhn && supported && pubKeyRef && signature >= TLV_RX_DATA_PROCESSED && processDescriptionsViaUnverifiedLink) {
+
 		cache_description(it->frame_data, it->frame_data_length, &dhash);
 
-	if (processDescriptionsViaUnverifiedLink && !dhn && (dhn = process_description(it->pb, &dhash))) {
+		if ((dhn = process_description(it->pb, &dhash))) {
 
-		if (dhn == FAILURE_PTR) {
+			if (dhn == FAILURE_PTR) {
 
-			goto_error(finish, TLV_RX_DATA_FAILURE);
+				goto_error(finish, TLV_RX_DATA_FAILURE);
 
-		} else if (dhn != REJECTED_PTR && dhn != UNRESOLVED_PTR) {
+			} else if (dhn != REJECTED_PTR && dhn != UNRESOLVED_PTR) {
 
-			ASSERTION(-502215, (dhn == get_dhash_tree_node(&dhash)));
+				ASSERTION(-502215, (dhn == get_dhash_tree_node(&dhash)));
 
-			if (desc_adv_tx_unsolicited)
-				schedule_best_tp_links(NULL, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
+				if (desc_adv_tx_unsolicited)
+					schedule_best_tp_links(NULL, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
 
-			if (dhash_adv_tx_unsolicited)
-				schedule_best_tp_links(NULL, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
+				if (dhash_adv_tx_unsolicited)
+					schedule_best_tp_links(NULL, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
+			}
 		}
 	}
-
 	
         goto_error(finish, it->frame_data_length);
 

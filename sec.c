@@ -62,8 +62,12 @@ CRYPTKEY_T *my_PubKey = NULL;
 CRYPTKEY_T *my_PktKey = NULL;
 
 static char *trustedNodesDir = NULL;
-static int inotify_fd = -1;
-static int inotify_wd = -1;
+static int trusted_ifd = -1;
+static int trusted_iwd = -1;
+
+static char *supportedNodesDir = NULL;
+static int support_ifd = -1;
+static int support_iwd = -1;
 
 struct trust_node {
 	GLOBAL_ID_T global_id;
@@ -72,7 +76,13 @@ struct trust_node {
 	uint8_t updated;
 };
 
+struct support_node {
+	GLOBAL_ID_T global_id;
+	uint8_t updated;
+};
+
 static AVL_TREE(trusted_nodes_tree, struct trust_node, global_id);
+static AVL_TREE(supported_nodes_tree, struct support_node, global_id);
 
 
 
@@ -435,9 +445,9 @@ int create_dsc_tlv_signature(struct tx_frame_iterator *it)
 		desc_msg->type = dext_msg->type;
 		memcpy( desc_msg->signature, dext_msg->signature, keySpace);
 
-		dbgf_sys(DBGT_INFO, "fixed RSA%d type=%d signature=%s of dataSha=%s over dataLen=%d data=%s (dataOffset=%d)",
+		dbgf_sys(DBGT_INFO, "fixed RSA%d type=%d signature=%s of dataSha=%s over dataLen=%d data=%s (dataOffset=%d desc_frames_len=%d)",
 			(keySpace*8), desc_msg->type, memAsHexString(desc_msg->signature, keySpace),
-			cryptShaAsString(&dataSha), dataLen, memAsHexString(data, dataLen), dataOffset);
+			cryptShaAsString(&dataSha), dataLen, memAsHexString(data, dataLen), dataOffset, it->frames_out_pos);
 
 		desc_msg = NULL;
 		dataOffset = 0;
@@ -459,23 +469,30 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 	if (it->op != TLV_OP_TEST)
 		return TLV_RX_DATA_PROCESSED;
 
-	char *goto_error_code = NULL;
+	assertion(-500000, (process_signature(it->frame_data_length, (struct dsc_msg_signature *)it->frame_data, it->dhnNew->desc_frame,
+		it->dhnNew->desc_frame_len, dext_dptr(it->dhnNew->dext, BMX_DSC_TLV_DSC_PUBKEY)) == TLV_RX_DATA_PROCESSED));
+
+	return TLV_RX_DATA_PROCESSED;
+}
+
+int process_signature(int32_t sigMsg_length, struct dsc_msg_signature *sigMsg, uint8_t *desc_frames, int32_t desc_frames_len, struct dsc_msg_pubkey *pkeyMsg)
+{
+
 	static struct prof_ctx prof = { .k ={ .func=(void(*)(void))process_dsc_tlv_signature}, .name=__FUNCTION__, .parent_func=(void (*) (void))rx_packet};
 	prof_start(&prof);
-	clock_t clock_before = (TIME_T)clock();
-	int32_t sign_len = it->frame_data_length - sizeof(struct dsc_msg_signature);
-	struct dsc_msg_signature *msg = (struct dsc_msg_signature*)(it->frame_data);
-	uint32_t dataOffset = (2*sizeof(struct tlv_hdr)) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) + it->frame_data_length;
-	uint8_t *data = (uint8_t*)it->dhnNew->desc_frame + dataOffset;
-	int32_t dataLen = it->dhnNew->desc_frame_len - dataOffset;
-	CRYPTSHA1_T dataSha;
-	CRYPTKEY_T *pkey = NULL;
-	struct dsc_msg_pubkey *pkey_msg = dext_dptr(it->dhnNew->dext, BMX_DSC_TLV_DSC_PUBKEY);
 
-	if ( !cryptKeyTypeAsString(msg->type) || cryptKeyLenByType(msg->type) != sign_len )
+	int32_t sign_len = sigMsg_length - sizeof(struct dsc_msg_signature);
+	uint32_t dataOffset = (2*sizeof(struct tlv_hdr)) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) + sigMsg_length;
+	uint8_t *data = desc_frames + dataOffset;
+	int32_t dataLen = desc_frames_len - dataOffset;
+	CRYPTKEY_T *pkey = NULL;
+	char *goto_error_code = NULL;
+	CRYPTSHA1_T dataSha;
+
+	if ( !cryptKeyTypeAsString(sigMsg->type) || cryptKeyLenByType(sigMsg->type) != sign_len )
 		goto_error( finish, "1");
 
-	if ( !pkey_msg || !cryptKeyTypeAsString(pkey_msg->type) || pkey_msg->type != msg->type)
+	if ( !pkeyMsg || !cryptKeyTypeAsString(pkeyMsg->type) || pkeyMsg->type != sigMsg->type)
 		goto_error( finish, "2");
 
 	if ( dataLen < (int)sizeof(struct dsc_msg_version))
@@ -486,31 +503,25 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 
 	cryptShaAtomic(data, dataLen, &dataSha);
 
-	if (!(pkey = cryptPubKeyFromRaw(pkey_msg->key, sign_len)))
+	if (!(pkey = cryptPubKeyFromRaw(pkeyMsg->key, sign_len)))
 		goto_error(finish, "5");
 
 	assertion(-502207, (pkey && cryptPubKeyCheck(pkey) == SUCCESS));
 
-	if (cryptVerify(msg->signature, sign_len, &dataSha, pkey) != SUCCESS )
+	if (cryptVerify(sigMsg->signature, sign_len, &dataSha, pkey) != SUCCESS )
 		goto_error( finish, "7");
 	
-	clock_t clock_after = (TIME_T)clock();
-	static clock_t clock_total;
-	clock_t clock_diff = (clock_after - clock_before);
-	clock_total += clock_diff
-	dbgf_sys(DBGT_INFO, "verified %s description signature in time=%d verified_total=%d total=%d",
-		cryptKeyTypeAsString(pkey->rawKeyType), clock_diff, clock_total, clock_after);
 	
 finish: {
 
 	dbgf(goto_error_code ? DBGL_SYS : DBGL_ALL, goto_error_code ? DBGT_ERR : DBGT_INFO,
-		"%s verifying  data_len=%d data_sha=%s \n"
+		"%s verifying  desc_frame_len=%d dataOffset=%d data_len=%d data=%s data_sha=%s \n"
 		"sign_len=%d signature=%s\n"
-		"pkey_msg_type=%s pkey_msg_len=%d pkey_type=%s pkey=%s \n"
+		"msg_pkey_type=%s msg_pkey_len=%d pkey_type=%s pkey=%s \n"
 		"problem?=%s",
-		goto_error_code?"Failed":"Succeeded", dataLen, cryptShaAsString(&dataSha),
-		sign_len, memAsHexString(msg->signature, sign_len),
-		pkey_msg ? cryptKeyTypeAsString(pkey_msg->type) : "---", pkey_msg ? cryptKeyLenByType(pkey_msg->type) : 0,
+		goto_error_code?"Failed":"Succeeded", desc_frames_len, dataOffset, dataLen, memAsHexString(data, dataLen), cryptShaAsString(&dataSha),
+		sign_len, memAsHexString(sigMsg->signature, sign_len),
+		pkeyMsg ? cryptKeyTypeAsString(pkeyMsg->type) : "---", pkeyMsg ? cryptKeyLenByType(pkeyMsg->type) : 0,
 		pkey ? cryptKeyTypeAsString(pkey->rawKeyType) : "---", pkey ? memAsHexString(pkey->rawKey, pkey->rawKeyLen) : "---",
 		goto_error_code);
 
@@ -518,6 +529,8 @@ finish: {
 		cryptKeyFree(&pkey);
 
 	prof_stop(&prof);
+
+	ASSERTION(-500000, (!goto_error_code));
 	
 	if (goto_error_code && sign_len > (descVerification/8))
 		return TLV_RX_DATA_REJECTED;
@@ -928,7 +941,78 @@ int create_dsc_tlv_trusts(struct tx_frame_iterator *it)
         return TLV_TX_DATA_IGNORED;
 }
 
+IDM_T supported_pubkey( CRYPTSHA1_T *pkhash ) {
+	return supportedNodesDir ? (avl_find_item(&supported_nodes_tree, pkhash) ? YES : NO) : YES;
+}
 
+STATIC_FUNC
+void check_supported_nodes(void *unused)
+{
+
+	DIR *dir;
+
+	if (support_ifd == -1) {
+                task_remove(check_supported_nodes, NULL);
+                task_register(DEF_TRUST_DIR_POLLING_INTERVAL, check_supported_nodes, NULL, -300000);
+        }
+
+	if ((dir = opendir(supportedNodesDir))) {
+
+		struct dirent *dirEntry;
+		struct support_node *sn;
+		GLOBAL_ID_T globalId;
+
+		while ((dirEntry = readdir(dir)) != NULL) {
+
+			char globalIdString[(2*sizeof(GLOBAL_ID_T))+1] = {0};
+
+			if (
+				(strlen(dirEntry->d_name) >= (2*sizeof(GLOBAL_ID_T))) &&
+				(strncpy(globalIdString, dirEntry->d_name, 2*sizeof(GLOBAL_ID_T))) &&
+				(hexStrToMem(globalIdString, (uint8_t*)&globalId, sizeof(GLOBAL_ID_T)) == SUCCESS)
+				) {
+
+				if ((sn = avl_find_item(&supported_nodes_tree, &globalId))) {
+
+					dbgf(sn->updated ? DBGL_SYS : DBGL_ALL, sn->updated ? DBGT_ERR : DBGT_INFO,
+						"file=%s prefix found %d times!",dirEntry->d_name, sn->updated);
+
+				} else {
+					sn = debugMallocReset(sizeof(struct support_node), -300000);
+					sn->global_id = globalId;
+					avl_insert(&supported_nodes_tree, sn, -300000);
+					dbgf_sys(DBGT_INFO, "file=%s defines new nodeId=%s!",
+						dirEntry->d_name, cryptShaAsString(&globalId));
+				}
+
+				sn->updated++;
+
+			} else {
+				dbgf_sys(DBGT_ERR, "file=%s... has illegal format!",dirEntry->d_name);
+			}
+		}
+		closedir(dir);
+
+		memset(&globalId, 0, sizeof(globalId));
+		while ((sn = avl_next_item(&supported_nodes_tree, &globalId))) {
+			struct orig_node *on;
+			globalId = sn->global_id;
+			if (!sn->updated && !cryptShasEqual(&sn->global_id, &self->nodeId)) {
+				avl_remove(&supported_nodes_tree, &globalId, -300000);
+
+				if ((on = avl_find_item(&orig_tree, &globalId)))
+					free_orig_node(on);
+
+				debugFree(sn, -300000);
+			} else {
+				sn->updated = 0;
+			}
+		}
+
+	} else {
+		cleanup_all(-500000);
+	}
+}
 
 STATIC_FUNC
 void check_trusted_nodes(void *unused)
@@ -936,7 +1020,7 @@ void check_trusted_nodes(void *unused)
 
 	DIR *dir;
 
-	if (inotify_fd == -1) {
+	if (trusted_ifd == -1) {
                 task_remove(check_trusted_nodes, NULL);
                 task_register(DEF_TRUST_DIR_POLLING_INTERVAL, check_trusted_nodes, NULL, -300657);
         }
@@ -951,7 +1035,6 @@ void check_trusted_nodes(void *unused)
 		while ((dirEntry = readdir(dir)) != NULL) {
 			
 			char globalIdString[(2*sizeof(GLOBAL_ID_T))+1] = {0};
-			struct trust_node *tn;
 
 			if (
 				(strlen(dirEntry->d_name) >= (2*sizeof(GLOBAL_ID_T))) &&
@@ -969,7 +1052,7 @@ void check_trusted_nodes(void *unused)
 					tn->global_id = globalId;
 					changed = YES;
 					avl_insert(&trusted_nodes_tree, tn, -300659);
-					dbgf_sys(DBGT_INFO, "file=%s defines new trusted nodeId=%s!",
+					dbgf_sys(DBGT_INFO, "file=%s defines new nodeId=%s!",
 						dirEntry->d_name, cryptShaAsString(&globalId));
 				}
 
@@ -1010,9 +1093,9 @@ void inotify_event_hook(int fd)
 {
         TRACE_FUNCTION_CALL;
 
-        dbgf_sys(DBGT_INFO, "detected changes in directory: %s", trustedNodesDir);
+	dbgf_sys(DBGT_INFO, "detected changes in directory: %s", (fd == trusted_ifd) ? trustedNodesDir : supportedNodesDir);
 
-        assertion(-501278, (fd > -1 && fd == inotify_fd));
+        assertion(-501278, (fd > -1 && (fd == trusted_ifd || fd == support_ifd)));
 
         int ilen = 1024;
         char *ibuff = debugMalloc(ilen, -300375);
@@ -1034,7 +1117,7 @@ void inotify_event_hook(int fd)
                         processed += (sizeof (struct inotify_event) +ievent->len);
 
                         if (ievent->mask & (IN_DELETE_SELF)) {
-                                dbgf_sys(DBGT_ERR, "directory %s has been removed \n", trustedNodesDir);
+				dbgf_sys(DBGT_ERR, "directory %s has been removed \n", (fd == trusted_ifd) ? trustedNodesDir : supportedNodesDir);
                                 cleanup_all(-500000);
                         }
                 }
@@ -1045,7 +1128,10 @@ void inotify_event_hook(int fd)
 
         debugFree(ibuff, -300377);
 
-        check_trusted_nodes(NULL);
+	if (fd == trusted_ifd)
+		check_trusted_nodes(NULL);
+	else
+		check_supported_nodes(NULL);
 }
 
 
@@ -1053,22 +1139,22 @@ STATIC_FUNC
 void cleanup_trusted_nodes(void)
 {
 
-        if (inotify_fd > -1) {
+	if (trusted_ifd > -1) {
 
-                if( inotify_wd > -1) {
-                        inotify_rm_watch(inotify_fd, inotify_wd);
-                        inotify_wd = -1;
-                }
+		if (trusted_iwd > -1) {
+			inotify_rm_watch(trusted_ifd, trusted_iwd);
+			trusted_iwd = -1;
+		}
 
-                set_fd_hook(inotify_fd, inotify_event_hook, DEL);
+		set_fd_hook(trusted_ifd, inotify_event_hook, DEL);
 
-                close(inotify_fd);
-                inotify_fd = -1;
-        } else {
-                task_remove(check_trusted_nodes, NULL);
-        }
+		close(trusted_ifd);
+		trusted_ifd = -1;
+	} else {
+		task_remove(check_trusted_nodes, NULL);
+	}
 
-	while( trusted_nodes_tree.items)
+	while (trusted_nodes_tree.items)
 		debugFree(avl_remove_first_item(&trusted_nodes_tree, -300661), -300664);
 
 	trustedNodesDir = NULL;
@@ -1094,18 +1180,18 @@ int32_t opt_trusted_node_dir(uint8_t cmd, uint8_t _save, struct opt_type *opt, s
 
 			trustedNodesDir = patch->val;
 
-			if ((inotify_fd = inotify_init()) < 0) {
+			if ((trusted_ifd = inotify_init()) < 0) {
 
 				dbg_sys(DBGT_WARN, "failed init inotify socket: %s! Using %d ms polling instead! You should enable inotify support in your kernel!",
 					strerror(errno), DEF_TRUST_DIR_POLLING_INTERVAL);
-				inotify_fd = -1;
+				trusted_ifd = -1;
 
-			} else if (fcntl(inotify_fd, F_SETFL, O_NONBLOCK) < 0) {
+			} else if (fcntl(trusted_ifd, F_SETFL, O_NONBLOCK) < 0) {
 
 				dbgf_sys(DBGT_ERR, "failed setting inotify non-blocking: %s", strerror(errno));
 				return FAILURE;
 
-			} else if ((inotify_wd = inotify_add_watch(inotify_fd, trustedNodesDir,
+			} else if ((trusted_iwd = inotify_add_watch(trusted_ifd, trustedNodesDir,
 				IN_CREATE | IN_DELETE | IN_DELETE_SELF | IN_MODIFY | IN_MOVE_SELF | IN_MOVED_FROM | IN_MOVED_TO)) < 0) {
 
 				dbgf_sys(DBGT_ERR, "failed adding watch for dir=%s: %s \n", trustedNodesDir, strerror(errno));
@@ -1113,7 +1199,7 @@ int32_t opt_trusted_node_dir(uint8_t cmd, uint8_t _save, struct opt_type *opt, s
 
 			} else {
 
-				set_fd_hook(inotify_fd, inotify_event_hook, ADD);
+				set_fd_hook(trusted_ifd, inotify_event_hook, ADD);
 			}
 
 			struct trust_node *tn = debugMallocReset(sizeof(struct trust_node), -300662);
@@ -1131,6 +1217,85 @@ int32_t opt_trusted_node_dir(uint8_t cmd, uint8_t _save, struct opt_type *opt, s
 }
 
 
+STATIC_FUNC
+void cleanup_supported_nodes(void)
+{
+
+	if (support_ifd > -1) {
+
+		if (support_iwd > -1) {
+			inotify_rm_watch(support_ifd, support_iwd);
+			support_iwd = -1;
+		}
+
+		set_fd_hook(support_ifd, inotify_event_hook, DEL);
+
+		close(support_ifd);
+		support_ifd = -1;
+	} else {
+		task_remove(check_supported_nodes, NULL);
+	}
+
+	while (supported_nodes_tree.items)
+		debugFree(avl_remove_first_item(&supported_nodes_tree, -300000), -300000);
+
+	supportedNodesDir = NULL;
+}
+
+
+STATIC_FUNC
+int32_t opt_supported_node_dir(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
+{
+
+        if (cmd == OPT_CHECK && check_dir(patch->val, NO/*create*/, NO/*writable*/) == FAILURE)
+			return FAILURE;
+
+        if (cmd == OPT_APPLY) {
+
+		if (patch->diff == DEL || (patch->diff == ADD && supportedNodesDir))
+			cleanup_supported_nodes();
+
+
+		if (patch->diff == ADD) {
+
+			assertion(-501286, (patch->val));
+
+			supportedNodesDir = patch->val;
+
+			if ((support_ifd = inotify_init()) < 0) {
+
+				dbg_sys(DBGT_WARN, "failed init inotify socket: %s! Using %d ms polling instead! You should enable inotify support in your kernel!",
+					strerror(errno), DEF_TRUST_DIR_POLLING_INTERVAL);
+				support_ifd = -1;
+
+			} else if (fcntl(support_ifd, F_SETFL, O_NONBLOCK) < 0) {
+
+				dbgf_sys(DBGT_ERR, "failed setting inotify non-blocking: %s", strerror(errno));
+				return FAILURE;
+
+			} else if ((support_iwd = inotify_add_watch(support_ifd, supportedNodesDir,
+				IN_CREATE | IN_DELETE | IN_DELETE_SELF | IN_MODIFY | IN_MOVE_SELF | IN_MOVED_FROM | IN_MOVED_TO)) < 0) {
+
+				dbgf_sys(DBGT_ERR, "failed adding watch for dir=%s: %s \n", supportedNodesDir, strerror(errno));
+				return FAILURE;
+
+			} else {
+
+				set_fd_hook(support_ifd, inotify_event_hook, ADD);
+			}
+
+			struct support_node *sn = debugMallocReset(sizeof(struct support_node), -300662);
+			sn->global_id = self->nodeId;
+			avl_insert(&supported_nodes_tree, sn, -300663);
+
+			check_supported_nodes(NULL);
+		}
+        }
+
+
+        return SUCCESS;
+}
+
 
 
 STATIC_FUNC
@@ -1147,6 +1312,8 @@ struct opt_type sec_options[]=
 			ARG_VALUE_FORM, HLP_PACKET_VERIFY},
 	{ODI,0,ARG_TRUSTED_NODES_DIR,   0,  9,2,A_PM1N,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,DEF_TRUSTED_NODES_DIR, opt_trusted_node_dir,
 			ARG_DIR_FORM,"directory with global-id hashes of this node's trusted other nodes"},
+	{ODI,0,ARG_SUPPORTED_NODES_DIR, 0,  9,2,A_PM1N,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,DEF_SUPPORTED_NODES_DIR, opt_supported_node_dir,
+			ARG_DIR_FORM,"directory with global-id hashes of this node's supported other nodes"},
 
 };
 
@@ -1255,4 +1422,5 @@ void cleanup_sec( void )
 	}
 
 	cleanup_trusted_nodes();
+	cleanup_supported_nodes();
 }

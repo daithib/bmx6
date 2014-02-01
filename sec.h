@@ -31,6 +31,9 @@
 #define DEF_TRUSTED_NODES_DIR "/etc/bmx6/trustedNodes"
 #define ARG_TRUSTED_NODES_DIR "trustedNodesDir"
 
+#define DEF_SUPPORTED_NODES_DIR "/etc/bmx6/supportedNodes"
+#define ARG_SUPPORTED_NODES_DIR "supportedNodesDir"
+
 #define ARG_KEY_PATH "keyPath"
 #define DEF_KEY_PATH "/etc/bmx6/rsa.der"
 
@@ -133,6 +136,9 @@ OGM_DEST_T allocate_internalNeighId(struct neigh_node *nn);
 uint32_t *init_neighTrust(struct orig_node *on);
 IDM_T verify_neighTrust(struct orig_node *on, struct neigh_node *neigh);
 
+IDM_T supported_pubkey( CRYPTSHA1_T *pkhash );
+
+int process_signature(int32_t sig_msg_length, struct dsc_msg_signature *sig_msg, uint8_t *desc_frame, int32_t desc_frame_len, struct dsc_msg_pubkey *pkey_msg);
 
 void init_sec( void );
 void cleanup_sec( void );
