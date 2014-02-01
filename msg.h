@@ -563,10 +563,9 @@ struct msg_description_request { // 2 bytes
 
 
 struct hdr_description_request { // 20 bytes
-	LOCAL_ID_T destination_local_id;
+	LOCAL_ID_T destination_local_id; //TODO: this may become the link-local IP of the destination
 	struct msg_description_request msg[];
 } __attribute__((packed));
-
 
 
 
@@ -575,6 +574,12 @@ struct hdr_description_request { // 20 bytes
 // for FRAME_TYPE_REF_REQ:
 struct msg_ref_req {
     SHA1_T rframe_hash;
+} __attribute__((packed));
+
+//TODO: Use this destination header!!!
+struct hdr_ref_req { // 20 bytes
+    IP6_T receiver_llip;
+	struct msg_ref_req msg[];
 } __attribute__((packed));
 
 

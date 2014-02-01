@@ -310,9 +310,9 @@ struct neigh_node {
 	int32_t orig_routes;
         
         
-        
+        struct orig_node *on;
         // the old neigh_node:
-	struct dhash_node *dhn;
+	struct dhash_node *dhn; //TODO remove and use on;
         CRYPTKEY_T *pktKey;
 
 	IID_T neighIID4me;
@@ -455,7 +455,7 @@ struct dhash_node {
 
 	TIME_T referred_by_me_timestamp; // last time this dhn was referred
 
-        struct neigh_node *local;
+        struct neigh_node *local; //TODO: remove and use on!
 	IID_T myIID4orig;
 
 
