@@ -84,6 +84,7 @@ typedef struct CRYPTSHA1_T {
 	} h;
 } CRYPTSHA1_T;
 
+extern const CRYPTSHA1_T ZERO_CYRYPSHA1;
 
 typedef struct CRYPTKEY_T {
     TIME_SEC_T endOfLife;

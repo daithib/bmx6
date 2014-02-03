@@ -30,7 +30,7 @@
 #include "tools.h"
 #include "allocate.h"
 
-
+const CRYPTSHA1_T ZERO_CYRYPSHA1 = { .h.u32 = {0} };
 const CRYPTKEY_T CYRYPTKEY_ZERO = { .nativeBackendKey=0, .backendKey=NULL, .rawKeyLen=0, .rawKey=NULL };
 
 static uint8_t shaClean = NO;
