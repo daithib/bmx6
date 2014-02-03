@@ -929,6 +929,7 @@ extern const void* REJECTED_PTR;
 extern const void* UNRESOLVED_PTR;
 extern const void* FAILURE_PTR;
 
+struct description_cache_node *purge_cached_descriptions(DHASH_T *onlyDhash, GLOBAL_ID_T *onlyGlobalId, IDM_T onlyExpired);
 
 struct dhash_node * process_description(struct packet_buff *pb, DHASH_T *dhash);
 

@@ -313,8 +313,8 @@ void del_cached_description(DHASH_T *dhash)
 	}
 }
 
-STATIC_FUNC
-struct description_cache_node *purge_cached_descriptions(IDM_T purge_all)
+
+struct description_cache_node *purge_cached_descriptions(DHASH_T *onlyDhash, GLOBAL_ID_T *onlyGlobalId, IDM_T onlyExpired)
 {
         TRACE_FUNCTION_CALL;
         struct description_cache_node *dcn;
@@ -322,14 +322,18 @@ struct description_cache_node *purge_cached_descriptions(IDM_T purge_all)
         DHASH_T tmp_dhash;
         memset( &tmp_dhash, 0, sizeof(DHASH_T));
 
-        dbgf_all( DBGT_INFO, "%s", purge_all ? "purge_all" : "only_expired");
+        dbgf_all( DBGT_INFO, "%s", onlyExpired ? "purge_all" : "only_expired");
 
-        while ((dcn = avl_next_item(&description_cache_tree, &tmp_dhash))) {
-
+	while ((dcn = onlyDhash ?
+		avl_find_item(&description_cache_tree, onlyDhash) :
+		avl_next_item(&description_cache_tree, &tmp_dhash))) {
 
 		tmp_dhash = dcn->dhash;
 
-                if (purge_all || ((TIME_T) (bmx_time - dcn->timestamp)) > DEF_DESC0_CACHE_TO) {
+		if (onlyGlobalId && !cryptShasEqual(onlyGlobalId, nodeIdFromDescAdv(dcn->desc_frame)))
+			continue;
+
+                if (!onlyExpired || ((TIME_T) (bmx_time - dcn->timestamp)) > DEF_DESC0_CACHE_TO) {
 
                         avl_remove(&description_cache_tree, &dcn->dhash, -300208);
                         debugFree(dcn->desc_frame, -300100);
@@ -340,6 +344,9 @@ struct description_cache_node *purge_cached_descriptions(IDM_T purge_all)
                         if (!dcn_min || U32_LT(dcn->timestamp, dcn_min->timestamp))
                                 dcn_min = dcn;
                 }
+
+		if (onlyDhash)
+			break;
         }
 
         return dcn_min;
@@ -365,7 +372,7 @@ void cache_description(uint8_t *desc, uint16_t desc_len, DHASH_T *dhash)
         if ( description_cache_tree.items == DEF_DESC0_CACHE_SIZE ) {
 
 
-                struct description_cache_node *dcn_min = purge_cached_descriptions( NO );
+                struct description_cache_node *dcn_min = purge_cached_descriptions( NULL, NULL, YES );
 
                 dbgf_sys(DBGT_WARN, "desc0_cache_tree reached %d items! cleaned up %d items!",
                         DEF_DESC0_CACHE_SIZE, DEF_DESC0_CACHE_SIZE - description_cache_tree.items);
@@ -3191,48 +3198,36 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
         TRACE_FUNCTION_CALL;
 
 	int32_t goto_error_code;
+	GLOBAL_ID_T *nodeId = nodeIdFromDescAdv(it->frame_data);
 
-	if ((it->frame_data_length > (int) MAX_DESC_SIZE))
+	if (!nodeId || (it->frame_data_length > (int) MAX_DESC_SIZE))
 		goto_error(finish, TLV_RX_DATA_FAILURE);
 
 	struct tlv_hdr pKTlvHdr = { .u.u16 = ntohs(((struct tlv_hdr*)it->frame_data)->u.u16) };
-
-	if (pKTlvHdr.u.tlv.type != BMX_DSC_TLV_RHASH ||
-		pKTlvHdr.u.tlv.length != sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) )
-		goto_error(finish, TLV_RX_DATA_FAILURE);
-
-	struct desc_hdr_rhash *pKeyRHashHdr = ((struct desc_hdr_rhash*)(it->frame_data + sizeof(struct tlv_hdr)));
-
-	if (pKeyRHashHdr->compression || pKeyRHashHdr->reserved || pKeyRHashHdr->expanded_type != BMX_DSC_TLV_DSC_PUBKEY)
-		goto_error(finish, TLV_RX_DATA_FAILURE);
-
 	struct tlv_hdr sigTlvHdr = { .u.u16 = ntohs(((struct tlv_hdr*)(it->frame_data + pKTlvHdr.u.tlv.length))->u.u16) };
-
-
 	DHASH_T dhash;
 	cryptShaAtomic(it->frame_data, it->frame_data_length, &dhash);
 
-	struct dhash_node *dhnInvalid = avl_find_item(&deprecated_dhash_tree, &dhash);
-	struct dhash_node *dhn = !dhnInvalid ? get_dhash_tree_node(&dhash) : NULL;
-	uint8_t supported = supported_pubkey(&pKeyRHashHdr->msg->rframe_hash);
-	struct ref_node *pubKeyRef = ref_node_get(&pKeyRHashHdr->msg->rframe_hash);
+	struct dhash_node *deprecated = avl_find_item(&deprecated_dhash_tree, &dhash);
+	struct dhash_node *dhn = !deprecated ? get_dhash_tree_node(&dhash) : NULL;
+	uint8_t supported = supported_pubkey(nodeId);
+	struct ref_node *pubKeyRef = ref_node_get(nodeId);
 	int signature = pubKeyRef && pubKeyRef->f_body ?
 		process_signature(sigTlvHdr.u.tlv.length - sizeof(struct tlv_hdr), 
 		((struct dsc_msg_signature*)(it->frame_data + pKTlvHdr.u.tlv.length + sizeof(struct tlv_hdr))),
 		it->frame_data, it->frame_data_length, ((struct dsc_msg_pubkey*)pubKeyRef->f_body)) : TLV_RX_DATA_FAILURE;
 
-	dbgf_sys( DBGT_INFO, "rcvd supportedKey=%d availableKey=%d invalidated=%d signature=%d known=%d dhash=%s nodeId=%s via_dev=%s via_ip=%s",
-		supported, !!pubKeyRef, !!dhnInvalid, signature, !!dhn, memAsHexString(&dhash, sizeof(SHA1_T)),
-		nodeIdAsStringFromDescAdv(it->frame_data),
-		it->pb->i.iif->label_cfg.str, it->pb->i.llip_str);
+	dbgf_sys( DBGT_INFO, "rcvd supportedKey=%d availableKey=%d deprecated=%d signature=%d known=%d dhash=%s nodeId=%s via_dev=%s via_ip=%s",
+		supported, !!pubKeyRef, !!deprecated, signature, !!dhn, memAsHexString(&dhash, sizeof(SHA1_T)),
+		cryptShaAsString(nodeId), it->pb->i.iif->label_cfg.str, it->pb->i.llip_str);
 
 	assertion(-500000, IMPLIES(dhn, supported));
 	assertion(-500000, IMPLIES(dhn, pubKeyRef));
 
-	if (!dhnInvalid && !dhn && supported && !pubKeyRef)
-		schedule_tx_task(&it->pb->i.iif->dummyLink, FRAME_TYPE_REF_REQ, SCHEDULE_MIN_MSG_SIZE, &pKeyRHashHdr->msg->rframe_hash, sizeof(SHA1_T));
+	if (!deprecated && !dhn && supported && !pubKeyRef)
+		schedule_tx_task(&it->pb->i.iif->dummyLink, FRAME_TYPE_REF_REQ, SCHEDULE_MIN_MSG_SIZE, nodeId, sizeof(SHA1_T));
 
-	if (!dhnInvalid && !dhn && supported && pubKeyRef && signature >= TLV_RX_DATA_PROCESSED && processDescriptionsViaUnverifiedLink) {
+	if (!deprecated && !dhn && supported && pubKeyRef && signature >= TLV_RX_DATA_PROCESSED && processDescriptionsViaUnverifiedLink) {
 
 		cache_description(it->frame_data, it->frame_data_length, &dhash);
 
@@ -5092,7 +5087,7 @@ void cleanup_msg( void )
         if (linkArray)
                 debugFree(linkArray, -300218);
         
-        purge_cached_descriptions(YES);
+        purge_cached_descriptions(NULL, NULL, NO);
 
         update_my_dev_adv();
 

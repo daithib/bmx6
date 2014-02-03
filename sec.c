@@ -998,7 +998,10 @@ void check_supported_nodes(void *unused)
 			struct orig_node *on;
 			globalId = sn->global_id;
 			if (!sn->updated && !cryptShasEqual(&sn->global_id, &self->nodeId)) {
+
 				avl_remove(&supported_nodes_tree, &globalId, -300000);
+
+				purge_cached_descriptions(NULL, &globalId, NO);
 
 				if ((on = avl_find_item(&orig_tree, &globalId)))
 					free_orig_node(on);
