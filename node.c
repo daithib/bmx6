@@ -592,6 +592,7 @@ struct dhash_node* create_dext_dhash(uint8_t *desc_frame, uint32_t desc_frame_le
 
 
 struct dhash_node *get_dhash_tree_node(DHASH_T *dhash) {
+
 	struct dhash_node *dhn = avl_find_item(&dhash_tree, dhash);
 
 	if (dhn) {
@@ -604,6 +605,7 @@ struct dhash_node *get_dhash_tree_node(DHASH_T *dhash) {
 		assertion(-502222, (dhn->desc_frame));
 		assertion(-502223, (dhn->desc_frame_len));
 		ASSERTION(-502224, (!avl_find(&deprecated_dhash_tree, &dhn->dhash)));
+		ASSERTION(-500000, (nodeIdFromDescAdv(dhn->desc_frame)));
 		ASSERTION(-500310, (dhn->on == avl_find_item(&orig_tree, nodeIdFromDescAdv(dhn->desc_frame))));
 	}
 
@@ -962,11 +964,17 @@ void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired, 
 SHA1_T *nodeIdFromDescAdv( uint8_t *desc_adv )
 {
 	struct tlv_hdr tlvHdr = { .u.u16 = ntohs(((struct tlv_hdr*)desc_adv)->u.u16) };
+
+	if (tlvHdr.u.tlv.type != BMX_DSC_TLV_RHASH )
+		return NULL;
+
+	if (tlvHdr.u.tlv.length != sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) )
+		return NULL;
+
 	struct desc_hdr_rhash *rhashHdr = ((struct desc_hdr_rhash*)(desc_adv + sizeof(struct tlv_hdr)));
 
-	assertion( -502091, (tlvHdr.u.tlv.type == BMX_DSC_TLV_RHASH ));
-	assertion( -502092, (tlvHdr.u.tlv.length == sizeof(struct tlv_hdr) + sizeof(struct desc_hdr_rhash) + sizeof(struct desc_msg_rhash) ));
-	assertion( -502093, (!rhashHdr->compression && !rhashHdr->reserved && rhashHdr->expanded_type == BMX_DSC_TLV_DSC_PUBKEY));
+	if (rhashHdr->compression || rhashHdr->reserved || rhashHdr->expanded_type != BMX_DSC_TLV_DSC_PUBKEY)
+		return NULL;
 
 	return &rhashHdr->msg->rframe_hash;
 }
