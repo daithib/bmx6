@@ -1782,7 +1782,7 @@ struct dhash_node * process_description(struct packet_buff *pb, DHASH_T *dhash)
         TRACE_FUNCTION_CALL;
         assertion(-500262, (pb));
         ASSERTION(-500381, (!get_dhash_tree_node( dhash )));
-	ASSERTION(-502213, (!avl_find_item(&dhash_invalid_tree, dhash)));
+	ASSERTION(-502213, (!avl_find_item(&deprecated_dhash_tree, dhash)));
 
 	struct description_cache_node *cache = avl_find_item(&description_cache_tree, dhash);
 
@@ -1892,7 +1892,7 @@ process_desc0_error:
 
 	} else {
 		assertion(-502158, (result==TLV_RX_DATA_FAILURE));
-		blacklist_neighbor_if_verified(pb);
+		badlist_neighbor_if_verified(pb);
 		return (struct dhash_node *) FAILURE_PTR;
 	}
 }
@@ -2139,7 +2139,7 @@ int32_t tx_frame_description_adv(struct tx_frame_iterator *it)
 		// a meanwhile invalidated dhn migh have been scheduled when it was still valid
 
 		IDM_T TODO_this_one_crashes;
-		assertion(-502160, (avl_find(&dhash_invalid_tree, dhash)));
+		assertion(-502160, (avl_find(&deprecated_dhash_tree, dhash)));
 
                 return TLV_TX_DATA_DONE;
         }
@@ -3135,7 +3135,7 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
         if (neighIID4x <= IID_RSVD_MAX)
                 return TLV_RX_DATA_FAILURE;
 
-	if (avl_find(&dhash_invalid_tree, dhash)) {
+	if (avl_find(&deprecated_dhash_tree, dhash)) {
 
 		dhn = (struct dhash_node*)REJECTED_PTR;
 
@@ -3143,7 +3143,7 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
 
 		if (dhn == REJECTED_PTR) {
 
-			invalidate_dhash_iid(NULL, dhash);
+			deprecate_dhash_iid(NULL, dhash);
 
 		} else if (dhn == FAILURE_PTR || dhn == UNRESOLVED_PTR) {
 
@@ -3212,7 +3212,7 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 	DHASH_T dhash;
 	cryptShaAtomic(it->frame_data, it->frame_data_length, &dhash);
 
-	struct dhash_node *dhnInvalid = avl_find_item(&dhash_invalid_tree, &dhash);
+	struct dhash_node *dhnInvalid = avl_find_item(&deprecated_dhash_tree, &dhash);
 	struct dhash_node *dhn = !dhnInvalid ? get_dhash_tree_node(&dhash) : NULL;
 	uint8_t supported = supported_pubkey(&pKeyRHashHdr->msg->rframe_hash);
 	struct ref_node *pubKeyRef = ref_node_get(&pKeyRHashHdr->msg->rframe_hash);
@@ -4454,12 +4454,12 @@ void update_my_description(void)
 	if (!initializing) {
 		assertion(-502175, (self->dhn));
 		dhashOld = self->dhn->dhash;
-		assertion(-502176, IMPLIES(!initializing, !avl_find(&dhash_invalid_tree, &dhashOld)));
+		assertion(-502176, IMPLIES(!initializing, !avl_find(&deprecated_dhash_tree, &dhashOld)));
 	}
 
 	update_orig_dhash( self, dhnNew );
 
-	assertion(-502177, IMPLIES(!initializing, avl_find(&dhash_invalid_tree, &dhashOld)));
+	assertion(-502177, IMPLIES(!initializing, avl_find(&deprecated_dhash_tree, &dhashOld)));
 
 	dbgf_sys(DBGT_INFO, "dhashOld=%s dhashNew=%s for nodeId=%s",
 		cryptShaAsString(&dhashOld), cryptShaAsString(&dhashNew), cryptShaAsString(&self->nodeId));
@@ -4729,7 +4729,7 @@ void rx_packet( struct packet_buff *pb )
 		goto finish;
 	}
 
-        if (blacklisted_neighbor(pb, NULL))
+        if (badlist_neighbor(pb, NULL))
                 goto finish;
 
         if (drop_all_frames)
@@ -4755,7 +4755,7 @@ process_packet_error:
                 "Drop (remaining) problematic packet: via NB=%s dev=%s len=%d my_version=%d version=%i capabilities=%d",
 		pb->i.llip_str, pb->i.iif->label_cfg.str, pb->i.length, my_compatibility, pb->p.hdr.comp_version, pb->p.hdr.reserved);
 
-        blacklist_neighbor_if_verified(pb);
+        badlist_neighbor_if_verified(pb);
 
 finish:
 	prof_stop(&prof);

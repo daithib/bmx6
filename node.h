@@ -464,14 +464,16 @@ struct dhash_node {
 	uint8_t *desc_frame;
         uint16_t desc_frame_len;
 	struct desc_extension *dext;
+        
+        struct deprecated_globalId_node *deprecated_globalId;
+};
+
+struct deprecated_globalId_node {
+    GLOBAL_ID_T globalId;
+    struct avl_tree deprecated_dhash_tree;
 };
 
 
-
-struct black_node {
-
-	DHASH_T dhash;
-};
 
 struct packet_header
 {
@@ -523,7 +525,7 @@ extern struct iid_repos my_iid_repos;
 
 
 //extern struct avl_tree dhash_tree;
-extern struct avl_tree dhash_invalid_tree;
+extern struct avl_tree deprecated_dhash_tree;
 extern struct avl_tree local_tree;
 extern struct avl_tree link_dev_tree;
 extern struct avl_tree link_tree;
@@ -545,13 +547,13 @@ IID_NODE_T* iid_get_node_by_myIID4x( IID_T myIID4x );
 
 LinkNode *getLinkNode(struct dev_node *dev, IPX_T *llip, LINKADV_SQN_T link_sqn, struct dhash_node *verifiedLinkDhn, DEVADV_IDX_T dev_idx);
 
-void blacklist_neighbor_if_verified(struct packet_buff *pb);
+void badlist_neighbor_if_verified(struct packet_buff *pb);
 
-IDM_T blacklisted_neighbor(struct packet_buff *pb, DHASH_T *dhash);
+IDM_T badlist_neighbor(struct packet_buff *pb, DHASH_T *dhash);
 
 
-void purge_dhash_invalid_list( IDM_T force_purge_all );
-void invalidate_dhash_iid( struct dhash_node *dhn, DHASH_T *dhash );
+void purge_deprecated_dhash_tree( struct dhash_node *onlyDhn, IDM_T onlyExpired );
+void deprecate_dhash_iid( struct dhash_node *dhn, DHASH_T *dhash );
 void purge_orig_router(struct orig_node *onlyOrig, struct neigh_node *onlyNeigh, LinkNode *onlyLink, IDM_T only_useless);
 void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired, struct orig_node *except_on);
 void block_orig_node(IDM_T block, struct orig_node *on);

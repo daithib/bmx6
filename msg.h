@@ -375,7 +375,7 @@ struct frame_hdr_rhash_adv {
 
 // iterator return codes:
 
-#define TLV_RX_DATA_FAILURE     (-5) // syntax error: exit or blacklist. Transmitter should NOT have send this!
+#define TLV_RX_DATA_FAILURE     (-5) // syntax error: exit or badlist. Transmitter should NOT have send this!
 #define TLV_RX_DATA_REJECTED    (-4) // incompatible version, outdated sqn. Marked as invalid to avoid further requests
 #define TLV_RX_DATA_REBOOTED    (-3) // changed runtimeKey
 #define TLV_RX_DATA_DONE        (-2) // done, nothing more to do

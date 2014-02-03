@@ -154,7 +154,7 @@ int process_packet_signature(struct rx_frame_iterator *it)
 	if (cryptShasEqual(&msg->dhash, &self->dhn->dhash))
 		return TLV_RX_DATA_DONE;
 
-	if (avl_find_item(&dhash_invalid_tree, &msg->dhash))
+	if (avl_find_item(&deprecated_dhash_tree, &msg->dhash))
 		return TLV_RX_DATA_REJECTED;
 
 

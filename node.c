@@ -70,15 +70,13 @@ AVL_TREE(link_dev_tree, LinkDevNode, key);
 AVL_TREE(local_tree, struct neigh_node, local_id);
 
 AVL_TREE(dhash_tree, struct dhash_node, dhash);
-AVL_TREE(dhash_invalid_tree, struct dhash_node, dhash);
+AVL_TREE(deprecated_dhash_tree, struct dhash_node, dhash);
+AVL_TREE(deprecated_globalId_tree, struct deprecated_globalId_node, globalId);
 
 AVL_TREE(orig_tree, struct orig_node, nodeId);
 
-//static AVL_TREE(blacklisted_tree, struct black_node, dhash);
-
 AVL_TREE(status_tree, struct status_handl, status_name);
 
-LIST_SIMPEL( dhash_invalid_plist, struct plist_node, list, list );
 static AVL_TREE(blocked_tree, struct orig_node, nodeId);
 
 
@@ -451,20 +449,20 @@ void iid_free_neighIID4x_by_myIID4x( struct iid_repos *rep, IID_T myIID4x)
  Data Infrastructure
  ************************************************************/
 
-void blacklist_neighbor_if_verified(struct packet_buff *pb)
+void badlist_neighbor_if_verified(struct packet_buff *pb)
 {
         TRACE_FUNCTION_CALL;
         dbgf_sys(DBGT_ERR, "%s via %s verifiedLinkDhn=%d", pb->i.llip_str, pb->i.iif->label_cfg.str, pb->i.verifiedLinkDhn);
 
 	if (pb->i.verifiedLinkDhn) {
-		//TODO: only blacklist neighbor if verifiedLinkDhn
+		//TODO: only badlist neighbor if verifiedLinkDhn
 	}
 
         EXITERROR(-500697, (0));
 }
 
 
-IDM_T blacklisted_neighbor(struct packet_buff *pb, DHASH_T *dhash)
+IDM_T badlist_neighbor(struct packet_buff *pb, DHASH_T *dhash)
 {
         TRACE_FUNCTION_CALL;
         //dbgf_all(DBGT_INFO, "%s via %s", pb->i.neigh_str, pb->i.iif->label_cfg.str);
@@ -490,21 +488,24 @@ void purge_dhash_iid(IID_T myIID4orig)
 }
 
 
-void purge_dhash_invalid_list( IDM_T force_purge_all ) {
+void purge_deprecated_dhash_tree( struct dhash_node *onlyDhn, IDM_T onlyExpired ) {
 
         TRACE_FUNCTION_CALL;
         struct dhash_node *dhn;
+	DHASH_T dhash = ZERO_CYRYPSHA1;
 
-        dbgf_all( DBGT_INFO, "%s", force_purge_all ? "force_purge_all" : "only_expired");
+	dbgf_all(DBGT_INFO, "dhash=%s onlyExpired=%d",
+		(onlyDhn ? cryptShaAsString(&onlyDhn->dhash) : NULL), onlyExpired)
 
-        while ((dhn = plist_get_first(&dhash_invalid_plist)) ) {
+	while ((dhn = onlyDhn ? avl_find_item(&deprecated_dhash_tree, &onlyDhn->dhash) : avl_next_item(&deprecated_dhash_tree, &dhash))) {
 
-                if (force_purge_all || ((uint32_t) (bmx_time - dhn->referred_by_me_timestamp) > MIN_DHASH_TO)) {
+		dhash = dhn->dhash;
+
+                if (!onlyExpired || ((uint32_t) (bmx_time - dhn->referred_by_me_timestamp) > MIN_DHASH_TO)) {
 
                         dbgf_all( DBGT_INFO, "dhash %8X myIID4orig %d", dhn->dhash.h.u32[0], dhn->myIID4orig);
 
-                        plist_del_head(&dhash_invalid_plist);
-                        avl_remove(&dhash_invalid_tree, &dhn->dhash, -300194);
+                        avl_remove(&deprecated_dhash_tree, &dhash, -300194);
 
 			if (dhn->myIID4orig > IID_RSVD_MAX) {
 
@@ -514,15 +515,15 @@ void purge_dhash_invalid_list( IDM_T force_purge_all ) {
 			}
 
                         debugFree(dhn, -300112);
-
-                } else {
-                        break;
                 }
+
+		if (onlyDhn)
+			break;
         }
 }
 
 
-void invalidate_dhash_iid( struct dhash_node *dhn, DHASH_T *dhash )
+void deprecate_dhash_iid( struct dhash_node *dhn, DHASH_T *dhash )
 {
         TRACE_FUNCTION_CALL;
 
@@ -541,14 +542,14 @@ void invalidate_dhash_iid( struct dhash_node *dhn, DHASH_T *dhash )
         dbgf_track(DBGT_INFO,
                 "dhash %8X myIID4orig %d, my_iid_repository: used=%d, inactive=%d  min_free=%d  max_free=%d ",
                 dhn->dhash.h.u32[0], dhn->myIID4orig,
-                my_iid_repos.tot_used, dhash_invalid_tree.items+1, my_iid_repos.min_free, my_iid_repos.max_free);
+                my_iid_repos.tot_used, deprecated_dhash_tree.items+1, my_iid_repos.min_free, my_iid_repos.max_free);
 
         assertion( -500698, (!dhn->on));
         assertion( -500699, (!dhn->local));
 	assertion( -502088, !avl_find(&dhash_tree, &dhn->dhash));
 
-        avl_insert(&dhash_invalid_tree, dhn, -300168);
-        plist_add_tail(&dhash_invalid_plist, dhn);
+        avl_insert(&deprecated_dhash_tree, dhn, -300168);
+
         dhn->referred_by_me_timestamp = bmx_time;
 }
 
@@ -574,7 +575,7 @@ void free_dhash( struct dhash_node *dhn )
         memset(&dhn->dhash, 0, sizeof ( DHASH_T));
         dhn->dhash.h.u32[(sizeof ( DHASH_T) / sizeof (uint32_t)) - 1] = blocked_counter++;
 
-	invalidate_dhash_iid(dhn, NULL);
+	deprecate_dhash_iid(dhn, NULL);
 }
 
 struct dhash_node* create_dext_dhash(uint8_t *desc_frame, uint32_t desc_frame_len, struct desc_extension* dext, DHASH_T *dhash)
@@ -602,7 +603,7 @@ struct dhash_node *get_dhash_tree_node(DHASH_T *dhash) {
 		assertion(-502221, (dhn->dext->dhn == dhn));
 		assertion(-502222, (dhn->desc_frame));
 		assertion(-502223, (dhn->desc_frame_len));
-		ASSERTION(-502224, (!avl_find(&dhash_invalid_tree, &dhn->dhash)));
+		ASSERTION(-502224, (!avl_find(&deprecated_dhash_tree, &dhn->dhash)));
 		ASSERTION(-500310, (dhn->on == avl_find_item(&orig_tree, nodeIdFromDescAdv(dhn->desc_frame))));
 	}
 
@@ -624,7 +625,7 @@ void update_orig_dhash(struct orig_node *on, struct dhash_node *dhn)
 
 		avl_remove(&dhash_tree, &on->dhn->dhash, -300195);
 
-                invalidate_dhash_iid(on->dhn, NULL);
+                deprecate_dhash_iid(on->dhn, NULL);
         }
 
         dhn->myIID4orig = iid_new_myIID4x(dhn);
@@ -1207,7 +1208,7 @@ void node_tasks(void) {
 
 	purge_link_route_orig_nodes(NULL, YES, self);
 
-	purge_dhash_invalid_list(NO);
+	purge_deprecated_dhash_tree(NULL, YES);
 
 	while ((on = avl_next_item(&blocked_tree, &id))) {
 
@@ -1275,6 +1276,6 @@ void cleanup_node(void) {
 		debugFree(handl, -300363);
 	}
 
-	purge_dhash_invalid_list(YES);
+	purge_deprecated_dhash_tree(NULL, NO);
 
 }
