@@ -552,8 +552,9 @@ void badlist_neighbor_if_verified(struct packet_buff *pb);
 IDM_T badlist_neighbor(struct packet_buff *pb, DHASH_T *dhash);
 
 
-void purge_deprecated_dhash_tree( struct dhash_node *onlyDhn, IDM_T onlyExpired );
-void deprecate_dhash_iid( struct dhash_node *dhn, DHASH_T *dhash );
+void purge_deprecated_globalId_tree( GLOBAL_ID_T *globalId );
+//void purge_deprecated_dhash_tree( struct dhash_node *onlyDhn, IDM_T onlyExpired );
+void deprecate_dhash_iid( struct dhash_node *dhn, DHASH_T *dhash, GLOBAL_ID_T *globalId );
 void purge_orig_router(struct orig_node *onlyOrig, struct neigh_node *onlyNeigh, LinkNode *onlyLink, IDM_T only_useless);
 void purge_link_route_orig_nodes(struct dev_node *only_dev, IDM_T only_expired, struct orig_node *except_on);
 void block_orig_node(IDM_T block, struct orig_node *on);

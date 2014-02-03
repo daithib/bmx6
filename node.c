@@ -487,7 +487,7 @@ void purge_dhash_iid(IID_T myIID4orig)
         }
 }
 
-
+STATIC_FUNC
 void purge_deprecated_dhash_tree( struct dhash_node *onlyDhn, IDM_T onlyExpired ) {
 
         TRACE_FUNCTION_CALL;
@@ -495,17 +495,32 @@ void purge_deprecated_dhash_tree( struct dhash_node *onlyDhn, IDM_T onlyExpired 
 	DHASH_T dhash = ZERO_CYRYPSHA1;
 
 	dbgf_all(DBGT_INFO, "dhash=%s onlyExpired=%d",
-		(onlyDhn ? cryptShaAsString(&onlyDhn->dhash) : NULL), onlyExpired)
+		(onlyDhn ? cryptShaAsString(&onlyDhn->dhash) : NULL), onlyExpired);
 
-	while ((dhn = onlyDhn ? avl_find_item(&deprecated_dhash_tree, &onlyDhn->dhash) : avl_next_item(&deprecated_dhash_tree, &dhash))) {
+	assertion(-500000, IMPLIES(onlyDhn, onlyDhn == avl_find_item(&deprecated_dhash_tree, &onlyDhn->dhash)));
+
+	while ((dhn = onlyDhn ? onlyDhn : avl_next_item(&deprecated_dhash_tree, &dhash))) {
 
 		dhash = dhn->dhash;
 
                 if (!onlyExpired || ((uint32_t) (bmx_time - dhn->referred_by_me_timestamp) > MIN_DHASH_TO)) {
 
-                        dbgf_all( DBGT_INFO, "dhash %8X myIID4orig %d", dhn->dhash.h.u32[0], dhn->myIID4orig);
+			if (dhn->deprecated_globalId) {
 
-                        avl_remove(&deprecated_dhash_tree, &dhash, -300194);
+				assertion(-500000, (dhn->deprecated_globalId->deprecated_dhash_tree.items));
+				assertion(-500000, (avl_find(&dhn->deprecated_globalId->deprecated_dhash_tree, &dhash)));
+
+				avl_remove(&dhn->deprecated_globalId->deprecated_dhash_tree, &dhash, -300000);
+
+				if (!dhn->deprecated_globalId->deprecated_dhash_tree.items) {
+					avl_remove(&deprecated_globalId_tree, &dhn->deprecated_globalId->globalId, -300000);
+					debugFree(dhn->deprecated_globalId, -300000);
+				}
+			}
+
+			dbgf_all(DBGT_INFO, "dhash %8X myIID4orig %d", dhn->dhash.h.u32[0], dhn->myIID4orig);
+
+			avl_remove(&deprecated_dhash_tree, &dhash, -300194);
 
 			if (dhn->myIID4orig > IID_RSVD_MAX) {
 
@@ -514,7 +529,7 @@ void purge_deprecated_dhash_tree( struct dhash_node *onlyDhn, IDM_T onlyExpired 
 				purge_dhash_iid(dhn->myIID4orig);
 			}
 
-                        debugFree(dhn, -300112);
+			debugFree(dhn, -300112);
                 }
 
 		if (onlyDhn)
@@ -522,11 +537,20 @@ void purge_deprecated_dhash_tree( struct dhash_node *onlyDhn, IDM_T onlyExpired 
         }
 }
 
+void purge_deprecated_globalId_tree( GLOBAL_ID_T *globalId ) {
 
-void deprecate_dhash_iid( struct dhash_node *dhn, DHASH_T *dhash )
+	struct deprecated_globalId_node *dgn;
+	struct dhash_node *dhn;
+
+	while ((dgn = avl_find_item(&deprecated_globalId_tree, globalId)) && (dhn = avl_first_item(&dgn->deprecated_dhash_tree)))
+		purge_deprecated_dhash_tree(dhn, NO);
+
+}
+
+void deprecate_dhash_iid( struct dhash_node *dhn, DHASH_T *dhash, GLOBAL_ID_T *globalId )
 {
         TRACE_FUNCTION_CALL;
-
+	IDM_T TODO_if_items_of_deprecated_dhashs_exceeds_max_acceptable_then_stop_adding_and_stop_requesting;
 	assertion( -502087, XOR(dhn, dhash));
 
 	if (!dhn) {
@@ -540,15 +564,30 @@ void deprecate_dhash_iid( struct dhash_node *dhn, DHASH_T *dhash )
 	}
 
         dbgf_track(DBGT_INFO,
-                "dhash %8X myIID4orig %d, my_iid_repository: used=%d, inactive=%d  min_free=%d  max_free=%d ",
-                dhn->dhash.h.u32[0], dhn->myIID4orig,
+                "dhash=%s globalId=%s myIID4orig=%d, my_iid_repository: used=%d, inactive=%d  min_free=%d  max_free=%d ",
+                cryptShaAsString(&dhn->dhash), cryptShaAsString(globalId), dhn->myIID4orig,
                 my_iid_repos.tot_used, deprecated_dhash_tree.items+1, my_iid_repos.min_free, my_iid_repos.max_free);
 
+	assertion( -500000, (!avl_find(&deprecated_dhash_tree, &dhn->dhash)));
         assertion( -500698, (!dhn->on));
         assertion( -500699, (!dhn->local));
 	assertion( -502088, !avl_find(&dhash_tree, &dhn->dhash));
 
         avl_insert(&deprecated_dhash_tree, dhn, -300168);
+
+	if (globalId) {
+		struct deprecated_globalId_node *dgn;
+
+		if (!(dgn = avl_find_item(&deprecated_globalId_tree, globalId))) {
+			dgn = debugMallocReset(sizeof(struct deprecated_globalId_node), -300000);
+			dgn->globalId = *globalId;
+			AVL_INIT_TREE(dgn->deprecated_dhash_tree, struct dhash_node, dhash);
+			avl_insert(&deprecated_globalId_tree, dgn, -300000);
+		}
+
+		avl_insert(&dgn->deprecated_dhash_tree, dhn, -300000);
+		dhn->deprecated_globalId = dgn;
+	}
 
         dhn->referred_by_me_timestamp = bmx_time;
 }
@@ -575,7 +614,7 @@ void free_dhash( struct dhash_node *dhn )
         memset(&dhn->dhash, 0, sizeof ( DHASH_T));
         dhn->dhash.h.u32[(sizeof ( DHASH_T) / sizeof (uint32_t)) - 1] = blocked_counter++;
 
-	deprecate_dhash_iid(dhn, NULL);
+	deprecate_dhash_iid(dhn, NULL, NULL);
 }
 
 struct dhash_node* create_dext_dhash(uint8_t *desc_frame, uint32_t desc_frame_len, struct desc_extension* dext, DHASH_T *dhash)
@@ -627,7 +666,7 @@ void update_orig_dhash(struct orig_node *on, struct dhash_node *dhn)
 
 		avl_remove(&dhash_tree, &on->dhn->dhash, -300195);
 
-                deprecate_dhash_iid(on->dhn, NULL);
+                deprecate_dhash_iid(on->dhn, NULL, NULL);
         }
 
         dhn->myIID4orig = iid_new_myIID4x(dhn);

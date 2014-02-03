@@ -470,7 +470,7 @@ int process_dsc_tlv_signature(struct rx_frame_iterator *it)
 		return TLV_RX_DATA_PROCESSED;
 
 	assertion(-500000, (process_signature(it->frame_data_length, (struct dsc_msg_signature *)it->frame_data, it->dhnNew->desc_frame,
-		it->dhnNew->desc_frame_len, dext_dptr(it->dhnNew->dext, BMX_DSC_TLV_DSC_PUBKEY)) == TLV_RX_DATA_PROCESSED));
+		it->dhnNew->desc_frame_len, dext_dptr(it->dhnNew->dext, BMX_DSC_TLV_DSC_PUBKEY)) >= TLV_RX_DATA_PROCESSED));
 
 	return TLV_RX_DATA_PROCESSED;
 }
@@ -983,6 +983,8 @@ void check_supported_nodes(void *unused)
 					avl_insert(&supported_nodes_tree, sn, -300000);
 					dbgf_sys(DBGT_INFO, "file=%s defines new nodeId=%s!",
 						dirEntry->d_name, cryptShaAsString(&globalId));
+
+					purge_deprecated_globalId_tree(&globalId);
 				}
 
 				sn->updated++;

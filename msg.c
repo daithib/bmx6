@@ -3150,7 +3150,7 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
 
 		if (dhn == REJECTED_PTR) {
 
-			deprecate_dhash_iid(NULL, dhash);
+			deprecate_dhash_iid(NULL, dhash, NULL);
 
 		} else if (dhn == FAILURE_PTR || dhn == UNRESOLVED_PTR) {
 
@@ -3215,7 +3215,7 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 	int signature = pubKeyRef && pubKeyRef->f_body ?
 		process_signature(sigTlvHdr.u.tlv.length - sizeof(struct tlv_hdr), 
 		((struct dsc_msg_signature*)(it->frame_data + pKTlvHdr.u.tlv.length + sizeof(struct tlv_hdr))),
-		it->frame_data, it->frame_data_length, ((struct dsc_msg_pubkey*)pubKeyRef->f_body)) : TLV_RX_DATA_FAILURE;
+		it->frame_data, it->frame_data_length, ((struct dsc_msg_pubkey*)pubKeyRef->f_body)) : TLV_RX_DATA_REJECTED;
 
 	dbgf_sys( DBGT_INFO, "rcvd supportedKey=%d availableKey=%d deprecated=%d signature=%d known=%d dhash=%s nodeId=%s via_dev=%s via_ip=%s",
 		supported, !!pubKeyRef, !!deprecated, signature, !!dhn, memAsHexString(&dhash, sizeof(SHA1_T)),
@@ -3223,6 +3223,12 @@ int32_t rx_frame_description_adv(struct rx_frame_iterator *it)
 
 	assertion(-500000, IMPLIES(dhn, supported));
 	assertion(-500000, IMPLIES(dhn, pubKeyRef));
+
+	if (signature < TLV_RX_DATA_REJECTED)
+		goto_error(finish, TLV_RX_DATA_FAILURE);
+
+	if (!deprecated && !dhn && !supported)
+		deprecate_dhash_iid(NULL, &dhash, nodeId);
 
 	if (!deprecated && !dhn && supported && !pubKeyRef)
 		schedule_tx_task(&it->pb->i.iif->dummyLink, FRAME_TYPE_REF_REQ, SCHEDULE_MIN_MSG_SIZE, nodeId, sizeof(SHA1_T));
