@@ -1960,18 +1960,19 @@ int32_t tx_msg_description_request(struct tx_frame_iterator *it)
         struct msg_description_request *msg = ((struct msg_description_request*) tx_iterator_cache_msg_ptr(it));
 	DHASH_T *dhash = (DHASH_T*)ttn->task.data;
         struct dhash_node *dhn = get_dhash_tree_node(dhash);
+	struct dhash_node *deprecated = avl_find_item(&deprecated_dhash_tree, dhash);
 	LinkDevNode *linkDev = ttn->task.linkDev;
 
         assertion(-500855, (tx_iterator_cache_data_space_pref(it) >= ((int) (sizeof (struct msg_description_request)))));
         assertion(-500870, (ttn->tx_iterations > 0 && ttn->considered_ts != bmx_time));
         assertion(-500858, (IMPLIES((dhn && dhn->on), dhn->desc_frame)));
 
-        dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%X dev_idx=%d iterations=%d time=%d requesting dhash=%s %s llneigh=%d",
+        dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%X dev_idx=%d iterations=%d time=%d requesting dhash=%s %s %s %s llneigh=%d",
                 it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, cryptShaAsString(linkDev? &linkDev->key.local_id : 0),
                 linkDev ? linkDev->key.dev_idx : -1, ttn->tx_iterations, ttn->considered_ts, cryptShaAsString(dhash),
-                dhn ? "ALREADY RESOLVED (req cancelled)" : "", (!!linkDev ));
+                (dhn ? "ALREADY RESOLVED" : ""), (deprecated ? "DEPRECATED" : ""), ((dhn || deprecated) ? "CANCELLED" : ""), (!!linkDev ));
 
-        if (dhn) {
+        if (dhn || deprecated) {
                 // description (and hash) already resolved, skip sending..
                 ttn->tx_iterations = 0;
                 return TLV_TX_DATA_DONE;
