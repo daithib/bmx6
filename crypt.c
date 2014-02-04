@@ -606,7 +606,7 @@ void cryptKeyAddRaw( CRYPTKEY_T *cryptKey) {
 
 	assertion(-502144, (cryptKeyTypeByLen(rawLen) != FAILURE));
 
-	dbgf_sys(DBGT_INFO, "mpi_size=%d rawLen=%d rawBuff:\n%s",
+	dbgf_sys(DBGT_INFO, "mpi_size=%zd rawLen=%d rawBuff:\n%s",
 		mpi_size( &rsa->N ), rawLen, memAsHexStringSep(rawStart, rawLen, 16, "\n"));
 
 	cryptKey->rawKey = debugMalloc(rawLen, -300641);
@@ -764,7 +764,7 @@ finish: {
 
 		cryptKeyFree(&key);
 
-		dbgf_sys(DBGT_ERR, "%s ret=%d derSz=%d path=%s", goto_error_code, ret);
+		dbgf_sys(DBGT_ERR, "%s ret=%d", goto_error_code, ret);
 		return NULL;
 	}
 
