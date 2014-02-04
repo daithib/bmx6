@@ -90,7 +90,7 @@ int prof_check(struct prof_ctx *p, int childs)
 		return SUCCESS;
 
 	dbgf_sys(DBGT_ERR, "func=%p name=%s parent_func=%p neigh=%p orig=%p parent_active_childs=%d childs=%d",
-		p->k.func, p->name, p->parent_func, p->k.neigh, p->k.orig, p->active_childs, childs);
+		p->k.func, p->name, p->parent_func, (void*)p->k.neigh, (void*)p->k.orig, p->active_childs, childs);
 
 	return FAILURE;
 }
@@ -206,7 +206,7 @@ static const struct field_format prof_status_format[] = {
 STATIC_FUNC
 struct prof_status *prof_status_iterate(struct prof_ctx *pn, struct prof_status *status)
 {
-	dbgf_all(DBGT_INFO, "dbg pn=%s status=%p", pn->name, status);
+	dbgf_all(DBGT_INFO, "dbg pn=%s status=%p", pn->name, (void*)status);
 
 	status->neighId = pn->k.neigh ? &pn->k.neigh->dhn->on->nodeId : NULL;
 	status->origId = &pn->k.orig ? &pn->k.orig->nodeId : NULL;
