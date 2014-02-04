@@ -783,22 +783,28 @@ static struct neigh_node *internalNeighId_array[LOCALS_MAX];
 static int16_t internalNeighId_max = -1;
 static uint8_t internalNeighId_u32s = 0;
 
+IDM_T setted_pubkey(struct dhash_node *dhn, uint8_t type, GLOBAL_ID_T *globalId)
+{
+
+	struct dsc_msg_trust *setList = dhn ? dext_dptr(dhn->dext, BMX_DSC_TLV_TRUSTS) : NULL;
+	uint32_t m =0, msgs = dhn ? (dhn->dext->dtd[BMX_DSC_TLV_TRUSTS].len / sizeof(struct dsc_msg_trust)) : 0;
+
+	if (setList) {
+		for (m = 0; m < msgs; m++) {
+
+			if (cryptShasEqual(globalId, &setList[m].globalId))
+				return 1;
+		}
+		return 0;
+	} 
+	return -1;
+}
 
 STATIC_FUNC
 void update_neighTrust(struct orig_node *on, struct dhash_node *dhnNew, struct neigh_node *nn)
 {
-	struct dsc_msg_trust *trustList = dhnNew ? dext_dptr(dhnNew->dext, BMX_DSC_TLV_TRUSTS) : NULL;
-	uint32_t m =0, msgs = dhnNew ? (dhnNew->dext->dtd[BMX_DSC_TLV_TRUSTS].len / sizeof(struct dsc_msg_trust)) : 0;
 
-	if (trustList) {
-		for (m = 0; m < msgs; m++) {
-
-			if (cryptShasEqual(&nn->local_id, &trustList[m].globalId))
-				break;
-		}
-	}
-
-	if (!trustList || m < msgs) {
+	if (setted_pubkey(dhnNew, BMX_DSC_TLV_TRUSTS, &nn->local_id)) {
 
 		bit_set((uint8_t*) on->trustedNeighsBitArray, internalNeighId_u32s * 32, nn->internalNeighId, 1);
 
@@ -942,7 +948,7 @@ int create_dsc_tlv_trusts(struct tx_frame_iterator *it)
 }
 
 IDM_T supported_pubkey( CRYPTSHA1_T *pkhash ) {
-	return supportedNodesDir ? (avl_find_item(&supported_nodes_tree, pkhash) ? YES : NO) : YES;
+	return supportedNodesDir ? (avl_find_item(&supported_nodes_tree, pkhash) ? YES : NO) : -1;
 }
 
 STATIC_FUNC

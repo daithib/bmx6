@@ -137,6 +137,7 @@ uint32_t *init_neighTrust(struct orig_node *on);
 IDM_T verify_neighTrust(struct orig_node *on, struct neigh_node *neigh);
 
 IDM_T supported_pubkey( CRYPTSHA1_T *pkhash );
+IDM_T setted_pubkey(struct dhash_node *dhn, uint8_t type, GLOBAL_ID_T *globalId);
 
 int process_signature(int32_t sig_msg_length, struct dsc_msg_signature *sig_msg, uint8_t *desc_frame, int32_t desc_frame_len, struct dsc_msg_pubkey *pkey_msg);
 
