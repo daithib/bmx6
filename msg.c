@@ -1154,7 +1154,7 @@ int32_t rx_msg_link_version_adv(struct rx_frame_iterator *it)
 
 		dbgf_track(DBGT_INFO,
 			"schedule LINK_REQ to NB=%s local_id=0x%X via dev=%s  link_adv_sqn=%d packet_link_sqn_ref=%d",
-			pbi->llip_str, local->local_id, local->best_tp_link->k.myDev->label_cfg.str,
+			pbi->llip_str, cryptShaAsString(&local->local_id), local->best_tp_link->k.myDev->label_cfg.str,
 			local->link_adv_sqn, local->packet_link_sqn_ref);
 
 		local->rp_ogm_request_rcvd = 0;
