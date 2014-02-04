@@ -775,6 +775,7 @@ struct rx_frame_iterator {
         int32_t frames_length;
         uint8_t op;
         uint8_t process_filter;
+        uint8_t dbgl;
 
         // MUST be initialized, updated by rx_frame_iterate(), and consumed by handl->rx_tlv_handler
         int32_t frames_pos;

@@ -3577,8 +3577,9 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
                 it->frame_msgs_length = f_data_len - f_handl->data_header_size;
                 it->frame_msgs_fixed = (f_handl->fixed_msg_size && f_handl->min_msg_size) ? (it->frame_msgs_length / f_handl->min_msg_size) : 0;
                 it->msg = f_data + f_handl->data_header_size;
-            
-                dbgf_track(DBGT_INFO, "%s - type=%s frame_length=%d frame_data_length=%d frame_msgs_length=%d",
+
+		dbgf((it->dbgl ? it->dbgl : DBGL_CHANGES), DBGT_INFO,
+			"%s - type=%s frame_length=%d frame_data_length=%d frame_msgs_length=%d",
 			it->caller, f_handl->name, f_len, f_data_len, it->frame_msgs_length);
 
 
@@ -3662,7 +3663,8 @@ int32_t rx_frame_iterate(struct rx_frame_iterator *it)
 
 rx_frame_iterate_error:{
 
-		dbgf(result == TLV_RX_DATA_FAILURE ? DBGL_SYS : DBGL_CHANGES, result == TLV_RX_DATA_FAILURE ? DBGT_ERR : DBGT_WARN,
+		dbgf(result == TLV_RX_DATA_FAILURE ? DBGL_SYS : (it->dbgl ? it->dbgl : DBGL_CHANGES),
+			result == TLV_RX_DATA_FAILURE ? DBGT_ERR : DBGT_WARN,
 		"%s - db_name=%s problem=\"%s\" result=%s dhn=%d frame_type=%d=%d=%s prev_expanded=%d "
 		"frames_pos=%d frames_length=%d f_pos_next=%d f_data_len=%d f_len=%d frame_msgs_len=%d",
 		it->caller, it->db->name, goto_error_code, tlv_rx_result_str(result),
