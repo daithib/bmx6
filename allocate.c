@@ -19,9 +19,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-
-#ifdef DEBUG_MALLOC
-
 #include <string.h>
 #include <syslog.h>
 
@@ -29,6 +26,8 @@
 #include "control.h"
 #include "bmx.h"
 #include "allocate.h"
+
+#ifdef DEBUG_MALLOC
 
 #define MAGIC_NUMBER_HEADER 0xB2B2B2B2
 #define MAGIC_NUMBER_TRAILOR 0xB2
