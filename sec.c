@@ -313,22 +313,30 @@ int create_dsc_tlv_pktkey(struct tx_frame_iterator *it)
 
 	struct dsc_msg_pubkey *msg = ((struct dsc_msg_pubkey*) tx_iterator_cache_msg_ptr(it));
 
+	uint8_t first = my_PktKey ? NO : YES;
+
 	if (my_PktKey && packetSignLifetime) {
 
 		assertion(-502204, (my_PktKey->endOfLife));
 
-		if (((TIME_SEC_T) (my_PktKey->endOfLife - (bmx_time_sec+1))) >= MAX_PACKET_SIGN_LT) {
+		// renew pktKey if approaching last quarter of pktKey lifetime:
+		if (((TIME_SEC_T) ((5*(my_PktKey->endOfLife - (bmx_time_sec+1)))/4)) >= MAX_PACKET_SIGN_LT) {
 			task_remove(update_dsc_tlv_pktkey, NULL);
 			cryptKeyFree(&my_PktKey);
 		}
 	}
 
 	if (!my_PktKey) {
-		my_PktKey = cryptKeyMake(packetSigning);
-		my_PktKey->endOfLife = (packetSignLifetime ? bmx_time_sec + packetSignLifetime : 0);
 
-		if (packetSignLifetime)
-			task_register(packetSignLifetime*1000, update_dsc_tlv_pktkey, NULL, -300655);
+		// set end-of-life for first packetKey to smaller random value >= 1:
+		int32_t thisSignLifetime = first && packetSignLifetime ? (1+((int32_t)rand_num(packetSignLifetime-1))) : packetSignLifetime;
+
+		my_PktKey = cryptKeyMake(packetSigning);
+
+		my_PktKey->endOfLife = (thisSignLifetime ? bmx_time_sec + thisSignLifetime : 0);
+
+		if (thisSignLifetime)
+			task_register(thisSignLifetime*1000, update_dsc_tlv_pktkey, NULL, -300655);
 	}
 	assertion(-502097, (my_PktKey));
 
