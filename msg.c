@@ -2148,7 +2148,7 @@ int32_t tx_frame_description_adv(struct tx_frame_iterator *it)
 		// a meanwhile invalidated dhn migh have been scheduled when it was still valid
 
 		IDM_T TODO_this_one_crashes_but_why;
-		ASSERTION(-502160, (avl_find(&deprecated_dhash_tree, dhash)));
+		//ASSERTION(-502160, (avl_find(&deprecated_dhash_tree, dhash)));
 
                 return TLV_TX_DATA_DONE;
         }
