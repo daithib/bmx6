@@ -2798,6 +2798,32 @@ int32_t opt_ip_version(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct 
 	return SUCCESS;
 }
 
+static int32_t nextDevStatPeriod = DEF_DEVSTAT_PERIOD;
+static int32_t currDevStatPeriod = DEF_DEVSTAT_PERIOD;
+static int32_t prevDevStatPeriod = DEF_DEVSTAT_PERIOD;
+
+STATIC_FUNC
+void update_devStatistic_task(void *data)
+{
+        struct dev_node *dev;
+        struct avl_node *an = NULL;
+
+	prevDevStatPeriod = currDevStatPeriod;
+	currDevStatPeriod = nextDevStatPeriod;
+
+        while ((dev = avl_iterate_item(&dev_name_tree, &an))) {
+
+		dev->udpInPrevBytes = dev->udpInCurrBytes;
+		dev->udpInPrevPackets = dev->udpInCurrPackets;
+		dev->udpOutPrevBytes = dev->udpOutCurrBytes;
+		dev->udpOutPrevPackets = dev->udpOutCurrPackets;
+		dev->udpInCurrBytes = dev->udpInCurrPackets = dev->udpOutCurrBytes = dev->udpOutCurrPackets = 0;
+        }
+
+        task_register(currDevStatPeriod, update_devStatistic_task, NULL, -300000);
+}
+
+
 struct dev_status {
         char* devName;
         DEVADV_IDX_T devIdx;
@@ -2809,6 +2835,11 @@ struct dev_status {
         char globalIp[IPX_PREFIX_STR_LEN];
         char *multicastIp;
         HELLO_SQN_T helloSqn;
+	uint32_t outPps;
+	uint32_t outBps;
+	uint32_t inPps;
+	uint32_t inBps;
+
 };
 
 static const struct field_format dev_status_format[] = {
@@ -2822,6 +2853,10 @@ static const struct field_format dev_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,               dev_status, globalIp,    1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,              dev_status, multicastIp, 1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,                      dev_status, helloSqn,    1, FIELD_RELEVANCE_MEDI),
+        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,                      dev_status, outPps,      1, FIELD_RELEVANCE_MEDI),
+        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,                      dev_status, outBps,      1, FIELD_RELEVANCE_MEDI),
+        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,                      dev_status, inPps,       1, FIELD_RELEVANCE_MEDI),
+        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,                      dev_status, inBps,       1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_END
 };
 
@@ -2852,6 +2887,10 @@ static int32_t dev_status_creator(struct status_handl *handl, void* data)
                 sprintf(status[i].globalIp, "%s/%d", dev->ip_global_str, dev->if_global_addr ? dev->if_global_addr->ifa.ifa_prefixlen : -1);
                 status[i].multicastIp = dev->ip_brc_str;
                 status[i].helloSqn = dev->link_hello_sqn;
+		status[i].outBps = dev->udpOutPrevBytes / prevDevStatPeriod;
+		status[i].outPps = dev->udpOutPrevPackets / prevDevStatPeriod;
+		status[i].inBps = dev->udpInPrevBytes / prevDevStatPeriod;
+		status[i].inPps = dev->udpInPrevPackets / prevDevStatPeriod;
 
                 i++;
         }
@@ -3233,6 +3272,8 @@ static struct opt_type ip_options[]=
 
 	{ODI,0,ARG_INTERFACES,	        0,  9,2,A_PS0,A_USR,A_DYN,A_ARG,A_ANY,	0,		0, 		0,		0,0, 		opt_status,
 			0,		"show interfaces\n"},
+	{ODI,0,ARG_DEVSTAT_PERIOD,      0, 9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,   &nextDevStatPeriod,MIN_DEVSTAT_PERIOD,MAX_DEVSTAT_PERIOD,DEF_DEVSTAT_PERIOD,0,0,
+			ARG_VALUE_FORM,	HLP_DEVSTAT_PERIOD},
 
 	{ODI,0,ARG_LLOCAL_PREFIX,	0,  9,1,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0,		0,		0,0,		opt_dev_prefix,
 			ARG_NETW_FORM,HLP_LLOCAL_PREFIX},
@@ -3323,6 +3364,8 @@ void init_ip(void)
         register_options_array(ip_options, sizeof ( ip_options), CODE_CATEGORY_NAME);
 
         register_status_handl(sizeof (struct dev_status), 1, dev_status_format, ARG_INTERFACES, dev_status_creator);
+
+	task_register(currDevStatPeriod, update_devStatistic_task, NULL, -300000);
 
         kernel_get_if_config();
 

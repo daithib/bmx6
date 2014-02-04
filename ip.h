@@ -53,6 +53,11 @@ struct ifname {
 
 typedef struct ifname IFNAME_T;
 
+#define ARG_DEVSTAT_PERIOD "devStatPeriod"
+#define MIN_DEVSTAT_PERIOD 100
+#define MAX_DEVSTAT_PERIOD 100000
+#define DEF_DEVSTAT_PERIOD 1000
+#define HLP_DEVSTAT_PERIOD "interface traffic-statistics period"
 
 #define ARG_LLOCAL_PREFIX "llocalPrefix"
 #define HLP_LLOCAL_PREFIX "specify link-local prefix for interfaces"
@@ -391,6 +396,15 @@ struct dev_node {
 	uint8_t activate_again;
 	uint8_t activate_cancelled;
 	uint8_t tmp_flag_for_to_be_send_adv;
+        
+        uint32_t udpOutCurrPackets;
+        uint32_t udpOutPrevPackets;
+        uint32_t udpInCurrPackets;
+        uint32_t udpInPrevPackets;
+        uint32_t udpOutCurrBytes;
+        uint32_t udpOutPrevBytes;
+        uint32_t udpInCurrBytes;
+        uint32_t udpInPrevBytes;
 
 //	DEVADV_IDX_T dev_adv_idx; //TODO: Remove (use llip_key.idx instead)
 	int16_t dev_adv_msg;

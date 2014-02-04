@@ -4321,6 +4321,10 @@ void tx_packet(void *devp)
 
 				cb_packet_hooks(&pb);
 
+				pb.i.oif->udpOutCurrPackets += 1;
+				pb.i.oif->udpOutCurrBytes += pb.i.length;
+
+
 				send_udp_packet(&pb, &dev->tx_netwbrc_addr, dev->unicast_sock);
 
 				dbgf_all(DBGT_INFO, "send packet size=%d  via dev=%s",
@@ -4733,6 +4737,9 @@ void rx_packet( struct packet_buff *pb )
 		dbgf_all(DBGT_ERR, "non-link-local IPv6 source address %s", ip6AsStr(&pb->i.llip));
 		goto finish;
 	}
+
+	pb->i.iif->udpInCurrPackets += 1;
+	pb->i.iif->udpInCurrBytes += pb->i.length;
 
         if (badlist_neighbor(pb, NULL))
                 goto finish;
