@@ -274,6 +274,8 @@ extern int32_t dhash_adv_tx_unsolicited;
 #define ARG_REFERENCES          "references"
 #define HLP_REFERENCES          "show cached reference frames\n"
 
+extern struct avl_tree ref_tree;
+extern int32_t ref_tree_items_used;
 
 
 

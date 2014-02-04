@@ -93,10 +93,10 @@ union schedule_hello_info {
 };
 
 
-AVL_TREE( description_cache_tree, struct description_cache_node, dhash );
+static AVL_TREE( description_cache_tree, struct description_cache_node, dhash );
 
-static AVL_TREE(ref_tree, struct ref_node, rhash);
-static int32_t ref_tree_items_used = 0;
+AVL_TREE(ref_tree, struct ref_node, rhash);
+int32_t ref_tree_items_used = 0;
 
 const int32_t always_fref = TYP_FREF_DO;
 const int32_t never_fref = TYP_FREF_DONT;
