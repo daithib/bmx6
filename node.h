@@ -526,6 +526,7 @@ extern struct iid_repos my_iid_repos;
 
 //extern struct avl_tree dhash_tree;
 extern struct avl_tree deprecated_dhash_tree;
+extern struct avl_tree deprecated_globalId_tree;
 extern struct avl_tree local_tree;
 extern struct avl_tree link_dev_tree;
 extern struct avl_tree link_tree;
