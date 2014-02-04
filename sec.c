@@ -94,7 +94,7 @@ int create_packet_signature(struct tx_frame_iterator *it)
 	static struct frame_msg_signature *msg = NULL;
 	static int32_t dataOffset = 0;
 
-	dbgf_all(DBGT_INFO, "f_type=%s msg=%p frames_out_pos=%d dataOffset=%d", it->handl->name, msg, it->frames_out_pos, dataOffset  );
+	dbgf_all(DBGT_INFO, "f_type=%s msg=%p frames_out_pos=%d dataOffset=%d", it->handl->name, (void*)msg, it->frames_out_pos, dataOffset  );
 
 	if (it->frame_type==FRAME_TYPE_SIGNATURE_ADV) {
 
@@ -445,7 +445,7 @@ int create_dsc_tlv_signature(struct tx_frame_iterator *it)
 		desc_msg->type = dext_msg->type;
 		memcpy( desc_msg->signature, dext_msg->signature, keySpace);
 
-		dbgf_sys(DBGT_INFO, "fixed RSA%d type=%d signature=%s of dataSha=%s over dataLen=%d data=%s (dataOffset=%d desc_frames_len=%d)",
+		dbgf_sys(DBGT_INFO, "fixed RSA%zd type=%d signature=%s of dataSha=%s over dataLen=%d data=%s (dataOffset=%d desc_frames_len=%d)",
 			(keySpace*8), desc_msg->type, memAsHexString(desc_msg->signature, keySpace),
 			cryptShaAsString(&dataSha), dataLen, memAsHexString(data, dataLen), dataOffset, it->frames_out_pos);
 
@@ -646,14 +646,14 @@ int32_t rsa_load( char *tmp_path ) {
 	memset(plain, 0, sizeof(plain));
 
 	if (cryptEncrypt(in, inLen, enc, &encLen, my_PubKey) != SUCCESS) {
-		dbgf_sys(DBGT_ERR, "Failed Encrypt inLen=%d outLen=%d inData=%s outData=%s",
+		dbgf_sys(DBGT_ERR, "Failed Encrypt inLen=%zd outLen=%zd inData=%s outData=%s",
 			inLen, encLen, memAsHexString((char*)in, inLen), memAsHexString((char*)enc, encLen));
 		return FAILURE;
 	}
 
 	if (cryptDecrypt(enc, encLen, plain, &plainLen) != SUCCESS ||
 		inLen != plainLen || memcmp(plain, in, inLen)) {
-		dbgf_sys(DBGT_ERR, "Failed Decrypt inLen=%d outLen=%d inData=%s outData=%s",
+		dbgf_sys(DBGT_ERR, "Failed Decrypt inLen=%zd outLen=%zd inData=%s outData=%s",
 			encLen, plainLen, memAsHexString((char*)enc, encLen), memAsHexString((char*)plain, plainLen));
 		return FAILURE;
 	}
@@ -662,7 +662,7 @@ int32_t rsa_load( char *tmp_path ) {
 	cryptShaAtomic(in, inLen, &inSha);
 
 	if (cryptSign(&inSha, enc, my_PubKey->rawKeyLen, NULL) != SUCCESS) {
-		dbgf_sys(DBGT_ERR, "Failed Sign inLen=%d outLen=%d inData=%s outData=%s",
+		dbgf_sys(DBGT_ERR, "Failed Sign inLen=%zd outLen=%zd inData=%s outData=%s",
 			inLen, encLen, memAsHexString((char*)in, inLen), memAsHexString((char*)enc, my_PubKey->rawKeyLen));
 		return FAILURE;
 	}
