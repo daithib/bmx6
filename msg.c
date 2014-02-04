@@ -2147,8 +2147,8 @@ int32_t tx_frame_description_adv(struct tx_frame_iterator *it)
 		dbgf_sys(DBGT_WARN, "UNKNOWN dhash=%s!", cryptShaAsString(dhash));
 		// a meanwhile invalidated dhn migh have been scheduled when it was still valid
 
-		IDM_T TODO_this_one_crashes;
-		assertion(-502160, (avl_find(&deprecated_dhash_tree, dhash)));
+		IDM_T TODO_this_one_crashes_but_why;
+		ASSERTION(-502160, (avl_find(&deprecated_dhash_tree, dhash)));
 
                 return TLV_TX_DATA_DONE;
         }
