@@ -452,7 +452,7 @@ void iid_free_neighIID4x_by_myIID4x( struct iid_repos *rep, IID_T myIID4x)
 void badlist_neighbor_if_verified(struct packet_buff *pb)
 {
         TRACE_FUNCTION_CALL;
-        dbgf_sys(DBGT_ERR, "%s via %s verifiedLinkDhn=%d", pb->i.llip_str, pb->i.iif->label_cfg.str, pb->i.verifiedLinkDhn);
+        dbgf_sys(DBGT_ERR, "%s via %s verifiedLinkDhn=%p", pb->i.llip_str, pb->i.iif->label_cfg.str, (void*)pb->i.verifiedLinkDhn);
 
 	if (pb->i.verifiedLinkDhn) {
 		//TODO: only badlist neighbor if verifiedLinkDhn
@@ -827,7 +827,7 @@ void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T on
 
                         if (!local->linkDev_tree.items) {
 
-                                dbgf_track(DBGT_INFO, "purging: local local_id=%X", cryptShaAsString(&linkDev->key.local_id));
+                                dbgf_track(DBGT_INFO, "purging: local local_id=%s", cryptShaAsString(&linkDev->key.local_id));
 
 				iid_purge_repos(&local->neighIID4x_repos);
 
