@@ -23,6 +23,10 @@
 
 #include <stdint.h>
 
+extern uint32_t debugMalloc_bytes;
+extern uint32_t debugMalloc_objects;
+
+
 #ifdef DEBUG_MALLOC
 
 // currently used memory tags: -300000, -300001 .. -300664
