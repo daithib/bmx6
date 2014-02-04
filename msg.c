@@ -446,8 +446,9 @@ IDM_T process_description_tlvs(struct packet_buff *pb, struct orig_node *onOld, 
 
                 assertion(-501355, (op == TLV_OP_TEST));
 
-                dbgf_sys(DBGT_WARN, "problematic description_ltv from %s, near type=%d=%s frame_data_length=%d  pos=%d %s",
-                        pb ? pb->i.llip_str : DBG_NIL, it.frame_type, (((uint8_t)it.frame_type) <= db->handl_max) ? db->handls[it.frame_type].name : "",
+                dbgf_sys(DBGT_WARN, "problematic description_ltv from %s, near type=%d=%s frame_data_length=%d  pos=%d %s %s",
+                        pb ? pb->i.llip_str : DBG_NIL,
+			it.frame_type, (((uint8_t)it.frame_type) <= db->handl_max) ? db->handls[it.frame_type].name : "",
                         it.frame_data_length, it.frames_pos, blocked ? "BLOCKED" : "", tlv_rx_result_str(result));
 
 		if (result==TLV_RX_DATA_REBOOTED || result==TLV_RX_DATA_REJECTED || result == TLV_RX_DATA_FAILURE)
@@ -1143,8 +1144,8 @@ int32_t rx_msg_link_version_adv(struct rx_frame_iterator *it)
 	if (msg_dev_req_enabled && UXX_LT(DEVADV_SQN_MAX, local->dev_adv_sqn, local->link_adv_dev_sqn_ref)) {
 
 		dbgf_track(DBGT_INFO,
-			"schedule DEV_REQ to NB=%s local_id=0x%X via dev=%s dev_adv_sqn=%d link_adv_dev_sqn_ref=%d",
-			pbi->llip_str, local->local_id, local->best_tp_link->k.myDev->label_cfg.str,
+			"schedule DEV_REQ to NB=%s local_id=%s via dev=%s dev_adv_sqn=%d link_adv_dev_sqn_ref=%d",
+			pbi->llip_str, cryptShaAsString(&local->local_id), local->best_tp_link->k.myDev->label_cfg.str,
 			local->dev_adv_sqn, local->link_adv_dev_sqn_ref);
 
 		schedule_tx_task(&pbi->iif->dummyLink, FRAME_TYPE_DEV_REQ, SCHEDULE_MIN_MSG_SIZE, &local->local_id, sizeof(LOCAL_ID_T));
@@ -1153,7 +1154,7 @@ int32_t rx_msg_link_version_adv(struct rx_frame_iterator *it)
 	if (UXX_LT(LINKADV_SQN_MAX, local->link_adv_sqn, local->packet_link_sqn_ref)) {
 
 		dbgf_track(DBGT_INFO,
-			"schedule LINK_REQ to NB=%s local_id=0x%X via dev=%s  link_adv_sqn=%d packet_link_sqn_ref=%d",
+			"schedule LINK_REQ to NB=%s local_id=%s via dev=%s  link_adv_sqn=%d packet_link_sqn_ref=%d",
 			pbi->llip_str, cryptShaAsString(&local->local_id), local->best_tp_link->k.myDev->label_cfg.str,
 			local->link_adv_sqn, local->packet_link_sqn_ref);
 
@@ -1372,7 +1373,7 @@ int32_t tx_msg_ref_request(struct tx_frame_iterator *it)
                 it->ttn->tx_iterations = 0;
                 return TLV_TX_DATA_DONE;
         } else {
-		dbgf_sys(DBGT_INFO, "");
+		dbgf_sys(DBGT_INFO, DBG_NIL);
 		((struct msg_ref_req*) tx_iterator_cache_msg_ptr(it))->rframe_hash = *rhash;
 		return sizeof (struct msg_ref_req);
 	}
@@ -1386,7 +1387,7 @@ int32_t rx_msg_ref_request(struct rx_frame_iterator *it)
 	SHA1_T *rhash = &(((struct msg_ref_req*)it->msg)->rframe_hash);
 	struct ref_node *refn = ref_node_get(rhash);
 
-	dbgf_sys(DBGT_INFO, "");
+	dbgf_sys(DBGT_INFO, DBG_NIL);
 
 	if (refn && refn->dext_tree.items)
 		schedule_tx_task(&it->pb->i.iif->dummyLink, FRAME_TYPE_REF_ADV, refn->f_body_len, &refn->rhash, sizeof(SHA1_T));
@@ -1432,7 +1433,7 @@ int32_t rx_frame_ref_adv(struct rx_frame_iterator *it)
 {
         TRACE_FUNCTION_CALL;
 
-	dbgf_sys(DBGT_INFO, "")
+	dbgf_sys(DBGT_INFO, DBG_NIL);
 	
 	assertion(-501583, !it->dhnNew && it->frame_type == FRAME_TYPE_REF_ADV);
 
@@ -1967,7 +1968,7 @@ int32_t tx_msg_description_request(struct tx_frame_iterator *it)
         assertion(-500870, (ttn->tx_iterations > 0 && ttn->considered_ts != bmx_time));
         assertion(-500858, (IMPLIES((dhn && dhn->on), dhn->desc_frame)));
 
-        dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%X dev_idx=%d iterations=%d time=%d requesting dhash=%s %s %s %s llneigh=%d",
+        dbgf_track(DBGT_INFO, "%s dev=%s to local_id=%s dev_idx=%d iterations=%d time=%d requesting dhash=%s %s %s %s llneigh=%d",
                 it->db->handls[ttn->task.type].name, ttn->task.dev->label_cfg.str, cryptShaAsString(linkDev? &linkDev->key.local_id : 0),
                 linkDev ? linkDev->key.dev_idx : -1, ttn->tx_iterations, ttn->considered_ts, cryptShaAsString(dhash),
                 (dhn ? "ALREADY RESOLVED" : ""), (deprecated ? "DEPRECATED" : ""), ((dhn || deprecated) ? "CANCELLED" : ""), (!!linkDev ));
@@ -2157,7 +2158,7 @@ int32_t tx_frame_description_adv(struct tx_frame_iterator *it)
 
         memcpy(tx_iterator_cache_msg_ptr(it), dhn->desc_frame, dhn->desc_frame_len);
 
-	dbgf_track(DBGT_INFO, "dhash=%s id=%s descr_size=%zu",
+	dbgf_track(DBGT_INFO, "dhash=%s id=%s descr_size=%d",
 		cryptShaAsString(dhash), cryptShaAsString(&dhn->on->nodeId), dhn->desc_frame_len);
 
         return dhn->desc_frame_len;
@@ -2382,8 +2383,8 @@ int32_t rx_frame_dev_adv( struct rx_frame_iterator *it)
 
         } else if (local->dev_adv_sqn != dev_sqn) {
 
-                dbgf_track(DBGT_INFO, "new DEV_ADV from NB=%s local_id=0x%X dev=%s dev_sqn=%d->%d",
-                        it->pb->i.llip_str,  local->local_id , it->pb->i.iif->label_cfg.str,
+                dbgf_track(DBGT_INFO, "new DEV_ADV from NB=%s local_id=%s dev=%s dev_sqn=%d->%d",
+                        it->pb->i.llip_str,  cryptShaAsString(&local->local_id) , it->pb->i.iif->label_cfg.str,
                         local->dev_adv_sqn, dev_sqn);
 
                 if (local->dev_adv)
@@ -3345,7 +3346,7 @@ int32_t rx_msg_description_request(struct rx_frame_iterator *it)
 		if (!dhn || ((TIME_T) (bmx_time - dhn->referred_by_me_timestamp)) > DEF_DESC0_REFERRED_TO) {
 
 			dbgf_track(DBGT_WARN, "%s from %s requesting UNKNOWN dhash=%s dhn=%p",
-				it->handl->name, pb->i.llip_str, cryptShaAsString(&msg->dhash), dhn);
+				it->handl->name, pb->i.llip_str, cryptShaAsString(&msg->dhash), (void*)dhn);
 
 			return sizeof(struct msg_description_request);
 		}
@@ -3861,7 +3862,7 @@ int32_t tx_frame_iterate_finish(struct tx_frame_iterator *it)
 		int32_t rfd_msgs = rfd_agg_len/REF_FRAME_BODY_SIZE_OUT + (rfd_agg_len%REF_FRAME_BODY_SIZE_OUT?1:0);
 		int32_t rfd_size = sizeof(struct desc_hdr_rhash) + (rfd_msgs*sizeof(struct desc_msg_rhash));
 
-		dbgf_track(DBGT_INFO, "added %s fDataInLen=%d fDataOutLen=%d -> msgs=%d rfd_size=%d flen=%d do_fref=%d (%d %d %d) do_fzip=%d (%d %d %d)",
+		dbgf_track(DBGT_INFO, "added %s fDataInLen=%d fDataOutLen=%d -> msgs=%d rfd_size=%d flen=%ld do_fref=%d (%d %d %d) do_fzip=%d (%d %d %d)",
 			handl->name, fdata_in, rfd_agg_len, rfd_msgs, rfd_size, sizeof (struct tlv_hdr) + rfd_size,
 			do_fref, use_referencing(handl), dextReferencing, DEF_FREF,
 			do_fzip, use_compression(handl), dextCompression, DEF_FZIP );
@@ -4424,7 +4425,7 @@ void update_my_description(void)
 
 	assertion(-502082, (!terminating));
 
-	dbgf_track(DBGT_INFO, "");
+	dbgf_track(DBGT_INFO, DBG_NIL);
 
 	uint8_t *frame_cache_array = debugMallocReset(vrt_frame_data_size_out, -300586);
 
