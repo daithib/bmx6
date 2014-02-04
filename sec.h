@@ -75,7 +75,7 @@ extern int32_t packetSigning;
 #define ARG_PACKET_VERIFY "packetVerification"
 #define MIN_PACKET_VERIFY 0
 #define MAX_PACKET_VERIFY 4096
-#define DEF_PACKET_VERIFY 1024
+#define DEF_PACKET_VERIFY 2048
 #define HLP_PACKET_VERIFY "verify incoming packet signature up-to given RSA key length"
 
 
