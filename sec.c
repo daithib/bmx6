@@ -718,8 +718,8 @@ int32_t opt_key_path(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct op
 
 			dbgf_sys(DBGT_ERR, "key=%s does not exist! Creating...", tmp_path);
 
-			if (cryptKeyMakeDer(1024, tmp_path) != SUCCESS) {
-				dbgf_sys(DBGT_ERR, "Failed creating new %d bit key to %s!", 1024, tmp_path);
+			if (cryptKeyMakeDer(DEF_DESC_SIGN, tmp_path) != SUCCESS) {
+				dbgf_sys(DBGT_ERR, "Failed creating new %d bit key to %s!", DEF_DESC_SIGN, tmp_path);
 				return FAILURE;
 			}
 		}

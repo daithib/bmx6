@@ -37,6 +37,13 @@
 #define ARG_KEY_PATH "keyPath"
 #define DEF_KEY_PATH "/etc/bmx6/rsa.der"
 
+#define ARG_DESC_SIGN "descSignLen"
+#define MIN_DESC_SIGN 512
+#define MAX_DESC_SIGN 4096
+#define DEF_DESC_SIGN 3072
+#define HLP_DESC_SIGN "sign own descriptions with given RSA key length"
+
+
 #define ARG_DESC_VERIFY "descVerificationLen"
 #define MIN_DESC_VERIFY 512
 #define MAX_DESC_VERIFY 4096
@@ -46,7 +53,7 @@
 #define ARG_PACKET_SIGN "packetSignLen"
 #define MIN_PACKET_SIGN 0
 #define MAX_PACKET_SIGN 2048
-#define DEF_PACKET_SIGN 768
+#define DEF_PACKET_SIGN 896
 #define HLP_PACKET_SIGN "sign outgoing packets with given RSA key length"
 extern int32_t packetSigning;
 
@@ -57,7 +64,7 @@ extern int32_t packetSigning;
 // ~6000 secs with ~1000 machines, or
 // ~600 secs with ~10000 machines, or 
 // ~60 secs with ~100000 machines
-// However, this would be for RSA512 but RSA768 is used by default!!:
+// However, this would be for RSA512 but RSA896 is used by default!!:
 #define MIN_PACKET_SIGN_LT (60)    // one minute, needs ~100000 machines to crack RSA512 before end of life
 #define DEF_PACKET_SIGN_LT (6000)   // 100 minutes, needs ~1000 machines to crack RSA512 before end of life
 #define MAX_PACKET_SIGN_LT (REGISTER_TASK_TIMEOUT_MAX/1000)
