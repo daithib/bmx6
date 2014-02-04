@@ -57,8 +57,9 @@ extern int32_t packetSigning;
 // ~6000 secs with ~1000 machines, or
 // ~600 secs with ~10000 machines, or 
 // ~60 secs with ~100000 machines
-#define MIN_PACKET_SIGN_LT (60)    // one minute, needs ~100000 machines to crack before end of life
-#define DEF_PACKET_SIGN_LT (600)   // 10 minutes, needs ~10000 machines to crack before end of life
+// However, this would be for RSA512 but RSA768 is used by default!!:
+#define MIN_PACKET_SIGN_LT (60)    // one minute, needs ~100000 machines to crack RSA512 before end of life
+#define DEF_PACKET_SIGN_LT (6000)   // 100 minutes, needs ~1000 machines to crack RSA512 before end of life
 #define MAX_PACKET_SIGN_LT (REGISTER_TASK_TIMEOUT_MAX/1000)
 #define ARG_PACKET_SIGN_LT "packetSignLifetime"
 
