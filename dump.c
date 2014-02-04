@@ -123,10 +123,10 @@ void dump(struct packet_buff *pb)
 
         uint16_t plength = pb->i.length;
 
-        dbgf_dump(DBGT_NONE, "%s srcIP=%-16s dev=%-12s udpPayload=%-d",
+        dbgf(DBGL_DUMP, DBGT_NONE, "%s srcIP=%-16s dev=%-12s udpPayload=%-d",
                 direction == DUMP_DIRECTION_IN ? "in " : "out", pb->i.llip_str, dev->label_cfg.str, plength);
 
-        dbgf_dump(DBGT_NONE, "%s data: %s",
+        dbgf(DBGL_DUMP, DBGT_NONE, "%s data: %s",
                 direction == DUMP_DIRECTION_IN ? "in " : "out", memAsHexString(((uint8_t*) phdr), plength));
 
 
@@ -135,7 +135,7 @@ void dump(struct packet_buff *pb)
         dump_all.tmp_all[direction][DUMP_TYPE_UDP_PAYLOAD] += (plength << IMPROVE_ROUNDOFF);
 
 
-        dbgf_dump(DBGT_NONE,
+        dbgf(DBGL_DUMP, DBGT_NONE,
                 "%s       headerVersion=%-2d reserved=%-2X headerSize=%-4zu",
                 direction == DUMP_DIRECTION_IN ? "in " : "out",
                 phdr->comp_version, phdr->reserved, sizeof (struct packet_header));
@@ -170,11 +170,11 @@ void dump(struct packet_buff *pb)
                 }
 
 
-                dbgf_dump(DBGT_NONE, "%s             frame_type=%-12s data_header_size=%-3d msgs=%-3d frame_length=%-4d",
+                dbgf(DBGL_DUMP, DBGT_NONE, "%s             frame_type=%-12s data_header_size=%-3d msgs=%-3d frame_length=%-4d",
                         direction == DUMP_DIRECTION_IN ? "in " : "out", tname,
                         it.db->handls[it.frame_type].data_header_size, frame_msgs, it.frame_length);
 
-                dbgf_dump(DBGT_NONE, "%s         data [%3d...%3d]:%s",
+                dbgf(DBGL_DUMP, DBGT_NONE, "%s         data [%3d...%3d]:%s",
                         direction == DUMP_DIRECTION_IN ? "in  hex" : "out hex",
                         pkt_pos, pkt_pos + it.frame_length - 1, memAsHexString(((uint8_t*) phdr) + pkt_pos, it.frame_length));
 
@@ -194,10 +194,10 @@ void dump(struct packet_buff *pb)
 
         if (result != TLV_RX_DATA_DONE) {
 
-                dbgf_dump(DBGT_NONE, "%s             ERROR frame_type=%d frame_length=%d frame_data_length=%d result=%s - ignoring further frames!!",
+                dbgf(DBGL_DUMP, DBGT_NONE, "%s             ERROR frame_type=%d frame_length=%d frame_data_length=%d result=%s - ignoring further frames!!",
                         direction == DUMP_DIRECTION_IN ? "in " : "out", it.frame_type, it.frame_length, it.frame_data_length, tlv_rx_result_str(result));
 
-                dbgf_dump(DBGT_NONE, "%s         data [%3d...%3d]:%s",
+                dbgf(DBGL_DUMP, DBGT_NONE, "%s         data [%3d...%3d]:%s",
                         direction == DUMP_DIRECTION_IN ? "in  hex" : "out hex",
                         pkt_pos, pkt_pos + it.frame_length - 1, memAsHexString(((uint8_t*) phdr) + pkt_pos, it.frame_length));
         }
