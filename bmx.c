@@ -738,6 +738,9 @@ struct bmx_status {
         GLOBAL_ID_T *shortId;
         GLOBAL_ID_T *globalId;
         char* name;
+	char *descKey;
+	char *pktKey;
+	CRYPTSHA1_T *dhash;
         char version[(sizeof(BMX_BRANCH)-1) + (sizeof("-")-1) + (sizeof(BRANCH_VERSION)-1) + 1];
         uint16_t compat;
         char revision[9];
@@ -756,6 +759,9 @@ static const struct field_format bmx_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_SHORT_ID,  bmx_status, shortId,       1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, bmx_status, globalId,      1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      bmx_status, name,          1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       bmx_status, descKey,       1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       bmx_status, pktKey,        1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, bmx_status, dhash,         1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       bmx_status, version,       1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              bmx_status, compat,        1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       bmx_status, revision,      1, FIELD_RELEVANCE_HIGH),
@@ -775,9 +781,13 @@ static int32_t bmx_status_creator(struct status_handl *handl, void *data)
 {
 	struct tun_in_node *tin = avl_first_item(&tun_in_tree);
         struct bmx_status *status = (struct bmx_status *) (handl->data = debugRealloc(handl->data, sizeof (struct bmx_status), -300365));
+	struct dsc_msg_pubkey *pkm;
         status->globalId = &self->nodeId;
         status->shortId = &self->nodeId;
         status->name = self->hostname;
+	status->dhash = &self->dhn->dhash;
+	status->descKey = (pkm = dext_dptr(self->dhn->dext, BMX_DSC_TLV_DSC_PUBKEY)) ? cryptKeyTypeAsString(pkm->type) : DBG_NIL;
+	status->pktKey = (pkm = dext_dptr(self->dhn->dext, BMX_DSC_TLV_PKT_PUBKEY)) ? cryptKeyTypeAsString(pkm->type) : DBG_NIL;
         sprintf(status->version, "%s-%s", BMX_BRANCH, BRANCH_VERSION);
         status->compat = my_compatibility;
 	snprintf(status->revision, 8, "%s", GIT_REV);
@@ -918,6 +928,8 @@ struct orig_status {
         GLOBAL_ID_T *shortId;
         GLOBAL_ID_T *globalId;
         char* name;
+	char *descKey;
+	char *pktKey;
 	CRYPTSHA1_T *dhash;
         uint8_t B; // blocked
         char S[2]; // supported by me
@@ -941,6 +953,8 @@ static const struct field_format orig_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_SHORT_ID,  orig_status, shortId,       1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, orig_status, globalId,      1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      orig_status, name,          1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       orig_status, descKey,       1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       orig_status, pktKey,        1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, orig_status, dhash,         1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              orig_status, B,             1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       orig_status, S,             1, FIELD_RELEVANCE_HIGH),
@@ -974,11 +988,14 @@ static int32_t orig_status_creator(struct status_handl *handl, void *data)
 
 		assertion(-502014, (on->dhn && on->dhn->desc_frame && on->dhn->dext));
 		IDM_T S,s,T,t;
+		struct dsc_msg_pubkey *pkm;
 
                 status[i].globalId = &on->nodeId;
                 status[i].shortId = &on->nodeId;
                 status[i].name = on->hostname;
 		status[i].dhash = &on->dhn->dhash;
+		status[i].descKey = (pkm = dext_dptr(on->dhn->dext, BMX_DSC_TLV_DSC_PUBKEY)) ? cryptKeyTypeAsString(pkm->type) : DBG_NIL;
+		status[i].pktKey = (pkm = dext_dptr(on->dhn->dext, BMX_DSC_TLV_PKT_PUBKEY)) ? cryptKeyTypeAsString(pkm->type) : DBG_NIL;
                 status[i].B = on->blocked;
 		status[i].S[0] = (S=supported_pubkey(&on->nodeId)) == -1 ? 'A' : (S + '0') ;
 		status[i].s[0] = (s=setted_pubkey(on->dhn, BMX_DSC_TLV_SUPPORTS, &self->nodeId)) == -1 ? 'A' : (s + '0');
