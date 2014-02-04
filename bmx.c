@@ -746,7 +746,10 @@ struct bmx_status {
         struct net_key *tun4Address;
         char *uptime;
         char cpu[6];
+	char mem[22];
         uint16_t nodes;
+	char deprecated[14];
+	char refs[14];
 };
 
 static const struct field_format bmx_status_format[] = {
@@ -761,7 +764,10 @@ static const struct field_format bmx_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_NETP,              bmx_status, tun4Address,   1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      bmx_status, uptime,        1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       bmx_status, cpu,           1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       bmx_status, mem,           1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              bmx_status, nodes,         1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       bmx_status, deprecated,    1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       bmx_status, refs,          1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_END
 };
 
@@ -780,7 +786,10 @@ static int32_t bmx_status_creator(struct status_handl *handl, void *data)
         status->tun6Address = tin ? &tin->tunAddr46[0] : NULL;
         status->uptime = get_human_uptime(0);
         sprintf(status->cpu, "%d.%1d", s_curr_avg_cpu_load / 10, s_curr_avg_cpu_load % 10);
+        sprintf(status->mem, "%dK/%d", debugMalloc_bytes/1000, debugMalloc_objects);
         status->nodes = orig_tree.items;
+        sprintf(status->deprecated, "%d/%d", deprecated_globalId_tree.items, deprecated_dhash_tree.items);
+        sprintf(status->refs, "%d/%d", ref_tree_items_used, ref_tree.items);
         return sizeof (struct bmx_status);
 }
 
@@ -910,7 +919,11 @@ struct orig_status {
         GLOBAL_ID_T *globalId;
         char* name;
 	CRYPTSHA1_T *dhash;
-        uint8_t blocked;
+        uint8_t B; // blocked
+        char S[2]; // supported by me
+	char s[2]; // me supported by him
+	char T[2]; // trusted by me;
+	char t[2]; // me trusted by him
         IPX_T primaryIp;
         uint16_t routes;
         IPX_T viaIp;
@@ -929,7 +942,11 @@ static const struct field_format orig_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, orig_status, globalId,      1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_CHAR,      orig_status, name,          1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_POINTER_GLOBAL_ID, orig_status, dhash,         1, FIELD_RELEVANCE_MEDI),
-        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              orig_status, blocked,       1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              orig_status, B,             1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       orig_status, S,             1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       orig_status, s,             1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       orig_status, T,             1, FIELD_RELEVANCE_HIGH),
+        FIELD_FORMAT_INIT(FIELD_TYPE_STRING_CHAR,       orig_status, t,             1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_IPX,               orig_status, primaryIp,     1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              orig_status, routes,        1, FIELD_RELEVANCE_HIGH),
         FIELD_FORMAT_INIT(FIELD_TYPE_IPX,               orig_status, viaIp,         1, FIELD_RELEVANCE_HIGH),
@@ -956,12 +973,17 @@ static int32_t orig_status_creator(struct status_handl *handl, void *data)
         while (data ? (on = data) : (on = avl_iterate_item(&orig_tree, &it))) {
 
 		assertion(-502014, (on->dhn && on->dhn->desc_frame && on->dhn->dext));
+		IDM_T S,s,T,t;
 
                 status[i].globalId = &on->nodeId;
                 status[i].shortId = &on->nodeId;
                 status[i].name = on->hostname;
 		status[i].dhash = &on->dhn->dhash;
-                status[i].blocked = on->blocked;
+                status[i].B = on->blocked;
+		status[i].S[0] = (S=supported_pubkey(&on->nodeId)) == -1 ? 'A' : (S + '0') ;
+		status[i].s[0] = (s=setted_pubkey(on->dhn, BMX_DSC_TLV_SUPPORTS, &self->nodeId)) == -1 ? 'A' : (s + '0');
+		status[i].T[0] = (T=setted_pubkey(self->dhn, BMX_DSC_TLV_TRUSTS, &on->nodeId)) == -1 ? 'A' : (T + '0');
+		status[i].t[0] = (t=setted_pubkey(on->dhn, BMX_DSC_TLV_TRUSTS, &self->nodeId)) == -1 ? 'A' : (t + '0');
                 status[i].primaryIp = on->primary_ip;
                 status[i].routes = on->rt_tree.items;
                 status[i].viaIp = (on->curr_rt_link ? 
