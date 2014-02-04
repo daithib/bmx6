@@ -2887,10 +2887,10 @@ static int32_t dev_status_creator(struct status_handl *handl, void* data)
                 sprintf(status[i].globalIp, "%s/%d", dev->ip_global_str, dev->if_global_addr ? dev->if_global_addr->ifa.ifa_prefixlen : -1);
                 status[i].multicastIp = dev->ip_brc_str;
                 status[i].helloSqn = dev->link_hello_sqn;
-		status[i].outBps = dev->udpOutPrevBytes / prevDevStatPeriod;
-		status[i].outPps = dev->udpOutPrevPackets / prevDevStatPeriod;
-		status[i].inBps = dev->udpInPrevBytes / prevDevStatPeriod;
-		status[i].inPps = dev->udpInPrevPackets / prevDevStatPeriod;
+		status[i].outBps = (1000 * dev->udpOutPrevBytes) / prevDevStatPeriod;
+		status[i].outPps = (1000 * dev->udpOutPrevPackets) / prevDevStatPeriod;
+		status[i].inBps = (1000 * dev->udpInPrevBytes) / prevDevStatPeriod;
+		status[i].inPps = (1000 * dev->udpInPrevPackets) / prevDevStatPeriod;
 
                 i++;
         }

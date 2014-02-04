@@ -56,7 +56,7 @@ typedef struct ifname IFNAME_T;
 #define ARG_DEVSTAT_PERIOD "devStatPeriod"
 #define MIN_DEVSTAT_PERIOD 100
 #define MAX_DEVSTAT_PERIOD 100000
-#define DEF_DEVSTAT_PERIOD 1000
+#define DEF_DEVSTAT_PERIOD 5000
 #define HLP_DEVSTAT_PERIOD "interface traffic-statistics period"
 
 #define ARG_LLOCAL_PREFIX "llocalPrefix"
