@@ -27,10 +27,11 @@
 #include "bmx.h"
 #include "allocate.h"
 
-#ifdef DEBUG_MALLOC
-
 #define MAGIC_NUMBER_HEADER 0xB2B2B2B2
 #define MAGIC_NUMBER_TRAILOR 0xB2
+
+#ifdef DEBUG_MALLOC
+
 
 uint32_t debugMalloc_bytes = 0;
 uint32_t debugMalloc_objects = 0;
