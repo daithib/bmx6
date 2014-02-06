@@ -71,18 +71,14 @@ static int support_iwd = -1;
 
 struct trust_node {
 	GLOBAL_ID_T global_id;
-	uint8_t depth;
-	uint8_t max;
+//	uint8_t depth;
+//	uint8_t max;
 	uint8_t updated;
 };
 
-struct support_node {
-	GLOBAL_ID_T global_id;
-	uint8_t updated;
-};
 
 static AVL_TREE(trusted_nodes_tree, struct trust_node, global_id);
-static AVL_TREE(supported_nodes_tree, struct support_node, global_id);
+static AVL_TREE(supported_nodes_tree, struct trust_node, global_id);
 
 
 
@@ -794,6 +790,11 @@ static uint8_t internalNeighId_u32s = 0;
 IDM_T setted_pubkey(struct dhash_node *dhn, uint8_t type, GLOBAL_ID_T *globalId)
 {
 
+	assertion(-500000, (type <= description_tlv_db->handl_max));
+	assertion(-500000, (description_tlv_db->handls[type].fixed_msg_size));
+	assertion(-500000, (description_tlv_db->handls[type].data_header_size == 0));
+	assertion(-500000, (description_tlv_db->handls[type].min_msg_size == sizeof(struct dsc_msg_trust)));
+
 	struct dsc_msg_trust *setList = dhn ? dext_dptr(dhn->dext, type) : NULL;
 	uint32_t m =0, msgs = dhn ? (dhn->dext->dtd[type].len / sizeof(struct dsc_msg_trust)) : 0;
 
@@ -903,6 +904,48 @@ void free_internalNeighId(OGM_DEST_T ini) {
 
 }
 
+STATIC_FUNC
+int process_dsc_tlv_supports(struct rx_frame_iterator *it)
+{
+	return TLV_RX_DATA_PROCESSED;
+}
+
+
+STATIC_FUNC
+int create_dsc_tlv_trusts(struct tx_frame_iterator *it)
+{
+        struct avl_node *an = NULL;
+        struct trust_node *tn;
+        struct dsc_msg_trust *msg = (struct dsc_msg_trust *)tx_iterator_cache_msg_ptr(it);
+        int32_t max_size = tx_iterator_cache_data_space_pref(it);
+        int pos = 0;
+	char *dir = (it->frame_type==BMX_DSC_TLV_SUPPORTS) ? supportedNodesDir : trustedNodesDir;
+	struct avl_tree *tree = (it->frame_type==BMX_DSC_TLV_SUPPORTS) ? &supported_nodes_tree : &trusted_nodes_tree;
+
+	assertion(-500000, (it->frame_type == BMX_DSC_TLV_SUPPORTS || it->frame_type == BMX_DSC_TLV_TRUSTS));
+
+	if (dir) {
+
+		while ((tn = avl_iterate_item(tree, &an))) {
+
+			if (pos + (int) sizeof(struct dsc_msg_trust) > max_size) {
+				dbgf_sys(DBGT_ERR, "Failed adding %s=%s", it->handl->name, cryptShaAsString(&tn->global_id));
+				return TLV_TX_DATA_FULL;
+			}
+
+			msg->globalId = tn->global_id;
+			msg++;
+			pos += sizeof(struct dsc_msg_trust);
+
+			dbgf_sys(DBGT_ERR, "adding %s=%s", it->handl->name, cryptShaAsString(&tn->global_id));
+		}
+
+		return pos;
+	}
+
+        return TLV_TX_DATA_IGNORED;
+}
+
 
 
 STATIC_FUNC
@@ -924,142 +967,33 @@ int process_dsc_tlv_trusts(struct rx_frame_iterator *it)
 }
 
 
-STATIC_FUNC
-int create_dsc_tlv_trusts(struct tx_frame_iterator *it)
-{
-        struct avl_node *an = NULL;
-        struct trust_node *tn;
-        struct dsc_msg_trust *msg = (struct dsc_msg_trust *)tx_iterator_cache_msg_ptr(it);
-        int32_t max_size = tx_iterator_cache_data_space_pref(it);
-        int pos = 0;
-
-	if (trustedNodesDir) {
-
-		while ((tn = avl_iterate_item(&trusted_nodes_tree, &an))) {
-
-			if (pos + (int) sizeof(struct dsc_msg_trust) > max_size) {
-				dbgf_sys(DBGT_ERR, "Failed adding %s=%s", it->handl->name, cryptShaAsString(&tn->global_id));
-				return TLV_TX_DATA_FULL;
-			}
-
-			msg->globalId = tn->global_id;
-			msg++;
-			pos += sizeof(struct dsc_msg_trust);
-
-			dbgf_sys(DBGT_ERR, "adding %s=%s", it->handl->name, cryptShaAsString(&tn->global_id));
-		}
-
-		return pos;
-	}
-
-        return TLV_TX_DATA_IGNORED;
-}
-
 IDM_T supported_pubkey( CRYPTSHA1_T *pkhash ) {
 	return supportedNodesDir ? (avl_find_item(&supported_nodes_tree, pkhash) ? YES : NO) : -1;
 }
 
-STATIC_FUNC
-void check_supported_nodes(void *unused)
-{
-
-	DIR *dir;
-	static uint32_t retry = 5;
-
-	task_remove(check_supported_nodes, NULL);
-
-	if ((dir = opendir(supportedNodesDir))) {
-
-		struct dirent *dirEntry;
-		struct support_node *sn;
-		GLOBAL_ID_T globalId;
-
-		while ((dirEntry = readdir(dir)) != NULL) {
-
-			char globalIdString[(2*sizeof(GLOBAL_ID_T))+1] = {0};
-
-			if (
-				(strlen(dirEntry->d_name) >= (2*sizeof(GLOBAL_ID_T))) &&
-				(strncpy(globalIdString, dirEntry->d_name, 2*sizeof(GLOBAL_ID_T))) &&
-				(hexStrToMem(globalIdString, (uint8_t*)&globalId, sizeof(GLOBAL_ID_T)) == SUCCESS)
-				) {
-
-				if ((sn = avl_find_item(&supported_nodes_tree, &globalId))) {
-
-					dbgf(sn->updated ? DBGL_SYS : DBGL_ALL, sn->updated ? DBGT_ERR : DBGT_INFO,
-						"file=%s prefix found %d times!",dirEntry->d_name, sn->updated);
-
-				} else {
-					sn = debugMallocReset(sizeof(struct support_node), -300000);
-					sn->global_id = globalId;
-					avl_insert(&supported_nodes_tree, sn, -300000);
-					dbgf_sys(DBGT_INFO, "file=%s defines new nodeId=%s!",
-						dirEntry->d_name, cryptShaAsString(&globalId));
-
-					purge_deprecated_globalId_tree(&globalId);
-				}
-
-				sn->updated++;
-
-			} else {
-				dbgf_sys(DBGT_ERR, "file=%s... has illegal format!",dirEntry->d_name);
-			}
-		}
-		closedir(dir);
-
-		memset(&globalId, 0, sizeof(globalId));
-		while ((sn = avl_next_item(&supported_nodes_tree, &globalId))) {
-			struct orig_node *on;
-			globalId = sn->global_id;
-			if (!sn->updated && !cryptShasEqual(&sn->global_id, &self->nodeId)) {
-
-				avl_remove(&supported_nodes_tree, &globalId, -300000);
-
-				purge_cached_descriptions(NULL, &globalId, NO);
-
-				if ((on = avl_find_item(&orig_tree, &globalId)))
-					free_orig_node(on);
-
-				debugFree(sn, -300000);
-			} else {
-				sn->updated = 0;
-			}
-		}
-
-		if (support_ifd == -1)
-			task_register(DEF_TRUST_DIR_POLLING_INTERVAL, check_supported_nodes, NULL, -300000);
-
-	} else {
-
-		dbgf_sys(DBGT_WARN, "Problem opening dir=%s: %s! Retrying in %d ms...",
-			supportedNodesDir, strerror(errno), retry);
-
-		task_register(retry, check_supported_nodes, NULL, -300000);
-
-		retry = 5000;
-
-		IDM_T TODO_check_correct_WARN_and_remove_both_assertions_502230;
-		ASSERTION(-502230, 0);
-	}
-}
 
 STATIC_FUNC
-void check_trusted_nodes(void *unused)
+void check_trusted_nodes(void *pathpp)
 {
 
+	assertion(-500000, (pathpp == &trustedNodesDir || pathpp == &supportedNodesDir));
+
 	DIR *dir;
-	static uint32_t retry = 5;
+	static uint32_t retry[2] = {5,5};
+	uint32_t *retryp = (pathpp == &trustedNodesDir) ? &retry[0] : &retry[1];
+	char *pathp = (pathpp == &trustedNodesDir) ? trustedNodesDir : supportedNodesDir;
+	struct avl_tree *treep = (pathpp == &trustedNodesDir) ? &trusted_nodes_tree : &supported_nodes_tree;
+	int ifd = (pathpp == &trustedNodesDir) ? trusted_ifd : support_ifd;
+	task_remove(check_trusted_nodes, pathpp);
 
-	task_remove(check_trusted_nodes, NULL);
-
-	if ((dir = opendir(trustedNodesDir))) {
+	if ((dir = opendir(pathp))) {
 
 		struct dirent *dirEntry;
 		struct trust_node *tn;
 		int8_t changed = NO;
 		GLOBAL_ID_T globalId;
 
-		retry = 5;
+		*retryp = 5;
 
 		while ((dirEntry = readdir(dir)) != NULL) {
 			
@@ -1071,7 +1005,7 @@ void check_trusted_nodes(void *unused)
 				(hexStrToMem(globalIdString, (uint8_t*)&globalId, sizeof(GLOBAL_ID_T)) == SUCCESS)
 				) {
 
-				if ((tn = avl_find_item(&trusted_nodes_tree, &globalId))) {
+				if ((tn = avl_find_item(treep, &globalId))) {
 
 					dbgf(tn->updated ? DBGL_SYS : DBGL_ALL, tn->updated ? DBGT_ERR : DBGT_INFO,
 						"file=%s prefix found %d times!",dirEntry->d_name, tn->updated);
@@ -1080,9 +1014,12 @@ void check_trusted_nodes(void *unused)
 					tn = debugMallocReset(sizeof(struct trust_node), -300658);
 					tn->global_id = globalId;
 					changed = YES;
-					avl_insert(&trusted_nodes_tree, tn, -300659);
+					avl_insert(treep, tn, -300659);
 					dbgf_sys(DBGT_INFO, "file=%s defines new nodeId=%s!",
 						dirEntry->d_name, cryptShaAsString(&globalId));
+
+					if (pathpp == &supportedNodesDir)
+						purge_deprecated_globalId_tree(&globalId);
 				}
 
 				tn->updated++;
@@ -1094,11 +1031,21 @@ void check_trusted_nodes(void *unused)
 		closedir(dir);
 
 		memset(&globalId, 0, sizeof(globalId));
-		while ((tn = avl_next_item(&trusted_nodes_tree, &globalId))) {
+		while ((tn = avl_next_item(treep, &globalId))) {
+			struct orig_node *on;
 			globalId = tn->global_id;
 			if (!tn->updated && !cryptShasEqual(&tn->global_id, &self->nodeId)) {
+
+				avl_remove(treep, &globalId, -300660);
+
+				if (pathpp == &supportedNodesDir) {
+					purge_cached_descriptions(NULL, &globalId, NO);
+
+					if ((on = avl_find_item(&orig_tree, &globalId)))
+						free_orig_node(on);
+				}
+
 				changed = YES;
-				avl_remove(&trusted_nodes_tree, &globalId, -300660);
 				debugFree(tn, -300000);
 			} else {
 				tn->updated = 0;
@@ -1106,22 +1053,21 @@ void check_trusted_nodes(void *unused)
 		}
 
 
-		if (changed) {
+		if ((pathpp == &trustedNodesDir) && changed)
 			my_description_changed = YES;
-			changed = NO;
-		}
 
-		if (trusted_ifd == -1)
-			task_register(DEF_TRUST_DIR_POLLING_INTERVAL, check_trusted_nodes, NULL, -300657);
+
+		if (ifd == -1)
+			task_register(DEF_TRUST_DIR_POLLING_INTERVAL, check_trusted_nodes, pathpp, -300657);
 
 	} else {
 
 		dbgf_sys(DBGT_WARN, "Problem opening dir=%s: %s! Retrying in %d ms...",
-			trustedNodesDir, strerror(errno), retry);
+			pathp, strerror(errno), *retryp);
 
-		task_register(retry, check_trusted_nodes, NULL, -300000);
+		task_register(*retryp, check_trusted_nodes, pathpp, -300000);
 
-		retry = 5000;
+		*retryp = 5000;
 
 		IDM_T TODO_check_correct_WARN_and_remove_both_assertions_502230;
 		ASSERTION(-502230, 0);
@@ -1168,10 +1114,7 @@ void inotify_event_hook(int fd)
 
         debugFree(ibuff, -300377);
 
-	if (fd == trusted_ifd)
-		check_trusted_nodes(NULL);
-	else
-		check_supported_nodes(NULL);
+	check_trusted_nodes((fd == trusted_ifd) ? &trustedNodesDir : &supportedNodesDir);
 }
 
 
@@ -1191,7 +1134,7 @@ void cleanup_trusted_nodes(void)
 		close(trusted_ifd);
 		trusted_ifd = -1;
 	} else {
-		task_remove(check_trusted_nodes, NULL);
+		task_remove(check_trusted_nodes, &trustedNodesDir);
 	}
 
 	while (trusted_nodes_tree.items)
@@ -1246,7 +1189,7 @@ int32_t opt_trusted_node_dir(uint8_t cmd, uint8_t _save, struct opt_type *opt, s
 			tn->global_id = self->nodeId;
 			avl_insert(&trusted_nodes_tree, tn, -300663);
 
-			check_trusted_nodes(NULL);
+			check_trusted_nodes(&trustedNodesDir);
 		}
 
 		my_description_changed = YES;
@@ -1273,7 +1216,7 @@ void cleanup_supported_nodes(void)
 		close(support_ifd);
 		support_ifd = -1;
 	} else {
-		task_remove(check_supported_nodes, NULL);
+		task_remove(check_trusted_nodes, &supportedNodesDir);
 	}
 
 	while (supported_nodes_tree.items)
@@ -1324,11 +1267,11 @@ int32_t opt_supported_node_dir(uint8_t cmd, uint8_t _save, struct opt_type *opt,
 				set_fd_hook(support_ifd, inotify_event_hook, ADD);
 			}
 
-			struct support_node *sn = debugMallocReset(sizeof(struct support_node), -300662);
+			struct trust_node *sn = debugMallocReset(sizeof(struct trust_node), -300662);
 			sn->global_id = self->nodeId;
 			avl_insert(&supported_nodes_tree, sn, -300663);
 
-			check_supported_nodes(NULL);
+			check_trusted_nodes(&supportedNodesDir);
 		}
         }
 
@@ -1449,6 +1392,16 @@ void init_sec( void )
 	handl.msg_format = trust_format;
         register_frame_handler(description_tlv_db, BMX_DSC_TLV_TRUSTS, &handl);
 
+        handl.name = "DSC_SUPPORTS";
+	handl.alwaysMandatory = 0;
+        handl.min_msg_size = sizeof(struct dsc_msg_trust);
+        handl.fixed_msg_size = 1;
+	handl.dextReferencing = (int32_t*)&always_fref;
+	handl.dextCompression = (int32_t*)&never_fzip;
+        handl.tx_frame_handler = create_dsc_tlv_trusts;
+        handl.rx_frame_handler = process_dsc_tlv_supports;
+	handl.msg_format = trust_format;
+        register_frame_handler(description_tlv_db, BMX_DSC_TLV_SUPPORTS, &handl);
 
 }
 
