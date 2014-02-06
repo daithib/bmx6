@@ -794,8 +794,8 @@ static uint8_t internalNeighId_u32s = 0;
 IDM_T setted_pubkey(struct dhash_node *dhn, uint8_t type, GLOBAL_ID_T *globalId)
 {
 
-	struct dsc_msg_trust *setList = dhn ? dext_dptr(dhn->dext, BMX_DSC_TLV_TRUSTS) : NULL;
-	uint32_t m =0, msgs = dhn ? (dhn->dext->dtd[BMX_DSC_TLV_TRUSTS].len / sizeof(struct dsc_msg_trust)) : 0;
+	struct dsc_msg_trust *setList = dhn ? dext_dptr(dhn->dext, type) : NULL;
+	uint32_t m =0, msgs = dhn ? (dhn->dext->dtd[type].len / sizeof(struct dsc_msg_trust)) : 0;
 
 	if (setList) {
 		for (m = 0; m < msgs; m++) {
