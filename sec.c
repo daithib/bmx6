@@ -964,11 +964,9 @@ void check_supported_nodes(void *unused)
 {
 
 	DIR *dir;
+	static uint32_t retry = 5;
 
-	if (support_ifd == -1) {
-                task_remove(check_supported_nodes, NULL);
-                task_register(DEF_TRUST_DIR_POLLING_INTERVAL, check_supported_nodes, NULL, -300000);
-        }
+	task_remove(check_supported_nodes, NULL);
 
 	if ((dir = opendir(supportedNodesDir))) {
 
@@ -1028,8 +1026,20 @@ void check_supported_nodes(void *unused)
 			}
 		}
 
+		if (support_ifd == -1)
+			task_register(DEF_TRUST_DIR_POLLING_INTERVAL, check_supported_nodes, NULL, -300000);
+
 	} else {
-		cleanup_all(-500000);
+
+		dbgf_sys(DBGT_WARN, "Problem opening dir=%s: %s! Retrying in %d ms...",
+			supportedNodesDir, strerror(errno), retry);
+
+		task_register(retry, check_supported_nodes, NULL, -300000);
+
+		retry = 5000;
+
+		IDM_T TODO_check_correct_WARN_and_remove_both_assertions_502230;
+		ASSERTION(-502230, 0);
 	}
 }
 
@@ -1038,11 +1048,9 @@ void check_trusted_nodes(void *unused)
 {
 
 	DIR *dir;
+	static uint32_t retry = 5;
 
-	if (trusted_ifd == -1) {
-                task_remove(check_trusted_nodes, NULL);
-                task_register(DEF_TRUST_DIR_POLLING_INTERVAL, check_trusted_nodes, NULL, -300657);
-        }
+	task_remove(check_trusted_nodes, NULL);
 
 	if ((dir = opendir(trustedNodesDir))) {
 
@@ -1050,6 +1058,8 @@ void check_trusted_nodes(void *unused)
 		struct trust_node *tn;
 		int8_t changed = NO;
 		GLOBAL_ID_T globalId;
+
+		retry = 5;
 
 		while ((dirEntry = readdir(dir)) != NULL) {
 			
@@ -1101,9 +1111,20 @@ void check_trusted_nodes(void *unused)
 			changed = NO;
 		}
 
+		if (trusted_ifd == -1)
+			task_register(DEF_TRUST_DIR_POLLING_INTERVAL, check_trusted_nodes, NULL, -300657);
 
 	} else {
-		cleanup_all(-502230);
+
+		dbgf_sys(DBGT_WARN, "Problem opening dir=%s: %s! Retrying in %d ms...",
+			trustedNodesDir, strerror(errno), retry);
+
+		task_register(retry, check_trusted_nodes, NULL, -300000);
+
+		retry = 5000;
+
+		IDM_T TODO_check_correct_WARN_and_remove_both_assertions_502230;
+		ASSERTION(-502230, 0);
 	}
 }
 
