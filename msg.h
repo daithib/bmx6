@@ -181,6 +181,12 @@ extern int32_t dhash_adv_tx_unsolicited;
 #define DEF_DHASH_REQ_TX_ITERS 10 //TODO: will blow lndev->tx_task_list[] if new local_ids appeare just for a moment
 #define ARG_DHS0_REQS_TX_ITERS "descShaReqSends"
 
+#define MIN_OGM_IID 0
+#define MAX_OGM_IID 1
+#define DEF_OGM_IID 0
+#define ARG_OGM_IID "iidOgms"
+extern int32_t ogmIid;
+
 #define _DEF_OGM_SQN_DIV   5
 #define _MIN_OGM_SQN_RANGE 32
 #define _MAX_OGM_SQN_RANGE 8192 // changing this will cause compatibility trouble
@@ -245,8 +251,9 @@ extern int32_t dhash_adv_tx_unsolicited;
 #define FRAME_TYPE_DHASH_REQ    18  // Hash-for-description-of-OG-ID requests
 #define FRAME_TYPE_DHASH_ADV    19  // Hash-for-description-of-OG-ID advertisements
 
-#define FRAME_TYPE_OGM_ADV      22 // most simple BMX-NG (type 0) OGM advertisements
-#define FRAME_TYPE_OGM_ACK      23 // most simple BMX-NG (type 0) OGM advertisements
+#define FRAME_TYPE_OGM_DHASH_ADV 21
+#define FRAME_TYPE_OGM_IID_ADV   22
+#define FRAME_TYPE_OGM_ACK       23
 
 
 #define FRAME_TYPE_NOP          25
@@ -544,8 +551,8 @@ struct msg_rp_adv { // 1 byte
 
 
 struct msg_dhash_adv { // 2 + X bytes
-	IID_T transmitterIID4x;
 	DHASH_T dhash;
+	IID_T transmitterIID4x;
 } __attribute__((packed));
 
 
@@ -661,20 +668,44 @@ FIELD_FORMAT_END }
 
 #define OGM_JUMPS_PER_AGGREGATION 10
 
-#define OGMS_PER_AGGREG_MAX  (PKT_FRAMES_SIZE_OUT - \
-                              (sizeof(struct tlv_hdr) + sizeof(struct hdr_ogm_adv) + \
-                               (OGM_JUMPS_PER_AGGREGATION * sizeof(struct msg_ogm_adv)))) \
-			      / sizeof(struct msg_ogm_adv)
+#define OGMS_IID_PER_AGGREG_MAX  (PKT_FRAMES_SIZE_OUT - \
+                              (sizeof(struct tlv_hdr) + \
+                              sizeof (struct hdr_ogm_iid_adv)  + \
+                              (OGM_DEST_ARRAY_BIT_SIZE / 8) + \
+                              (OGM_JUMPS_PER_AGGREGATION * sizeof(struct msg_ogm_iid_adv)))) \
+                              / sizeof(struct msg_ogm_iid_adv)
 
-#define OGMS_PER_AGGREG_PREF ( OGMS_PER_AGGREG_MAX  / 2 )
+#define OGMS_IID_PER_AGGREG_PREF ( (OGMS_IID_PER_AGGREG_MAX * 2)  / 3 )
 
+#define OGMS_DHASH_PER_AGGREG_MAX  (PKT_FRAMES_SIZE_OUT - \
+                              (sizeof(struct tlv_hdr) + \
+                              sizeof (struct hdr_ogm_dhash_adv)  + \
+                              (OGM_DEST_ARRAY_BIT_SIZE / 8))) \
+                              / sizeof(struct msg_ogm_dhash_adv)
+
+#define OGMS_DHASH_PER_AGGREG_PREF ( (OGMS_DHASH_PER_AGGREG_MAX *2) / 3 )
 
 
 
 #define OGM_IID_RSVD_JUMP  (OGM_IIDOFFST_MASK) // 63 //255 // resulting from ((2^transmitterIIDoffset_bit_range)-1)
 
 
-struct msg_ogm_adv // 4 bytes
+struct msg_ogm_dhash_adv {
+    DHASH_T dhash;
+    uint8_t mtcExponent;
+    uint8_t mtcMantissa;
+    uint16_t sqn;
+} __attribute__((packed));
+
+struct hdr_ogm_dhash_adv {
+	AGGREG_SQN_T aggregation_sqn;
+        DHASH_T transmittersDhash;
+	uint8_t ogm_dst_field_size;
+	struct msg_ogm_dhash_adv msg[];
+} __attribute__((packed));
+
+
+struct msg_ogm_iid_adv // 4 bytes
 {
     union {
         struct {
@@ -711,12 +742,12 @@ struct msg_ogm_adv // 4 bytes
 
 
 
-struct hdr_ogm_adv { // 2 bytes
+struct hdr_ogm_iid_adv { // 2 bytes
 	AGGREG_SQN_T aggregation_sqn;
         IID_T transmittersIID;
 	uint8_t ogm_dst_field_size;
 
-	struct msg_ogm_adv msg[];
+	struct msg_ogm_iid_adv msg[];
 } __attribute__((packed));
 
 /*
@@ -741,13 +772,15 @@ struct ogm_aggreg_node {
 
 	struct list_node list;
 
-	struct msg_ogm_adv *ogm_advs;
+	struct msg_ogm_iid_adv *ogm_advs;
 
 	uint8_t ogm_dest_field[(OGM_DEST_ARRAY_BIT_SIZE / 8)];
 //	int16_t ogm_dest_bit_max;
 	int16_t ogm_dest_bytes;
 
-	uint16_t aggregated_msgs;
+	uint16_t ogm_msgs;
+	uint16_t ogm_iid_jumps;
+	IDM_T ogm_iid;
 
 	AGGREG_SQN_T    sqn;
 	uint8_t  tx_attempt;

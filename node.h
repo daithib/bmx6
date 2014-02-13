@@ -315,8 +315,6 @@ struct neigh_node {
 	struct dhash_node *dhn; //TODO remove and use on;
         CRYPTKEY_T *pktKey;
 
-	IID_T neighIID4me;
-
 	struct iid_repos neighIID4x_repos;
 
         TIME_T ogm_new_aggregation_rcvd;

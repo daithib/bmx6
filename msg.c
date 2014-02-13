@@ -58,6 +58,7 @@ static int32_t vrt_desc_size_out =       DEF_VRT_DESC_SIZE;
 static int32_t vrt_desc_size_in =        DEF_VRT_DESC_SIZE;
 
 static int32_t ogmSqnRange = DEF_OGM_SQN_RANGE;
+int32_t ogmIid = DEF_OGM_SQN_RANGE;
 
 static int32_t ogm_adv_tx_iters = DEF_OGM_TX_ITERS;
 static int32_t ogm_ack_tx_iters = DEF_OGM_ACK_TX_ITERS;
@@ -740,7 +741,7 @@ OGM_SQN_T set_ogmSqn_toBeSend_and_aggregated(struct orig_node *on, UMETRIC_T um,
 
 
 STATIC_FUNC
-IID_T create_ogm(struct orig_node *on, IID_T prev_ogm_iid, struct msg_ogm_adv *ogm)
+IID_T create_ogm(struct orig_node *on, IID_T prev_ogm_iid, struct msg_ogm_iid_adv *ogm)
 {
         TRACE_FUNCTION_CALL;
         assertion(-501064, (on->ogmMetric_next <= UMETRIC_MAX));
@@ -765,7 +766,7 @@ IID_T create_ogm(struct orig_node *on, IID_T prev_ogm_iid, struct msg_ogm_adv *o
 
         assertion(-500890, ((on->dhn->myIID4orig - prev_ogm_iid) <= OGM_IIDOFFST_MASK));
 
-	struct msg_ogm_adv m;
+	struct msg_ogm_iid_adv m;
 	m.u.o.iidOffset=(on->dhn->myIID4orig - prev_ogm_iid);
 	m.u.o.sqn=on->ogmSqn_next;
 	m.u.o.mtcExponent = fm.val.f.exp_fm16;
@@ -780,11 +781,12 @@ STATIC_FUNC
 void create_ogm_aggregation(void)
 {
         TRACE_FUNCTION_CALL;
-        uint32_t target_ogms = XMIN(OGMS_PER_AGGREG_MAX,
-                ((ogm_aggreg_pending < ((OGMS_PER_AGGREG_PREF / 3)*4)) ? ogm_aggreg_pending : OGMS_PER_AGGREG_PREF));
+        uint32_t target_ogms = ogmIid ?
+		XMIN(OGMS_IID_PER_AGGREG_MAX, ((ogm_aggreg_pending < ((OGMS_IID_PER_AGGREG_PREF / 3)*4)) ? ogm_aggreg_pending : OGMS_IID_PER_AGGREG_PREF)) :
+		XMIN(OGMS_DHASH_PER_AGGREG_MAX, ((ogm_aggreg_pending < ((OGMS_DHASH_PER_AGGREG_PREF / 3)*4)) ? ogm_aggreg_pending : OGMS_DHASH_PER_AGGREG_PREF));
 
-        struct msg_ogm_adv* msgs =
-                debugMalloc((target_ogms + OGM_JUMPS_PER_AGGREGATION) * sizeof (struct msg_ogm_adv), -300177);
+        struct msg_ogm_iid_adv* msgs =
+                debugMalloc((target_ogms + OGM_JUMPS_PER_AGGREGATION) * sizeof (struct msg_ogm_iid_adv), -300177);
 
         IID_T curr_iid;
         IID_T ogm_iid = 0;
@@ -823,7 +825,7 @@ void create_ogm_aggregation(void)
 
                                 ogm_iid = dhn->myIID4orig;
 
-				struct msg_ogm_adv ogm = {.u.j={.mtcU10=0}};
+				struct msg_ogm_iid_adv ogm = {.u.j={.mtcU10=0}};
 				ogm.u.j.iid=ogm_iid;
 				ogm.u.j.iidOffset=OGM_IID_RSVD_JUMP;
 
@@ -852,7 +854,9 @@ void create_ogm_aggregation(void)
 
         struct ogm_aggreg_node *oan = debugMallocReset(sizeof (struct ogm_aggreg_node), -300179);
 
-        oan->aggregated_msgs = ogm_msg + ogm_iid_jumps;
+        oan->ogm_msgs = ogm_msg;
+	oan->ogm_iid_jumps = ogm_iid_jumps;
+	oan->ogm_iid = ogmIid;
         oan->ogm_advs = msgs;
         oan->tx_attempt = 0;
         oan->sqn = (++ogm_aggreg_sqn_max);
@@ -961,8 +965,8 @@ LinkNode **get_unacked_ogm_links(struct ogm_aggreg_node *oan)
 
                         if (oan->tx_attempt >= ((ogm_adv_tx_iters * 3) / 4)) {
 
-                                dbg_track(DBGT_WARN, "schedule ogm_aggregation_sqn=%3d msgs=%2d dest_bytes=%d tx_attempt=%2d/%d via dev=%s to NB=%s",
-                                        oan->sqn, oan->aggregated_msgs, oan->ogm_dest_bytes, (oan->tx_attempt + 1),
+                                dbg_track(DBGT_WARN, "schedule ogm_aggregation_sqn=%d msgs=%d jumps=%d dest_bytes=%d tx_attempt=%d/%d via dev=%s to NB=%s",
+                                        oan->sqn, oan->ogm_msgs, oan->ogm_iid_jumps, oan->ogm_dest_bytes, (oan->tx_attempt + 1),
                                         ogm_adv_tx_iters, bestLink->k.myDev->label_cfg.str,
                                         ip6AsStr(&bestLink->k.linkDev->link_ip));
                         }
@@ -1099,11 +1103,17 @@ void schedule_or_purge_ogm_aggregations(IDM_T purge_all)
                         oan->tx_attempt = (array[0]) ? (oan->tx_attempt + 1) : ogm_adv_tx_iters;
 
                         for (d = 0; (array[d]); d++) {
-				int16_t len = ((oan->aggregated_msgs * sizeof (struct msg_ogm_adv)) + oan->ogm_dest_bytes);
-				schedule_tx_task((array[d]), FRAME_TYPE_OGM_ADV, len, &oan->sqn, sizeof(AGGREG_SQN_T));
+
+				if (ogmIid) {
+					int16_t len = (((oan->ogm_msgs + oan->ogm_iid_jumps) * sizeof (struct msg_ogm_iid_adv)) + oan->ogm_dest_bytes);
+					schedule_tx_task((array[d]), FRAME_TYPE_OGM_IID_ADV, len, &oan->sqn, sizeof(AGGREG_SQN_T));
+				} else {
+					int16_t len = (((oan->ogm_msgs) * sizeof (struct msg_ogm_dhash_adv)) + oan->ogm_dest_bytes);
+					schedule_tx_task((array[d]), FRAME_TYPE_OGM_DHASH_ADV, len, &oan->sqn, sizeof(AGGREG_SQN_T));
+				}
                         }
 
-                        assertion(-501319, (IMPLIES(d, (oan->aggregated_msgs))));
+                        assertion(-501319, (IMPLIES(d, (oan->ogm_msgs))));
                 }
 
                 lprev = lpos;
@@ -1931,7 +1941,7 @@ int32_t tx_msg_dhash_request(struct tx_frame_iterator *it)
 
         assertion(-500858, (IMPLIES((dhn && dhn->on), dhn->desc_frame)));
 
-        if (dhn) {
+        if (dhn && ogmIid) {
                 // description (and hash) already resolved, skip sending..
                 ttn->tx_iterations = 0;
                 return TLV_TX_DATA_DONE;
@@ -2170,41 +2180,41 @@ int32_t tx_frame_description_adv(struct tx_frame_iterator *it)
 STATIC_FUNC
 int32_t tx_msg_dhash_adv(struct tx_frame_iterator *it)
 {
+	TRACE_FUNCTION_CALL;
+	assertion(-500774, (tx_iterator_cache_data_space_pref(it) >= ((int) sizeof(struct msg_dhash_adv))));
 
-        TRACE_FUNCTION_CALL;
-        assertion(-500774, (tx_iterator_cache_data_space_pref(it) >= ((int) sizeof (struct msg_dhash_adv))));
-
-	IID_T *myIID4x = (IID_T*)it->ttn->task.data;
-        assertion(-500556, (*myIID4x >= IID_MIN_USED));
-        struct msg_dhash_adv *adv = (struct msg_dhash_adv *) tx_iterator_cache_msg_ptr(it);
-        struct dhash_node *dhn;
+	IID_T *myIID4x = (IID_T*) it->ttn->task.data;
+	assertion(-500556, (*myIID4x >= IID_MIN_USED));
+	struct msg_dhash_adv *adv = (struct msg_dhash_adv *) tx_iterator_cache_msg_ptr(it);
+	struct dhash_node *dhn;
 
 
-        if (*myIID4x == myIID4me) {
+	if (*myIID4x == myIID4me) {
 
-                adv->transmitterIID4x = htons(myIID4me);
-                dhn = self->dhn;
+		dhn = self->dhn;
 
-        } else if ((dhn = iid_get_node_by_myIID4x(*myIID4x)) && dhn->on) {
+	} else if ((dhn = iid_get_node_by_myIID4x(*myIID4x)) && dhn->on) {
 
-                assertion(-500259, (dhn->desc_frame));
-                adv->transmitterIID4x = htons(*myIID4x);
+		assertion(-500259, (dhn->desc_frame));
 
-        } else {
+	} else {
 
-                dbgf_sys(DBGT_WARN, "%s myIID4x %d !", dhn ? "INVALID" : "UNKNOWN", *myIID4x);
+		dbgf_sys(DBGT_WARN, "%s myIID4x %d !", dhn ? "INVALID" : "UNKNOWN", *myIID4x);
 
-                // an meanwhile invalidated dhn migh have been scheduled when it was still valid, but not an unknown:
-//                assertion(-500978, (dhn && !dhn->on));
+		// an meanwhile invalidated dhn migh have been scheduled when it was still valid, but not an unknown:
+		//                assertion(-500978, (dhn && !dhn->on));
 
-                return TLV_TX_DATA_DONE;
-        }
+		return TLV_TX_DATA_DONE;
+	}
 
-        memcpy((char*) & adv->dhash, (char*) & dhn->dhash, sizeof(DHASH_T));
+	if (ogmIid)
+		adv->transmitterIID4x = htons(dhn->myIID4orig);
 
-        dbgf_track(DBGT_INFO, "id=%s", cryptShaAsString(&dhn->on->nodeId));
+	adv->dhash = dhn->dhash;
 
-        return sizeof (struct msg_dhash_adv);
+	dbgf_track(DBGT_INFO, "id=%s", cryptShaAsString(&dhn->on->nodeId));
+
+	return sizeof(struct msg_dhash_adv);
 }
 
 
@@ -2762,6 +2772,73 @@ int32_t rx_frame_rp_adv(struct rx_frame_iterator *it)
 
 
 
+STATIC_FUNC
+int32_t tx_frame_ogm_dhash_advs(struct tx_frame_iterator *it)
+{
+	TRACE_FUNCTION_CALL;
+	struct tx_task_node *ttn = it->ttn;
+	AGGREG_SQN_T sqn = *((AGGREG_SQN_T*) ttn->task.data); // because AGGREG_SQN_T is just 8 bit!
+	struct ogm_aggreg_node *oan;
+
+	if (!ogmIid && (oan = list_find_next(&ogm_aggreg_list, &sqn, NULL))) {
+
+		dbgf_all(DBGT_INFO, "aggregation_sqn=%d ogms=%d jumps=%d dest_bytes=%d attempt=%d",
+			oan->sqn, oan->ogm_msgs, oan->ogm_iid_jumps, oan->ogm_dest_bytes, oan->tx_attempt);
+
+
+		uint16_t msgs_length = (oan->ogm_msgs) * sizeof(struct msg_ogm_dhash_adv);
+		struct hdr_ogm_dhash_adv* hdr = ((struct hdr_ogm_dhash_adv*) tx_iterator_cache_hdr_ptr(it));
+
+		assertion(-500000, (!oan->ogm_iid));
+		assertion(-501141, (oan->sqn == sqn));
+		assertion(-501143, (oan->ogm_dest_bytes <= (OGM_DEST_ARRAY_BIT_SIZE / 8)));
+		assertion(-500859, (hdr->msg == ((struct msg_ogm_dhash_adv*) tx_iterator_cache_msg_ptr(it))));
+		assertion(-500429, (ttn->frame_msgs_length == msgs_length + oan->ogm_dest_bytes));
+		assertion(-501144, (((int) ttn->frame_msgs_length) <= tx_iterator_cache_data_space_pref(it)));
+
+		hdr->aggregation_sqn = sqn;
+		hdr->transmittersDhash = self->dhn->dhash;
+		hdr->ogm_dst_field_size = oan->ogm_dest_bytes;
+
+		if (oan->ogm_dest_bytes)
+			memcpy(hdr->msg, oan->ogm_dest_field, oan->ogm_dest_bytes);
+
+		struct msg_ogm_dhash_adv *msg = (struct msg_ogm_dhash_adv *)(((uint8_t*)(hdr->msg)) + oan->ogm_dest_bytes);
+
+		uint16_t i=0, m=0;
+		IID_T myIId4X = 0;
+		for (;i < (oan->ogm_msgs + oan->ogm_iid_jumps); i++) {
+
+			struct msg_ogm_iid_adv iidOgm = {.u.u32 = ntohl(oan->ogm_advs[i].u.u32)};
+			struct dhash_node *dhn;
+
+			if (iidOgm.u.j.iidOffset == OGM_IID_RSVD_JUMP) {
+				myIId4X = iidOgm.u.j.iid;
+				continue;
+			} else {
+				myIId4X += iidOgm.u.o.iidOffset;
+
+				if ((dhn = iid_get_node_by_myIID4x(myIId4X))) {
+					assertion(-500000, (dhn->on && dhn->desc_frame));
+					msg[m].sqn = htons(iidOgm.u.o.sqn);
+					msg[m].mtcExponent = iidOgm.u.o.mtcExponent;
+					msg[m].mtcMantissa = iidOgm.u.o.mtcMantissa;
+					msg[m].dhash = dhn->dhash;
+					m++;
+				}
+			}
+		}
+
+		assertion(-500000, (oan->ogm_msgs >= m));
+
+		return ((m * sizeof(struct msg_ogm_dhash_adv)) + oan->ogm_dest_bytes);
+	}
+
+	// this happens when the to-be-send ogm aggregation has already been purged...
+	dbgf_sys(DBGT_WARN, "aggregation_sqn %d does not exist anymore in ogm_aggreg_list", sqn);
+	ttn->tx_iterations = 0;
+	return TLV_TX_DATA_DONE;
+}
 
 
 
@@ -2769,44 +2846,44 @@ int32_t rx_frame_rp_adv(struct rx_frame_iterator *it)
 
 
 STATIC_FUNC
-int32_t tx_frame_ogm_advs(struct tx_frame_iterator *it)
+int32_t tx_frame_ogm_iid_advs(struct tx_frame_iterator *it)
 {
-        TRACE_FUNCTION_CALL;
-        struct tx_task_node *ttn = it->ttn;
-        AGGREG_SQN_T sqn = *((AGGREG_SQN_T*)ttn->task.data); // because AGGREG_SQN_T is just 8 bit!
+	TRACE_FUNCTION_CALL;
+	struct tx_task_node *ttn = it->ttn;
+	AGGREG_SQN_T sqn = *((AGGREG_SQN_T*) ttn->task.data); // because AGGREG_SQN_T is just 8 bit!
+	struct ogm_aggreg_node *oan;
 
-        struct ogm_aggreg_node *oan = list_find_next(&ogm_aggreg_list, &sqn, NULL);
+	if (ogmIid && (oan = list_find_next(&ogm_aggreg_list, &sqn, NULL))) {
 
-        if (oan) {
+		dbgf_all(DBGT_INFO, "aggregation_sqn=%d ogms=%d jumps=%d dest_bytes=%d attempt=%d",
+			oan->sqn, oan->ogm_msgs, oan->ogm_iid_jumps, oan->ogm_dest_bytes, oan->tx_attempt);
 
-                dbgf_all(DBGT_INFO, "aggregation_sqn=%d ogms+jumps=%d dest_bytes=%d attempt=%d",
-                        oan->sqn, oan->aggregated_msgs, oan->ogm_dest_bytes, oan->tx_attempt);
+		uint16_t msgs_length = (oan->ogm_msgs + oan->ogm_iid_jumps) * sizeof(struct msg_ogm_iid_adv);
+		struct hdr_ogm_iid_adv* hdr = ((struct hdr_ogm_iid_adv*) tx_iterator_cache_hdr_ptr(it));
 
-                uint16_t msgs_length = (oan->aggregated_msgs * sizeof (struct msg_ogm_adv));
-                struct hdr_ogm_adv* hdr = ((struct hdr_ogm_adv*) tx_iterator_cache_hdr_ptr(it));
+		assertion(-500000, (oan->ogm_iid));
+		assertion(-501141, (oan->sqn == sqn));
+		assertion(-501143, (oan->ogm_dest_bytes <= (OGM_DEST_ARRAY_BIT_SIZE / 8)));
+		assertion(-500859, (hdr->msg == ((struct msg_ogm_iid_adv*) tx_iterator_cache_msg_ptr(it))));
+		assertion(-500429, (ttn->frame_msgs_length == msgs_length + oan->ogm_dest_bytes));
+		assertion(-501144, (((int) ttn->frame_msgs_length) <= tx_iterator_cache_data_space_pref(it)));
 
-                assertion(-501141, (oan->sqn == sqn));
-                assertion(-501143, (oan->ogm_dest_bytes <= (OGM_DEST_ARRAY_BIT_SIZE/8)));
-                assertion(-500859, (hdr->msg == ((struct msg_ogm_adv*) tx_iterator_cache_msg_ptr(it))));
-                assertion(-500429, (ttn->frame_msgs_length == msgs_length + oan->ogm_dest_bytes));
-                assertion(-501144, (((int) ttn->frame_msgs_length) <= tx_iterator_cache_data_space_pref(it)));
-
-                hdr->aggregation_sqn = sqn;
+		hdr->aggregation_sqn = sqn;
 		hdr->transmittersIID = htons(myIID4me);
-                hdr->ogm_dst_field_size = oan->ogm_dest_bytes;
-                
-                if (oan->ogm_dest_bytes)
-                        memcpy(tx_iterator_cache_msg_ptr(it), oan->ogm_dest_field, oan->ogm_dest_bytes);
+		hdr->ogm_dst_field_size = oan->ogm_dest_bytes;
 
-                memcpy(tx_iterator_cache_msg_ptr(it) + oan->ogm_dest_bytes, oan->ogm_advs, msgs_length);
+		if (oan->ogm_dest_bytes)
+			memcpy(hdr->msg, oan->ogm_dest_field, oan->ogm_dest_bytes);
 
-                return ttn->frame_msgs_length;
-        }
+		memcpy(((uint8_t*)(hdr->msg)) + oan->ogm_dest_bytes, oan->ogm_advs, msgs_length);
 
-        // this happens when the to-be-send ogm aggregation has already been purged...
-        dbgf_sys(DBGT_WARN, "aggregation_sqn %d does not exist anymore in ogm_aggreg_list", sqn);
-        ttn->tx_iterations = 0;
-        return TLV_TX_DATA_DONE;
+		return ttn->frame_msgs_length;
+	}
+
+	// this happens when the to-be-send ogm aggregation has already been purged...
+	dbgf_sys(DBGT_WARN, "aggregation_sqn %d does not exist anymore in ogm_aggreg_list", sqn);
+	ttn->tx_iterations = 0;
+	return TLV_TX_DATA_DONE;
 }
 
 
@@ -2829,242 +2906,338 @@ int32_t tx_msg_ogm_ack(struct tx_frame_iterator *it)
 }
 
 
-
-
-
-
-
 STATIC_FUNC
-int32_t rx_frame_ogm_advs(struct rx_frame_iterator *it)
+int32_t process_ogm_hdr(struct rx_frame_iterator *it, struct neigh_node *local, uint16_t ogm_dst_field_size)
 {
-        TRACE_FUNCTION_CALL;
+	// TODO: ogm_aggregations from this guy must be processed only for ogms from him if not being in his ogm_destination_array
+	// to find out about the direct metric to him....
 
-	assertion(-502164, (it->pb->i.verifiedLink));
+	dbgf_all(DBGT_INFO, " ");
 
-        struct hdr_ogm_adv *hdr = (struct hdr_ogm_adv *) it->frame_data;
-        struct packet_buff *pb = it->pb;
-        struct neigh_node *local = pb->i.verifiedLink->k.linkDev->local;
+	IDM_T isIIdOgm = it->frame_type == FRAME_TYPE_OGM_IID_ADV ? 1 : 0;
+	uint8_t *ogm_destination_field = it->msg;
 	LINKADV_SQN_T link_sqn = local->packet_link_sqn_ref;
-        uint8_t *ogm_destination_field = it->msg;
-        AGGREG_SQN_T aggregation_sqn = hdr->aggregation_sqn;
-        uint16_t ogm_dst_field_size = hdr->ogm_dst_field_size;
-	IID_T transmittersIID = ntohs(hdr->transmittersIID);
 
-        if (ogm_dst_field_size > (OGM_DEST_ARRAY_BIT_SIZE / 8) ||
-                it->frame_msgs_length < ((int) sizeof (struct msg_ogm_adv)) ||
-                ogm_dst_field_size > (it->frame_msgs_length - sizeof (struct msg_ogm_adv))) {
+	AGGREG_SQN_T TODO_change_AGGREG_SQN_T_to_uint16_t;
+	AGGREG_SQN_T aggregation_sqn = isIIdOgm ?
+		((struct hdr_ogm_iid_adv *) it->frame_data)->aggregation_sqn :
+		((struct hdr_ogm_dhash_adv *) it->frame_data)->aggregation_sqn;
 
-                dbgf_sys(DBGT_ERR, "invalid ogm_dst_field_size=%d frame_msgs_length=%d ",
-                        ogm_dst_field_size, it->frame_msgs_length);
-                return TLV_RX_DATA_FAILURE;
-        }
+	if ((ogm_dst_field_size > (OGM_DEST_ARRAY_BIT_SIZE / 8)) ||
+		(it->frame_msgs_length < ((int) it->handl->min_msg_size)) ||
+		(ogm_dst_field_size > (it->frame_msgs_length - it->handl->min_msg_size)) ||
+		((it->frame_msgs_length - ogm_dst_field_size) % it->handl->min_msg_size)) {
 
-        if (link_sqn != local->link_adv_sqn) {
+		dbgf_sys(DBGT_ERR, "invalid ogm_dst_field_size=%d frame_msgs_length=%d ",
+			ogm_dst_field_size, it->frame_msgs_length);
+		return TLV_RX_DATA_FAILURE;
+	}
 
-                dbgf_track(DBGT_INFO, "rcvd link_sqn=%d != local->link_adv_sqn=%d", link_sqn, local->link_adv_sqn);
-                return it->frame_msgs_length;
+	if (link_sqn != local->link_adv_sqn) {
 
-        } else if (ogm_dst_field_size > ((local->link_adv_msgs / 8) + ((local->link_adv_msgs % 8) ? 1 : 0))) {
+		dbgf_track(DBGT_INFO, "rcvd link_sqn=%d != local->link_adv_sqn=%d", link_sqn, local->link_adv_sqn);
+		return it->frame_msgs_length;
 
-                dbgf_sys(DBGT_ERR, "invalid ogm_dst_field_size=%d link_adv_msgs=%d",
-                        ogm_dst_field_size, local->link_adv_msgs);
-                return TLV_RX_DATA_FAILURE;
-        }
+	} else if (ogm_dst_field_size > ((local->link_adv_msgs / 8) + ((local->link_adv_msgs % 8) ? 1 : 0))) {
 
-        IDM_T only_process_sender_and_refresh_all = !local->orig_routes;
+		dbgf_sys(DBGT_ERR, "invalid ogm_dst_field_size=%d link_adv_msgs=%d",
+			ogm_dst_field_size, local->link_adv_msgs);
+		return TLV_RX_DATA_FAILURE;
+	}
 
-        IDM_T ack_sender = (local->neighLinkId != LINKADV_ID_IGNORED &&
-                local->neighLinkId < (ogm_dst_field_size * 8) &&
-                bit_get(ogm_destination_field, (ogm_dst_field_size * 8), local->neighLinkId));
+	IDM_T ack_sender = (local->neighLinkId != LINKADV_ID_IGNORED &&
+		local->neighLinkId < (ogm_dst_field_size * 8) &&
+		bit_get(ogm_destination_field, (ogm_dst_field_size * 8), local->neighLinkId));
 
-        if (only_process_sender_and_refresh_all || !ack_sender) {
-                dbgf_all(DBGT_INFO, "not wanted: link_adv_msg_for_me=%d ogm_destination_bytes=%d orig_routes=%d",
-                        local->neighLinkId, ogm_dst_field_size, local->orig_routes);
-        }
+	if (!local->orig_routes || !ack_sender) {
+		dbgf_all(DBGT_INFO, "not wanted: link_adv_msg_for_me=%d ogm_destination_bytes=%d orig_routes=%d",
+			local->neighLinkId, ogm_dst_field_size, local->orig_routes);
+	}
 
+	if (!(local->ogm_new_aggregation_rcvd || local->ogm_aggregation_cleard_max /*ever used*/) ||
+		((AGGREG_SQN_MASK)& (local->ogm_aggregation_cleard_max - aggregation_sqn)) >= AGGREG_SQN_CACHE_RANGE) {
 
-        // TODO: ogm_aggregations from this guy must be processed only for ogms from him if not being in his ogm_destination_array
-        // to find out about the direct metric to him....
+		if ((local->ogm_new_aggregation_rcvd || local->ogm_aggregation_cleard_max /*ever used*/) &&
+			((AGGREG_SQN_MASK)& (aggregation_sqn - local->ogm_aggregation_cleard_max)) > AGGREG_SQN_CACHE_WARN) {
 
-        uint16_t msgs = (it->frame_msgs_length - ogm_dst_field_size) / sizeof (struct msg_ogm_adv);
+			dbgf_track(DBGT_WARN, "neigh=%s with NEW, unknown, and LOST aggregation_sqn=%d max=%d",
+				it->pb->i.llip_str, aggregation_sqn, local->ogm_aggregation_cleard_max);
+		} else {
+			dbgf_all(DBGT_INFO, "neigh=%s with NEW, unknown aggregation_sqn=%d max=%d",
+				it->pb->i.llip_str, aggregation_sqn, local->ogm_aggregation_cleard_max);
+		}
 
-        dbgf_all(DBGT_INFO, " ");
+		if ((AGGREG_SQN_MASK & (aggregation_sqn - (local->ogm_aggregation_cleard_max + 1))) >= AGGREG_SQN_CACHE_RANGE) {
 
+			memset(local->ogm_aggregations_rcvd, 0, AGGREG_SQN_CACHE_RANGE / 8);
 
-        if (!(local->ogm_new_aggregation_rcvd || local->ogm_aggregation_cleard_max /*ever used*/) ||
-                ((AGGREG_SQN_MASK)& (local->ogm_aggregation_cleard_max - aggregation_sqn)) >= AGGREG_SQN_CACHE_RANGE) {
+		} else {
+			bits_clear(local->ogm_aggregations_rcvd, AGGREG_SQN_CACHE_RANGE,
+				((AGGREG_SQN_MASK)& (local->ogm_aggregation_cleard_max + 1)), aggregation_sqn, AGGREG_SQN_MASK);
+		}
 
-                if ((local->ogm_new_aggregation_rcvd || local->ogm_aggregation_cleard_max /*ever used*/) &&
-                        ((AGGREG_SQN_MASK)& (aggregation_sqn - local->ogm_aggregation_cleard_max)) > AGGREG_SQN_CACHE_WARN) {
+		local->ogm_aggregation_cleard_max = aggregation_sqn;
+		local->ogm_new_aggregation_rcvd = bmx_time;
 
-                        dbgf_track(DBGT_WARN, "neigh=%s with NEW, unknown, and LOST aggregation_sqn=%d  max=%d  ogms=%d",
-                                pb->i.llip_str, aggregation_sqn, local->ogm_aggregation_cleard_max, msgs);
-                } else {
-                        dbgf_all(DBGT_INFO, "neigh=%s with NEW, unknown aggregation_sqn=%d  max=%d  msgs=%d",
-                                pb->i.llip_str, aggregation_sqn, local->ogm_aggregation_cleard_max, msgs);
-                }
+		bit_set(local->ogm_aggregations_rcvd, AGGREG_SQN_CACHE_RANGE, aggregation_sqn, 1);
+	} else {
 
-                if ((AGGREG_SQN_MASK & (aggregation_sqn - (local->ogm_aggregation_cleard_max + 1))) >= AGGREG_SQN_CACHE_RANGE) {
+		if (bit_get(local->ogm_aggregations_rcvd, AGGREG_SQN_CACHE_RANGE, aggregation_sqn)) {
 
-                        memset(local->ogm_aggregations_rcvd, 0, AGGREG_SQN_CACHE_RANGE / 8);
-                        
-                } else {
-                        bits_clear(local->ogm_aggregations_rcvd, AGGREG_SQN_CACHE_RANGE,
-                                ((AGGREG_SQN_MASK)& (local->ogm_aggregation_cleard_max + 1)), aggregation_sqn, AGGREG_SQN_MASK);
-                }
+			dbgf_all(DBGT_INFO, "neigh: id=%s via dev=%s with OLD, already KNOWN ogm_aggregation_sqn=%d",
+				cryptShaAsString(&local->dhn->on->nodeId), it->pb->i.iif->label_cfg.str, aggregation_sqn);
 
-/*
-                if ((AGGREG_SQN_MASK& (neigh->ogm_aggregation_cleard_max + 1 - aggregation_sqn)) >= AGGREG_SQN_CACHE_RANGE) {
-                        memset(neigh->ogm_aggregations_rcvd, 0, AGGREG_SQN_CACHE_RANGE / 8);
-                } else {
-                        bits_clear(neigh->ogm_aggregations_rcvd, AGGREG_SQN_CACHE_RANGE,
-                                ((AGGREG_SQN_MASK)& (neigh->ogm_aggregation_cleard_max + 1)), aggregation_sqn, AGGREG_SQN_MASK);
-                }
-*/
-                
-                local->ogm_aggregation_cleard_max = aggregation_sqn;
-                local->ogm_new_aggregation_rcvd = bmx_time;
-                
-        } else {
+			return it->frame_msgs_length;
 
-                if (bit_get(local->ogm_aggregations_rcvd, AGGREG_SQN_CACHE_RANGE, aggregation_sqn)) {
+		} else /*if (((AGGREG_SQN_MASK)& (neigh->ogm_aggregation_cleard_max - aggregation_sqn)) > AGGREG_SQN_CACHE_WARN)*/ {
 
-                        dbgf_all(DBGT_INFO, "neigh: id=%s via dev=%s with OLD, already KNOWN ogm_aggregation_sqn=%d",
-                                cryptShaAsString(&local->dhn->on->nodeId), pb->i.iif->label_cfg.str, aggregation_sqn);
+			dbgf_track(DBGT_WARN, "neigh=%s  orig=%s with OLD, unknown aggregation_sqn=%d  max=%d",
+				it->pb->i.llip_str, cryptShaAsString(&local->dhn->on->nodeId),
+				aggregation_sqn, local->ogm_aggregation_cleard_max);
 
-                        if (ack_sender)
-                                schedule_tx_task(local->best_tp_link, FRAME_TYPE_OGM_ACK, SCHEDULE_MIN_MSG_SIZE, &aggregation_sqn, sizeof(aggregation_sqn));
+			bit_set(local->ogm_aggregations_rcvd, AGGREG_SQN_CACHE_RANGE, aggregation_sqn, 1);
+		}
+	}
 
-                        return it->frame_msgs_length;
+	if (ack_sender)
+		schedule_tx_task(local->best_tp_link, FRAME_TYPE_OGM_ACK, SCHEDULE_MIN_MSG_SIZE, &aggregation_sqn, sizeof(aggregation_sqn));
 
-                } else /*if (((AGGREG_SQN_MASK)& (neigh->ogm_aggregation_cleard_max - aggregation_sqn)) > AGGREG_SQN_CACHE_WARN)*/ {
 
-                        dbgf_track(DBGT_WARN, "neigh=%s  orig=%s with OLD, unknown aggregation_sqn=%d  max=%d  ogms=%d",
-                                pb->i.llip_str, cryptShaAsString(&local->dhn->on->nodeId),
-                                aggregation_sqn, local->ogm_aggregation_cleard_max, msgs);
-                }
-        }
-
-
-
-        uint16_t m;
-        IID_T neighIID4x = 0;
-
-        for (m = 0; m < msgs; m++) {
-
-		struct msg_ogm_adv ogm = { .u.u32 = ntohl( ((struct msg_ogm_adv*)(it->msg + ogm_dst_field_size))[m].u.u32 ) };
-
-                if (ogm.u.j.iidOffset == OGM_IID_RSVD_JUMP) {
-
-                        dbgf_all(DBGT_INFO, " IID jump from %d to %d", neighIID4x, ogm.u.j.iid);
-                        neighIID4x = ogm.u.j.iid;
-
-                        if ((m + 1) >= msgs)
-                                return TLV_RX_DATA_FAILURE;
-
-                        continue;
-
-                } else {
-
-                        dbgf_all(DBGT_INFO, " IID offset from %d to %d", neighIID4x, neighIID4x + ogm.u.o.iidOffset);
-                        neighIID4x += ogm.u.o.iidOffset;
-                }
-
-                IID_NODE_T *dhn = iid_get_node_by_neighIID4x(local, neighIID4x, !only_process_sender_and_refresh_all/*verbose*/);
-
-                if (only_process_sender_and_refresh_all && neighIID4x != transmittersIID)
-                        continue;
-
-
-                struct orig_node *on = dhn ? dhn->on : NULL;
-
-                if (on) {
-
-                        if (((OGM_SQN_MASK) & (ogm.u.o.sqn - on->ogmSqn_rangeMin)) >= on->ogmSqn_rangeSize) {
-
-                                dbgf_sys(DBGT_ERR,
-                                        "DAD-Alert: EXCEEDED ogm_sqn=%d neighIID4x=%d id=%s via link=%s sqn_min=%d sqn_range=%d",
-                                        ogm.u.o.sqn, neighIID4x, cryptShaAsString(&on->nodeId), pb->i.llip_str,
-                                        on->ogmSqn_rangeMin, on->ogmSqn_rangeSize);
-
-                                purge_local_node(local);
-
-                                return TLV_RX_DATA_FAILURE;
-                        }
-
-                        if (dhn == self->dhn || on->blocked) {
-
-                                dbgf_all(DBGT_WARN, "%s orig_sqn=%d/%d id=%s via link=%s neighIID4x=%d",
-                                        dhn == self->dhn ? "MYSELF" : "BLOCKED",
-                                        ogm.u.o.sqn, on->ogmSqn_next, cryptShaAsString(&on->nodeId), pb->i.llip_str, neighIID4x);
-
-                                continue;
-                        }
-
-			if (verify_neighTrust(on, local) != SUCCESS) {
-
-				dbgf_sys(DBGT_INFO, "DISTRUSTED neigh=%s for orig=%s",
-					cryptShaAsShortStr(&local->local_id), cryptShaAsShortStr(&on->nodeId) );
-
-				continue;
-			}
-
-                        FMETRIC_U16_T fm = fmetric(ogm.u.o.mtcMantissa, ogm.u.o.mtcExponent);
-                        IDM_T valid_metric = is_fmetric_valid(fm);
-
-                        if (!valid_metric) {
-
-                                dbgf_mute(50, DBGL_SYS, DBGT_ERR,
-                                        "INVALID metric! orig_sqn=%d/%d orig=%s via link=%s neighIID4x=%d",
-                                        ogm.u.o.sqn, on->ogmSqn_next, cryptShaAsString(&on->nodeId), pb->i.llip_str, neighIID4x);
-
-                                return TLV_RX_DATA_FAILURE;
-                        }
-
-                        UMETRIC_T um = fmetric_to_umetric(fm);
-
-                        if (um < on->path_metricalgo->umetric_min) {
-
-                                dbgf_mute(50, DBGL_SYS, DBGT_ERR,
-                                        "UNUSABLE metric=%ju usable=%ju orig_sqn=%d/%d id=%s via link=%s neighIID4x=%d",
-                                        um, on->path_metricalgo->umetric_min,
-                                        ogm.u.o.sqn, on->ogmSqn_next, cryptShaAsString(&on->nodeId), pb->i.llip_str, neighIID4x);
-
-                                continue;
-                        } 
-                        
-                        if (update_path_metrics(pb, on, ogm.u.o.sqn, &um) != SUCCESS) {
-                                assertion(-501145, (0));
-                                return TLV_RX_DATA_FAILURE;
-                        }
-
-                } else {
-
-                        dbgf_track(DBGT_WARN, "%s orig_sqn=%d or neighIID4x=%d id=%s via link=%s sqn_min=%d sqn_range=%d",
-                                !dhn ? "UNKNOWN DHN" : "INVALIDATED",
-                                ogm.u.o.sqn, neighIID4x,
-                                on ? cryptShaAsString(&on->nodeId) : DBG_NIL,
-                                pb->i.llip_str,
-                                on ? on->ogmSqn_rangeMin : 0,
-                                on ? on->ogmSqn_rangeSize : 0);
-
-                        if (!dhn) {
-                                dbgf_track(DBGT_INFO, "schedule frame_type=%d", FRAME_TYPE_DHASH_REQ);
-                                schedule_tx_task(local->best_tp_link, FRAME_TYPE_DHASH_REQ, SCHEDULE_MIN_MSG_SIZE, &neighIID4x, sizeof(IID_T));
-                        }
-
-                }
-        }
-
-        bit_set(local->ogm_aggregations_rcvd, AGGREG_SQN_CACHE_RANGE, aggregation_sqn, 1);
-
-        if (ack_sender)
-                schedule_tx_task(local->best_tp_link, FRAME_TYPE_OGM_ACK, SCHEDULE_MIN_MSG_SIZE, &aggregation_sqn, sizeof(aggregation_sqn));
-
-        return it->frame_msgs_length;
+	return 0;
 }
 
+STATIC_FUNC
+int32_t process_ogm_msg(struct rx_frame_iterator *it, struct neigh_node *local, struct orig_node *on, OGM_SQN_T sqn, uint8_t exp, uint8_t mant)
+{
 
+	if (((OGM_SQN_MASK) & (sqn - on->ogmSqn_rangeMin)) >= on->ogmSqn_rangeSize) {
+
+		dbgf_sys(DBGT_ERR,
+			"DAD-Alert: EXCEEDED ogm_sqn=%d id=%s via link=%s sqn_min=%d sqn_range=%d",
+			sqn, cryptShaAsString(&on->nodeId), it->pb->i.llip_str,
+			on->ogmSqn_rangeMin, on->ogmSqn_rangeSize);
+
+		purge_local_node(local);
+
+		return TLV_RX_DATA_FAILURE;
+	}
+
+	if (on->dhn == self->dhn || on->blocked) {
+
+		dbgf_all(DBGT_WARN, "%s orig_sqn=%d/%d id=%s via link=%s",
+			on->dhn == self->dhn ? "MYSELF" : "BLOCKED",
+			sqn, on->ogmSqn_next, cryptShaAsString(&on->nodeId), it->pb->i.llip_str);
+
+		return 0;
+	}
+
+	if (verify_neighTrust(on, local) != SUCCESS) {
+
+		dbgf_sys(DBGT_INFO, "DISTRUSTED neigh=%s for orig=%s",
+			cryptShaAsShortStr(&local->local_id), cryptShaAsShortStr(&on->nodeId));
+
+		return 0;
+	}
+
+	FMETRIC_U16_T fm = fmetric(mant, exp);
+	IDM_T valid_metric = is_fmetric_valid(fm);
+
+	if (!valid_metric) {
+
+		dbgf_mute(50, DBGL_SYS, DBGT_ERR,
+			"INVALID metric! orig_sqn=%d/%d orig=%s via link=%s",
+			sqn, on->ogmSqn_next, cryptShaAsString(&on->nodeId), it->pb->i.llip_str);
+
+		return TLV_RX_DATA_FAILURE;
+	}
+
+	UMETRIC_T um = fmetric_to_umetric(fm);
+
+	if (um < on->path_metricalgo->umetric_min) {
+
+		dbgf_mute(50, DBGL_SYS, DBGT_ERR,
+			"UNUSABLE metric=%ju usable=%ju orig_sqn=%d/%d id=%s via link=%s",
+			um, on->path_metricalgo->umetric_min,
+			sqn, on->ogmSqn_next, cryptShaAsString(&on->nodeId), it->pb->i.llip_str);
+
+		return 0;
+	}
+
+	if (update_path_metrics(it->pb, on, sqn, &um) != SUCCESS) {
+		assertion(-501145, (0));
+		return TLV_RX_DATA_FAILURE;
+	}
+
+	return 0;
+}
+
+STATIC_FUNC
+struct dhash_node *process_dhash(const char* verbose, struct rx_frame_iterator *it, DHASH_T *dhash, IID_T neighIID4x)
+{
+	struct packet_buff *pb = it->pb;
+	struct neigh_node *viaNeigh = pb->i.verifiedLink->k.linkDev->local;
+	IDM_T is_transmitter = cryptShasEqual(dhash, &viaNeigh->dhn->dhash);
+	struct dhash_node *dhn = NULL, *dhnOld = NULL;
+
+	assertion(-502166, (it->pb->i.verifiedLink));
+	assertion(-500689, (!cryptShasEqual(&pb->i.verifiedLink->k.linkDev->local->dhn->dhash, &(self->dhn->dhash)))); // cant be transmitter' and myselfs'
+	assertion(-500000, IMPLIES(neighIID4x > IID_RSVD_MAX, ogmIid));
+
+	if (avl_find(&deprecated_dhash_tree, dhash)) {
+
+		dhn = (struct dhash_node*) REJECTED_PTR;
+
+	} else if ((dhn = dhnOld = get_dhash_tree_node(dhash)) || (dhn = process_description(pb, dhash))) {
+
+		if (dhn == REJECTED_PTR) {
+
+			deprecate_dhash_iid(NULL, dhash, NULL);
+
+		} else if (dhn == FAILURE_PTR || dhn == UNRESOLVED_PTR) {
+
+		} else if (neighIID4x > IID_RSVD_MAX && iid_set_neighIID4x(&viaNeigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE) {
+
+			dhn = (struct dhash_node*) FAILURE_PTR;
+
+		} else {
+			ASSERTION(-502214, (dhn == get_dhash_tree_node(dhash)));
+			assertion(-502167, IMPLIES(is_transmitter, dhn == viaNeigh->dhn));
+			assertion(-502168, IMPLIES(!is_transmitter, dhn != viaNeigh->dhn));
+
+			dhn->referred_by_me_timestamp = bmx_time;
+
+			if (!dhnOld && desc_adv_tx_unsolicited)
+				schedule_best_tp_links(viaNeigh, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
+
+			if (!dhnOld && dhash_adv_tx_unsolicited)
+				schedule_best_tp_links(NULL, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
+		}
+	}
+
+	dbgf(verbose ? DBGL_CHANGES : DBGL_ALL, DBGT_INFO,
+		"%s via dev=%s NB=%s dhash=%8X..  dhn=%s neighIID4x=%d is_transmitter=%d (on)nodeId=%s",
+		verbose, pb->i.iif->label_cfg.str, pb->i.llip_str, dhash->h.u32[0],
+		(dhn ? (dhn == FAILURE_PTR ? "FAILURE" :
+		(dhn == UNRESOLVED_PTR ? "UNRESOLVED" : (dhn == REJECTED_PTR ? "REJECTED" : "RESOLVED"))) : "UNKNOWN"),
+		neighIID4x, is_transmitter,
+		((dhn && dhn != FAILURE_PTR && dhn != UNRESOLVED_PTR && dhn != REJECTED_PTR && dhn->on) ?
+		cryptShaAsString(&dhn->on->nodeId) : DBG_NIL));
+
+	return dhn;
+}
+
+STATIC_FUNC
+int32_t rx_frame_ogm_dhash_advs(struct rx_frame_iterator *it)
+{
+	TRACE_FUNCTION_CALL;
+	assertion(-502164, (it->pb->i.verifiedLink));
+	int32_t ret;
+	struct packet_buff *pb = it->pb;
+	struct neigh_node *local = pb->i.verifiedLink->k.linkDev->local;
+	uint16_t ogm_dst_field_size = ((struct hdr_ogm_dhash_adv *) it->frame_data)->ogm_dst_field_size;
+
+	if ((ret = process_ogm_hdr(it, local, ogm_dst_field_size)))
+		return ret;
+
+	IDM_T only_process_sender_and_refresh_all = !local->orig_routes;
+	uint16_t msgs = (it->frame_msgs_length - ogm_dst_field_size) / it->handl->min_msg_size;
+
+	DHASH_T *transmittersIID = &(((struct hdr_ogm_dhash_adv *) it->frame_data)->transmittersDhash);
+	uint16_t m;
+
+	for (m = 0; m < msgs; m++) {
+
+		struct dhash_node *dhn;
+		struct msg_ogm_dhash_adv *ogm = &(((struct msg_ogm_dhash_adv*) (it->msg + ogm_dst_field_size))[m]);
+
+		if (only_process_sender_and_refresh_all && !cryptShasEqual(&ogm->dhash, transmittersIID))
+			continue;
+
+		if ((dhn = process_dhash(NULL, it, &ogm->dhash, IID_RSVD_UNUSED)) &&
+			dhn != REJECTED_PTR && dhn != UNRESOLVED_PTR && dhn != FAILURE_PTR) {
+
+			ASSERTION(-500000, (dhn == get_dhash_tree_node(&ogm->dhash)));
+
+			if ((ret = process_ogm_msg(it, local, dhn->on, ntohs(ogm->sqn), ogm->mtcExponent, ogm->mtcMantissa)))
+				return ret;
+		}
+	}
+
+	return it->frame_msgs_length;
+}
+
+STATIC_FUNC
+int32_t rx_frame_ogm_iid_advs(struct rx_frame_iterator *it)
+{
+	TRACE_FUNCTION_CALL;
+	assertion(-502164, (it->pb->i.verifiedLink));
+
+	if (!ogmIid)
+		return it->frame_msgs_length;
+
+	int32_t ret;
+	struct packet_buff *pb = it->pb;
+	struct neigh_node *local = pb->i.verifiedLink->k.linkDev->local;
+	uint16_t ogm_dst_field_size = ((struct hdr_ogm_iid_adv *) it->frame_data)->ogm_dst_field_size;
+
+	if ((ret = process_ogm_hdr(it, local, ogm_dst_field_size)))
+		return ret;
+
+	IDM_T only_process_sender_and_refresh_all = !local->orig_routes;
+	uint16_t msgs = (it->frame_msgs_length - ogm_dst_field_size) / it->handl->min_msg_size;
+	struct hdr_ogm_iid_adv *hdr = ((struct hdr_ogm_iid_adv *) it->frame_data);
+	IID_T transmittersIID = ntohs(hdr->transmittersIID);
+	uint16_t m;
+	IID_T neighIID4x = 0;
+
+	for (m = 0; m < msgs; m++) {
+
+		struct msg_ogm_iid_adv ogm = {.u.u32 = ntohl(((struct msg_ogm_iid_adv*) (it->msg + ogm_dst_field_size))[m].u.u32)};
+
+		if (ogm.u.j.iidOffset == OGM_IID_RSVD_JUMP) {
+
+			dbgf_all(DBGT_INFO, " IID jump from %d to %d", neighIID4x, ogm.u.j.iid);
+			neighIID4x = ogm.u.j.iid;
+
+			if ((m + 1) >= msgs)
+				return TLV_RX_DATA_FAILURE;
+
+			continue;
+
+		} else {
+
+			dbgf_all(DBGT_INFO, " IID offset from %d to %d", neighIID4x, neighIID4x + ogm.u.o.iidOffset);
+			neighIID4x += ogm.u.o.iidOffset;
+		}
+
+		IID_NODE_T *dhn = iid_get_node_by_neighIID4x(local, neighIID4x, !only_process_sender_and_refresh_all/*verbose*/);
+
+		if (only_process_sender_and_refresh_all && neighIID4x != transmittersIID)
+			continue;
+
+
+		struct orig_node *on = dhn ? dhn->on : NULL;
+
+		if (on) {
+
+			if ((ret = process_ogm_msg(it, local, on, ogm.u.o.sqn, ogm.u.o.mtcExponent, ogm.u.o.mtcMantissa)))
+				return ret;
+
+		} else {
+
+			dbgf_track(DBGT_WARN, "%s orig_sqn=%d or neighIID4x=%d id=%s via link=%s sqn_min=%d sqn_range=%d",
+				!dhn ? "UNKNOWN DHN" : "INVALIDATED", ogm.u.o.sqn, neighIID4x,
+				on ? cryptShaAsString(&on->nodeId) : DBG_NIL, pb->i.llip_str,
+				on ? on->ogmSqn_rangeMin : 0, on ? on->ogmSqn_rangeSize : 0);
+
+			if (!dhn)
+				schedule_tx_task(local->best_tp_link, FRAME_TYPE_DHASH_REQ, SCHEDULE_MIN_MSG_SIZE, &neighIID4x, sizeof(IID_T));
+
+		}
+	}
+
+	return it->frame_msgs_length;
+}
 
 
 
@@ -3125,72 +3298,21 @@ int32_t rx_frame_ogm_acks(struct rx_frame_iterator *it)
 STATIC_FUNC
 int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
 {
-        TRACE_FUNCTION_CALL;
+	TRACE_FUNCTION_CALL;
 
-        struct packet_buff *pb = it->pb;
-        struct msg_dhash_adv *adv = (struct msg_dhash_adv*) (it->msg);
+	struct packet_buff *pb = it->pb;
+	struct msg_dhash_adv *adv = (struct msg_dhash_adv*) (it->msg);
 	DHASH_T *dhash = &adv->dhash;
-        IID_T neighIID4x = ntohs(adv->transmitterIID4x);
+	IID_T neighIID4x = ntohs(adv->transmitterIID4x);
 
-        dbgf_track(DBGT_INFO, "dhash=%s via NB: %s", cryptShaAsString(dhash), pb->i.llip_str);
+	dbgf_track(DBGT_INFO, "dhash=%s via NB: %s", cryptShaAsString(dhash), pb->i.llip_str);
 	assertion(-502166, (it->pb->i.verifiedLink));
-        assertion(-500689, (!cryptShasEqual(&pb->i.verifiedLink->k.linkDev->local->dhn->dhash, &(self->dhn->dhash)))); // cant be transmitter' and myselfs'
+	assertion(-500689, (!cryptShasEqual(&pb->i.verifiedLink->k.linkDev->local->dhn->dhash, &(self->dhn->dhash)))); // cant be transmitter' and myselfs'
 
-	struct neigh_node *viaNeigh = pb->i.verifiedLink->k.linkDev->local;
-	IDM_T is_transmitter = cryptShasEqual(dhash, &viaNeigh->dhn->dhash);
-	struct dhash_node *dhn = NULL, *dhnOld = NULL;
-
-
-        if (neighIID4x <= IID_RSVD_MAX)
-                return TLV_RX_DATA_FAILURE;
-
-	if (avl_find(&deprecated_dhash_tree, dhash)) {
-
-		dhn = (struct dhash_node*)REJECTED_PTR;
-
-	} else if ((dhn = dhnOld = get_dhash_tree_node(dhash)) || (dhn = process_description(pb, dhash))) {
-
-		if (dhn == REJECTED_PTR) {
-
-			deprecate_dhash_iid(NULL, dhash, NULL);
-
-		} else if (dhn == FAILURE_PTR || dhn == UNRESOLVED_PTR) {
-
-		} else if (iid_set_neighIID4x(&viaNeigh->neighIID4x_repos, neighIID4x, dhn->myIID4orig) == FAILURE) {
-
-			dhn = (struct dhash_node*)FAILURE_PTR;
-			
-		} else {
-			ASSERTION(-502214, (dhn == get_dhash_tree_node(dhash)));
-			assertion(-502167, IMPLIES(is_transmitter, dhn == viaNeigh->dhn));
-			assertion(-502168, IMPLIES(!is_transmitter, dhn != viaNeigh->dhn));
-
-			if (dhn == self->dhn)
-				viaNeigh->neighIID4me = neighIID4x;
-			
-			if (!dhnOld && desc_adv_tx_unsolicited)
-				schedule_best_tp_links(viaNeigh, FRAME_TYPE_DESC_ADVS, dhn->desc_frame_len, &dhn->dhash, sizeof(DHASH_T));
-
-			if (!dhnOld && dhash_adv_tx_unsolicited)
-				schedule_best_tp_links(NULL, FRAME_TYPE_DHASH_ADV, SCHEDULE_MIN_MSG_SIZE, &dhn->myIID4orig, sizeof(IID_T));
-
-		}
-        }
-
-	dbgf_track(DBGT_INFO, "via dev=%s NB=%s dhash=%8X..  dhn=%s neighIID4x=%d is_transmitter=%d (on)nodeId=%s",
-                pb->i.iif->label_cfg.str, pb->i.llip_str, dhash->h.u32[0],
-                (dhn ? (dhn==FAILURE_PTR?"FAILURE":
-                        (dhn==UNRESOLVED_PTR?"UNRESOLVED":(dhn==REJECTED_PTR?"REJECTED":"RESOLVED"))):"UNKNOWN"),
-                neighIID4x, is_transmitter,
-		((dhn && dhn!=FAILURE_PTR && dhn!=UNRESOLVED_PTR && dhn!=REJECTED_PTR && dhn->on) ?
-			cryptShaAsString(&dhn->on->nodeId) : DBG_NIL));
-
-
-
-	if (dhn == FAILURE_PTR)
+	if (process_dhash(__FUNCTION__, it, dhash, (ogmIid && neighIID4x > IID_RSVD_MAX) ? neighIID4x : IID_RSVD_UNUSED) == FAILURE_PTR)
 		return TLV_RX_DATA_FAILURE;
 	else
-		return sizeof (struct msg_dhash_adv);
+		return sizeof(struct msg_dhash_adv);
 }
 
 
@@ -3271,6 +3393,9 @@ int32_t rx_msg_dhash_request(struct rx_frame_iterator *it)
         TRACE_FUNCTION_CALL;
 
 	assertion(-502169, (it->pb->i.verifiedLink));
+
+	if(!ogmIid)
+		return sizeof ( struct msg_dhash_request);
 
         struct packet_buff *pb = it->pb;
         struct hdr_dhash_request *hdr = (struct hdr_dhash_request*) (it->frame_data);
@@ -4659,6 +4784,7 @@ static int32_t ref_status_creator(struct status_handl *handl, void *data)
 }
 
 
+
 int32_t opt_update_dext_method(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
 {
         TRACE_FUNCTION_CALL;
@@ -4774,6 +4900,20 @@ finish:
 	return;
 }
 
+
+int32_t opt_ogm_iid(uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn)
+{
+        TRACE_FUNCTION_CALL;
+
+	if ( cmd == OPT_APPLY ) {
+		purge_link_route_orig_nodes(NULL, NO, self);
+		schedule_or_purge_ogm_aggregations(YES /*purge_all*/);
+	}
+
+	return SUCCESS;
+}
+
+
 STATIC_FUNC
 struct opt_type msg_options[]=
 {
@@ -4805,6 +4945,9 @@ struct opt_type msg_options[]=
 	{ODI,0,ARG_VRT_DESC_SIZE_IN,       0,  9,0,A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,      &vrt_desc_size_in,MIN_VRT_DESC_SIZE,MAX_VRT_DESC_SIZE,DEF_VRT_DESC_SIZE,0,    opt_update_dext_method,
 			ARG_VALUE_FORM, HLP_VRT_DESC_SIZE_IN},
 
+        {ODI, 0, ARG_OGM_IID,              0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &ogmIid,           MIN_OGM_IID,  MAX_OGM_IID, DEF_OGM_IID,0,  opt_ogm_iid,
+			ARG_VALUE_FORM,	"enable/disable usage of IID-based OGMs"}
+        ,
         {ODI, 0, ARG_OGM_SQN_RANGE,        0,  9,0, A_PS1, A_ADM, A_DYI, A_CFA, A_ANY, &ogmSqnRange,    MIN_OGM_SQN_RANGE,  MAX_OGM_SQN_RANGE, DEF_OGM_SQN_RANGE,0,  0,
 			ARG_VALUE_FORM,	"set average OGM sequence number range (affects frequency of bmx6 description updates)"}
         ,
@@ -5076,14 +5219,21 @@ void init_msg( void )
         handl.rx_frame_handler = rx_frame_rp_adv;
         register_frame_handler(packet_frame_db, FRAME_TYPE_RP_ADV, &handl);
 
-
-        handl.name = "OGM_ADV";
-        handl.data_header_size = sizeof (struct hdr_ogm_adv);
-        handl.min_msg_size = sizeof (struct msg_ogm_adv);
+        handl.name = "OGM_DHASH_ADV";
+        handl.data_header_size = sizeof (struct hdr_ogm_dhash_adv);
+        handl.min_msg_size = sizeof (struct msg_ogm_dhash_adv);
         handl.fixed_msg_size = 0;
-        handl.tx_frame_handler = tx_frame_ogm_advs;
-        handl.rx_frame_handler = rx_frame_ogm_advs;
-        register_frame_handler(packet_frame_db, FRAME_TYPE_OGM_ADV, &handl);
+        handl.tx_frame_handler = tx_frame_ogm_dhash_advs;
+        handl.rx_frame_handler = rx_frame_ogm_dhash_advs;
+        register_frame_handler(packet_frame_db, FRAME_TYPE_OGM_DHASH_ADV, &handl);
+
+        handl.name = "OGM_IID_ADV";
+        handl.data_header_size = sizeof (struct hdr_ogm_iid_adv);
+        handl.min_msg_size = sizeof (struct msg_ogm_iid_adv);
+        handl.fixed_msg_size = 0;
+        handl.tx_frame_handler = tx_frame_ogm_iid_advs;
+        handl.rx_frame_handler = rx_frame_ogm_iid_advs;
+        register_frame_handler(packet_frame_db, FRAME_TYPE_OGM_IID_ADV, &handl);
 
         handl.name = "OGM_ACK";
         handl.tx_iterations = &ogm_ack_tx_iters;

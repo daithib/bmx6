@@ -825,7 +825,6 @@ struct link_status {
         HELLO_SQN_T lastHelloSqn;
         TIME_T lastHelloAdv;
 
-        IID_T nbIid4Me;
         uint8_t myLinkId;
         uint8_t neighLinkId;
         DEVADV_SQN_T devAdvSqn;
@@ -853,7 +852,6 @@ static const struct field_format link_status_format[] = {
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, lastHelloSqn,     1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, lastHelloAdv,     1, FIELD_RELEVANCE_MEDI),
 
-        FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, nbIid4Me,         1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, myLinkId,         1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, neighLinkId,      1, FIELD_RELEVANCE_MEDI),
         FIELD_FORMAT_INIT(FIELD_TYPE_UINT,              link_status, devAdvSqn,        1, FIELD_RELEVANCE_MEDI),
@@ -902,7 +900,6 @@ static int32_t link_status_creator(struct status_handl *handl, void *data)
                                 status[i].lastHelloSqn = linkDev->hello_sqn_max;
                                 status[i].lastHelloAdv = ((TIME_T) (bmx_time - linkDev->hello_time_max)) / 1000;
 
-                                status[i].nbIid4Me = local->neighIID4me;
                                 status[i].myLinkId = local->myLinkId;
                                 status[i].neighLinkId = local->neighLinkId;
                                 status[i].devAdvSqn = local->dev_adv_sqn;
