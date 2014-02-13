@@ -2919,6 +2919,7 @@ int32_t process_ogm_hdr(struct rx_frame_iterator *it, struct neigh_node *local, 
 	LINKADV_SQN_T link_sqn = local->packet_link_sqn_ref;
 
 	AGGREG_SQN_T TODO_change_AGGREG_SQN_T_to_uint16_t;
+	
 	AGGREG_SQN_T aggregation_sqn = isIIdOgm ?
 		((struct hdr_ogm_iid_adv *) it->frame_data)->aggregation_sqn :
 		((struct hdr_ogm_dhash_adv *) it->frame_data)->aggregation_sqn;
@@ -2980,11 +2981,12 @@ int32_t process_ogm_hdr(struct rx_frame_iterator *it, struct neigh_node *local, 
 		local->ogm_new_aggregation_rcvd = bmx_time;
 
 		bit_set(local->ogm_aggregations_rcvd, AGGREG_SQN_CACHE_RANGE, aggregation_sqn, 1);
+
 	} else {
 
 		if (bit_get(local->ogm_aggregations_rcvd, AGGREG_SQN_CACHE_RANGE, aggregation_sqn)) {
 
-			dbgf_all(DBGT_INFO, "neigh: id=%s via dev=%s with OLD, already KNOWN ogm_aggregation_sqn=%d",
+			dbgf_track(DBGT_INFO, "neigh: id=%s via dev=%s with OLD, already KNOWN ogm_aggregation_sqn=%d",
 				cryptShaAsString(&local->dhn->on->nodeId), it->pb->i.iif->label_cfg.str, aggregation_sqn);
 
 			return it->frame_msgs_length;
@@ -3142,7 +3144,7 @@ int32_t rx_frame_ogm_dhash_advs(struct rx_frame_iterator *it)
 	IDM_T only_process_sender_and_refresh_all = !local->orig_routes;
 	uint16_t msgs = (it->frame_msgs_length - ogm_dst_field_size) / it->handl->min_msg_size;
 
-	DHASH_T *transmittersIID = &(((struct hdr_ogm_dhash_adv *) it->frame_data)->transmittersDhash);
+	DHASH_T *transmittersDhash = &(((struct hdr_ogm_dhash_adv *) it->frame_data)->transmittersDhash);
 	uint16_t m;
 
 	for (m = 0; m < msgs; m++) {
@@ -3150,7 +3152,7 @@ int32_t rx_frame_ogm_dhash_advs(struct rx_frame_iterator *it)
 		struct dhash_node *dhn;
 		struct msg_ogm_dhash_adv *ogm = &(((struct msg_ogm_dhash_adv*) (it->msg + ogm_dst_field_size))[m]);
 
-		if (only_process_sender_and_refresh_all && !cryptShasEqual(&ogm->dhash, transmittersIID))
+		if (only_process_sender_and_refresh_all && !cryptShasEqual(&ogm->dhash, transmittersDhash))
 			continue;
 
 		if ((dhn = process_dhash(NULL, it, &ogm->dhash, IID_RSVD_UNUSED)) &&
@@ -3180,8 +3182,10 @@ int32_t rx_frame_ogm_iid_advs(struct rx_frame_iterator *it)
 	struct neigh_node *local = pb->i.verifiedLink->k.linkDev->local;
 	uint16_t ogm_dst_field_size = ((struct hdr_ogm_iid_adv *) it->frame_data)->ogm_dst_field_size;
 
-	if ((ret = process_ogm_hdr(it, local, ogm_dst_field_size)))
+	if ((ret = process_ogm_hdr(it, local, ogm_dst_field_size))) {
+		dbgf_track(DBGT_WARN, "f1")
 		return ret;
+	}
 
 	IDM_T only_process_sender_and_refresh_all = !local->orig_routes;
 	uint16_t msgs = (it->frame_msgs_length - ogm_dst_field_size) / it->handl->min_msg_size;
@@ -3220,8 +3224,10 @@ int32_t rx_frame_ogm_iid_advs(struct rx_frame_iterator *it)
 
 		if (on) {
 
-			if ((ret = process_ogm_msg(it, local, on, ogm.u.o.sqn, ogm.u.o.mtcExponent, ogm.u.o.mtcMantissa)))
+			if ((ret = process_ogm_msg(it, local, on, ogm.u.o.sqn, ogm.u.o.mtcExponent, ogm.u.o.mtcMantissa))) {
+				dbgf_track(DBGT_WARN, "f2")
 				return ret;
+			}
 
 		} else {
 
@@ -3898,9 +3904,14 @@ int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 
 		int32_t avail_cache_space_theoretical = (avail_frames_space/sizeof(struct desc_msg_rhash)) * REF_FRAME_BODY_SIZE_OUT;
 
+		assertion(-500000, (avail_cache_space_theoretical >= 0));
+		assertion(-500000, (it->frame_cache_size >= used_cache_space));
+
 		int32_t avail_cache_space_practical = XMIN(it->frame_cache_size - used_cache_space, avail_cache_space_theoretical);
 
 		int32_t avail_vrt_desc_space = vrt_desc_size_out - (it->dext->dlen + sizeof(struct tlv_hdr_virtual) + handl->data_header_size);
+
+		assertion(-500000, (avail_vrt_desc_space >= 0));
 
 		return XMIN(avail_cache_space_practical, avail_vrt_desc_space);
 
@@ -3914,6 +3925,8 @@ int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max)
 			it->frame_cache_msgs_size );
 
 		int32_t cache_space = it->frame_cache_size - it->frame_cache_msgs_size;
+
+		assertion(-500000, (cache_space >= 0));
 
 		return XMIN(frame_space, cache_space);
 	}
