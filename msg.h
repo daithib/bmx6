@@ -698,10 +698,10 @@ struct msg_ogm_dhash_adv {
 } __attribute__((packed));
 
 struct hdr_ogm_dhash_adv {
-	AGGREG_SQN_T aggregation_sqn;
-        DHASH_T transmittersDhash;
-	uint8_t ogm_dst_field_size;
-	struct msg_ogm_dhash_adv msg[];
+    DHASH_T transmittersDhash;
+    AGGREG_SQN_T aggregation_sqn;
+    uint8_t ogm_dst_field_size;
+    struct msg_ogm_dhash_adv msg[];
 } __attribute__((packed));
 
 
@@ -743,11 +743,10 @@ struct msg_ogm_iid_adv // 4 bytes
 
 
 struct hdr_ogm_iid_adv { // 2 bytes
-	AGGREG_SQN_T aggregation_sqn;
-        IID_T transmittersIID;
-	uint8_t ogm_dst_field_size;
-
-	struct msg_ogm_iid_adv msg[];
+    IID_T transmittersIID;
+    AGGREG_SQN_T aggregation_sqn;
+    uint8_t ogm_dst_field_size;
+    struct msg_ogm_iid_adv msg[];
 } __attribute__((packed));
 
 /*
