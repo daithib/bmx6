@@ -2796,13 +2796,6 @@ int32_t tx_frame_ogm_dhash_advs(struct tx_frame_iterator *it)
 		assertion(-500429, (ttn->frame_msgs_length == msgs_length + oan->ogm_dest_bytes));
 		assertion(-501144, (((int) ttn->frame_msgs_length) <= tx_iterator_cache_data_space_max(it)));
 
-		hdr->aggregation_sqn = sqn;
-		hdr->transmittersDhash = self->dhn->dhash;
-		hdr->ogm_dst_field_size = oan->ogm_dest_bytes;
-
-		if (oan->ogm_dest_bytes)
-			memcpy(hdr->msg, oan->ogm_dest_field, oan->ogm_dest_bytes);
-
 		struct msg_ogm_dhash_adv *msg = (struct msg_ogm_dhash_adv *)(((uint8_t*)(hdr->msg)) + oan->ogm_dest_bytes);
 
 		uint16_t i=0, m=0;
@@ -2831,7 +2824,21 @@ int32_t tx_frame_ogm_dhash_advs(struct tx_frame_iterator *it)
 
 		assertion(-500000, (oan->ogm_msgs >= m));
 
-		return ((m * sizeof(struct msg_ogm_dhash_adv)) + oan->ogm_dest_bytes);
+		if (m) {
+
+			hdr->aggregation_sqn = sqn;
+			hdr->transmittersDhash = self->dhn->dhash;
+			hdr->ogm_dst_field_size = oan->ogm_dest_bytes;
+
+			if (oan->ogm_dest_bytes)
+				memcpy(hdr->msg, oan->ogm_dest_field, oan->ogm_dest_bytes);
+
+			return ((m * sizeof(struct msg_ogm_dhash_adv)) + oan->ogm_dest_bytes);
+
+		} else {
+			ttn->tx_iterations = 0;
+			return TLV_TX_DATA_DONE;
+		}
 	}
 
 	// this happens when the to-be-send ogm aggregation has already been purged...
