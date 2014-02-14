@@ -782,13 +782,13 @@ void create_ogm_aggregation(void)
 {
         TRACE_FUNCTION_CALL;
         uint32_t target_ogms = ogmIid ?
-		XMIN(OGMS_IID_PER_AGGREG_MAX, ((ogm_aggreg_pending < ((OGMS_IID_PER_AGGREG_PREF / 3)*4)) ? ogm_aggreg_pending : OGMS_IID_PER_AGGREG_PREF)) :
-		XMIN(OGMS_DHASH_PER_AGGREG_MAX, ((ogm_aggreg_pending < ((OGMS_DHASH_PER_AGGREG_PREF / 3)*4)) ? ogm_aggreg_pending : OGMS_DHASH_PER_AGGREG_PREF));
+		((ogm_aggreg_pending <= OGMS_IID_PER_AGGREG_MAX) ? ogm_aggreg_pending : OGMS_IID_PER_AGGREG_PREF) :
+		((ogm_aggreg_pending <= OGMS_DHASH_PER_AGGREG_MAX) ? ogm_aggreg_pending : OGMS_DHASH_PER_AGGREG_PREF);
 
-        struct msg_ogm_iid_adv* msgs =
-                debugMalloc((target_ogms + OGM_JUMPS_PER_AGGREGATION) * sizeof (struct msg_ogm_iid_adv), -300177);
+	struct msg_ogm_iid_adv* msgs =
+		 debugMalloc((target_ogms + OGM_JUMPS_PER_AGGREGATION) * sizeof(struct msg_ogm_iid_adv), -300177);
 
-        IID_T curr_iid;
+	IID_T curr_iid;
         IID_T ogm_iid = 0;
         IID_T ogm_iid_jumps = 0;
         uint16_t ogm_msg = 0;
@@ -2794,7 +2794,7 @@ int32_t tx_frame_ogm_dhash_advs(struct tx_frame_iterator *it)
 		assertion(-501143, (oan->ogm_dest_bytes <= (OGM_DEST_ARRAY_BIT_SIZE / 8)));
 		assertion(-500859, (hdr->msg == ((struct msg_ogm_dhash_adv*) tx_iterator_cache_msg_ptr(it))));
 		assertion(-500429, (ttn->frame_msgs_length == msgs_length + oan->ogm_dest_bytes));
-		assertion(-501144, (((int) ttn->frame_msgs_length) <= tx_iterator_cache_data_space_pref(it)));
+		assertion(-501144, (((int) ttn->frame_msgs_length) <= tx_iterator_cache_data_space_max(it)));
 
 		hdr->aggregation_sqn = sqn;
 		hdr->transmittersDhash = self->dhn->dhash;
@@ -2866,7 +2866,7 @@ int32_t tx_frame_ogm_iid_advs(struct tx_frame_iterator *it)
 		assertion(-501143, (oan->ogm_dest_bytes <= (OGM_DEST_ARRAY_BIT_SIZE / 8)));
 		assertion(-500859, (hdr->msg == ((struct msg_ogm_iid_adv*) tx_iterator_cache_msg_ptr(it))));
 		assertion(-500429, (ttn->frame_msgs_length == msgs_length + oan->ogm_dest_bytes));
-		assertion(-501144, (((int) ttn->frame_msgs_length) <= tx_iterator_cache_data_space_pref(it)));
+		assertion(-501144, (((int) ttn->frame_msgs_length) <= tx_iterator_cache_data_space_max(it)));
 
 		hdr->aggregation_sqn = sqn;
 		hdr->transmittersIID = htons(myIID4me);
@@ -4169,7 +4169,7 @@ int32_t tx_tlv_msg(struct tx_frame_iterator *in)
 	uint8_t cache_data_array[PKT_FRAMES_SIZE_MAX - sizeof(struct tlv_hdr)] = {0};
 
 	struct tx_frame_iterator out = {
-		.caller = in->caller, .ttn = in->ttn, .dext = in->dext, .db = in->handl->next_db,
+		.caller = in->caller, .ttn = in->ttn, .dext = in->dext, .db = in->handl->next_db, .prev_type = -1,
 		.frames_out_ptr = (in->frame_cache_array + in->frame_cache_msgs_size),
 		.frames_out_pref = tx_iterator_cache_data_space_pref(in),
 		.frames_out_max =  tx_iterator_cache_data_space_max(in),
@@ -4287,10 +4287,10 @@ void tx_packet(void *devp)
         memset(&pb.i, 0, sizeof (pb.i));
 
         struct tx_frame_iterator it = {
-                .caller = __FUNCTION__, .db = packet_frame_db,
+                .caller = __FUNCTION__, .db = packet_frame_db, .prev_type = -1,
                 .frames_out_ptr = (pb.p.data + sizeof (struct packet_header)),
                 .frames_out_max =  PKT_FRAMES_SIZE_MAX,
-                .frames_out_pref = PKT_FRAMES_SIZE_OUT,
+                .frames_out_pref = PKT_FRAMES_SIZE_PREF,
                 .frame_cache_array = cache_data_array,
 		.frame_cache_size = sizeof(cache_data_array),
         };
@@ -4335,7 +4335,7 @@ void tx_packet(void *devp)
                         it.ttn = list_entry(lpos, struct tx_task_node, list);
                         item++;
 
-                        dbgf_all(DBGT_INFO, "%s type=%d =%s", dev->label_cfg.str, it.frame_type, handl->name);
+                        dbgf_all(DBGT_INFO, "%s db=%s type=%d=%s", dev->label_cfg.str, it.db->name, it.frame_type, handl->name);
 
                         assertion(-500440, (it.ttn->task.type == it.frame_type));
 
@@ -4377,9 +4377,10 @@ void tx_packet(void *devp)
                                         tlv_tx_result_str(fit_result), tlv_tx_result_str(result), it.frame_type);
                         }
 
-                        dbgf_track(DBGT_INFO, "%s type=%d =%s considered=%d iterations=%d tlv_result=%s item=%d/%d",
-                                dev->label_cfg.str, it.frame_type, handl->name, it.ttn->considered_ts,
-                                it.ttn->tx_iterations, tlv_tx_result_str(result), item, it.tx_task_list->items);
+                        dbgf_track(DBGT_INFO, "%s db=%s type=%d=%s prev=%d out=%d ttn_len=%d sched=%d considered=%d iterations=%d tlv_result=%s item=%d/%d",
+				dev->label_cfg.str, it.db->name, it.frame_type, handl->name, last_send_frame_type,
+				it.frames_out_pos, it.ttn->frame_msgs_length, tx_iterator_cache_data_space_sched(&it),
+				it.ttn->considered_ts, it.ttn->tx_iterations, tlv_tx_result_str(result), item, it.tx_task_list->items);
 
                         if (result == TLV_TX_DATA_DONE) {
 
@@ -4414,6 +4415,7 @@ void tx_packet(void *devp)
 
                         } else if (result == TLV_TX_DATA_FULL) {
                                 // means not created because would not fit!
+                                assertion(-500000, (last_send_frame_type != FRAME_TYPE_LINK_VERSION));
                                 assertion(-500430, (it.frame_cache_msgs_size || it.frames_out_pos)); // single message larger than MAX_UDPD_SIZE
                                 break;
 
@@ -4425,7 +4427,9 @@ void tx_packet(void *devp)
                 }
 		}
 
-                if (it.frames_out_pos > prev_frames_out_pos) {
+
+		if (it.frames_out_pos > prev_frames_out_pos) {
+			it.prev_type = it.frame_type;
 			last_send_frame_type = it.frame_type;
                         dbgf_all(DBGT_INFO, "prepared frame_type=%s frame_size=%d frames_out_pos=%d",
                                 handl->name, (it.frames_out_pos - prev_frames_out_pos), it.frames_out_pos);
@@ -4445,8 +4449,10 @@ void tx_packet(void *devp)
 				struct packet_header *phdr = (struct packet_header *) pb.p.data;
 
 				assertion(-501338, (it.frames_out_pos && it.frames_out_num));
-				assertion(-501339, IMPLIES(it.frames_out_num > 1, it.frames_out_pos <= it.frames_out_pref));
-				assertion(-501340, IMPLIES(it.frames_out_num == 1, it.frames_out_pos <= it.frames_out_max));
+				assertion(-500000, (it.frames_out_pos <= it.frames_out_max));
+				IDM_T TODO_fix_this;
+//				assertion(-501339, IMPLIES(it.frames_out_num > 1, it.frames_out_pos <= it.frames_out_pref));
+//				assertion(-501340, IMPLIES(it.frames_out_num == 1, it.frames_out_pos <= it.frames_out_max));
 
 				pb.i.oif = dev;
 				pb.i.length = (it.frames_out_pos + sizeof( struct packet_header));
@@ -4576,7 +4582,7 @@ void update_my_description(void)
 
         // add all tlv options:
         struct tx_frame_iterator tx = {
-                .caller = __FUNCTION__, .db = description_tlv_db,
+                .caller = __FUNCTION__, .db = description_tlv_db, .prev_type = -1,
 		.frames_out_ptr = debugMallocReset(desc_size_out, -300627),
                 .frames_out_max = desc_size_out,
                 .frames_out_pref = desc_size_out,
@@ -5015,6 +5021,9 @@ void init_msg( void )
 {
 	assertion(-501567, (FRAME_TYPE_MASK >= FRAME_TYPE_MAX_KNOWN));
 	assertion(-501568, (FRAME_TYPE_MASK >= BMX_DSC_TLV_MAX_KNOWN));
+
+	assertion(-500000, (OGMS_IID_PER_AGGREG_PREF <= OGMS_IID_PER_AGGREG_MAX));
+	assertion(-500000, (OGMS_DHASH_PER_AGGREG_PREF <= OGMS_DHASH_PER_AGGREG_MAX));
 
         assertion(-500998, (sizeof(struct tlv_hdr) == 2));
 

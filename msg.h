@@ -40,8 +40,15 @@
 #define DEF_UDPD_SIZE (BIG_UDPD_SIZE / 2)
 #define MAX_UDPD_SIZE 1400
 
-#define     PKT_FRAMES_SIZE_OUT     (pref_udpd_size - sizeof(struct packet_header))
-#define     PKT_FRAMES_SIZE_MAX     ( MAX_UDPD_SIZE - sizeof(struct packet_header))
+#define PKT_FRAMES_SIZE_PREF     (pref_udpd_size - sizeof(struct packet_header))
+#define PKT_FRAMES_SIZE_MAX     ( MAX_UDPD_SIZE - sizeof(struct packet_header))
+
+#define FRM_SIGN_VERS_SIZE_MIN ( sizeof(struct tlv_hdr) + sizeof(struct frame_msg_signature) + \
+                                      sizeof(struct tlv_hdr) + sizeof(struct msg_link_version_adv) )
+#define FRM_SIGN_VERS_SIZE_MAX (FRM_SIGN_VERS_SIZE_MIN  + (MAX_PACKET_SIGN/8))
+
+#define SIGNED_FRAMES_SIZE_PREF (PKT_FRAMES_SIZE_PREF - FRM_SIGN_VERS_SIZE_MAX)
+#define SIGNED_FRAMES_SIZE_MAX (PKT_FRAMES_SIZE_MAX - FRM_SIGN_VERS_SIZE_MAX)
 
 #define ARG_DESC_FRAME_SIZE         "descSizeOut"
 #define HLP_DESC_FRAME_SIZE         "set maximum size for own description and references"
@@ -668,22 +675,31 @@ FIELD_FORMAT_END }
 
 #define OGM_JUMPS_PER_AGGREGATION 10
 
-#define OGMS_IID_PER_AGGREG_MAX  (PKT_FRAMES_SIZE_OUT - \
-                              (sizeof(struct tlv_hdr) + \
+#define OGMS_IID_PER_AGGREG_MAX  (SIGNED_FRAMES_SIZE_MAX - (\
+                              sizeof(struct tlv_hdr) + \
                               sizeof (struct hdr_ogm_iid_adv)  + \
                               (OGM_DEST_ARRAY_BIT_SIZE / 8) + \
                               (OGM_JUMPS_PER_AGGREGATION * sizeof(struct msg_ogm_iid_adv)))) \
                               / sizeof(struct msg_ogm_iid_adv)
 
-#define OGMS_IID_PER_AGGREG_PREF ( (OGMS_IID_PER_AGGREG_MAX * 2)  / 3 )
+#define OGMS_IID_PER_AGGREG_PREF (SIGNED_FRAMES_SIZE_PREF - (\
+                              sizeof(struct tlv_hdr) + \
+                              sizeof (struct hdr_ogm_iid_adv)  + \
+                              (OGM_DEST_ARRAY_BIT_SIZE / 8) + \
+                              (OGM_JUMPS_PER_AGGREGATION * sizeof(struct msg_ogm_iid_adv)))) \
+                              / sizeof(struct msg_ogm_iid_adv)
 
-#define OGMS_DHASH_PER_AGGREG_MAX  (PKT_FRAMES_SIZE_OUT - \
-                              (sizeof(struct tlv_hdr) + \
+#define OGMS_DHASH_PER_AGGREG_MAX  (SIGNED_FRAMES_SIZE_MAX - (\
+                              sizeof(struct tlv_hdr) + \
                               sizeof (struct hdr_ogm_dhash_adv)  + \
                               (OGM_DEST_ARRAY_BIT_SIZE / 8))) \
                               / sizeof(struct msg_ogm_dhash_adv)
 
-#define OGMS_DHASH_PER_AGGREG_PREF ( (OGMS_DHASH_PER_AGGREG_MAX *2) / 3 )
+#define OGMS_DHASH_PER_AGGREG_PREF (SIGNED_FRAMES_SIZE_PREF - (\
+                              sizeof(struct tlv_hdr) + \
+                              sizeof (struct hdr_ogm_dhash_adv)  + \
+                              (OGM_DEST_ARRAY_BIT_SIZE / 8))) \
+                              / sizeof(struct msg_ogm_dhash_adv)
 
 
 
@@ -851,6 +867,7 @@ struct tx_frame_iterator {
 
         // updated by tx_frame_iterate() caller():
 	uint8_t              frame_type;
+	int8_t              prev_type;
 
 	// updated by tx_frame_iterate():
         struct frame_handl  *handl;
@@ -897,35 +914,6 @@ struct frame_db {
     struct frame_handl handls[];
 };
 
-static inline uint8_t * tx_iterator_cache_hdr_ptr(struct tx_frame_iterator *it)
-{
-	return it->frame_cache_array;
-}
-
-static inline uint8_t * tx_iterator_cache_msg_ptr(struct tx_frame_iterator *it)
-{
-	return it->frame_cache_array + it->db->handls[it->frame_type].data_header_size + it->frame_cache_msgs_size;
-}
-
-int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max);
-
-#define tx_iterator_cache_data_space_max( it )  _tx_iterator_cache_data_space(it, 1)
-#define tx_iterator_cache_data_space_pref( it ) _tx_iterator_cache_data_space(it, 0)
-
-static inline int32_t tx_iterator_cache_data_space_sched(struct tx_frame_iterator *it)
-{
-    return (!it->frames_out_pos && !it->frame_cache_msgs_size) ?
-	tx_iterator_cache_data_space_max(it) : tx_iterator_cache_data_space_pref(it);
-}
-
-static inline int32_t tx_iterator_cache_msg_space_pref(struct tx_frame_iterator *it)
-{
-        if (it->db->handls[it->frame_type].min_msg_size && it->db->handls[it->frame_type].fixed_msg_size)
-                return tx_iterator_cache_data_space_pref(it) / it->db->handls[it->frame_type].min_msg_size;
-        else
-                return 0;
-}
-
 
 
 extern const int32_t always_fref;
@@ -947,6 +935,38 @@ extern struct frame_db *packet_desc_db;
 extern struct frame_db *description_tlv_db;
 
 extern int32_t processDescriptionsViaUnverifiedLink;
+
+
+static inline uint8_t * tx_iterator_cache_hdr_ptr(struct tx_frame_iterator *it)
+{
+	return it->frame_cache_array;
+}
+
+static inline uint8_t * tx_iterator_cache_msg_ptr(struct tx_frame_iterator *it)
+{
+	return it->frame_cache_array + it->db->handls[it->frame_type].data_header_size + it->frame_cache_msgs_size;
+}
+
+int32_t _tx_iterator_cache_data_space(struct tx_frame_iterator *it, IDM_T max);
+
+#define tx_iterator_cache_data_space_max( it )  _tx_iterator_cache_data_space(it, 1)
+#define tx_iterator_cache_data_space_pref( it ) _tx_iterator_cache_data_space(it, 0)
+
+static inline int32_t tx_iterator_cache_data_space_sched(struct tx_frame_iterator *it)
+{
+    return ((!it->frames_out_pos && !it->frame_cache_msgs_size) || (it->db == packet_frame_db && it->prev_type == FRAME_TYPE_LINK_VERSION)) ?
+	tx_iterator_cache_data_space_max(it) : tx_iterator_cache_data_space_pref(it);
+}
+
+static inline int32_t tx_iterator_cache_msg_space_pref(struct tx_frame_iterator *it)
+{
+        if (it->db->handls[it->frame_type].min_msg_size && it->db->handls[it->frame_type].fixed_msg_size)
+                return tx_iterator_cache_data_space_pref(it) / it->db->handls[it->frame_type].min_msg_size;
+        else
+                return 0;
+}
+
+
 
 /***********************************************************
   The core frame/message structures and handlers
