@@ -4422,8 +4422,11 @@ void tx_packet(void *devp)
 
                         } else if (result == TLV_TX_DATA_FULL) {
                                 // means not created because would not fit!
-                                assertion(-500000, (last_send_frame_type != FRAME_TYPE_LINK_VERSION));
-                                assertion(-500430, (it.frame_cache_msgs_size || it.frames_out_pos)); // single message larger than MAX_UDPD_SIZE
+				assertion(-500000, (it.frame_type < FRAME_TYPE_SIGNATURE_ADV || it.frame_type > FRAME_TYPE_LINK_VERSION));
+				assertion(-500430, (it.frame_cache_msgs_size || it.frames_out_pos)); // single message larger than MAX_UDPD_SIZE
+				assertion(-500000, IMPLIES(it.frame_type > FRAME_TYPE_LINK_VERSION, it.frame_cache_msgs_size || it.frames_out_pos > (
+					 sizeof(struct tlv_hdr) + sizeof(struct dsc_msg_pubkey) +my_PktKey->rawKeyLen +
+					 sizeof(struct tlv_hdr) + sizeof(struct msg_link_version_adv))));
                                 break;
 
                         } else {
