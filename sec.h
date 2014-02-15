@@ -40,7 +40,7 @@
 #define ARG_DESC_SIGN "descSignLen"
 #define MIN_DESC_SIGN 512
 #define MAX_DESC_SIGN 4096
-#define DEF_DESC_SIGN 3072
+#define DEF_DESC_SIGN 2048
 #define HLP_DESC_SIGN "sign own descriptions with given RSA key length"
 
 
