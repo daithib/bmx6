@@ -1321,7 +1321,8 @@ void ref_node_use(struct desc_extension *dext, struct ref_node *refn, uint8_t f_
 
 	struct dext_tree_node *dtn = avl_find_item(&refn->dext_tree, &dext);
 
-	assertion(-501618, (!(dtn && !bit_get(dtn->rf_types, (sizeof(dtn->rf_types) * 8), f_type))));
+	//can be due to double used references like equal support and trust sets
+	//assertion(-501618, (!(dtn && !bit_get(dtn->rf_types, (sizeof(dtn->rf_types) * 8), f_type))));
 
 	if (!refn->dext_tree.items)
 		ref_tree_items_used++;
