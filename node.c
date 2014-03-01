@@ -570,7 +570,6 @@ void deprecate_dhash_iid( struct dhash_node *dhn, DHASH_T *dhash, GLOBAL_ID_T *g
 
 	assertion( -500000, (!avl_find(&deprecated_dhash_tree, &dhn->dhash)));
         assertion( -500698, (!dhn->on));
-        assertion( -500699, (!dhn->local));
 	assertion( -502088, !avl_find(&dhash_tree, &dhn->dhash));
 
         avl_insert(&deprecated_dhash_tree, dhn, -300168);
@@ -603,7 +602,6 @@ void free_dhash( struct dhash_node *dhn )
                 "dhash %8X myIID4orig %d", dhn->dhash.h.u32[0], dhn->myIID4orig);
 
         assertion(-500961, (!dhn->on));
-        assertion(-500962, (!dhn->local));
 
         avl_remove(&dhash_tree, &dhn->dhash, -300195);
 
@@ -651,17 +649,34 @@ struct dhash_node *get_dhash_tree_node(DHASH_T *dhash) {
 	return dhn;
 }
 
+IDM_T  check_verifiedLinkDhn(struct dhash_node* dhn, struct neigh_node *local) {
+
+	struct orig_node *on = dhn ? dhn->on : NULL;
+
+	assertion(-500000, (on));
+	assertion(-502182, (!is_zero(&on->nodeId, sizeof(GLOBAL_ID_T))));
+	assertion(-500953, (on->dhn == dhn));
+	assertion(-500000, (on->dhn->on == on));
+        assertion(-502190, (on != self));
+        assertion(-502190, (on->dhn != self->dhn));
+
+	assertion(-500000, IMPLIES(local, on->neigh == local));
+
+	assertion(-500953, IMPLIES(on->neigh, on->neigh->on == on));
+	assertion(-502189, IMPLIES(on->neigh, cryptShasEqual(&on->neigh->local_id, &on->nodeId)));
+	assertion(-500000, IMPLIES(on->neigh, on->neigh == avl_find_item(&local_tree, &on->nodeId)));
+	assertion(-500000, IMPLIES(!on->neigh, !avl_find_item(&local_tree, &on->nodeId)));
+
+	return SUCCESS;
+}
+
 void update_orig_dhash(struct orig_node *on, struct dhash_node *dhn)
 {
 	assertion(-502225, (on));
 	assertion(-502226, (dhn));
 
-        struct neigh_node *neigh = NULL;
-
         if (on->dhn) {
-                neigh = on->dhn->local;
 
-                on->dhn->local = NULL;
                 on->dhn->on = NULL;
 
 		avl_remove(&dhash_tree, &on->dhn->dhash, -300195);
@@ -677,11 +692,6 @@ void update_orig_dhash(struct orig_node *on, struct dhash_node *dhn)
         on->updated_timestamp = bmx_time;
 
         dbgf_track(DBGT_INFO, "dhash %8X.. myIID4orig %d", dhn->dhash.h.u32[0], dhn->myIID4orig);
-
-        if (neigh) {
-                neigh->dhn = on->dhn;
-                on->dhn->local = neigh;
-        }
 
 	ASSERTION(-502227, (get_dhash_tree_node(&dhn->dhash)));
 }
@@ -830,8 +840,8 @@ void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T on
 
 				iid_purge_repos(&local->neighIID4x_repos);
 
-				local->dhn->local = NULL;
-				local->dhn = NULL;
+				local->on->neigh = NULL;
+				local->on = NULL;
 
 				if (local->pktKey)
 					cryptKeyFree(&local->pktKey);
@@ -931,8 +941,8 @@ void free_orig_node(struct orig_node *on)
         if ( on->dhn ) {
                 on->dhn->on = NULL;
 
-                if (on->dhn->local)
-			purge_local_node(on->dhn->local);
+                if (on->neigh)
+			purge_local_node(on->neigh);
 
                 free_dhash(on->dhn);
         }
@@ -1067,72 +1077,71 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
 {
         TRACE_FUNCTION_CALL;
 
-	assertion(-502181, (verifiedLinkDhn));
+	assertion(-502181, (verifiedLinkDhn && verifiedLinkDhn->on));
 
 	if (dev_idx < DEVADV_IDX_MIN)
 		return NULL;
 
 	LOCAL_ID_T *local_id = &verifiedLinkDhn->on->nodeId;
-        struct neigh_node *local = avl_find_item(&local_tree, local_id);
+        struct neigh_node *local = verifiedLinkDhn->on->neigh;
 
-	dbgf_all(DBGT_INFO, "NB=%s local_id=%s dev_idx=0x%X", ip6AsStr(llip), cryptShaAsString(local_id), dev_idx);
+	dbgf_all(DBGT_INFO, "llip=%s local_id=%s dev_idx=0x%X local=%s", ip6AsStr(llip), cryptShaAsString(local_id), dev_idx, local?"yes":"no");
 
-	assertion(-502182, (local_id && !is_zero(local_id, sizeof(LOCAL_ID_T))));
+	assertion(-500000, (check_verifiedLinkDhn(verifiedLinkDhn, local) == SUCCESS));
 
+	if (local) {
 
+		if ((((LINKADV_SQN_T) (link_sqn - local->packet_link_sqn_ref)) > LINKADV_SQN_DAD_RANGE)) {
 
-        if (local) {
-		assertion(-502183, IMPLIES(verifiedLinkDhn->local, verifiedLinkDhn->local == local));
-		assertion(-502184, (cryptShasEqual(&local->local_id, &verifiedLinkDhn->on->nodeId)));
-		assertion(-500517, (verifiedLinkDhn != self->dhn));
-		assertion(-500390, (verifiedLinkDhn && verifiedLinkDhn->on && verifiedLinkDhn->on->dhn == verifiedLinkDhn));
+			dbgf_sys(DBGT_ERR, "DAD-Alert NB=%s local_id=%s dev=%s link_sqn=%d link_sqn_max=%d dad_range=%d dad_to=%d",
+				 ip6AsStr(llip), cryptShaAsString(local_id), iif->label_cfg.str, link_sqn, local->packet_link_sqn_ref,
+				 LINKADV_SQN_DAD_RANGE, LINKADV_SQN_DAD_RANGE * my_tx_interval);
 
-                if ((((LINKADV_SQN_T) (link_sqn - local->packet_link_sqn_ref)) > LINKADV_SQN_DAD_RANGE)) {
+			purge_local_node(local);
 
-                        dbgf_sys(DBGT_ERR, "DAD-Alert NB=%s local_id=%s dev=%s link_sqn=%d link_sqn_max=%d dad_range=%d dad_to=%d",
-                                ip6AsStr(llip), cryptShaAsString(local_id), iif->label_cfg.str, link_sqn, local->packet_link_sqn_ref,
-                                LINKADV_SQN_DAD_RANGE, LINKADV_SQN_DAD_RANGE * my_tx_interval);
+			assertion(-500984, (!avl_find_item(&local_tree, local_id)));
 
-                        purge_local_node(local);
+			local = NULL;
 
-                        assertion(-500984, (!avl_find_item(&local_tree, local_id)));
-
-                        local = NULL;
-                }
-        }
+			assertion(-500000, (check_verifiedLinkDhn(verifiedLinkDhn, local) == SUCCESS));
+		}
+	}
 
 	LinkDevKey linkDevKey = {.local_id = *local_id, .dev_idx = dev_idx};
-	
 	LinkDevNode *linkDev = NULL;
 
-        if (local) {
+	if (local) {
 
-                linkDev = avl_find_item(&local->linkDev_tree, &dev_idx);
+		linkDev = avl_find_item(&local->linkDev_tree, &dev_idx);
 
-                assertion(-500943, (linkDev == avl_find_item(&link_dev_tree, &linkDevKey)));
+		assertion(-500943, (linkDev == avl_find_item(&link_dev_tree, &linkDevKey)));
 
-                if (linkDev && !is_ip_equal(llip, &linkDev->link_ip)) {
+		if (linkDev && !is_ip_equal(llip, &linkDev->link_ip)) {
 
-                        dbgf_sys(DBGT_WARN, "Reinitialized! NB=%s via dev=%s "
-                                "cached llIP=%s local_id=%s dev_idx=0x%X ! Reinitializing link_node...",
-                                ip6AsStr(llip), iif->label_cfg.str, ip6AsStr( &linkDev->link_ip),
-                                cryptShaAsString(local_id), dev_idx);
+			dbgf_sys(DBGT_WARN, "Reinitialized! NB=%s via dev=%s "
+				 "cached llIP=%s local_id=%s dev_idx=0x%X ! Reinitializing link_node...",
+				 ip6AsStr(llip), iif->label_cfg.str, ip6AsStr(&linkDev->link_ip),
+				 cryptShaAsString(local_id), dev_idx);
 
-                        purge_linkDevs(&linkDev->key, NULL, NO);
-                        ASSERTION(-500213, !avl_find(&link_dev_tree, &linkDevKey));
-                        linkDev = NULL;
+			purge_linkDevs(&linkDev->key, NULL, NO);
+			ASSERTION(-500213, !avl_find(&link_dev_tree, &linkDevKey));
+			linkDev = NULL;
 			local = avl_find_item(&local_tree, local_id);
-                }
+
+			assertion(-500000, (check_verifiedLinkDhn(verifiedLinkDhn, local) == SUCCESS));
+		}
 	}
 
 	if (!local) {
 
-                if (local_tree.items >= LOCALS_MAX) {
+		if (local_tree.items >= LOCALS_MAX) {
                         dbgf_sys(DBGT_WARN, "max number of locals reached");
                         return NULL;
-                }
+		}
 
-                assertion(-500944, (!avl_find_item(&link_dev_tree, &linkDevKey)));
+		assertion(-502185, (!verifiedLinkDhn->on->neigh));
+		assertion(-500944, (!avl_find_item(&link_dev_tree, &linkDevKey)));
+
                 local = debugMallocReset(sizeof(struct neigh_node), -300336);
                 AVL_INIT_TREE(local->linkDev_tree, LinkDevNode, key.dev_idx);
                 local->local_id = *local_id;
@@ -1141,9 +1150,8 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
 		local->internalNeighId = allocate_internalNeighId(local);
                 avl_insert(&local_tree, local, -300337);
 
-		assertion(-502185, (!verifiedLinkDhn->local));
-		local->dhn = verifiedLinkDhn;
-		verifiedLinkDhn->local = local;
+		local->on = verifiedLinkDhn->on;
+		local->on->neigh = local;
 
 		struct dsc_msg_pubkey *pkey_msg = dext_dptr(verifiedLinkDhn->dext, BMX_DSC_TLV_PKT_PUBKEY);
 
@@ -1151,8 +1159,8 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
 			local->pktKey = cryptPubKeyFromRaw(pkey_msg->key, cryptKeyLenByType(pkey_msg->type));
 
 		assertion(-502186, IMPLIES(pkey_msg, local->pktKey && cryptPubKeyCheck(local->pktKey) == SUCCESS));
-		assertion(-500953, (verifiedLinkDhn->local->dhn == verifiedLinkDhn));
-		assertion(-500949, (local->dhn->local == local));
+
+		assertion(-500000, (check_verifiedLinkDhn(verifiedLinkDhn, local) == SUCCESS));
 	}
 
         local->packet_link_sqn_ref = link_sqn;
@@ -1173,19 +1181,14 @@ LinkDevNode *getLinkDevNode(struct dev_node *iif, IPX_T *llip, LINKADV_SQN_T lin
                 avl_insert(&local->linkDev_tree, linkDev, -300334);
 
                 dbgf_track(DBGT_INFO, "creating new link=%s (total %d)", ip6AsStr(llip), link_dev_tree.items);
-
         }
 
         linkDev->pkt_time_max = bmx_time;
 
-	assertion(-502187, (local));
-	assertion(-502188, (verifiedLinkDhn->local == local));
-	assertion(-502189, (cryptShasEqual(&local->local_id, &verifiedLinkDhn->on->nodeId)));
-        assertion(-502190, (verifiedLinkDhn != self->dhn));
         ASSERTION(-502191, (linkDev == avl_find_item(&local->linkDev_tree, &linkDev->key.dev_idx)));
-        assertion(-502192, (verifiedLinkDhn && verifiedLinkDhn->on && verifiedLinkDhn->on->dhn == verifiedLinkDhn));
-        assertion(-502193, (verifiedLinkDhn->local->dhn == verifiedLinkDhn));
-        assertion(-502194, (local->dhn->local == local));
+	assertion(-502187, (local));
+
+	ASSERTION(-500000, (check_verifiedLinkDhn(verifiedLinkDhn, local) == SUCCESS)); //this was already checked before
 
         return linkDev;
 }

@@ -312,7 +312,7 @@ struct neigh_node {
         
         struct orig_node *on;
         // the old neigh_node:
-	struct dhash_node *dhn; //TODO remove and use on;
+	//struct dhash_node *dhn; //TODO remove and use on;
         CRYPTKEY_T *pktKey;
 
 	struct iid_repos neighIID4x_repos;
@@ -402,7 +402,7 @@ struct orig_node {
 	GLOBAL_ID_T nodeId;
 
 	struct dhash_node *dhn;
-
+	struct neigh_node *neigh;
 	TIME_T updated_timestamp; // last time this on's desc was succesfully updated
 
 	OGM_SQN_T ogmSqn_rangeMin;
@@ -453,7 +453,7 @@ struct dhash_node {
 
 	TIME_T referred_by_me_timestamp; // last time this dhn was referred
 
-        struct neigh_node *local; //TODO: remove and use on!
+//        struct neigh_node *local; //TODO: remove and use on!
 	IID_T myIID4orig;
 
 
@@ -568,6 +568,8 @@ void purge_local_node(struct neigh_node *local);
 void purge_linkDevs(LinkDevKey *onlyLinkDev, struct dev_node *only_dev, IDM_T only_expired);
 
 struct dhash_node *get_dhash_tree_node(DHASH_T *dhash);
+IDM_T  check_verifiedLinkDhn(struct dhash_node* dhn, struct neigh_node *local);
+
 void update_orig_dhash(struct orig_node *on, struct dhash_node *dhn);
 struct dhash_node* create_dext_dhash(uint8_t *desc_frame, uint32_t desc_frame_len, struct desc_extension* dext, DHASH_T *dhash);
 

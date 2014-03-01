@@ -3084,14 +3084,16 @@ int32_t process_ogm_msg(struct rx_frame_iterator *it, struct neigh_node *local, 
 STATIC_FUNC
 struct dhash_node *process_dhash(const char* verbose, struct rx_frame_iterator *it, DHASH_T *dhash, IID_T neighIID4x)
 {
+	assertion(-502166, (it->pb->i.verifiedLink));
+	assertion(-500000, (it->pb->i.verifiedLink->k.linkDev->local->on));
+	assertion(-500000, (it->pb->i.verifiedLink->k.linkDev->local->on->dhn));
+	assertion(-500689, (!cryptShasEqual(&it->pb->i.verifiedLink->k.linkDev->local->on->dhn->dhash, &(self->dhn->dhash)))); // cant be transmitter' and myselfs'
+	assertion(-500000, IMPLIES(neighIID4x > IID_RSVD_MAX, ogmIid));
+
 	struct packet_buff *pb = it->pb;
 	struct neigh_node *viaNeigh = pb->i.verifiedLink->k.linkDev->local;
-	IDM_T is_transmitter = cryptShasEqual(dhash, &viaNeigh->dhn->dhash);
+	IDM_T is_transmitter = cryptShasEqual(dhash, &viaNeigh->on->dhn->dhash);
 	struct dhash_node *dhn = NULL, *dhnOld = NULL;
-
-	assertion(-502166, (it->pb->i.verifiedLink));
-	assertion(-500689, (!cryptShasEqual(&pb->i.verifiedLink->k.linkDev->local->dhn->dhash, &(self->dhn->dhash)))); // cant be transmitter' and myselfs'
-	assertion(-500000, IMPLIES(neighIID4x > IID_RSVD_MAX, ogmIid));
 
 	if (avl_find(&deprecated_dhash_tree, dhash)) {
 
@@ -3111,8 +3113,8 @@ struct dhash_node *process_dhash(const char* verbose, struct rx_frame_iterator *
 
 		} else {
 			ASSERTION(-502214, (dhn == get_dhash_tree_node(dhash)));
-			assertion(-502167, IMPLIES(is_transmitter, dhn == viaNeigh->dhn));
-			assertion(-502168, IMPLIES(!is_transmitter, dhn != viaNeigh->dhn));
+			assertion(-502167, IMPLIES(is_transmitter, dhn == viaNeigh->on->dhn));
+			assertion(-502168, IMPLIES(!is_transmitter, dhn != viaNeigh->on->dhn));
 
 			dhn->referred_by_me_timestamp = bmx_time;
 
@@ -3321,7 +3323,7 @@ int32_t rx_msg_dhash_adv( struct rx_frame_iterator *it)
 
 	dbgf_track(DBGT_INFO, "dhash=%s via NB: %s", cryptShaAsString(dhash), pb->i.llip_str);
 	assertion(-502166, (it->pb->i.verifiedLink));
-	assertion(-500689, (!cryptShasEqual(&pb->i.verifiedLink->k.linkDev->local->dhn->dhash, &(self->dhn->dhash)))); // cant be transmitter' and myselfs'
+	assertion(-500689, (!cryptShasEqual(&pb->i.verifiedLink->k.linkDev->local->on->dhn->dhash, &(self->dhn->dhash)))); // cant be transmitter' and myselfs'
 
 	if (process_dhash(__FUNCTION__, it, dhash, (ogmIid && neighIID4x > IID_RSVD_MAX) ? neighIID4x : IID_RSVD_UNUSED) == FAILURE_PTR)
 		return TLV_RX_DATA_FAILURE;

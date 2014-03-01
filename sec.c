@@ -175,6 +175,7 @@ int process_packet_signature(struct rx_frame_iterator *it)
 
 
 	assertion(-502198, (dhn && dhn == get_dhash_tree_node(&msg->dhash)));
+	assertion(-500000, (check_verifiedLinkDhn(dhn, NULL) == SUCCESS));
 
 	int32_t sign_len = it->frame_data_length - sizeof(struct frame_msg_signature);
 	uint8_t *data = it->frame_data + it->frame_data_length;
@@ -193,9 +194,8 @@ int process_packet_signature(struct rx_frame_iterator *it)
 		goto_error( finish, "3");
 
 
-	if (dhn->local) {
-		
-		pkey = dhn->local->pktKey;
+	if (dhn->on->neigh) {
+		pkey = dhn->on->neigh->pktKey;
 		
 	} else if ((pkey_msg = dext_dptr(dhn->dext, BMX_DSC_TLV_PKT_PUBKEY))) {
 
@@ -237,7 +237,7 @@ finish:{
 		pkey ? cryptKeyTypeAsString(pkey->rawKeyType) : "---", pkey ? memAsHexString(pkey->rawKey, pkey->rawKeyLen) : "---",
 		goto_error_code);
 
-	if (pkey && !(dhn->local && dhn->local->pktKey))
+	if (pkey && !(dhn->on->neigh && dhn->on->neigh->pktKey))
 			cryptKeyFree(&pkey);
 
 	if (!goto_error_code && !dhnOld && dhn) {
@@ -375,22 +375,22 @@ int process_dsc_tlv_pubKey(struct rx_frame_iterator *it)
 			goto_error(finish, "3");
 
 	} else if (it->op == TLV_OP_DEL && it->frame_type == BMX_DSC_TLV_PKT_PUBKEY &&
-		it->onOld && it->onOld->dhn && it->onOld->dhn->local) {
+		it->onOld && it->onOld->dhn && it->onOld->neigh) {
 
-		if (it->onOld->dhn->local->pktKey)
-			cryptKeyFree(&it->onOld->dhn->local->pktKey);
+		if (it->onOld->neigh->pktKey)
+			cryptKeyFree(&it->onOld->neigh->pktKey);
 
 	} else if (it->op == TLV_OP_NEW && it->frame_type == BMX_DSC_TLV_PKT_PUBKEY &&
-		it->onOld && it->onOld->dhn && it->onOld->dhn->local) {
+		it->onOld && it->onOld->dhn && it->onOld->neigh) {
 
-		if (it->onOld->dhn->local->pktKey)
-			cryptKeyFree(&it->onOld->dhn->local->pktKey);
+		if (it->onOld->neigh->pktKey)
+			cryptKeyFree(&it->onOld->neigh->pktKey);
 
 		msg = dext_dptr(it->dhnNew->dext, BMX_DSC_TLV_PKT_PUBKEY);
 		assertion(-502205, (msg));
 
-		it->onOld->dhn->local->pktKey = cryptPubKeyFromRaw(msg->key, cryptKeyLenByType(msg->type));
-		assertion(-502206, (it->onOld->dhn->local->pktKey && cryptPubKeyCheck(it->onOld->dhn->local->pktKey) == SUCCESS));
+		it->onOld->neigh->pktKey = cryptPubKeyFromRaw(msg->key, cryptKeyLenByType(msg->type));
+		assertion(-502206, (it->onOld->neigh->pktKey && cryptPubKeyCheck(it->onOld->neigh->pktKey) == SUCCESS));
 	}
 
 finish: {

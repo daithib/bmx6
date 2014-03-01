@@ -876,7 +876,7 @@ static int32_t link_status_creator(struct status_handl *handl, void *data)
 
         for (local_it = NULL; (local = avl_iterate_item(&local_tree, &local_it));) {
 
-                struct orig_node *on = local->dhn->on;
+                struct orig_node *on = local->on;
 		assertion(-502210, (on));
                 for (linkDev_it = NULL; (linkDev = avl_iterate_item(&local->linkDev_tree, &linkDev_it));) {
 
