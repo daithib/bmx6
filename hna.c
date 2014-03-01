@@ -2193,7 +2193,7 @@ int process_dsc_tlv_tunXin6net(struct rx_frame_iterator *it)
                                         }
 
 					dbgf_track(DBGT_INFO, "%s network=%s bw=%d, found for orig=%s tun6Id=%d",
-						what, netAsStr(&net), adv->bandwidth.val.u8, globalIdAsString(&tok.on->nodeId), tok.tun6Id);
+						what, netAsStr(&net), adv->bandwidth.val.u8, cryptShaAsString(&tok.on->nodeId), tok.tun6Id);
 
 					assertion(-501578, (tnn->tunNetKey.ton->tunOutKey.on == tok.on));
 
