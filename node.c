@@ -216,8 +216,8 @@ IID_NODE_T* iid_get_node_by_neighIID4x(IID_NEIGH_T *nn, IID_T neighIID4x, IDM_T 
         if (!nn || nn->neighIID4x_repos.max_free <= neighIID4x) {
 
                 if (verbose) {
-                        dbgf_all(DBGT_INFO, "NB: global_id=%s neighIID4x=%d to large for neighIID4x_repos",
-                                nn ? cryptShaAsString(&nn->dhn->on->nodeId) : "???", neighIID4x);
+			dbgf_all(DBGT_INFO, "neighIID4x=%d to large for neighIID4x_repos of neigh=%s",
+				 neighIID4x, nn ? cryptShaAsString(&nn->local_id) : "???");
                 }
                 return NULL;
         }
@@ -714,13 +714,12 @@ void purge_orig_router(struct orig_node *onlyOrig, struct neigh_node *onlyNeigh,
                         if (onlyLink && (rt->best_path_link != onlyLink) && (on->curr_rt_link != onlyLink))
                                 continue;
 
-                        dbgf_track(DBGT_INFO, "only_orig=%s only_lndev=%s,%s only_useless=%d purging metric=%ju router=%s (%s)",
+                        dbgf_track(DBGT_INFO, "only_orig=%s only_lndev=%s,%s only_useless=%d purging metric=%ju neigh=%s",
                                 onlyOrig ? cryptShaAsString(&onlyOrig->nodeId) : DBG_NIL,
                                 onlyLink ? ip6AsStr(&onlyLink->k.linkDev->link_ip):DBG_NIL,
                                 onlyLink ? onlyLink->k.myDev->label_cfg.str : DBG_NIL,
                                 only_useless,rt->mr.umetric,
-                                cryptShaAsString(&rt->local_key->local_id),
-                                rt->local_key ? cryptShaAsString(&rt->local_key->dhn->on->nodeId) : "???");
+                                cryptShaAsString(&rt->local_key->local_id));
 
                         if (on->curr_rt_local == rt) {
 

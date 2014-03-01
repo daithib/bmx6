@@ -2994,15 +2994,15 @@ int32_t process_ogm_hdr(struct rx_frame_iterator *it, struct neigh_node *local, 
 
 		if (bit_get(local->ogm_aggregations_rcvd, AGGREG_SQN_CACHE_RANGE, aggregation_sqn)) {
 
-			dbgf_track(DBGT_INFO, "neigh: id=%s via dev=%s with OLD, already KNOWN ogm_aggregation_sqn=%d",
-				cryptShaAsString(&local->dhn->on->nodeId), it->pb->i.iif->label_cfg.str, aggregation_sqn);
+			dbgf_track(DBGT_INFO, "neigh=%s via dev=%s with OLD, already KNOWN ogm_aggregation_sqn=%d",
+				cryptShaAsString(&local->local_id), it->pb->i.iif->label_cfg.str, aggregation_sqn);
 
 			return it->frame_msgs_length;
 
 		} else /*if (((AGGREG_SQN_MASK)& (neigh->ogm_aggregation_cleard_max - aggregation_sqn)) > AGGREG_SQN_CACHE_WARN)*/ {
 
-			dbgf_track(DBGT_WARN, "neigh=%s  orig=%s with OLD, unknown aggregation_sqn=%d  max=%d",
-				it->pb->i.llip_str, cryptShaAsString(&local->dhn->on->nodeId),
+			dbgf_track(DBGT_WARN, "llip=%s neigh=%s with OLD, unknown aggregation_sqn=%d  max=%d",
+				it->pb->i.llip_str, cryptShaAsString(&local->local_id),
 				aggregation_sqn, local->ogm_aggregation_cleard_max);
 
 			bit_set(local->ogm_aggregations_rcvd, AGGREG_SQN_CACHE_RANGE, aggregation_sqn, 1);
@@ -4427,7 +4427,7 @@ void tx_packet(void *devp)
 				assertion(-500430, (it.frame_cache_msgs_size || it.frames_out_pos)); // single message larger than MAX_UDPD_SIZE
 				assertion(-500000, IMPLIES(it.frame_type > FRAME_TYPE_LINK_VERSION, it.frame_cache_msgs_size ||
 						 it.frames_out_pos > (int) (
-						 sizeof(struct tlv_hdr) + sizeof(struct dsc_msg_pubkey) +my_PktKey->rawKeyLen +
+					 sizeof(struct tlv_hdr) + sizeof(struct dsc_msg_pubkey) +my_PktKey->rawKeyLen +
 						 sizeof(struct tlv_hdr) + sizeof(struct msg_link_version_adv))));
                                 break;
 
